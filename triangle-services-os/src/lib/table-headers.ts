@@ -1,0 +1,15 @@
+export const COMPANIES_EXPORT_HEADERS = [
+  "Company name",
+  "Type",
+  "Country",
+  "City",
+  "Sectors",
+  "Lead score",
+  "Status",
+  "Priority",
+  "Owner",
+  "Next action",
+  "Last contact",
+  "Website",
+  "Source",
+];
