@@ -1,0 +1,149 @@
+import "server-only";
+import { createCookieSupabaseClient } from "@/lib/supabase/server";
+
+export type CompanyRow = {
+  id: string;
+  name: string;
+  legal_name: string | null;
+  company_type: string | null;
+  company_status: string;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  website: string | null;
+  website_domain: string | null;
+  linkedin_url: string | null;
+  source_url: string | null;
+  sectors: string[] | null;
+  target_countries: string[] | null;
+  priority: string;
+  lead_score: number;
+  lead_score_reason: string | null;
+  owner_id: string | null;
+  description: string | null;
+  pain_points: string | null;
+  notes: string | null;
+  research_status: string;
+  do_not_contact: boolean;
+  last_contact_at: string | null;
+  next_action_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listCompanies(organizationId: string): Promise<CompanyRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("listCompanies error", error);
+    return [];
+  }
+  return data as CompanyRow[];
+}
+
+export async function getCompanyById(id: string): Promise<CompanyRow | null> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getCompanyById error", error);
+    return null;
+  }
+  return data as CompanyRow | null;
+}
+
+function extractDomain(input: string | null | undefined): string | null {
+  if (!input) return null;
+  try {
+    const url = input.startsWith("http") ? input : `https://${input}`;
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export type CompanyInput = Partial<CompanyRow> & { name: string };
+
+export async function createCompany(
+  organizationId: string,
+  userId: string,
+  input: CompanyInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return { ok: false, error: "Supabase not configured" };
+
+  const domain = extractDomain(input.website ?? input.website_domain);
+
+  // Dedupe by domain within the same org
+  if (domain) {
+    const { data: existing } = await supabase
+      .from("companies")
+      .select("id, name")
+      .eq("organization_id", organizationId)
+      .eq("website_domain", domain)
+      .limit(1)
+      .maybeSingle();
+    if (existing) {
+      return { ok: false, error: `Company already exists: ${existing.name}` };
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("companies")
+    .insert({
+      ...input,
+      website_domain: domain,
+      organization_id: organizationId,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, id: data.id };
+}
+
+export async function updateCompany(
+  id: string,
+  userId: string,
+  patch: Partial<CompanyRow>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return { ok: false, error: "Supabase not configured" };
+
+  const updates: Partial<CompanyRow> & { updated_by: string } = {
+    ...patch,
+    updated_by: userId,
+  };
+
+  if (patch.website) {
+    updates.website_domain = extractDomain(patch.website);
+  }
+
+  const { error } = await supabase.from("companies").update(updates).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteCompany(id: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return { ok: false, error: "Supabase not configured" };
+  const { error } = await supabase.from("companies").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
