@@ -1,37 +1,36 @@
-import { createServerClient } from "@supabase/ssr";
-import { type NextRequest, NextResponse } from "next/server";
+﻿import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Next.js 16+ proxy (formerly middleware).
+ * Refreshes the Supabase JWT on every request and writes the updated token
+ * back to cookies so server components can read a valid session.
+ *
+ * Without this, supabase.auth.getUser() returns null in server components
+ * after the initial access token expires, causing random logouts.
+ */
 export async function proxy(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const isAppRoute =
-    request.nextUrl.pathname === "/dashboard" ||
-    request.nextUrl.pathname.startsWith("/companies") ||
-    request.nextUrl.pathname.startsWith("/contacts") ||
-    request.nextUrl.pathname.startsWith("/opportunities") ||
-    request.nextUrl.pathname.startsWith("/pipeline") ||
-    request.nextUrl.pathname.startsWith("/tasks") ||
-    request.nextUrl.pathname.startsWith("/documents") ||
-    request.nextUrl.pathname.startsWith("/workers") ||
-    request.nextUrl.pathname.startsWith("/ai") ||
-    request.nextUrl.pathname.startsWith("/imports") ||
-    request.nextUrl.pathname.startsWith("/settings");
+  let supabaseResponse = NextResponse.next({ request });
 
-  if (!supabaseUrl || !supabaseAnonKey || !isAppRoute) {
-    return NextResponse.next();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    return supabaseResponse;
   }
 
-  let response = NextResponse.next({ request });
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        supabaseResponse = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
+          supabaseResponse.cookies.set(name, value, options),
         );
       },
     },
@@ -41,28 +40,31 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+  const { pathname } = request.nextUrl;
+  const isAuthPath =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/register");
+
+  if (!user && !isAuthPath) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  return response;
+  if (user && pathname === "/login") {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/dashboard";
+    dashboardUrl.searchParams.delete("next");
+    return NextResponse.redirect(dashboardUrl);
+  }
+
+  return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/companies/:path*",
-    "/contacts/:path*",
-    "/opportunities/:path*",
-    "/pipeline/:path*",
-    "/tasks/:path*",
-    "/documents/:path*",
-    "/workers/:path*",
-    "/ai/:path*",
-    "/imports/:path*",
-    "/settings/:path*",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
