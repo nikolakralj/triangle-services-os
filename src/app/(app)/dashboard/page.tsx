@@ -26,7 +26,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Daily operating view for the 300-company lead database, pipeline, follow-ups and vendor document readiness."
-        actions={<Button variant="primary">Generate weekly Ralph report</Button>}
+        actions={<Button variant="primary">Generate weekly report</Button>}
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total companies" value={companies.length} helper="Target: 300" icon={<Building2 className="h-5 w-5" />} tone="sky" />
@@ -36,7 +36,7 @@ export default function DashboardPage() {
         <StatCard label="RFQs received" value="0" helper="No formal RFQ yet" icon={<FileWarning className="h-5 w-5" />} tone="slate" />
         <StatCard label="Offers sent" value="0" helper="Proposal module is ready next" icon={<CheckCircle2 className="h-5 w-5" />} tone="slate" />
         <StatCard label="Overdue follow-ups" value={overdueTasks.length} helper="Needs action today" icon={<AlertTriangle className="h-5 w-5" />} tone="rose" />
-        <StatCard label="Tasks due this week" value={dueThisWeek.length} helper="Nikola + Ralph combined" icon={<Clock3 className="h-5 w-5" />} tone="sky" />
+        <StatCard label="Tasks due this week" value={dueThisWeek.length} helper="All team members" icon={<Clock3 className="h-5 w-5" />} tone="sky" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

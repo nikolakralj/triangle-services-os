@@ -247,10 +247,7 @@ export function CompaniesWorkspace({
               <Input name="sectors" placeholder="Sectors, comma-separated" />
               <Input name="sourceUrl" placeholder="Source URL" />
               <Input name="nextActionAt" type="date" />
-              <Select name="owner">
-                <option>Nikola</option>
-                <option>Ralph</option>
-              </Select>
+              <Input name="owner" placeholder="Assigned to (name)" />
               <Button className="lg:col-span-1" type="submit" variant="primary">
                 Save company
               </Button>

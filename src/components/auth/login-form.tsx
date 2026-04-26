@@ -62,7 +62,7 @@ export function LoginForm() {
             Business Development OS
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Private invite-only workspace for Nikola and Ralph.
+            Private invite-only workspace. Access by invitation only.
           </p>
         </div>
 

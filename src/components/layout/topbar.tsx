@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { ORGANIZATION_NAME } from "@/lib/constants";
 
-export function Topbar() {
+export function Topbar({ displayName, role }: { displayName?: string; role?: string }) {
+  const label = displayName
+    ? `${displayName}${role ? ` / ${role}` : ""}`
+    : role || null;
+
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="grid min-h-14 grid-cols-1 gap-2 px-4 py-2 xl:grid-cols-[minmax(320px,1fr)_auto] xl:items-center xl:px-5">
@@ -31,9 +35,11 @@ export function Topbar() {
           <span className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium leading-4 text-slate-700">
             {ORGANIZATION_NAME}
           </span>
-          <span className="h-9 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium leading-4 text-emerald-700">
-            Nikola / admin
-          </span>
+          {label ? (
+            <span className="h-9 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium leading-4 text-emerald-700">
+              {label}
+            </span>
+          ) : null}
           <div className="group relative">
             <Button variant="primary">
               <Plus className="h-4 w-4" />
