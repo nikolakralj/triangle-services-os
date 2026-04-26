@@ -9,7 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="min-w-0 flex-1">
           <Topbar />
-          <main className="mx-auto max-w-[1600px] px-4 py-5 xl:px-6">{children}</main>
+          <main className="mx-auto max-w-[1760px] px-4 py-4 xl:px-5">{children}</main>
         </div>
       </div>
     </AuthGate>

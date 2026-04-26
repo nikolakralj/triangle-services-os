@@ -17,21 +17,21 @@ import { ORGANIZATION_NAME } from "@/lib/constants";
 export function Topbar() {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="flex min-h-16 flex-col gap-3 px-4 py-3 xl:flex-row xl:items-center xl:justify-between xl:px-6">
-        <div className="flex items-center gap-3">
-          <div className="relative w-full max-w-xl">
+      <div className="grid min-h-14 grid-cols-1 gap-2 px-4 py-2 xl:grid-cols-[minmax(320px,1fr)_auto] xl:items-center xl:px-5">
+        <div className="min-w-0">
+          <div className="relative w-full max-w-3xl">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
-              className="pl-9"
+              className="h-10 pl-9"
               placeholder="Search companies, contacts, opportunities, workers, documents..."
             />
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
+          <span className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium leading-4 text-slate-700">
             {ORGANIZATION_NAME}
           </span>
-          <span className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          <span className="h-9 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium leading-4 text-emerald-700">
             Nikola / admin
           </span>
           <div className="group relative">
