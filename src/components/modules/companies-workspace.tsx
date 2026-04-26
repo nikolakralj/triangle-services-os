@@ -37,6 +37,7 @@ export function CompaniesWorkspace({
   canWrite?: boolean;
   canDelete?: boolean;
 }) {
+  void canWrite; // Reserved for Supabase-backed create/edit controls in next iteration
   void canDelete; // Reserved for delete buttons in next iteration
   const [companies, setCompanies] = useState(initialCompanies);
   const [query, setQuery] = useState("");

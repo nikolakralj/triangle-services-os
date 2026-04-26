@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { documentMetadataSchema } from "@/lib/validation";
-import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
+import { createServiceSupabaseClient, requireApiRole } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const access = await requireApiAccess(request);
+  const access = await requireApiRole(request, ["admin", "partner"]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import { documents } from "@/lib/sample-data";
 import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
 
+function canReadDocument(role: string, document: { visibility: string; sensitivity: string }) {
+  if (role === "admin" || role === "partner") return true;
+  if (
+    role === "researcher" &&
+    ["internal", "researcher_allowed"].includes(document.visibility) &&
+    document.sensitivity === "normal"
+  ) {
+    return true;
+  }
+  return (
+    role === "viewer" &&
+    document.visibility === "researcher_allowed" &&
+    document.sensitivity === "normal"
+  );
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -31,6 +47,9 @@ export async function GET(
     .single();
 
   if (error || !document) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!canReadDocument(access.role, document)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { data, error: signedError } = await service.storage
     .from(document.storage_bucket)

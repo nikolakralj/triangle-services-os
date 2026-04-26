@@ -1,37 +1,49 @@
 "use client";
 
 import Papa from "papaparse";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { useEffect } from "react";
 
 type ImportRow = Record<string, string>;
+type DatabaseImportRow = {
+  id: string;
+  raw_data: Record<string, unknown>;
+  normalized_data: {
+    lead_score?: number;
+    [key: string]: unknown;
+  } | null;
+  status: string;
+};
 
 export function ImportsWorkspace() {
   const [rows, setRows] = useState<ImportRow[]>([]);
+  const [previewRows, setPreviewRows] = useState<ImportRow[]>([]);
   const [importType, setImportType] = useState("csv_companies");
   const [message, setMessage] = useState("");
-  const [dbRows, setDbRows] = useState<any[]>([]);
+  const [dbRows, setDbRows] = useState<DatabaseImportRow[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const supabase = createBrowserSupabaseClient();
 
-  async function fetchImportRows() {
+  const fetchImportRows = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase
       .from("import_rows")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
-    if (data) setDbRows(data);
-  }
+    if (data) setDbRows(data as DatabaseImportRow[]);
+  }, [supabase]);
 
   useEffect(() => {
-    fetchImportRows();
-  }, [supabase]);
+    const timer = window.setTimeout(() => {
+      void fetchImportRows();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchImportRows]);
 
   async function handleAIProcess(id: string) {
     setProcessingId(id);
@@ -63,7 +75,8 @@ export function ImportsWorkspace() {
       header: true,
       skipEmptyLines: true,
       complete(results) {
-        setRows(results.data.slice(0, 25));
+        setRows(results.data);
+        setPreviewRows(results.data.slice(0, 25));
         setMessage(`${results.data.length} rows parsed. Previewing first 25.`);
       },
     });
@@ -100,6 +113,11 @@ export function ImportsWorkspace() {
             Save import batch
           </Button>
           {message ? <span className="text-sm text-slate-600">{message}</span> : null}
+          {rows.length > previewRows.length ? (
+            <span className="text-sm font-medium text-slate-700">
+              Saving all {rows.length} rows, not only preview.
+            </span>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -109,7 +127,7 @@ export function ImportsWorkspace() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                {Object.keys(rows[0] ?? {}).map((key) => (
+                {Object.keys(previewRows[0] ?? {}).map((key) => (
                   <th key={key} className="border-b border-slate-200 px-4 py-3">
                     {key}
                   </th>
@@ -117,7 +135,7 @@ export function ImportsWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
+              {previewRows.map((row, index) => (
                 <tr key={index} className="border-b border-slate-100">
                   {Object.values(row).map((value, valueIndex) => (
                     <td key={valueIndex} className="px-4 py-3 text-slate-700">
@@ -153,7 +171,9 @@ export function ImportsWorkspace() {
               ) : null}
               {dbRows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100">
-                  <td className="px-4 py-3 text-slate-700">{row.raw_data?.source_url || "Direct API"}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {typeof row.raw_data.source_url === "string" ? row.raw_data.source_url : "Direct API"}
+                  </td>
                   <td className="px-4 py-3 text-slate-700 max-w-xs truncate">
                     {JSON.stringify(row.raw_data).substring(0, 80)}...
                   </td>

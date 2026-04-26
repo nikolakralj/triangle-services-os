@@ -29,6 +29,13 @@ const aiExtractionSchema = z.object({
     .optional(),
 });
 
+type ImportRowRecord = {
+  id: string;
+  organization_id: string;
+  raw_data: unknown;
+  normalized_data: z.infer<typeof aiExtractionSchema> | null;
+};
+
 export async function processImportRow(rowId: string) {
   if (!process.env.OPENAI_API_KEY) {
     return { error: "OPENAI_API_KEY is not configured in .env.local" };
@@ -63,6 +70,7 @@ export async function processImportRow(rowId: string) {
   if (fetchError || !row) {
     return { error: "Failed to fetch row from database" };
   }
+  const importRow = row as ImportRowRecord;
 
   try {
     const response = await openAiClient.chat.completions.create({
@@ -75,7 +83,7 @@ export async function processImportRow(rowId: string) {
         },
         {
           role: "user",
-          content: JSON.stringify(row.raw_data),
+          content: JSON.stringify(importRow.raw_data),
         },
       ],
       response_format: { type: "json_object" },
@@ -84,8 +92,7 @@ export async function processImportRow(rowId: string) {
     const content = response.choices[0].message.content;
     if (!content) throw new Error("No content from OpenAI");
 
-    const parsedContent = JSON.parse(content);
-    // In a real scenario, use zod to validate parsedContent here.
+    const parsedContent = aiExtractionSchema.parse(JSON.parse(content));
 
     // Save back to database
     const { error: updateError } = await supabase
@@ -101,9 +108,9 @@ export async function processImportRow(rowId: string) {
     }
 
     return { success: true, data: parsedContent };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("AI processing error:", err);
-    return { error: err.message || "Failed to process with AI" };
+    return { error: err instanceof Error ? err.message : "Failed to process with AI" };
   }
 }
 
@@ -135,15 +142,16 @@ export async function approveImportRow(rowId: string) {
     .single();
 
   if (fetchError || !row) return { error: "Row not found" };
-  if (!row.normalized_data) return { error: "Row must be AI evaluated first" };
+  const importRow = row as ImportRowRecord;
+  if (!importRow.normalized_data) return { error: "Row must be AI evaluated first" };
 
-  const nd = row.normalized_data;
+  const nd = importRow.normalized_data;
   
   // 1. Insert Company
   const { data: company, error: companyError } = await supabase
     .from("companies")
     .insert({
-      organization_id: row.organization_id,
+      organization_id: importRow.organization_id,
       name: nd.name,
       legal_name: nd.legal_name,
       country: nd.country,
@@ -168,7 +176,7 @@ export async function approveImportRow(rowId: string) {
     const { data: contact, error: contactError } = await supabase
       .from("contacts")
       .insert({
-        organization_id: row.organization_id,
+        organization_id: importRow.organization_id,
         company_id: company.id,
         full_name: nd.primary_contact.full_name,
         job_title: nd.primary_contact.job_title,

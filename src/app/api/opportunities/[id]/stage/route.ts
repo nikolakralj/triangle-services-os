@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { stageUpdateSchema } from "@/lib/validation";
-import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
+import { createServiceSupabaseClient, requireApiRole } from "@/lib/supabase/server";
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const access = await requireApiAccess(request);
+  const access = await requireApiRole(request, ["admin", "partner"]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

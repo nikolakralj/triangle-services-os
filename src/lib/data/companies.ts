@@ -1,8 +1,10 @@
 import "server-only";
 import { createCookieSupabaseClient } from "@/lib/supabase/server";
+import type { Company } from "@/lib/types";
 
 export type CompanyRow = {
   id: string;
+  organization_id: string;
   name: string;
   legal_name: string | null;
   company_type: string | null;
@@ -77,6 +79,38 @@ function extractDomain(input: string | null | undefined): string | null {
 }
 
 export type CompanyInput = Partial<CompanyRow> & { name: string };
+
+export function rowToCompany(r: CompanyRow): Company {
+  return {
+    id: r.id,
+    name: r.name,
+    legalName: r.legal_name ?? undefined,
+    companyType: r.company_type ?? "other",
+    status: (r.company_status as Company["status"]) ?? "research",
+    country: r.country ?? "",
+    region: r.region ?? undefined,
+    city: r.city ?? "",
+    website: r.website ?? "",
+    websiteDomain: r.website_domain ?? "",
+    linkedinUrl: r.linkedin_url ?? undefined,
+    sourceUrl: r.source_url ?? undefined,
+    sectors: r.sectors ?? [],
+    targetCountries: r.target_countries ?? [],
+    priority: (r.priority as Company["priority"]) ?? "medium",
+    leadScore: r.lead_score ?? 0,
+    leadScoreReason: r.lead_score_reason ?? "",
+    ownerId: r.owner_id ?? undefined,
+    description: r.description ?? "",
+    painPoints: r.pain_points ?? undefined,
+    notes: r.notes ?? undefined,
+    researchStatus: (r.research_status as Company["researchStatus"]) ?? "not_reviewed",
+    doNotContact: r.do_not_contact ?? false,
+    lastContactAt: r.last_contact_at ?? undefined,
+    nextActionAt: r.next_action_at ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
 
 export async function createCompany(
   organizationId: string,

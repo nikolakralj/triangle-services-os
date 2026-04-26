@@ -59,6 +59,9 @@ export async function requireApiAccess(request: Request) {
   const { isConfigured } = getSupabaseConfig();
 
   if (!isConfigured) {
+    if (process.env.NODE_ENV === "production" && process.env.ENABLE_DEMO_MODE !== "true") {
+      return { ok: false as const, status: 503, error: "Supabase is not configured." };
+    }
     return {
       ok: true as const,
       demo: true,
@@ -104,4 +107,16 @@ export async function requireApiAccess(request: Request) {
     organizationId: member.organization_id as string,
     role: member.role as string,
   };
+}
+
+export async function requireApiRole(
+  request: Request,
+  allowedRoles: Array<"admin" | "partner" | "researcher" | "viewer">,
+) {
+  const access = await requireApiAccess(request);
+  if (!access.ok) return access;
+  if (!allowedRoles.includes(access.role as "admin" | "partner" | "researcher" | "viewer")) {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
+  return access;
 }

@@ -4,7 +4,7 @@ import { externalLeadSchema } from "@/lib/validation";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-import-api-secret") || new URL(request.url).searchParams.get("secret");
+  const secret = request.headers.get("x-import-api-secret");
   if (!process.env.IMPORT_API_SECRET || secret !== process.env.IMPORT_API_SECRET) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

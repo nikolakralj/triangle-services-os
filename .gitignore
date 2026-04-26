@@ -41,3 +41,6 @@ dev-server.*.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+tmp_*
+create_sql.js
+import_leads.sql

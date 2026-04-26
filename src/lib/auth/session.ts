@@ -9,6 +9,11 @@ export type SessionContext = {
   role: "admin" | "partner" | "researcher" | "viewer";
 };
 
+type OrgMembershipRow = {
+  organization_id: string;
+  role: SessionContext["role"];
+};
+
 /**
  * Resolves the active user + their primary org membership.
  * Returns null if not authenticated or not yet a member of any org.
@@ -31,12 +36,13 @@ export async function getSession(): Promise<SessionContext | null> {
     .maybeSingle();
 
   if (!member) return null;
+  const typedMember = member as OrgMembershipRow;
 
   return {
     userId: user.id,
     email: user.email ?? "",
-    organizationId: member.organization_id as string,
-    role: member.role as SessionContext["role"],
+    organizationId: typedMember.organization_id,
+    role: typedMember.role,
   };
 }
 

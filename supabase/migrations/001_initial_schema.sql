@@ -78,6 +78,28 @@ as $$
   limit 1;
 $$;
 
+create or replace function public.get_my_org_membership()
+returns table (
+  organization_id uuid,
+  role text
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select om.organization_id, om.role
+  from public.organization_members om
+  where om.user_id = auth.uid()
+    and om.status = 'active'
+  order by om.joined_at nulls last, om.created_at
+  limit 1;
+$$;
+
+revoke all on function public.get_my_org_membership() from public;
+revoke all on function public.get_my_org_membership() from anon;
+grant execute on function public.get_my_org_membership() to authenticated;
+
 create table public.companies (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -570,10 +592,29 @@ insert into storage.buckets (id, name, public)
 values ('documents', 'documents', false)
 on conflict (id) do update set public = false;
 
-create policy "members can read document objects" on storage.objects
+create policy "members can read permitted document objects" on storage.objects
 for select using (
   bucket_id = 'documents'
-  and public.is_org_member((storage.foldername(name))[1]::uuid)
+  and exists (
+    select 1
+    from public.documents d
+    where d.storage_bucket = bucket_id
+      and d.storage_path = name
+      and public.is_org_member(d.organization_id)
+      and (
+        public.current_user_role(d.organization_id) in ('admin','partner')
+        or (
+          public.current_user_role(d.organization_id) = 'researcher'
+          and d.visibility in ('internal','researcher_allowed')
+          and d.sensitivity = 'normal'
+        )
+        or (
+          public.current_user_role(d.organization_id) = 'viewer'
+          and d.visibility = 'researcher_allowed'
+          and d.sensitivity = 'normal'
+        )
+      )
+  )
 );
 
 create policy "admin partner can upload document objects" on storage.objects
