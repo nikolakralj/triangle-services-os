@@ -23,13 +23,11 @@ export async function getSession(): Promise<SessionContext | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // Use a security-definer RPC so the query bypasses RLS on organization_members
+  // (the RLS policy itself calls is_org_member which can fail when auth.uid()
+  // isn't fully propagated in server-component cookie-based requests).
   const { data: member } = await supabase
-    .from("organization_members")
-    .select("organization_id, role, status")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("joined_at", { ascending: true })
-    .limit(1)
+    .rpc("get_my_org_membership")
     .maybeSingle();
 
   if (!member) return null;
