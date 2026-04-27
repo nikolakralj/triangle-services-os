@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { ContactDetail } from "@/components/modules/detail-sections";
-import { activities, companies, contacts } from "@/lib/sample-data";
+import { getContactById, rowToContact } from "@/lib/data/contacts";
+import { getCompanyById, rowToCompany } from "@/lib/data/companies";
+import {
+  getActivitiesByContact,
+  rowToActivity,
+} from "@/lib/data/activities";
 
 export default async function ContactDetailPage({
   params,
@@ -9,9 +14,21 @@ export default async function ContactDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contact = contacts.find((item) => item.id === id);
-  if (!contact) notFound();
-  const company = companies.find((item) => item.id === contact.companyId);
+
+  // Fetch contact first
+  const contactRow = await getContactById(id);
+  if (!contactRow) notFound();
+
+  const contact = rowToContact(contactRow);
+
+  // Fetch related data in parallel
+  const [companyRow, activityRows] = await Promise.all([
+    contact.companyId ? getCompanyById(contact.companyId) : Promise.resolve(null),
+    getActivitiesByContact(id),
+  ]);
+
+  const company = companyRow ? rowToCompany(companyRow) : undefined;
+  const activities = activityRows.map(rowToActivity);
 
   return (
     <>
@@ -22,7 +39,7 @@ export default async function ContactDetailPage({
       <ContactDetail
         contact={contact}
         company={company}
-        activities={activities.filter((item) => item.contactId === contact.id)}
+        activities={activities}
       />
     </>
   );

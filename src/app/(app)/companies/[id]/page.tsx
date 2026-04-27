@@ -3,6 +3,19 @@ import { PageHeader } from "@/components/common/page-header";
 import { CompanyDetail } from "@/components/modules/detail-sections";
 import { requireSession } from "@/lib/auth/session";
 import { getCompanyById, rowToCompany } from "@/lib/data/companies";
+import {
+  getContactsByCompany,
+  rowToContact,
+} from "@/lib/data/contacts";
+import {
+  getOpportunitiesByCompany,
+  rowToOpportunity,
+} from "@/lib/data/opportunities";
+import { getTasksByEntity, rowToTask } from "@/lib/data/tasks";
+import {
+  getActivitiesByCompany,
+  rowToActivity,
+} from "@/lib/data/activities";
 
 export default async function CompanyDetailPage({
   params,
@@ -17,6 +30,19 @@ export default async function CompanyDetailPage({
 
   const company = rowToCompany(row);
 
+  // Fetch related data in parallel
+  const [contactRows, opportunityRows, taskRows, activityRows] = await Promise.all([
+    getContactsByCompany(id),
+    getOpportunitiesByCompany(id),
+    getTasksByEntity("company", id),
+    getActivitiesByCompany(id),
+  ]);
+
+  const contacts = contactRows.map(rowToContact);
+  const opportunities = opportunityRows.map(rowToOpportunity);
+  const tasks = taskRows.map(rowToTask);
+  const activities = activityRows.map(rowToActivity);
+
   return (
     <>
       <PageHeader
@@ -25,11 +51,11 @@ export default async function CompanyDetailPage({
       />
       <CompanyDetail
         company={company}
-        contacts={[]}
-        opportunities={[]}
-        tasks={[]}
+        contacts={contacts}
+        opportunities={opportunities}
+        tasks={tasks}
         documents={[]}
-        activities={[]}
+        activities={activities}
       />
     </>
   );

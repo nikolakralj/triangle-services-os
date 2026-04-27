@@ -234,6 +234,28 @@ export async function createOpportunity(
 }
 
 /**
+ * Get opportunities for a specific company
+ */
+export async function getOpportunitiesByCompany(
+  companyId: string,
+): Promise<OpportunityRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getOpportunitiesByCompany error", error);
+    return [];
+  }
+  return data as OpportunityRow[];
+}
+
+/**
  * Get opportunities by stage (for Kanban grouping)
  */
 export async function getOpportunitiesByStage(
