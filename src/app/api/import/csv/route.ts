@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
 import { csvImportSchema } from "@/lib/validation";
-import { createServiceSupabaseClient, requireApiRole } from "@/lib/supabase/server";
+import {
+  createServiceSupabaseClient,
+  requireApiRole,
+} from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const access = await requireApiRole(request, ["admin", "partner", "researcher"]);
+  const access = await requireApiRole(request, [
+    "admin",
+    "partner",
+    "researcher",
+  ]);
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
   }
 
   const parsed = csvImportSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation error", issues: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation error", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const { importType, rows } = parsed.data;
@@ -31,7 +44,8 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
 
     await service.from("import_rows").insert(
       rows.map((row, index) => ({

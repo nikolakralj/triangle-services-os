@@ -15,12 +15,19 @@ export async function createCompanyAction(input: CompanyInput) {
     return { ok: false as const, error: "Your role does not allow writes." };
   }
 
-  const result = await createCompany(session.organizationId, session.userId, input);
+  const result = await createCompany(
+    session.organizationId,
+    session.userId,
+    input,
+  );
   if (result.ok) revalidatePath("/companies");
   return result;
 }
 
-export async function updateCompanyAction(id: string, patch: Partial<CompanyInput>) {
+export async function updateCompanyAction(
+  id: string,
+  patch: Partial<CompanyInput>,
+) {
   const session = await requireSession();
   if (!capabilities(session.role).canWrite) {
     return { ok: false as const, error: "Your role does not allow writes." };

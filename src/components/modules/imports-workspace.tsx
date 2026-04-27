@@ -100,19 +100,30 @@ export function ImportsWorkspace() {
           description="Map and import companies or contacts. The API stores import batches when Supabase is configured."
         />
         <CardContent className="flex flex-wrap items-center gap-3">
-          <Select className="max-w-56" value={importType} onChange={(event) => setImportType(event.target.value)}>
+          <Select
+            className="max-w-56"
+            value={importType}
+            onChange={(event) => setImportType(event.target.value)}
+          >
             <option value="csv_companies">Companies</option>
             <option value="csv_contacts">Contacts</option>
           </Select>
           <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
             <Upload className="h-4 w-4" />
             Choose CSV
-            <input className="hidden" type="file" accept=".csv" onChange={(event) => parse(event.target.files?.[0])} />
+            <input
+              className="hidden"
+              type="file"
+              accept=".csv"
+              onChange={(event) => parse(event.target.files?.[0])}
+            />
           </label>
           <Button onClick={sendToApi} disabled={!rows.length} variant="primary">
             Save import batch
           </Button>
-          {message ? <span className="text-sm text-slate-600">{message}</span> : null}
+          {message ? (
+            <span className="text-sm text-slate-600">{message}</span>
+          ) : null}
           {rows.length > previewRows.length ? (
             <span className="text-sm font-medium text-slate-700">
               Saving all {rows.length} rows, not only preview.
@@ -122,7 +133,10 @@ export function ImportsWorkspace() {
       </Card>
 
       <Card>
-        <CardHeader title="Preview" description="Duplicate detection uses website domain or company name + country for companies, and email or full name + company for contacts." />
+        <CardHeader
+          title="Preview"
+          description="Duplicate detection uses website domain or company name + country for companies, and email or full name + company for contacts."
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
@@ -149,14 +163,21 @@ export function ImportsWorkspace() {
         </div>
       </Card>
       <Card>
-        <CardHeader title="Review External Leads" description="Leads gathered by external scrapers. Process them with AI to enrich data before saving to companies." />
+        <CardHeader
+          title="Review External Leads"
+          description="Leads gathered by external scrapers. Process them with AI to enrich data before saving to companies."
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3 border-b border-slate-200">Source</th>
-                <th className="px-4 py-3 border-b border-slate-200">Raw Data Snapshot</th>
-                <th className="px-4 py-3 border-b border-slate-200">AI Score</th>
+                <th className="px-4 py-3 border-b border-slate-200">
+                  Raw Data Snapshot
+                </th>
+                <th className="px-4 py-3 border-b border-slate-200">
+                  AI Score
+                </th>
                 <th className="px-4 py-3 border-b border-slate-200">Status</th>
                 <th className="px-4 py-3 border-b border-slate-200">Action</th>
               </tr>
@@ -165,21 +186,30 @@ export function ImportsWorkspace() {
               {dbRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-4 text-center text-slate-500">
-                    No pending leads found. Ensure your web scraper is sending data to the webhook.
+                    No pending leads found. Ensure your web scraper is sending
+                    data to the webhook.
                   </td>
                 </tr>
               ) : null}
               {dbRows.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="px-4 py-3 text-slate-700">
-                    {typeof row.raw_data.source_url === "string" ? row.raw_data.source_url : "Direct API"}
+                    {typeof row.raw_data.source_url === "string"
+                      ? row.raw_data.source_url
+                      : "Direct API"}
                   </td>
                   <td className="px-4 py-3 text-slate-700 max-w-xs truncate">
                     {JSON.stringify(row.raw_data).substring(0, 80)}...
                   </td>
                   <td className="px-4 py-3 font-semibold text-slate-900">
                     {row.normalized_data?.lead_score ? (
-                      <span className={row.normalized_data.lead_score >= 80 ? "text-green-600" : "text-amber-600"}>
+                      <span
+                        className={
+                          row.normalized_data.lead_score >= 80
+                            ? "text-green-600"
+                            : "text-amber-600"
+                        }
+                      >
                         {row.normalized_data.lead_score}
                       </span>
                     ) : (
@@ -187,17 +217,25 @@ export function ImportsWorkspace() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${row.status === 'created' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${row.status === "created" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-800"}`}
+                    >
                       {row.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 flex items-center gap-2">
-                    <Button 
-                      variant="secondary" 
+                    <Button
+                      variant="secondary"
                       onClick={() => handleAIProcess(row.id)}
-                      disabled={processingId === row.id || row.status === "created"}
+                      disabled={
+                        processingId === row.id || row.status === "created"
+                      }
                     >
-                      {processingId === row.id ? "Evaluating..." : row.normalized_data?.lead_score ? "Re-evaluate" : "Evaluate via AI"}
+                      {processingId === row.id
+                        ? "Evaluating..."
+                        : row.normalized_data?.lead_score
+                          ? "Re-evaluate"
+                          : "Evaluate via AI"}
                     </Button>
                     {row.normalized_data && row.status !== "created" && (
                       <Button

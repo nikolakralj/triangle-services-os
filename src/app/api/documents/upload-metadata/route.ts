@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
 import { documentMetadataSchema } from "@/lib/validation";
-import { createServiceSupabaseClient, requireApiRole } from "@/lib/supabase/server";
+import {
+  createServiceSupabaseClient,
+  requireApiRole,
+} from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const access = await requireApiRole(request, ["admin", "partner"]);
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
   }
 
   const parsed = documentMetadataSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation error", issues: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation error", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const service = createServiceSupabaseClient();
@@ -42,9 +51,13 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ documentId: data.id });
   }
 
-  return NextResponse.json({ documentId: "demo-document", message: "Document metadata accepted in demo mode." });
+  return NextResponse.json({
+    documentId: "demo-document",
+    message: "Document metadata accepted in demo mode.",
+  });
 }

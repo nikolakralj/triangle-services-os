@@ -15,10 +15,23 @@ export default function TasksPage() {
       />
       <Card className="mb-4">
         <CardContent className="grid gap-3 lg:grid-cols-6">
-          <Select><option>My tasks</option><option>All tasks</option><option>Overdue</option><option>Due today</option><option>Due this week</option><option>Completed</option></Select>
-          <Select><option>All owners</option></Select>
-          <Select><option>All priorities</option></Select>
-          <Select><option>All related entities</option></Select>
+          <Select>
+            <option>My tasks</option>
+            <option>All tasks</option>
+            <option>Overdue</option>
+            <option>Due today</option>
+            <option>Due this week</option>
+            <option>Completed</option>
+          </Select>
+          <Select>
+            <option>All owners</option>
+          </Select>
+          <Select>
+            <option>All priorities</option>
+          </Select>
+          <Select>
+            <option>All related entities</option>
+          </Select>
           <Button>Mark selected done</Button>
           <Button>Export CSV</Button>
         </CardContent>

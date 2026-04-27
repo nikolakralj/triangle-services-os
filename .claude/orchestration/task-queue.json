@@ -1,32 +1,20 @@
 {
-  "tasks": [],
-  "completed": [],
-  "workflow_state": {
-    "current_stage": null,
-    "current_workflow": null,
-    "started_at": null,
-    "last_update": null
+  "last_trigger": "file-watcher",
+  "triggered_at": "2026-04-27T06:10:23.296Z",
+  "action": "antigravity-test",
+  "files": [
+    "src\\app\\(app)\\pipeline\\page.tsx.tmp.32984.1777270221272",
+    "src\\app\\(app)\\pipeline\\page.tsx"
+  ],
+  "status": "pending",
+  "last_action": "antigravity-complete",
+  "last_action_time": "2026-04-27T06:10:29.816Z",
+  "test_results": {
+    "typescript": true,
+    "eslint": false,
+    "tests": false,
+    "timestamp": "2026-04-27T06:10:25.259Z"
   },
-  "agent_status": {
-    "claude-code": {
-      "status": "idle",
-      "last_activity": null,
-      "current_task": null
-    },
-    "codex": {
-      "status": "idle",
-      "last_activity": null,
-      "current_task": null
-    },
-    "antigravity": {
-      "status": "idle",
-      "last_activity": null,
-      "current_task": null
-    },
-    "devpit": {
-      "status": "idle",
-      "last_activity": null,
-      "current_task": null
-    }
-  }
+  "next_agent": "devpit",
+  "_processed_at": "2026-04-27T06:10:29.817Z"
 }

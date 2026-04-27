@@ -26,17 +26,33 @@ export default function DocumentsPage() {
       />
       <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
         {folders.map((folder) => (
-          <Link key={folder} href={folder === "Templates" ? "/documents/templates" : "/documents/checklist"} className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700 shadow-sm hover:border-sky-300 hover:text-sky-700">
+          <Link
+            key={folder}
+            href={
+              folder === "Templates"
+                ? "/documents/templates"
+                : "/documents/checklist"
+            }
+            className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-700 shadow-sm hover:border-sky-300 hover:text-sky-700"
+          >
             {folder}
           </Link>
         ))}
       </div>
       <Card className="mb-4">
         <CardContent className="grid gap-3 lg:grid-cols-5">
-          <Select><option>All categories</option></Select>
-          <Select><option>All sensitivities</option></Select>
-          <Select><option>All linked records</option></Select>
-          <Select><option>Review status</option></Select>
+          <Select>
+            <option>All categories</option>
+          </Select>
+          <Select>
+            <option>All sensitivities</option>
+          </Select>
+          <Select>
+            <option>All linked records</option>
+          </Select>
+          <Select>
+            <option>Review status</option>
+          </Select>
           <Button>Search documents</Button>
         </CardContent>
       </Card>

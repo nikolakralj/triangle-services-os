@@ -5,6 +5,12 @@ import { listCompanies, rowToCompany } from "@/lib/data/companies";
 
 export default async function CompaniesPage() {
   const session = await requireSession();
+  console.log(
+    "Session Org ID:",
+    session.organizationId,
+    "User ID:",
+    session.userId,
+  );
   const rows = await listCompanies(session.organizationId);
   const companies = rows.map(rowToCompany);
   const caps = capabilities(session.role);

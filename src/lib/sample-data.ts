@@ -30,8 +30,10 @@ export const companies: Company[] = [
     leadScoreReason:
       "Active in Austria data-center MEP work and likely to need supervised electrical crews during peak site phases.",
     ownerName: "Ralph",
-    description: "MEP contractor with Austrian industrial and data-center references.",
-    currentProjects: "Vienna region data-center package and industrial retrofit work.",
+    description:
+      "MEP contractor with Austrian industrial and data-center references.",
+    currentProjects:
+      "Vienna region data-center package and industrial retrofit work.",
     painPoints:
       "Peak-load electrical installation crews, documentation discipline, German site communication.",
     notes: "Good first outreach target for Ralph.",
@@ -49,7 +51,11 @@ export const companies: Company[] = [
     website: "https://nordrail.example",
     websiteDomain: "nordrail.example",
     sourceUrl: "https://example.com/rail-retrofit-contract",
-    sectors: ["Rail / rolling stock", "Electrical installation", "Commissioning"],
+    sectors: [
+      "Rail / rolling stock",
+      "Electrical installation",
+      "Commissioning",
+    ],
     targetCountries: ["Germany", "Austria"],
     priority: "critical",
     leadScore: 23,
@@ -57,8 +63,10 @@ export const companies: Company[] = [
       "Rail retrofit and commissioning work maps directly to Triangle electrical crew and supervisor capability.",
     ownerName: "Ralph",
     description: "Rolling-stock modernization and rail systems supplier.",
-    currentProjects: "Fleet retrofit program with electrical cabinet and cabling scope.",
-    painPoints: "Reliable retrofit crews, supervision, travel-ready documentation.",
+    currentProjects:
+      "Fleet retrofit program with electrical cabinet and cabling scope.",
+    painPoints:
+      "Reliable retrofit crews, supervision, travel-ready documentation.",
     lastContactAt: "2026-04-22",
     nextActionAt: "2026-04-25",
   },
@@ -75,7 +83,8 @@ export const companies: Company[] = [
     targetCountries: ["Croatia", "Slovenia", "Hungary"],
     priority: "medium",
     leadScore: 16,
-    leadScoreReason: "Good automation relevance, but manpower need needs confirmation.",
+    leadScoreReason:
+      "Good automation relevance, but manpower need needs confirmation.",
     ownerName: "Nikola",
     description: "Regional automation and PLC integrator.",
     painPoints: "Commissioning support and peak project staffing.",
@@ -94,7 +103,8 @@ export const companies: Company[] = [
     targetCountries: ["Sweden", "Denmark", "Germany"],
     priority: "high",
     leadScore: 19,
-    leadScoreReason: "Data-center contractor in target sector; needs contact validation.",
+    leadScoreReason:
+      "Data-center contractor in target sector; needs contact validation.",
     ownerName: "Ralph",
     description: "Data-center construction contractor.",
     nextActionAt: "2026-05-02",
@@ -108,7 +118,11 @@ export const companies: Company[] = [
     city: "Gyor",
     website: "https://kovacs-industrial.example",
     websiteDomain: "kovacs-industrial.example",
-    sectors: ["Industrial construction", "Manufacturing", "Electrical installation"],
+    sectors: [
+      "Industrial construction",
+      "Manufacturing",
+      "Electrical installation",
+    ],
     targetCountries: ["Hungary", "Austria", "Slovakia"],
     priority: "high",
     leadScore: 20,
@@ -196,7 +210,8 @@ export const opportunities: Opportunity[] = [
     scopeSummary:
       "Supervised electrical installation crew for cable tray, cabling support and site reporting.",
     clientNeed: "Reliable peak-load crew with documentation discipline.",
-    nextStep: "Send capability summary and ask for vendor registration process.",
+    nextStep:
+      "Send capability summary and ask for vendor registration process.",
     ownerName: "Ralph",
     nextActionAt: "2026-04-27",
     status: "open",
@@ -385,38 +400,40 @@ export const documents: DocumentRecord[] = [
   },
 ];
 
-export const checklist: ChecklistItem[] = DOCUMENT_CHECKLIST_TITLES.map((title, index) => ({
-  id: `checklist-${index + 1}`,
-  title,
-  category:
-    index < 4
-      ? "Company documents"
-      : index < 8
-        ? "Compliance / Safety"
-        : index < 11
-          ? "Worker documents"
-          : index < 18
-            ? "Sales documents"
-            : "Project documents",
-  status:
-    title === "Company registration" ||
-    title === "Insurance certificate" ||
-    title === "Capability statement"
-      ? "uploaded"
-      : title === "Safety policy" || title === "Basic HSE manual"
-        ? "draft"
-        : "missing",
-  ownerName: index % 2 === 0 ? "Nikola" : "Ralph",
-  reviewDate: index % 3 === 0 ? "2026-05-15" : undefined,
-  linkedDocumentId:
-    title === "Company registration"
-      ? "doc-02"
-      : title === "Insurance certificate"
-        ? "doc-03"
-        : title === "Capability statement"
-          ? "doc-01"
-          : undefined,
-}));
+export const checklist: ChecklistItem[] = DOCUMENT_CHECKLIST_TITLES.map(
+  (title, index) => ({
+    id: `checklist-${index + 1}`,
+    title,
+    category:
+      index < 4
+        ? "Company documents"
+        : index < 8
+          ? "Compliance / Safety"
+          : index < 11
+            ? "Worker documents"
+            : index < 18
+              ? "Sales documents"
+              : "Project documents",
+    status:
+      title === "Company registration" ||
+      title === "Insurance certificate" ||
+      title === "Capability statement"
+        ? "uploaded"
+        : title === "Safety policy" || title === "Basic HSE manual"
+          ? "draft"
+          : "missing",
+    ownerName: index % 2 === 0 ? "Nikola" : "Ralph",
+    reviewDate: index % 3 === 0 ? "2026-05-15" : undefined,
+    linkedDocumentId:
+      title === "Company registration"
+        ? "doc-02"
+        : title === "Insurance certificate"
+          ? "doc-03"
+          : title === "Capability statement"
+            ? "doc-01"
+            : undefined,
+  }),
+);
 
 export const workers: Worker[] = [
   {
@@ -493,4 +510,3 @@ export const workers: Worker[] = [
 ];
 
 export const pipelineStages = PIPELINE_STAGES;
-

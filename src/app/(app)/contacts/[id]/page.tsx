@@ -15,7 +15,10 @@ export default async function ContactDetailPage({
 
   return (
     <>
-      <PageHeader title={contact.fullName} description="Contact record with GDPR/source information, timeline and outreach draft actions." />
+      <PageHeader
+        title={contact.fullName}
+        description="Contact record with GDPR/source information, timeline and outreach draft actions."
+      />
       <ContactDetail
         contact={contact}
         company={company}

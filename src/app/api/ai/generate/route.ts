@@ -1,18 +1,31 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { buildTrianglePrompt, fallbackAIOutput, TRIANGLE_AI_SYSTEM_PROMPT } from "@/lib/ai/prompts";
+import {
+  buildTrianglePrompt,
+  fallbackAIOutput,
+  TRIANGLE_AI_SYSTEM_PROMPT,
+} from "@/lib/ai/prompts";
 import { aiGenerationRequestSchema } from "@/lib/validation";
-import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
+import {
+  requireApiAccess,
+  createServiceSupabaseClient,
+} from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const access = await requireApiAccess(request);
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
   }
 
   const parsed = aiGenerationRequestSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation error", issues: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation error", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const input = parsed.data;
@@ -23,7 +36,8 @@ export async function POST(request: Request) {
   if (!apiKey) {
     return NextResponse.json({
       outputText: fallbackAIOutput(input),
-      warning: "AI is not configured. Add OPENAI_API_KEY to environment variables.",
+      warning:
+        "AI is not configured. Add OPENAI_API_KEY to environment variables.",
     });
   }
 
@@ -57,7 +71,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ outputText, model });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI generation failed." },
+      {
+        error: error instanceof Error ? error.message : "AI generation failed.",
+      },
       { status: 500 },
     );
   }

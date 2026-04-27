@@ -14,7 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { ORGANIZATION_NAME } from "@/lib/constants";
 
-export function Topbar({ displayName, role }: { displayName?: string; role?: string }) {
+export function Topbar({
+  displayName,
+  role,
+}: {
+  displayName?: string;
+  role?: string;
+}) {
   const label = displayName
     ? `${displayName}${role ? ` / ${role}` : ""}`
     : role || null;
@@ -50,7 +56,11 @@ export function Topbar({ displayName, role }: { displayName?: string; role?: str
               {[
                 { href: "/companies", label: "Add company", icon: Building2 },
                 { href: "/contacts", label: "Add contact", icon: UserPlus },
-                { href: "/opportunities", label: "Add opportunity", icon: Plus },
+                {
+                  href: "/opportunities",
+                  label: "Add opportunity",
+                  icon: Plus,
+                },
                 { href: "/tasks", label: "Add task", icon: Plus },
                 { href: "/documents", label: "Upload document", icon: FileUp },
                 { href: "/workers", label: "Add worker", icon: Users },

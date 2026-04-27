@@ -71,7 +71,9 @@ export function CompaniesWorkspace({
     const company: Company = {
       id: `company-${Date.now()}`,
       name: String(formData.get("name") ?? "New company"),
-      companyType: String(formData.get("companyType") ?? "electrical_contractor"),
+      companyType: String(
+        formData.get("companyType") ?? "electrical_contractor",
+      ),
       status: "target",
       country: String(formData.get("country") ?? ""),
       city: String(formData.get("city") ?? ""),
@@ -147,7 +149,9 @@ export function CompaniesWorkspace({
                 .map((item) => item.trim())
                 .filter(Boolean),
               priority:
-                row.priority === "high" || row.priority === "critical" || row.priority === "low"
+                row.priority === "high" ||
+                row.priority === "critical" ||
+                row.priority === "low"
                   ? row.priority
                   : "medium",
               leadScore: 0,
@@ -167,18 +171,29 @@ export function CompaniesWorkspace({
       current.map((company) => {
         if (!filtered.some((item) => item.id === company.id)) return company;
         const sectorScore = company.sectors.some((sector) =>
-          ["Data center", "MEP", "Electrical installation", "Rail / rolling stock"].includes(sector),
+          [
+            "Data center",
+            "MEP",
+            "Electrical installation",
+            "Rail / rolling stock",
+          ].includes(sector),
         )
           ? 5
           : 3;
-        const geoScore = ["Austria", "Germany", "Netherlands", "Denmark", "Sweden"].includes(
-          company.country,
-        )
+        const geoScore = [
+          "Austria",
+          "Germany",
+          "Netherlands",
+          "Denmark",
+          "Sweden",
+        ].includes(company.country)
           ? 5
           : 3;
-        const typeScore = company.companyType.includes("contractor") || company.companyType.includes("oem")
-          ? 5
-          : 3;
+        const typeScore =
+          company.companyType.includes("contractor") ||
+          company.companyType.includes("oem")
+            ? 5
+            : 3;
         const score = Math.min(25, sectorScore + geoScore + typeScore + 4 + 4);
         return {
           ...company,
@@ -200,7 +215,10 @@ export function CompaniesWorkspace({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search name, website, country, type, sector..."
           />
-          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <Select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
             <option value="all">All statuses</option>
             <option value="research">Research</option>
             <option value="target">Target</option>
@@ -209,10 +227,17 @@ export function CompaniesWorkspace({
             <option value="replied">Replied</option>
             <option value="won">Won</option>
           </Select>
-          <Select value={owner} onChange={(event) => setOwner(event.target.value)}>
+          <Select
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+          >
             <option value="all">All owners</option>
-            {Array.from(new Set(initialCompanies.map((c) => c.ownerName).filter(Boolean))).map((name) => (
-              <option key={name} value={name as string}>{name as string}</option>
+            {Array.from(
+              new Set(initialCompanies.map((c) => c.ownerName).filter(Boolean)),
+            ).map((name) => (
+              <option key={name} value={name as string}>
+                {name as string}
+              </option>
             ))}
           </Select>
           <Button onClick={() => setShowAdd((value) => !value)}>
@@ -236,7 +261,10 @@ export function CompaniesWorkspace({
 
       {showAdd ? (
         <Card>
-          <CardHeader title="Add company" description="Creates a target company in the local workspace preview." />
+          <CardHeader
+            title="Add company"
+            description="Creates a target company in the local workspace preview."
+          />
           <CardContent>
             <form action={addDemoCompany} className="grid gap-3 lg:grid-cols-4">
               <Input name="name" placeholder="Company name" required />
@@ -271,7 +299,10 @@ export function CompaniesWorkspace({
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 {COMPANIES_EXPORT_HEADERS.map((header) => (
-                  <th key={header} className="border-b border-slate-200 px-4 py-3 font-semibold">
+                  <th
+                    key={header}
+                    className="border-b border-slate-200 px-4 py-3 font-semibold"
+                  >
                     {header}
                   </th>
                 ))}
@@ -279,35 +310,59 @@ export function CompaniesWorkspace({
             </thead>
             <tbody>
               {filtered.map((company) => (
-                <tr key={company.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr
+                  key={company.id}
+                  className="border-b border-slate-100 hover:bg-slate-50"
+                >
                   <td className="px-4 py-3">
-                    <Link className="font-semibold text-slate-950 hover:text-sky-700" href={`/companies/${company.id}`}>
+                    <Link
+                      className="font-semibold text-slate-950 hover:text-sky-700"
+                      href={`/companies/${company.id}`}
+                    >
                       {company.name}
                     </Link>
-                    <div className="text-xs text-slate-500">{company.websiteDomain}</div>
+                    <div className="text-xs text-slate-500">
+                      {company.websiteDomain}
+                    </div>
                   </td>
                   <td className="px-4 py-3">{company.companyType}</td>
                   <td className="px-4 py-3">{company.country}</td>
                   <td className="px-4 py-3">{company.city}</td>
-                  <td className="px-4 py-3">{company.sectors.slice(0, 2).join(", ")}</td>
                   <td className="px-4 py-3">
-                    <Badge intent="info">{company.leadScore || "not scored"}</Badge>
+                    {company.sectors.slice(0, 2).join(", ")}
                   </td>
-                  <td className="px-4 py-3"><Badge>{company.status}</Badge></td>
                   <td className="px-4 py-3">
-                    <Badge intent={priorityIntent(company.priority)}>{company.priority}</Badge>
+                    <Badge intent="info">
+                      {company.leadScore || "not scored"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge>{company.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge intent={priorityIntent(company.priority)}>
+                      {company.priority}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">{company.ownerName ?? "—"}</td>
                   <td className="px-4 py-3">{company.nextActionAt ?? "n/a"}</td>
-                  <td className="px-4 py-3">{company.lastContactAt ?? "n/a"}</td>
                   <td className="px-4 py-3">
-                    <a className="text-sky-700 hover:underline" href={company.website}>
+                    {company.lastContactAt ?? "n/a"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <a
+                      className="text-sky-700 hover:underline"
+                      href={company.website}
+                    >
                       Website
                     </a>
                   </td>
                   <td className="px-4 py-3">
                     {company.sourceUrl ? (
-                      <a className="text-sky-700 hover:underline" href={company.sourceUrl}>
+                      <a
+                        className="text-sky-700 hover:underline"
+                        href={company.sourceUrl}
+                      >
                         Source
                       </a>
                     ) : (

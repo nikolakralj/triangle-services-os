@@ -41,7 +41,11 @@ export type Company = {
   currentProjects?: string;
   painPoints?: string;
   notes?: string;
-  researchStatus?: "not_reviewed" | "reviewed" | "approved_for_outreach" | "rejected";
+  researchStatus?:
+    | "not_reviewed"
+    | "reviewed"
+    | "approved_for_outreach"
+    | "rejected";
   doNotContact?: boolean;
   lastContactAt?: string;
   nextActionAt?: string;
@@ -202,7 +206,12 @@ export type Worker = {
   skills: string[];
   certificates: string[];
   industries: string[];
-  availabilityStatus: "available" | "available_soon" | "busy" | "unknown" | "do_not_use";
+  availabilityStatus:
+    | "available"
+    | "available_soon"
+    | "busy"
+    | "unknown"
+    | "do_not_use";
   availableFrom?: string;
   preferredCountries: string[];
   hourlyRateExpectation?: number;

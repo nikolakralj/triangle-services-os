@@ -9,7 +9,11 @@ export default function AIPage() {
         title="AI Assistant"
         description="Internal business-development assistant for lead scoring, summaries, outreach drafts, call scripts, proposal outlines and document drafts."
       />
-      <AIAssistant companies={companies} contacts={contacts} opportunities={opportunities} />
+      <AIAssistant
+        companies={companies}
+        contacts={contacts}
+        opportunities={opportunities}
+      />
     </>
   );
 }

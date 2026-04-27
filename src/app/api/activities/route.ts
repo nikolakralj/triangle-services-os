@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
 import { activitySchema } from "@/lib/validation";
-import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
+import {
+  createServiceSupabaseClient,
+  requireApiAccess,
+} from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const access = await requireApiAccess(request);
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
   }
 
   const parsed = activitySchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation error", issues: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation error", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const service = createServiceSupabaseClient();
@@ -34,9 +43,13 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ activityId: data.id });
   }
 
-  return NextResponse.json({ activityId: "demo-activity", message: "Activity accepted in demo mode." });
+  return NextResponse.json({
+    activityId: "demo-activity",
+    message: "Activity accepted in demo mode.",
+  });
 }

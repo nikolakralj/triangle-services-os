@@ -16,9 +16,15 @@ export default function ContactsPage() {
       <Card className="mb-4">
         <CardContent className="grid gap-3 lg:grid-cols-5">
           <Input placeholder="Search contact, email, company..." />
-          <Select><option>All role categories</option></Select>
-          <Select><option>All countries</option></Select>
-          <Select><option>All owners</option></Select>
+          <Select>
+            <option>All role categories</option>
+          </Select>
+          <Select>
+            <option>All countries</option>
+          </Select>
+          <Select>
+            <option>All owners</option>
+          </Select>
           <Button>Export CSV</Button>
         </CardContent>
       </Card>

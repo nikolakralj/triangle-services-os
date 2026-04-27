@@ -53,12 +53,12 @@ export async function processImportRow(rowId: string) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {}
         },
       },
-    }
+    },
   );
 
   const { data: row, error: fetchError } = await supabase
@@ -110,7 +110,9 @@ export async function processImportRow(rowId: string) {
     return { success: true, data: parsedContent };
   } catch (err: unknown) {
     console.error("AI processing error:", err);
-    return { error: err instanceof Error ? err.message : "Failed to process with AI" };
+    return {
+      error: err instanceof Error ? err.message : "Failed to process with AI",
+    };
   }
 }
 
@@ -127,12 +129,12 @@ export async function approveImportRow(rowId: string) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, options),
             );
           } catch {}
         },
       },
-    }
+    },
   );
 
   const { data: row, error: fetchError } = await supabase
@@ -143,10 +145,11 @@ export async function approveImportRow(rowId: string) {
 
   if (fetchError || !row) return { error: "Row not found" };
   const importRow = row as ImportRowRecord;
-  if (!importRow.normalized_data) return { error: "Row must be AI evaluated first" };
+  if (!importRow.normalized_data)
+    return { error: "Row must be AI evaluated first" };
 
   const nd = importRow.normalized_data;
-  
+
   // 1. Insert Company
   const { data: company, error: companyError } = await supabase
     .from("companies")
@@ -168,7 +171,8 @@ export async function approveImportRow(rowId: string) {
     .select("id")
     .single();
 
-  if (companyError) return { error: "Failed to create company: " + companyError.message };
+  if (companyError)
+    return { error: "Failed to create company: " + companyError.message };
 
   // 2. Insert Contact (if exists)
   let contactId = null;

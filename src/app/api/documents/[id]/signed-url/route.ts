@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { documents } from "@/lib/sample-data";
-import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
+import {
+  createServiceSupabaseClient,
+  requireApiAccess,
+} from "@/lib/supabase/server";
 
-function canReadDocument(role: string, document: { visibility: string; sensitivity: string }) {
+function canReadDocument(
+  role: string,
+  document: { visibility: string; sensitivity: string },
+) {
   if (role === "admin" || role === "partner") return true;
   if (
     role === "researcher" &&
@@ -24,7 +30,10 @@ export async function GET(
 ) {
   const access = await requireApiAccess(request);
   if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
   }
 
   const { id } = await context.params;
@@ -32,10 +41,12 @@ export async function GET(
 
   if (!service || access.demo) {
     const document = documents.find((item) => item.id === id);
-    if (!document) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!document)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({
       signedUrl: "#demo-signed-url",
-      message: "Demo mode: configure Supabase Storage to generate real private signed URLs.",
+      message:
+        "Demo mode: configure Supabase Storage to generate real private signed URLs.",
     });
   }
 
@@ -46,7 +57,8 @@ export async function GET(
     .eq("organization_id", access.organizationId)
     .single();
 
-  if (error || !document) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (error || !document)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!canReadDocument(access.role, document)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -55,6 +67,7 @@ export async function GET(
     .from(document.storage_bucket)
     .createSignedUrl(document.storage_path, 60 * 5);
 
-  if (signedError) return NextResponse.json({ error: signedError.message }, { status: 500 });
+  if (signedError)
+    return NextResponse.json({ error: signedError.message }, { status: 500 });
   return NextResponse.json({ signedUrl: data.signedUrl });
 }

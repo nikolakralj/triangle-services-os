@@ -5,16 +5,24 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-import-api-secret");
-  if (!process.env.IMPORT_API_SECRET || secret !== process.env.IMPORT_API_SECRET) {
+  if (
+    !process.env.IMPORT_API_SECRET ||
+    secret !== process.env.IMPORT_API_SECRET
+  ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const parsed = externalLeadSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation error", issues: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation error", issues: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
-  const organizationId = process.env.DEFAULT_ORGANIZATION_ID || "00000000-0000-0000-0000-000000000001";
+  const organizationId =
+    process.env.DEFAULT_ORGANIZATION_ID ||
+    "00000000-0000-0000-0000-000000000001";
   const payload = parsed.data;
   const service = createServiceSupabaseClient();
 
@@ -34,7 +42,8 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
 
     await service.from("import_rows").insert(
       payload.items.map((item, index) => ({

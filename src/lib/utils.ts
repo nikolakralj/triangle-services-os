@@ -51,11 +51,17 @@ export function toCsv(rows: Record<string, unknown>[]) {
   const headers = Object.keys(rows[0]);
   return [
     headers.join(","),
-    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(",")),
+    ...rows.map((row) =>
+      headers.map((header) => csvEscape(row[header])).join(","),
+    ),
   ].join("\n");
 }
 
-export function downloadTextFile(filename: string, content: string, mime = "text/csv") {
+export function downloadTextFile(
+  filename: string,
+  content: string,
+  mime = "text/csv",
+) {
   const blob = new Blob([content], { type: `${mime};charset=utf-8;` });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);

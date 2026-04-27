@@ -15,10 +15,18 @@ export default function OpportunitiesPage() {
       />
       <Card className="mb-4">
         <CardContent className="grid gap-3 lg:grid-cols-5">
-          <Select><option>All stages</option></Select>
-          <Select><option>All owners</option></Select>
-          <Select><option>All countries</option></Select>
-          <Select><option>All opportunity types</option></Select>
+          <Select>
+            <option>All stages</option>
+          </Select>
+          <Select>
+            <option>All owners</option>
+          </Select>
+          <Select>
+            <option>All countries</option>
+          </Select>
+          <Select>
+            <option>All opportunity types</option>
+          </Select>
           <Button>Export CSV</Button>
         </CardContent>
       </Card>

@@ -14,7 +14,10 @@ export default async function WorkerDetailPage({
 
   return (
     <>
-      <PageHeader title={worker.fullName} description="Basic worker profile for availability, capability and document tracking." />
+      <PageHeader
+        title={worker.fullName}
+        description="Basic worker profile for availability, capability and document tracking."
+      />
       <WorkerDetail worker={worker} />
     </>
   );

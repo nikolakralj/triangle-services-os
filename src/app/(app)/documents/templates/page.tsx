@@ -27,7 +27,10 @@ export default function DocumentTemplatesPage() {
         description="AI-generated legal/compliance templates are always draft material requiring qualified review."
       />
       <Card>
-        <CardHeader title="Template actions" description="Saved outputs should be stored in document_templates with review_needed status." />
+        <CardHeader
+          title="Template actions"
+          description="Saved outputs should be stored in document_templates with review_needed status."
+        />
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {templates.map((template) => (
             <Button key={template}>{template}</Button>
@@ -35,7 +38,8 @@ export default function DocumentTemplatesPage() {
         </CardContent>
       </Card>
       <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        DRAFT - for internal use only. Must be reviewed by qualified legal/compliance advisor before external use.
+        DRAFT - for internal use only. Must be reviewed by qualified
+        legal/compliance advisor before external use.
       </p>
     </>
   );

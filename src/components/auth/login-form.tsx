@@ -22,11 +22,16 @@ export function LoginForm() {
   async function signInWithPassword(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase) {
-      setMessage("Supabase is not configured. Use demo mode locally or add env vars.");
+      setMessage(
+        "Supabase is not configured. Use demo mode locally or add env vars.",
+      );
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     setLoading(false);
     if (error) {
       setMessage(error.message);
@@ -37,7 +42,9 @@ export function LoginForm() {
 
   async function sendMagicLink() {
     if (!supabase) {
-      setMessage("Supabase is not configured. Use demo mode locally or add env vars.");
+      setMessage(
+        "Supabase is not configured. Use demo mode locally or add env vars.",
+      );
       return;
     }
     setLoading(true);
@@ -48,7 +55,9 @@ export function LoginForm() {
       },
     });
     setLoading(false);
-    setMessage(error ? error.message : "Magic link sent. Check the invited email inbox.");
+    setMessage(
+      error ? error.message : "Magic link sent. Check the invited email inbox.",
+    );
   }
 
   return (

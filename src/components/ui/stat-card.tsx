@@ -28,7 +28,9 @@ export function StatCard({
         <div>
           <p className="text-sm font-medium text-slate-500">{label}</p>
           <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
-          {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
+          {helper ? (
+            <p className="mt-1 text-xs text-slate-500">{helper}</p>
+          ) : null}
         </div>
         {icon ? (
           <div className={cn("rounded-md p-2", colors[tone])}>{icon}</div>

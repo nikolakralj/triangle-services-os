@@ -2,9 +2,19 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { DndContext, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragEndEvent,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, CircleDollarSign, GripVertical, Users } from "lucide-react";
+import {
+  CalendarDays,
+  CircleDollarSign,
+  GripVertical,
+  Users,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
@@ -18,9 +28,10 @@ function PipelineCard({
   opportunity: Opportunity;
   company?: Company;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: opportunity.id,
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: opportunity.id,
+    });
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.65 : 1,
@@ -64,7 +75,9 @@ function PipelineCard({
               <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
               {opportunity.expectedStartDate ?? "n/a"}
             </span>
-            <span className="truncate">Owner: {opportunity.ownerName ?? "-"}</span>
+            <span className="truncate">
+              Owner: {opportunity.ownerName ?? "-"}
+            </span>
           </div>
           <p className="mt-2 line-clamp-2 border-t border-slate-100 pt-2 text-xs leading-5 text-slate-500">
             {opportunity.nextStep ?? "Set next step"}
@@ -90,12 +103,16 @@ function PipelineColumn({
     <section
       ref={setNodeRef}
       className={`flex min-h-[320px] flex-col rounded-xl border ${
-        isOver ? "border-sky-400 bg-sky-50 shadow-sm shadow-sky-100" : "border-slate-200 bg-slate-50"
+        isOver
+          ? "border-sky-400 bg-sky-50 shadow-sm shadow-sky-100"
+          : "border-slate-200 bg-slate-50"
       }`}
     >
       <div className="border-b border-slate-200 bg-white/95 p-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="truncate text-sm font-semibold text-slate-950">{stage.name}</h2>
+          <h2 className="truncate text-sm font-semibold text-slate-950">
+            {stage.name}
+          </h2>
           <Badge>{opportunities.length}</Badge>
         </div>
         <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500">
@@ -108,7 +125,9 @@ function PipelineColumn({
             <PipelineCard
               key={opportunity.id}
               opportunity={opportunity}
-              company={companies.find((company) => company.id === opportunity.companyId)}
+              company={companies.find(
+                (company) => company.id === opportunity.companyId,
+              )}
             />
           ))
         ) : (
@@ -151,7 +170,9 @@ export function PipelineBoard({
 
     setOpportunities((current) =>
       current.map((opportunity) =>
-        opportunity.id === opportunityId ? { ...opportunity, stageId } : opportunity,
+        opportunity.id === opportunityId
+          ? { ...opportunity, stageId }
+          : opportunity,
       ),
     );
 
@@ -174,17 +195,31 @@ export function PipelineBoard({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <Select className="w-44" value={owner} onChange={(event) => setOwner(event.target.value)}>
+          <Select
+            className="w-44"
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+          >
             <option value="all">All owners</option>
-            {Array.from(new Set(opportunities.map((o) => o.ownerName).filter(Boolean))).map((name) => (
+            {Array.from(
+              new Set(opportunities.map((o) => o.ownerName).filter(Boolean)),
+            ).map((name) => (
               <option key={name} value={name as string}>
                 {name as string}
               </option>
             ))}
           </Select>
-          <Select className="w-44" value={country} onChange={(event) => setCountry(event.target.value)}>
+          <Select
+            className="w-44"
+            value={country}
+            onChange={(event) => setCountry(event.target.value)}
+          >
             <option value="all">All countries</option>
-            {[...new Set(opportunities.map((opportunity) => opportunity.country))].map((item) => (
+            {[
+              ...new Set(
+                opportunities.map((opportunity) => opportunity.country),
+              ),
+            ].map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -201,7 +236,9 @@ export function PipelineBoard({
                 key={stage.id}
                 stage={stage}
                 companies={companies}
-                opportunities={filtered.filter((opportunity) => opportunity.stageId === stage.id)}
+                opportunities={filtered.filter(
+                  (opportunity) => opportunity.stageId === stage.id,
+                )}
               />
             ))}
           </div>

@@ -66,10 +66,34 @@ export async function requireRole(
 }
 
 export const ROLE_CAPABILITIES = {
-  admin: { canWrite: true, canDelete: true, canInvite: true, canSeeFinancials: true, canSeeWorkers: true },
-  partner: { canWrite: true, canDelete: false, canInvite: false, canSeeFinancials: true, canSeeWorkers: true },
-  researcher: { canWrite: true, canDelete: false, canInvite: false, canSeeFinancials: false, canSeeWorkers: false },
-  viewer: { canWrite: false, canDelete: false, canInvite: false, canSeeFinancials: true, canSeeWorkers: true },
+  admin: {
+    canWrite: true,
+    canDelete: true,
+    canInvite: true,
+    canSeeFinancials: true,
+    canSeeWorkers: true,
+  },
+  partner: {
+    canWrite: true,
+    canDelete: false,
+    canInvite: false,
+    canSeeFinancials: true,
+    canSeeWorkers: true,
+  },
+  researcher: {
+    canWrite: true,
+    canDelete: false,
+    canInvite: false,
+    canSeeFinancials: false,
+    canSeeWorkers: false,
+  },
+  viewer: {
+    canWrite: false,
+    canDelete: false,
+    canInvite: false,
+    canSeeFinancials: true,
+    canSeeWorkers: true,
+  },
 } as const;
 
 export function capabilities(role: SessionContext["role"]) {

@@ -56,7 +56,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             <ShieldCheck className="h-4 w-4" />
             Local demo mode:
           </span>{" "}
-          Supabase env vars are not configured yet. The app is previewing with seeded demo data.
+          Supabase env vars are not configured yet. The app is previewing with
+          seeded demo data.
         </div>
       ) : null}
       {children}

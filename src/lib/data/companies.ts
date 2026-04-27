@@ -33,8 +33,11 @@ export type CompanyRow = {
   updated_at: string;
 };
 
-export async function listCompanies(organizationId: string): Promise<CompanyRow[]> {
-  const supabase = await createCookieSupabaseClient();
+export async function listCompanies(
+  organizationId: string,
+): Promise<CompanyRow[]> {
+  const { createServiceSupabaseClient } = await import("@/lib/supabase/server");
+  const supabase = createServiceSupabaseClient();
   if (!supabase) return [];
 
   const { data, error } = await supabase
@@ -103,7 +106,8 @@ export function rowToCompany(r: CompanyRow): Company {
     description: r.description ?? "",
     painPoints: r.pain_points ?? undefined,
     notes: r.notes ?? undefined,
-    researchStatus: (r.research_status as Company["researchStatus"]) ?? "not_reviewed",
+    researchStatus:
+      (r.research_status as Company["researchStatus"]) ?? "not_reviewed",
     doNotContact: r.do_not_contact ?? false,
     lastContactAt: r.last_contact_at ?? undefined,
     nextActionAt: r.next_action_at ?? undefined,
@@ -169,12 +173,17 @@ export async function updateCompany(
     updates.website_domain = extractDomain(patch.website);
   }
 
-  const { error } = await supabase.from("companies").update(updates).eq("id", id);
+  const { error } = await supabase
+    .from("companies")
+    .update(updates)
+    .eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
-export async function deleteCompany(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteCompany(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createCookieSupabaseClient();
   if (!supabase) return { ok: false, error: "Supabase not configured" };
   const { error } = await supabase.from("companies").delete().eq("id", id);

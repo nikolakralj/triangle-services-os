@@ -37,7 +37,9 @@ export function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:block">
       <div className="border-b border-slate-100 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Private OS</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+          Private OS
+        </p>
         <h1 className="mt-2 text-lg font-semibold leading-tight text-slate-950">
           Triangle Services
         </h1>
@@ -47,7 +49,8 @@ export function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const active =
-            pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}

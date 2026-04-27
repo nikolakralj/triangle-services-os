@@ -15,10 +15,18 @@ export default function WorkersPage() {
       />
       <Card className="mb-4">
         <CardContent className="grid gap-3 lg:grid-cols-5">
-          <Select><option>All roles</option></Select>
-          <Select><option>All availability</option></Select>
-          <Select><option>All countries</option></Select>
-          <Select><option>All skills</option></Select>
+          <Select>
+            <option>All roles</option>
+          </Select>
+          <Select>
+            <option>All availability</option>
+          </Select>
+          <Select>
+            <option>All countries</option>
+          </Select>
+          <Select>
+            <option>All skills</option>
+          </Select>
           <Button>Export CSV</Button>
         </CardContent>
       </Card>

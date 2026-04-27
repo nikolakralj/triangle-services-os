@@ -19,7 +19,9 @@ Rules:
 export function buildTrianglePrompt(input: AIGenerationRequest) {
   const company = companies.find((item) => item.id === input.companyId);
   const contact = contacts.find((item) => item.id === input.contactId);
-  const opportunity = opportunities.find((item) => item.id === input.opportunityId);
+  const opportunity = opportunities.find(
+    (item) => item.id === input.opportunityId,
+  );
 
   return `Generation type: ${input.generationType}
 Language: ${input.language ?? "en"}
@@ -46,9 +48,16 @@ export function fallbackAIOutput(input: AIGenerationRequest) {
       {
         score: company?.leadScore ?? 15,
         priority: company?.priority ?? "medium",
-        reason: company?.leadScoreReason ?? "Needs AI scoring after more project/source data is added.",
-        recommended_next_action: "Find decision maker and generate a short first outreach email.",
-        missing_information: ["Verified contact", "Current project evidence", "Vendor registration requirements"],
+        reason:
+          company?.leadScoreReason ??
+          "Needs AI scoring after more project/source data is added.",
+        recommended_next_action:
+          "Find decision maker and generate a short first outreach email.",
+        missing_information: [
+          "Verified contact",
+          "Current project evidence",
+          "Vendor registration requirements",
+        ],
       },
       null,
       2,

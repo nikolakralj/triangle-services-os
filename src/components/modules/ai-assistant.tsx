@@ -41,11 +41,17 @@ export function AIAssistant({
   const [message, setMessage] = useState("");
 
   const filteredContacts = useMemo(
-    () => contacts.filter((contact) => !companyId || contact.companyId === companyId),
+    () =>
+      contacts.filter(
+        (contact) => !companyId || contact.companyId === companyId,
+      ),
     [companyId, contacts],
   );
   const filteredOpportunities = useMemo(
-    () => opportunities.filter((opportunity) => !companyId || opportunity.companyId === companyId),
+    () =>
+      opportunities.filter(
+        (opportunity) => !companyId || opportunity.companyId === companyId,
+      ),
     [companyId, opportunities],
   );
 
@@ -86,7 +92,10 @@ export function AIAssistant({
         <CardContent className="space-y-3">
           <label className="block text-sm font-medium text-slate-700">
             Action
-            <Select value={generationType} onChange={(event) => setGenerationType(event.target.value)}>
+            <Select
+              value={generationType}
+              onChange={(event) => setGenerationType(event.target.value)}
+            >
               {actions.map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -96,7 +105,10 @@ export function AIAssistant({
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Company
-            <Select value={companyId} onChange={(event) => setCompanyId(event.target.value)}>
+            <Select
+              value={companyId}
+              onChange={(event) => setCompanyId(event.target.value)}
+            >
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
                   {company.name}
@@ -106,7 +118,10 @@ export function AIAssistant({
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Contact
-            <Select value={contactId} onChange={(event) => setContactId(event.target.value)}>
+            <Select
+              value={contactId}
+              onChange={(event) => setContactId(event.target.value)}
+            >
               <option value="">No contact selected</option>
               {filteredContacts.map((contact) => (
                 <option key={contact.id} value={contact.id}>
@@ -117,7 +132,10 @@ export function AIAssistant({
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Opportunity
-            <Select value={opportunityId} onChange={(event) => setOpportunityId(event.target.value)}>
+            <Select
+              value={opportunityId}
+              onChange={(event) => setOpportunityId(event.target.value)}
+            >
               <option value="">No opportunity selected</option>
               {filteredOpportunities.map((opportunity) => (
                 <option key={opportunity.id} value={opportunity.id}>
@@ -129,7 +147,10 @@ export function AIAssistant({
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium text-slate-700">
               Language
-              <Select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              <Select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value)}
+              >
                 <option value="en">English</option>
                 <option value="de">German</option>
                 <option value="hr">Croatian</option>
@@ -137,7 +158,10 @@ export function AIAssistant({
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Tone
-              <Select value={tone} onChange={(event) => setTone(event.target.value)}>
+              <Select
+                value={tone}
+                onChange={(event) => setTone(event.target.value)}
+              >
                 <option value="direct">Direct</option>
                 <option value="professional">Professional</option>
                 <option value="friendly">Friendly</option>
@@ -149,7 +173,10 @@ export function AIAssistant({
           </div>
           <label className="block text-sm font-medium text-slate-700">
             Offer type
-            <Select value={offerType} onChange={(event) => setOfferType(event.target.value)}>
+            <Select
+              value={offerType}
+              onChange={(event) => setOfferType(event.target.value)}
+            >
               {OFFER_TYPES.map((item) => (
                 <option key={item}>{item}</option>
               ))}
@@ -163,11 +190,20 @@ export function AIAssistant({
               placeholder="Example: mention supervised crews, German communication and fast mobilization."
             />
           </label>
-          <Button variant="primary" className="w-full" onClick={generate} disabled={loading}>
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={generate}
+            disabled={loading}
+          >
             <Sparkles className="h-4 w-4" />
             {loading ? "Generating..." : "Generate draft"}
           </Button>
-          {message ? <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{message}</p> : null}
+          {message ? (
+            <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+              {message}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -177,7 +213,9 @@ export function AIAssistant({
           description="Saved server-side when Supabase is configured; copy manually into your chosen outreach channel."
           action={
             <div className="flex gap-2">
-              <Button onClick={() => output && navigator.clipboard.writeText(output)}>
+              <Button
+                onClick={() => output && navigator.clipboard.writeText(output)}
+              >
                 <Copy className="h-4 w-4" /> Copy
               </Button>
               <Button>
@@ -188,7 +226,8 @@ export function AIAssistant({
         />
         <CardContent>
           <pre className="min-h-[540px] whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800">
-            {output || "Generated outreach, lead score, call script or document draft will appear here."}
+            {output ||
+              "Generated outreach, lead score, call script or document draft will appear here."}
           </pre>
         </CardContent>
       </Card>
