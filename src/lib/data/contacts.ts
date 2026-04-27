@@ -1,5 +1,6 @@
 import "server-only";
 import { createCookieSupabaseClient } from "@/lib/supabase/server";
+import type { Contact } from "@/lib/types";
 
 export type ContactRow = {
   id: string;
@@ -35,6 +36,31 @@ export type ContactRow = {
   created_by: string | null;
   updated_by: string | null;
 };
+
+/**
+ * Convert database row to UI type for Contact
+ */
+export function rowToContact(row: ContactRow): Contact {
+  return {
+    id: row.id,
+    companyId: row.company_id ?? "",
+    fullName: row.full_name,
+    jobTitle: row.job_title ?? "",
+    roleCategory: row.role_category ?? "",
+    email: row.email ?? "",
+    phone: row.phone ?? undefined,
+    linkedinUrl: row.linkedin_url ?? undefined,
+    language: (row.language as Contact["language"]) ?? "English",
+    country: row.country ?? "",
+    priority: (row.priority as Contact["priority"]) ?? "medium",
+    ownerId: row.owner_id ?? undefined,
+    ownerName: undefined, // Set separately by caller if available
+    lastContactAt: row.last_contact_at ?? undefined,
+    nextActionAt: row.next_action_at ?? undefined,
+    optOut: row.opt_out,
+    doNotContact: row.do_not_contact,
+  };
+}
 
 /**
  * Get all contacts for organization

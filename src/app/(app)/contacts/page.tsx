@@ -3,9 +3,30 @@ import { ContactsTable } from "@/components/modules/simple-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import { companies, contacts } from "@/lib/sample-data";
+import { getSession } from "@/lib/auth/session";
+import { listContacts, rowToContact } from "@/lib/data/contacts";
+import { listCompanies, rowToCompany } from "@/lib/data/companies";
 
-export default function ContactsPage() {
+export default async function ContactsPage() {
+  const session = await getSession();
+  if (!session?.organizationId) {
+    return (
+      <PageHeader
+        title="Contacts"
+        description="Contacts not available - organization context required"
+      />
+    );
+  }
+
+  const [contactRows, companyRows] = await Promise.all([
+    listContacts(session.organizationId),
+    listCompanies(session.organizationId),
+  ]);
+
+  // Convert database rows to UI types
+  const contacts = contactRows.map(rowToContact);
+  const companies = companyRows.map(rowToCompany);
+
   return (
     <>
       <PageHeader
