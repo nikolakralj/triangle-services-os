@@ -20,7 +20,8 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\nikol\\\\Projects\\\\triangle-services-os\\\\src\" -Recurse | Where-Object { $_.Extension -in \".tsx\", \".ts\" } | Select-Object -ExpandProperty FullName)",
       "PowerShell(cd \"C:\\\\Users\\\\nikol\\\\Projects\\\\triangle-services-os\"; git diff 8f855aa 981632f -- src/lib/auth/session.ts src/lib/supabase/server.ts src/lib/security/redirects.ts)",
       "WebSearch",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(gh pr create --title 'chore: track Claude Code session permissions in worktree' --body ' *)"
     ]
   }
 }
