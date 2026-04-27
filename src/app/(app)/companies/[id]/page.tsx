@@ -16,6 +16,12 @@ import {
   getActivitiesByCompany,
   rowToActivity,
 } from "@/lib/data/activities";
+import {
+  enrichContactsWithOwnerNames,
+  enrichOpportunitiesWithOwnerNames,
+  enrichTasksWithOwnerNames,
+  enrichActivitiesWithCreatorNames,
+} from "@/lib/data/utils";
 
 export default async function CompanyDetailPage({
   params,
@@ -43,6 +49,12 @@ export default async function CompanyDetailPage({
   const tasks = taskRows.map(rowToTask);
   const activities = activityRows.map(rowToActivity);
 
+  // Resolve owner/assignee names
+  const enrichedContacts = await enrichContactsWithOwnerNames(contacts);
+  const enrichedOpportunities = await enrichOpportunitiesWithOwnerNames(opportunities);
+  const enrichedTasks = await enrichTasksWithOwnerNames(tasks);
+  const enrichedActivities = await enrichActivitiesWithCreatorNames(activities);
+
   return (
     <>
       <PageHeader
@@ -51,11 +63,11 @@ export default async function CompanyDetailPage({
       />
       <CompanyDetail
         company={company}
-        contacts={contacts}
-        opportunities={opportunities}
-        tasks={tasks}
+        contacts={enrichedContacts}
+        opportunities={enrichedOpportunities}
+        tasks={enrichedTasks}
         documents={[]}
-        activities={activities}
+        activities={enrichedActivities}
       />
     </>
   );

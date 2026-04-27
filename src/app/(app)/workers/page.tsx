@@ -3,9 +3,23 @@ import { WorkersTable } from "@/components/modules/simple-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
-import { workers } from "@/lib/sample-data";
+import { getSession } from "@/lib/auth/session";
+import { listWorkers, rowToWorker } from "@/lib/data/workers";
 
-export default function WorkersPage() {
+export default async function WorkersPage() {
+  const session = await getSession();
+  if (!session?.organizationId) {
+    return (
+      <PageHeader
+        title="Workers"
+        description="Workers not available - organization context required"
+      />
+    );
+  }
+
+  const workerRows = await listWorkers(session.organizationId);
+  const workers = workerRows.map(rowToWorker);
+
   return (
     <>
       <PageHeader
