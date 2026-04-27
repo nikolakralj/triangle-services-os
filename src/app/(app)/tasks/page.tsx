@@ -3,9 +3,23 @@ import { TasksTable } from "@/components/modules/simple-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
-import { tasks } from "@/lib/sample-data";
+import { getSession } from "@/lib/auth/session";
+import { listTasks, rowToTask } from "@/lib/data/tasks";
 
-export default function TasksPage() {
+export default async function TasksPage() {
+  const session = await getSession();
+  if (!session?.organizationId) {
+    return (
+      <PageHeader
+        title="Tasks"
+        description="Tasks not available - organization context required"
+      />
+    );
+  }
+
+  const taskRows = await listTasks(session.organizationId);
+  const tasks = taskRows.map(rowToTask);
+
   return (
     <>
       <PageHeader

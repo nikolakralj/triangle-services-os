@@ -22,7 +22,13 @@ import {
 } from "@/lib/data/opportunities";
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listContacts } from "@/lib/data/contacts";
-import { activities, tasks } from "@/lib/sample-data";
+import {
+  listOpenTasks,
+  getOverdueTasks,
+  getTasksDueThisWeek,
+  rowToTask,
+} from "@/lib/data/tasks";
+import { listActivities, rowToActivity } from "@/lib/data/activities";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -35,28 +41,34 @@ export default async function DashboardPage() {
     );
   }
 
-  const [companyRows, opportunityRows, stageRows, contactRows] = await Promise.all([
+  const [
+    companyRows,
+    opportunityRows,
+    stageRows,
+    contactRows,
+    overdueTaskRows,
+    dueThisWeekTaskRows,
+    activityRows,
+  ] = await Promise.all([
     listCompanies(session.organizationId),
     listOpportunities(session.organizationId),
     listPipelineStages(session.organizationId),
     listContacts(session.organizationId),
+    getOverdueTasks(session.organizationId),
+    getTasksDueThisWeek(session.organizationId),
+    listActivities(session.organizationId, 10),
   ]);
 
   // Convert database rows to UI types
   const companies = companyRows.map(rowToCompany);
   const opportunities = opportunityRows.map(rowToOpportunity);
   const pipelineStages = stageRows.map(rowToPipelineStage);
+  const overdueTasks = overdueTaskRows.map(rowToTask);
+  const dueThisWeek = dueThisWeekTaskRows.map(rowToTask);
+  const activities = activityRows.map(rowToActivity);
 
   const openOpportunities = opportunities.filter(
     (item) => item.status === "open",
-  );
-  const overdueTasks = tasks.filter(
-    (task) =>
-      task.status !== "done" && task.dueDate && task.dueDate <= "2026-04-24",
-  );
-  const dueThisWeek = tasks.filter(
-    (task) =>
-      task.status !== "done" && task.dueDate && task.dueDate <= "2026-04-30",
   );
   const companiesWithoutNextAction = companies.filter(
     (company) => !company.nextActionAt,
