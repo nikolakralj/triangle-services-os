@@ -153,6 +153,7 @@ class Orchestrator {
       typescript: false,
       eslint: false,
       tests: false,
+      e2e: false,
       timestamp: new Date().toISOString()
     };
 
@@ -179,16 +180,27 @@ class Orchestrator {
         this.logActivity('antigravity', 'lint-error', { error: e.message });
       }
 
-      // Run tests if available
-      this.log('info', 'Antigravity: Running tests...');
+      // Run unit tests if available
+      this.log('info', 'Antigravity: Running unit tests...');
       try {
         execSync('npm test -- --passWithNoTests 2>/dev/null', { stdio: 'pipe' });
         results.tests = true;
-        this.log('success', 'Antigravity: Tests passed');
+        this.log('success', 'Antigravity: Unit tests passed');
       } catch (e) {
         // Tests might fail legitimately
-        this.log('warning', 'Antigravity: Tests failed or not configured');
+        this.log('warning', 'Antigravity: Unit tests failed or not configured');
         this.logActivity('antigravity', 'test-error', { error: e.message });
+      }
+
+      // Run Playwright e2e tests
+      this.log('info', 'Antigravity: Running Playwright e2e tests...');
+      try {
+        execSync('npm run test:e2e', { stdio: 'pipe', timeout: 120000 });
+        results.e2e = true;
+        this.log('success', 'Antigravity: E2E tests passed');
+      } catch (e) {
+        this.log('warning', 'Antigravity: E2E tests failed');
+        this.logActivity('antigravity', 'e2e-error', { error: e.message });
       }
 
       this.updateTaskQueue({
@@ -198,9 +210,9 @@ class Orchestrator {
         next_agent: 'devpit'
       });
 
-      const allPassed = results.typescript && results.eslint;
+      const allPassed = results.typescript && results.eslint && results.e2e;
       if (allPassed) {
-        this.log('success', 'Antigravity: All validations passed! Ready for DevPit review');
+        this.log('success', 'Antigravity: All validations passed! TypeScript, ESLint, and E2E tests OK');
         this.logActivity('antigravity', 'completed', { results, status: 'success' });
       } else {
         this.log('warning', 'Antigravity: Some validations failed, needs review');
