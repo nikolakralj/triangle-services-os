@@ -13,15 +13,40 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
+import { getSession } from "@/lib/auth/session";
 import {
-  activities,
-  companies,
-  opportunities,
-  pipelineStages,
-  tasks,
-} from "@/lib/sample-data";
+  listOpportunities,
+  listPipelineStages,
+  rowToOpportunity,
+  rowToPipelineStage,
+} from "@/lib/data/opportunities";
+import { listCompanies, rowToCompany } from "@/lib/data/companies";
+import { listContacts } from "@/lib/data/contacts";
+import { activities, tasks } from "@/lib/sample-data";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await getSession();
+  if (!session?.organizationId) {
+    return (
+      <PageHeader
+        title="Dashboard"
+        description="Dashboard not available - organization context required"
+      />
+    );
+  }
+
+  const [companyRows, opportunityRows, stageRows, contactRows] = await Promise.all([
+    listCompanies(session.organizationId),
+    listOpportunities(session.organizationId),
+    listPipelineStages(session.organizationId),
+    listContacts(session.organizationId),
+  ]);
+
+  // Convert database rows to UI types
+  const companies = companyRows.map(rowToCompany);
+  const opportunities = opportunityRows.map(rowToOpportunity);
+  const pipelineStages = stageRows.map(rowToPipelineStage);
+
   const openOpportunities = opportunities.filter(
     (item) => item.status === "open",
   );
@@ -36,6 +61,7 @@ export default function DashboardPage() {
   const companiesWithoutNextAction = companies.filter(
     (company) => !company.nextActionAt,
   );
+  const contactCount = contactRows.length;
 
   return (
     <>
@@ -61,7 +87,7 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Contacts added"
-          value="3"
+          value={contactCount}
           helper="Decision makers and coordinators"
           icon={<Users className="h-5 w-5" />}
           tone="violet"
