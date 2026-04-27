@@ -269,16 +269,19 @@ export async function getOpportunitiesByStage(
     Array<OpportunityRow & { company_name?: string }>
   >();
 
-  (data as any[]).forEach((opp) => {
-    const stageId = opp.stage_id || "no-stage";
-    if (!grouped.has(stageId)) {
-      grouped.set(stageId, []);
-    }
-    grouped.get(stageId)!.push({
-      ...opp,
-      company_name: opp.company?.name,
+  if (Array.isArray(data)) {
+    data.forEach((opp: unknown) => {
+      const typedOpp = opp as OpportunityRow & { company?: { name: string } };
+      const stageId = typedOpp.stage_id || "no-stage";
+      if (!grouped.has(stageId)) {
+        grouped.set(stageId, []);
+      }
+      grouped.get(stageId)!.push({
+        ...typedOpp,
+        company_name: typedOpp.company?.name,
+      });
     });
-  });
+  }
 
   return grouped;
 }

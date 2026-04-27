@@ -1,20 +1,20 @@
 {
   "last_trigger": "file-watcher",
-  "triggered_at": "2026-04-27T06:10:23.296Z",
+  "triggered_at": "2026-04-27T06:12:57.589Z",
   "action": "antigravity-test",
   "files": [
-    "src\\app\\(app)\\pipeline\\page.tsx.tmp.32984.1777270221272",
-    "src\\app\\(app)\\pipeline\\page.tsx"
+    "src\\lib\\data\\opportunities.ts.tmp.32984.1777270375567",
+    "src\\lib\\data\\opportunities.ts"
   ],
   "status": "pending",
   "last_action": "antigravity-complete",
-  "last_action_time": "2026-04-27T06:10:29.816Z",
+  "last_action_time": "2026-04-27T06:13:03.483Z",
   "test_results": {
     "typescript": true,
-    "eslint": false,
+    "eslint": true,
     "tests": false,
-    "timestamp": "2026-04-27T06:10:25.259Z"
+    "timestamp": "2026-04-27T06:12:58.878Z"
   },
   "next_agent": "devpit",
-  "_processed_at": "2026-04-27T06:10:29.817Z"
+  "_processed_at": "2026-04-27T06:13:03.484Z"
 }
