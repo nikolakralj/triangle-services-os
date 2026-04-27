@@ -1,0 +1,329 @@
+name: Triangle Services OS - Multi-Agent Workflow
+version: '1.0'
+
+# DevPit Workflow Configuration
+# This orchestrates the full CI/CD and development workflow across all agents
+
+workflows:
+  # Main feature development workflow
+  feature_development:
+    name: Feature Development Cycle
+    description: Complete feature from design through deployment
+
+    stages:
+      - stage: design
+        agent: claude-code
+        name: Feature Design & Planning
+        tasks:
+          - Create feature specification
+          - Update architecture documentation
+          - Create task list for implementation
+        outputs:
+          - DESIGN.md
+          - tasks created
+        trigger_next: on_commit
+        approval_required: false
+
+      - stage: implementation
+        agent: claude-code
+        name: Code Implementation
+        tasks:
+          - Write feature code
+          - Create unit tests
+          - Update documentation
+          - Commit changes
+        outputs:
+          - source code commits
+          - test files
+          - docs updates
+        notify_on_ready:
+          - codex
+        approval_required: false
+
+      - stage: polish
+        agent: codex
+        name: Auto-Formatting & Style
+        dependencies:
+          - implementation
+        tasks:
+          - Run prettier formatting
+          - Fix linting issues
+          - Enforce code style
+          - Commit formatting changes
+        outputs:
+          - formatted code commits
+        trigger_next: on_complete
+        approval_required: false
+
+      - stage: testing
+        agent: antigravity
+        name: Local Testing & Validation
+        dependencies:
+          - polish
+        tasks:
+          - Run TypeScript type checking
+          - Run ESLint validation
+          - Run unit tests
+          - Run integration tests locally
+          - Report results to DevPit
+        outputs:
+          - test results
+          - type check report
+          - coverage report
+        conditions:
+          - must_pass:
+            - typescript
+            - tests
+            - lint
+        approval_required: true
+
+      - stage: approval
+        agent: devpit
+        name: Change Review & Approval
+        dependencies:
+          - testing
+        tasks:
+          - Review all changes
+          - Verify test coverage
+          - Approve for merge
+          - Trigger CI/CD if approved
+        outputs:
+          - approval decision
+          - merge signal
+        approval_required: true
+
+  # Bug fix workflow (faster)
+  bug_fix:
+    name: Bug Fix Cycle
+    description: Rapid bug fix and verification
+
+    stages:
+      - stage: diagnosis
+        agent: claude-code
+        name: Bug Diagnosis
+        tasks:
+          - Identify root cause
+          - Create reproduction case
+          - Document issue
+        approval_required: false
+
+      - stage: fix
+        agent: claude-code
+        name: Fix Implementation
+        tasks:
+          - Write fix code
+          - Add regression test
+          - Commit fix
+        notify_on_ready:
+          - codex
+
+      - stage: format
+        agent: codex
+        name: Format Fix
+        dependencies:
+          - fix
+        tasks:
+          - Auto-format code
+          - Apply linting
+        trigger_next: on_complete
+
+      - stage: verify
+        agent: antigravity
+        name: Verify Fix
+        dependencies:
+          - format
+        tasks:
+          - Run reproduction test
+          - Verify fix works
+          - Run full test suite
+        approval_required: true
+
+      - stage: merge
+        agent: devpit
+        name: Merge Approved Fix
+        dependencies:
+          - verify
+        approval_required: true
+
+  # Database migration workflow
+  database_migration:
+    name: Database Schema Changes
+    description: Safe schema migrations with validation
+
+    stages:
+      - stage: design
+        agent: claude-code
+        name: Migration Design
+        tasks:
+          - Create migration file
+          - Document changes
+          - Plan RLS policies
+          - Review security impact
+        approval_required: true
+
+      - stage: test
+        agent: antigravity
+        name: Test Migration
+        dependencies:
+          - design
+        tasks:
+          - Apply to local database
+          - Test RLS policies
+          - Verify no data loss
+          - Test rollback
+        approval_required: true
+
+      - stage: deploy
+        agent: devpit
+        name: Deploy to Staging
+        dependencies:
+          - test
+        tasks:
+          - Apply to staging database
+          - Verify in staging environment
+          - Plan production rollout
+        approval_required: true
+
+# Agents and their capabilities
+agents:
+  claude-code:
+    name: Claude Code (Main IDE Agent)
+    role: architect, developer, planner
+    capabilities:
+      - design features
+      - write code
+      - create tests
+      - fix bugs
+      - update documentation
+    notification_channels:
+      - console
+      - git-commit
+      - task-queue
+
+  codex:
+    name: Codex (Auto-Polish)
+    role: formatter, linter, style-enforcer
+    capabilities:
+      - format code
+      - enforce linting
+      - fix style issues
+      - apply conventions
+    notification_channels:
+      - console
+      - task-queue
+    triggers:
+      - on_commit_ready
+      - pre_commit_hook
+
+  antigravity:
+    name: Antigravity (Local Testing)
+    role: validator, tester, type-checker
+    capabilities:
+      - run type checking
+      - run tests
+      - run linting
+      - validate locally
+      - report results
+    notification_channels:
+      - console
+      - task-queue
+      - test-results
+
+  devpit:
+    name: DevPit (Workflow Orchestration)
+    role: coordinator, approver, deployer
+    capabilities:
+      - review changes
+      - approve merges
+      - coordinate workflow
+      - track progress
+      - deploy changes
+    notification_channels:
+      - console
+      - task-queue
+      - github
+
+# Notifications and signals
+notifications:
+  on_stage_complete:
+    enabled: true
+    targets:
+      - next_agent_in_workflow
+      - task_queue
+      - console
+
+  on_approval_needed:
+    enabled: true
+    targets:
+      - devpit
+      - task_queue
+
+  on_test_failure:
+    enabled: true
+    targets:
+      - claude-code
+      - devpit
+      - task_queue
+
+  on_workflow_complete:
+    enabled: true
+    targets:
+      - all_agents
+      - task_queue
+
+# Integration points
+integrations:
+  git:
+    enabled: true
+    hooks:
+      - pre-commit: .claude/hooks/pre-commit.sh
+    notifications:
+      - on_commit: update task_queue
+      - on_push: notify devpit
+
+  file_system:
+    enabled: true
+    watchers:
+      - .claude/watchers/file-watcher.js
+    notifications:
+      - on_change: trigger antigravity
+
+  task_queue:
+    enabled: true
+    location: .claude/orchestration/task-queue.json
+    polling_interval: 5000
+
+# Rules and constraints
+rules:
+  must_have_tests:
+    enabled: true
+    applies_to:
+      - new features
+      - bug fixes
+    enforced_by: antigravity
+
+  must_format:
+    enabled: true
+    applies_to:
+      - all commits
+    enforced_by: codex
+
+  must_pass_types:
+    enabled: true
+    applies_to:
+      - all code
+    enforced_by: antigravity
+
+  must_pass_lint:
+    enabled: true
+    applies_to:
+      - all code
+    enforced_by: antigravity
+
+  must_review:
+    enabled: true
+    applies_to:
+      - merges to main
+      - database changes
+      - api changes
+    enforced_by: devpit

@@ -1,0 +1,97 @@
+{
+  "orchestration": {
+    "enabled": true,
+    "agents": {
+      "claude-code": {
+        "name": "Claude Code (IDE + Main Agent)",
+        "role": "architecture, planning, feature development",
+        "triggers": ["task.created", "file.changed"],
+        "outputs": ["commits", "pull requests", "design docs"],
+        "dependencies": []
+      },
+      "codex": {
+        "name": "Codex (Auto-Polish)",
+        "role": "code formatting, style enforcement, minor fixes",
+        "triggers": ["pre-commit", "claude-code.commit-ready"],
+        "outputs": ["formatted commits", "style fixes"],
+        "dependencies": ["claude-code"]
+      },
+      "antigravity": {
+        "name": "Antigravity (Local IDE Testing)",
+        "role": "local execution, type checking, test running",
+        "triggers": ["file.changed", "codex.formatting-done"],
+        "outputs": ["test results", "type errors", "local feedback"],
+        "dependencies": ["codex"]
+      },
+      "devpit": {
+        "name": "DevPit (Workflow Orchestration)",
+        "role": "coordinate overall workflow, approve changes, track progress",
+        "triggers": ["antigravity.tests-pass", "manual"],
+        "outputs": ["workflow approvals", "deployment decisions"],
+        "dependencies": ["antigravity"]
+      }
+    },
+    "workflow": {
+      "feature_development": {
+        "stages": [
+          {
+            "name": "design",
+            "owner": "claude-code",
+            "action": "create feature plan",
+            "notify": "devpit"
+          },
+          {
+            "name": "implementation",
+            "owner": "claude-code",
+            "action": "write code and commit",
+            "notify": "codex"
+          },
+          {
+            "name": "polish",
+            "owner": "codex",
+            "action": "auto-format and style fixes",
+            "notify": "antigravity"
+          },
+          {
+            "name": "testing",
+            "owner": "antigravity",
+            "action": "run types, tests, lint locally",
+            "notify": "devpit"
+          },
+          {
+            "name": "approval",
+            "owner": "devpit",
+            "action": "review and approve merge",
+            "notify": "claude-code"
+          }
+        ]
+      },
+      "bug_fix": {
+        "stages": [
+          {
+            "name": "diagnosis",
+            "owner": "claude-code",
+            "action": "identify root cause",
+            "notify": "devpit"
+          },
+          {
+            "name": "fix",
+            "owner": "claude-code",
+            "action": "implement fix",
+            "notify": "codex"
+          },
+          {
+            "name": "test",
+            "owner": "antigravity",
+            "action": "verify fix locally",
+            "notify": "devpit"
+          }
+        ]
+      }
+    },
+    "notifications": {
+      "enabled": true,
+      "channels": ["console", "file", "git-notes"]
+    }
+  }
+}

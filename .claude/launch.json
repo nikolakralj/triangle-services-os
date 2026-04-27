@@ -1,0 +1,34 @@
+{
+  "version": "0.0.1",
+  "description": "Claude Code launch configurations for Triangle Services OS",
+  "configurations": [
+    {
+      "name": "orchestrator",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/coordinator/orchestrator.js"],
+      "port": 0,
+      "description": "Multi-agent orchestration coordinator hub"
+    },
+    {
+      "name": "file-watcher",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/watchers/file-watcher.js"],
+      "port": 0,
+      "description": "File watcher for Antigravity integration"
+    },
+    {
+      "name": "dev-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "description": "Next.js development server"
+    },
+    {
+      "name": "all-orchestration",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [".claude/start-all.sh"],
+      "port": 0,
+      "description": "Start all orchestration services (orchestrator + file-watcher + git hooks)"
+    }
+  ]
+}

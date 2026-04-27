@@ -1,0 +1,32 @@
+{
+  "tasks": [],
+  "completed": [],
+  "workflow_state": {
+    "current_stage": null,
+    "current_workflow": null,
+    "started_at": null,
+    "last_update": null
+  },
+  "agent_status": {
+    "claude-code": {
+      "status": "idle",
+      "last_activity": null,
+      "current_task": null
+    },
+    "codex": {
+      "status": "idle",
+      "last_activity": null,
+      "current_task": null
+    },
+    "antigravity": {
+      "status": "idle",
+      "last_activity": null,
+      "current_task": null
+    },
+    "devpit": {
+      "status": "idle",
+      "last_activity": null,
+      "current_task": null
+    }
+  }
+}
