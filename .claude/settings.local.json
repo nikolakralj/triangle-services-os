@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__list_projects",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__get_cost",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__confirm_cost",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__create_project",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__apply_migration",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__get_project_url",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__get_publishable_keys",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__execute_sql",
+      "mcp__9d486760-f026-4237-bd4e-9835fb348f6e__get_project",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill /PID 30288 /F)",
+      "PowerShell(Stop-Process -Id 30288 -Force)",
+      "PowerShell(Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess\\) -Force -ErrorAction SilentlyContinue; Write-Output \"Stopped\")",
+      "Bash(powershell -Command \"\\(Get-Content 'src/lib/sample-data.ts' -Raw\\) -replace 'owner: \\\\\"Nikola\\\\\"', 'ownerName: \\\\\"Nikola\\\\\"' -replace 'owner: \\\\\"Ralph\\\\\"', 'ownerName: \\\\\"Ralph\\\\\"' -replace 'assignedTo: \\\\\"Nikola\\\\\"', 'assignedToName: \\\\\"Nikola\\\\\"' -replace 'assignedTo: \\\\\"Ralph\\\\\"', 'assignedToName: \\\\\"Ralph\\\\\"' -replace 'createdBy: \\\\\"Nikola\\\\\"', 'createdByName: \\\\\"Nikola\\\\\"' -replace 'createdBy: \\\\\"Ralph\\\\\"', 'createdByName: \\\\\"Ralph\\\\\"' -replace 'uploadedBy: \\\\\"Nikola\\\\\"', 'uploadedByName: \\\\\"Nikola\\\\\"' -replace 'uploadedBy: \\\\\"Ralph\\\\\"', 'uploadedByName: \\\\\"Ralph\\\\\"' -replace 'owner: index % 2 === 0 \\\\? \\\\\"Nikola\\\\\" : \\\\\"Ralph\\\\\"', 'ownerName: index % 2 === 0 ? \\\\\"Nikola\\\\\" : \\\\\"Ralph\\\\\"' | Set-Content 'src/lib/sample-data.ts'\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\nikol\\\\Projects\\\\triangle-services-os\\\\src\" -Recurse | Where-Object { $_.Extension -in \".tsx\", \".ts\" } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(cd \"C:\\\\Users\\\\nikol\\\\Projects\\\\triangle-services-os\"; git diff 8f855aa 981632f -- src/lib/auth/session.ts src/lib/supabase/server.ts src/lib/security/redirects.ts)",
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)"
+    ]
+  }
+}
