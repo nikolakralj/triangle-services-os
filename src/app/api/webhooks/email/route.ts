@@ -2,22 +2,23 @@ import { NextResponse } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-email-webhook-secret") || new URL(request.url).searchParams.get("secret");
-  
+  const secret =
+    request.headers.get("x-email-webhook-secret") || new URL(request.url).searchParams.get("secret");
+
   if (!process.env.EMAIL_WEBHOOK_SECRET || secret !== process.env.EMAIL_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
     const payload = await request.json();
-    
+
     // We expect a format similar to Postmark or SendGrid inbound parse.
     // Let's extract the recipient emails (To/Cc) to find who we are communicating with.
     const fromAddress = payload.From || payload.from || "";
     const toAddress = payload.To || payload.to || "";
     const subject = payload.Subject || payload.subject || "No Subject";
     const body = payload.TextBody || payload.text || payload.HtmlBody || "";
-    
+
     // Extract actual email addresses from strings like "John Doe <john@example.com>"
     const extractEmails = (str: string) => {
       const matches = str.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi);
@@ -25,9 +26,12 @@ export async function POST(request: Request) {
     };
 
     const targetEmails = [...extractEmails(toAddress), ...extractEmails(fromAddress)];
-    
+
     if (targetEmails.length === 0) {
-      return NextResponse.json({ error: "No valid email addresses found in To/From fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No valid email addresses found in To/From fields" },
+        { status: 400 },
+      );
     }
 
     const serviceClient = createServiceSupabaseClient();
@@ -53,9 +57,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Even if we don't find a contact, we could still save it if it matches a company domain. 
+    // Even if we don't find a contact, we could still save it if it matches a company domain.
     // For now, let's just log it if we found a contact, or log it as an unlinked activity if not.
-    
+
     const { error: insertError } = await serviceClient.from("activities").insert({
       organization_id: organizationId,
       activity_type: "email",
@@ -66,8 +70,8 @@ export async function POST(request: Request) {
       metadata: {
         from: fromAddress,
         to: toAddress,
-        source: "webhook"
-      }
+        source: "webhook",
+      },
     });
 
     if (insertError) {
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, matched: !!matchedContact });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Webhook processing error:", error);
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }

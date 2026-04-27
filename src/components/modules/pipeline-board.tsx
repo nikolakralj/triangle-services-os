@@ -30,7 +30,7 @@ function PipelineCard({
     <article
       ref={setNodeRef}
       style={style}
-      className="rounded-md border border-slate-200 bg-white p-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md"
+      className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md"
     >
       <div className="flex items-start gap-2">
         <button
@@ -49,7 +49,7 @@ function PipelineCard({
             {opportunity.title}
           </Link>
           <p className="mt-1 truncate text-xs text-slate-500">
-            {company?.name ?? "No company"} · {opportunity.country}
+            {company?.name ?? "No company"} - {opportunity.country}
           </p>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
             <span className="inline-flex items-center gap-1">
@@ -89,11 +89,11 @@ function PipelineColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`flex h-[calc(100vh-220px)] min-h-[460px] w-72 shrink-0 flex-col rounded-lg border ${
-        isOver ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-slate-50"
+      className={`flex min-h-[320px] flex-col rounded-xl border ${
+        isOver ? "border-sky-400 bg-sky-50 shadow-sm shadow-sky-100" : "border-slate-200 bg-slate-50"
       }`}
     >
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 p-3 backdrop-blur">
+      <div className="border-b border-slate-200 bg-white/95 p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="truncate text-sm font-semibold text-slate-950">{stage.name}</h2>
           <Badge>{opportunities.length}</Badge>
@@ -102,7 +102,7 @@ function PipelineColumn({
           {stage.description}
         </p>
       </div>
-      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
+      <div className="flex max-h-[440px] flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
         {opportunities.length ? (
           opportunities.map((opportunity) => (
             <PipelineCard
@@ -112,7 +112,7 @@ function PipelineColumn({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/70 p-3 text-center text-xs text-slate-400">
             Drop opportunities here
           </div>
         )}
@@ -164,14 +164,15 @@ export function PipelineBoard({
     });
   }
 
-  const activeStages = stages.filter((stage) =>
-    filtered.some((opportunity) => opportunity.stageId === stage.id) ||
-    !["won", "lost", "nurture"].includes(stage.key),
+  const activeStages = stages.filter(
+    (stage) =>
+      filtered.some((opportunity) => opportunity.stageId === stage.id) ||
+      !["won", "lost", "nurture"].includes(stage.key),
   );
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Select className="w-44" value={owner} onChange={(event) => setOwner(event.target.value)}>
             <option value="all">All owners</option>
@@ -193,8 +194,8 @@ export function PipelineBoard({
         <Button>Add opportunity</Button>
       </div>
       <DndContext onDragEnd={onDragEnd}>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-3">
-          <div className="flex gap-3 pb-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {activeStages.map((stage) => (
               <PipelineColumn
                 key={stage.id}
