@@ -6,6 +6,7 @@ import {
   findByFingerprint,
 } from "@/lib/data/discovered-projects";
 import { startHuntRun, completeHuntRun } from "@/lib/data/hunt-runs";
+import { seedChainFromAI } from "@/lib/data/contractor-chain";
 import {
   callOpenAIHunter,
   collectWebSources,
@@ -230,7 +231,36 @@ export async function POST(request: Request) {
         fingerprint,
       });
 
-      if (inserted) newProjectsInserted++;
+      if (inserted) {
+        newProjectsInserted++;
+
+        // Seed contractor chain from AI output
+        await seedChainFromAI(
+          access.organizationId,
+          inserted.id,
+          [
+            ...(ai.client_company
+              ? [{
+                  role: "owner" as const,
+                  companyName: ai.client_company,
+                  level: "known" as const,
+                  confidence: 90,
+                  rationale: "Named as client or operator in source.",
+                }]
+              : []),
+            ...(ai.general_contractor
+              ? [{
+                  role: "gc" as const,
+                  companyName: ai.general_contractor,
+                  level: "known" as const,
+                  confidence: 85,
+                  rationale: "Named as general contractor or delivery partner in source.",
+                }]
+              : []),
+          ],
+          access.userId,
+        );
+      }
     }
 
     // ======================================================

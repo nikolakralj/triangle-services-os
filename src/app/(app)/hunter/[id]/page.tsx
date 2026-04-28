@@ -20,8 +20,10 @@ import {
 } from "@/lib/data/discovered-projects";
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
+import { getChainNodes } from "@/lib/data/contractor-chain";
 import { PromoteProjectButton } from "@/components/modules/promote-project-button";
 import { UpdateProjectStatusButton } from "@/components/modules/update-project-status-button";
+import { ContractorChainPanel } from "@/components/modules/contractor-chain-panel";
 import {
   buildCommercialReadiness,
   buildContractorChain,
@@ -47,6 +49,9 @@ export default async function DiscoveredProjectDetailPage({
     listCompanies(session.organizationId),
     listPipelineStages(session.organizationId),
   ]);
+
+  // Load saved contractor chain nodes in parallel after we have the project id
+  const savedChainNodes = row ? await getChainNodes(id) : [];
 
   if (!row || row.organization_id !== session.organizationId) notFound();
 
@@ -117,12 +122,21 @@ export default async function DiscoveredProjectDetailPage({
           <Card>
             <CardHeader
               title="Contractor chain"
-              description="Known, inferred, and unknown roles stay separated so we do not pretend the route to buyer is clearer than it is."
+              description="Saved nodes are persistent. AI suggestions below are inferred and not yet confirmed. Hover a node to edit or remove it."
             />
-            <CardContent className="space-y-3">
-              {contractorChain.map((node) => (
-                <ContractorChainRow key={node.id} node={node} />
-              ))}
+            <CardContent>
+              <ContractorChainPanel
+                projectId={project.id}
+                savedNodes={savedChainNodes}
+                inferredNodes={contractorChain.map((n) => ({
+                  id: n.id,
+                  label: n.label,
+                  company: n.company,
+                  level: n.level,
+                  confidence: n.confidence,
+                  rationale: n.rationale,
+                }))}
+              />
             </CardContent>
           </Card>
 
