@@ -285,52 +285,80 @@ export function OpportunityDetail({
   );
 }
 
-export function WorkerDetail({ worker }: { worker: Worker }) {
+export function WorkerDetail({
+  worker,
+  tasks,
+  activities,
+}: {
+  worker: Worker;
+  tasks?: Task[];
+  activities?: Activity[];
+}) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-      <Card>
-        <CardHeader
-          title="Worker overview"
-          description="Basic MVP worker/freelancer record."
-        />
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <Info label="Role" value={worker.role} />
-          <Info label="Type" value={worker.workerType} />
-          <Info
-            label="Country"
-            value={`${worker.country}, ${worker.city ?? ""}`}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader
+            title="Worker overview"
+            description="Basic MVP worker/freelancer record."
           />
-          <Info label="Languages" value={worker.languages.join(", ")} />
-          <Info label="Skills" value={worker.skills.join(", ")} />
-          <Info label="Certificates" value={worker.certificates.join(", ")} />
-          <Info label="Availability" value={worker.availabilityStatus} />
-          <Info label="Available from" value={worker.availableFrom ?? "n/a"} />
-          <Info
-            label="Preferred countries"
-            value={worker.preferredCountries.join(", ")}
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <Info label="Role" value={worker.role} />
+            <Info label="Type" value={worker.workerType} />
+            <Info
+              label="Country"
+              value={`${worker.country}, ${worker.city ?? ""}`}
+            />
+            <Info label="Languages" value={worker.languages.join(", ")} />
+            <Info label="Skills" value={worker.skills.join(", ")} />
+            <Info label="Certificates" value={worker.certificates.join(", ")} />
+            <Info label="Availability" value={worker.availabilityStatus} />
+            <Info label="Available from" value={worker.availableFrom ?? "n/a"} />
+            <Info
+              label="Preferred countries"
+              value={worker.preferredCountries.join(", ")}
+            />
+            <Info
+              label="Rate expectation"
+              value={
+                worker.dailyRateExpectation
+                  ? `${worker.dailyRateExpectation} EUR/day`
+                  : worker.hourlyRateExpectation
+                    ? `${worker.hourlyRateExpectation} EUR/h`
+                    : "n/a"
+              }
+            />
+            <Info label="Reliability" value={`${worker.reliabilityScore}/5`} />
+            <Info label="Status" value={worker.status} />
+          </CardContent>
+        </Card>
+        {activities && (
+          <Card>
+            <CardHeader title="Activity timeline" />
+            <CardContent>
+              <ActivityTimeline activities={activities} />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader title="Scores" />
+          <CardContent className="space-y-3">
+            <Score label="Quality" value={worker.qualityScore} />
+            <Score label="Safety" value={worker.safetyScore} />
+            <Score label="Reliability" value={worker.reliabilityScore} />
+          </CardContent>
+        </Card>
+        {tasks && (
+          <SideList
+            title="Tasks"
+            items={tasks.map(
+              (task) => `${task.title} · ${task.dueDate ?? "no date"}`,
+            )}
           />
-          <Info
-            label="Rate expectation"
-            value={
-              worker.dailyRateExpectation
-                ? `${worker.dailyRateExpectation} EUR/day`
-                : worker.hourlyRateExpectation
-                  ? `${worker.hourlyRateExpectation} EUR/h`
-                  : "n/a"
-            }
-          />
-          <Info label="Reliability" value={`${worker.reliabilityScore}/5`} />
-          <Info label="Status" value={worker.status} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader title="Scores" />
-        <CardContent className="space-y-3">
-          <Score label="Quality" value={worker.qualityScore} />
-          <Score label="Safety" value={worker.safetyScore} />
-          <Score label="Reliability" value={worker.reliabilityScore} />
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }

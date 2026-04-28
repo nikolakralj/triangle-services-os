@@ -10,6 +10,7 @@ import {
   FileText,
   Gauge,
   KanbanSquare,
+  Radar,
   Settings,
   Upload,
   Users,
@@ -19,6 +20,13 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
+  {
+    href: "/hunter",
+    label: "Hunter",
+    icon: Radar,
+    badge: "AI",
+    highlight: true,
+  },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
@@ -51,6 +59,8 @@ export function Sidebar() {
           const active =
             pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const highlight = "highlight" in item && item.highlight;
+          const badge = "badge" in item ? item.badge : undefined;
           return (
             <Link
               key={item.href}
@@ -59,11 +69,25 @@ export function Sidebar() {
                 "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition",
                 active
                   ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+                  : highlight
+                    ? "bg-gradient-to-r from-sky-50 to-emerald-50 text-sky-900 hover:from-sky-100 hover:to-emerald-100 ring-1 ring-sky-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
               )}
             >
               <Icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {badge && (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                    active
+                      ? "bg-white/20 text-white"
+                      : "bg-emerald-500 text-white",
+                  )}
+                >
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}

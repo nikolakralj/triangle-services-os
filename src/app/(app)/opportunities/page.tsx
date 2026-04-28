@@ -3,9 +3,33 @@ import { OpportunitiesTable } from "@/components/modules/simple-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
-import { companies, opportunities } from "@/lib/sample-data";
+import { getSession } from "@/lib/auth/session";
+import { listOpportunities, rowToOpportunity } from "@/lib/data/opportunities";
+import { listCompanies, rowToCompany } from "@/lib/data/companies";
+import { enrichOpportunitiesWithOwnerNames } from "@/lib/data/utils";
 
-export default function OpportunitiesPage() {
+export default async function OpportunitiesPage() {
+  const session = await getSession();
+  if (!session?.organizationId) {
+    return (
+      <PageHeader
+        title="Opportunities"
+        description="Opportunities not available - organization context required"
+      />
+    );
+  }
+
+  const [opportunityRows, companyRows] = await Promise.all([
+    listOpportunities(session.organizationId),
+    listCompanies(session.organizationId),
+  ]);
+
+  const opportunities = opportunityRows.map(rowToOpportunity);
+  const companies = companyRows.map(rowToCompany);
+
+  // Resolve owner names
+  const enrichedOpportunities = await enrichOpportunitiesWithOwnerNames(opportunities);
+
   return (
     <>
       <PageHeader
@@ -30,7 +54,7 @@ export default function OpportunitiesPage() {
           <Button>Export CSV</Button>
         </CardContent>
       </Card>
-      <OpportunitiesTable opportunities={opportunities} companies={companies} />
+      <OpportunitiesTable opportunities={enrichedOpportunities} companies={companies} />
     </>
   );
 }

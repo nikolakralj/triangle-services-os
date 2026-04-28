@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   DndContext,
@@ -18,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
+import { AddOpportunityModal } from "./add-opportunity-modal";
 import type { Company, Opportunity, PipelineStage } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
@@ -149,9 +151,11 @@ export function PipelineBoard({
   stages: PipelineStage[];
   companies: Company[];
 }) {
+  const router = useRouter();
   const [opportunities, setOpportunities] = useState(initialOpportunities);
   const [owner, setOwner] = useState("all");
   const [country, setCountry] = useState("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -226,8 +230,15 @@ export function PipelineBoard({
             ))}
           </Select>
         </div>
-        <Button>Add opportunity</Button>
+        <Button onClick={() => setIsModalOpen(true)}>Add opportunity</Button>
       </div>
+      <AddOpportunityModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => router.refresh()}
+        companies={companies}
+        stages={stages}
+      />
       <DndContext onDragEnd={onDragEnd}>
         <div className="rounded-xl border border-slate-200 bg-white p-3">
           <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
