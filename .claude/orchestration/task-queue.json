@@ -1,23 +1,7 @@
 {
-  "last_trigger": "cli",
-  "triggered_at": "2026-04-27T06:15:00Z",
-  "action": "antigravity-test",
-  "files": [
-    "src/lib/data/opportunities.ts",
-    "src/lib/data/contacts.ts",
-    "src/app/(app)/pipeline/page.tsx",
-    "src/app/(app)/contacts/page.tsx",
-    "src/app/(app)/dashboard/page.tsx"
-  ],
-  "status": "pending",
-  "last_action": "antigravity-complete",
-  "last_action_time": "2026-04-27T06:42:19.631Z",
-  "test_results": {
-    "typescript": true,
-    "eslint": true,
-    "tests": false,
-    "timestamp": "2026-04-27T06:42:15.120Z"
-  },
-  "next_agent": "devpit",
-  "_processed_at": "2026-04-27T06:42:19.632Z"
+  "last_trigger": "pre-commit",
+  "triggered_at": "2026-04-28T09:49:24Z",
+  "action": "codex-format",
+  "files": ,
+  "status": "pending"
 }
