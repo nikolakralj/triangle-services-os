@@ -372,6 +372,80 @@ function AddNodeForm({
   );
 }
 
+// ─── Inferred suggestion card (confirm to save) ───────────────────────────
+
+function InferredNodeCard({
+  node,
+  projectId,
+  onSaved,
+}: {
+  node: { id: string; label: string; company?: string; level: ChainKnowledgeLevel; confidence?: number; rationale: string };
+  projectId: string;
+  onSaved: () => void;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tone = LEVEL_CONFIG[node.level];
+  const Icon = tone.icon;
+
+  const handleConfirm = async () => {
+    setIsSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/hunter/projects/${projectId}/chain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: node.id, // node.id is the role key (owner, developer, etc.)
+          company_name: node.company ?? null,
+          level: node.level,
+          confidence: node.confidence ?? null,
+          rationale: node.rationale,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className={cn("rounded-lg border p-3", tone.shell)}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone.text)} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-slate-900">{node.label}</p>
+              <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                {tone.badge} · AI
+              </span>
+              {node.confidence && (
+                <span className="text-xs text-slate-400">{node.confidence}%</span>
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-slate-800">{node.company ?? "—"}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{node.rationale}</p>
+            {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
+          </div>
+        </div>
+        <button
+          onClick={handleConfirm}
+          disabled={isSaving}
+          className="shrink-0 inline-flex items-center gap-1 rounded-md bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-white disabled:opacity-50 border border-slate-200 shadow-sm"
+        >
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+          Confirm
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main panel ────────────────────────────────────────────────────────────
 
 export function ContractorChainPanel({
@@ -418,32 +492,16 @@ export function ContractorChainPanel({
       {pendingInferred.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            AI suggestions (not yet saved)
+            AI suggestions — click to confirm and save
           </p>
-          {pendingInferred.map((node) => {
-            const tone = LEVEL_CONFIG[node.level];
-            const Icon = tone.icon;
-            return (
-              <div
-                key={node.id}
-                className={cn("rounded-lg border p-3 opacity-70", tone.shell)}
-              >
-                <div className="flex items-start gap-2">
-                  <Icon className={cn("mt-0.5 h-4 w-4", tone.text)} />
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{node.label}</p>
-                      <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                        {tone.badge} · AI
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-sm text-slate-800">{node.company ?? "—"}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{node.rationale}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {pendingInferred.map((node) => (
+            <InferredNodeCard
+              key={node.id}
+              node={node}
+              projectId={projectId}
+              onSaved={handleRefresh}
+            />
+          ))}
         </div>
       )}
 

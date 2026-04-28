@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/supabase/server";
-import {
-  updateChainNode,
-  deleteChainNode,
-  type ChainKnowledgeLevel,
-} from "@/lib/data/contractor-chain";
+import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
+import type { ChainKnowledgeLevel } from "@/lib/data/contractor-chain";
 
 const VALID_LEVELS: ChainKnowledgeLevel[] = ["known", "inferred", "unknown"];
 
@@ -16,6 +12,11 @@ export async function PATCH(
   const access = await requireApiAccess(request);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const service = createServiceSupabaseClient();
+  if (!service) {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -37,18 +38,28 @@ export async function PATCH(
     );
   }
 
-  const updates: Parameters<typeof updateChainNode>[2] = {};
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (company_name !== undefined) updates.company_name = company_name;
   if (company_id !== undefined) updates.company_id = company_id;
-  if (level !== undefined) updates.level = level as ChainKnowledgeLevel;
+  if (level !== undefined) updates.level = level;
   if (confidence !== undefined) updates.confidence = confidence;
   if (rationale !== undefined) updates.rationale = rationale;
   if (notes !== undefined) updates.notes = notes;
   if (label !== undefined) updates.label = label;
 
-  const ok = await updateChainNode(nodeId, access.organizationId, updates);
-  if (!ok) {
-    return NextResponse.json({ error: "Update failed or node not found" }, { status: 404 });
+  const { data, error } = await service
+    .from("contractor_chain_nodes")
+    .update(updates)
+    .eq("id", nodeId)
+    .eq("organization_id", access.organizationId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ ok: true });
@@ -64,9 +75,19 @@ export async function DELETE(
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const ok = await deleteChainNode(nodeId, access.organizationId);
-  if (!ok) {
-    return NextResponse.json({ error: "Delete failed or node not found" }, { status: 404 });
+  const service = createServiceSupabaseClient();
+  if (!service) {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
+  }
+
+  const { error } = await service
+    .from("contractor_chain_nodes")
+    .delete()
+    .eq("id", nodeId)
+    .eq("organization_id", access.organizationId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

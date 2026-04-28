@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/supabase/server";
-import { getDiscoveredProjectById } from "@/lib/data/discovered-projects";
-import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 
 const VALID_STATUSES = new Set([
   "new",
@@ -34,34 +32,27 @@ export async function PATCH(
     );
   }
 
-  // Verify project belongs to org
-  const row = await getDiscoveredProjectById(id);
-  if (!row || row.organization_id !== access.organizationId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   const service = createServiceSupabaseClient();
   if (!service) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
   }
 
-  const { error } = await service
+  // Update scoped to both id AND org — no separate lookup needed
+  const { data, error } = await service
     .from("discovered_projects")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .update({ status })
+    .eq("id", id)
+    .eq("organization_id", access.organizationId)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Log activity
-  await service.from("activities").insert({
-    organization_id: access.organizationId,
-    activity_type: "status_change",
-    title: "Project status updated",
-    summary: `Discovered project status changed to: ${status}`,
-    created_by: access.userId,
-  });
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true, status });
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/supabase/server";
-import { getDiscoveredProjectById } from "@/lib/data/discovered-projects";
+import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 import {
   upsertChainNode,
   CHAIN_ROLE_LABELS,
@@ -24,9 +23,18 @@ export async function POST(
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  // Verify project belongs to org
-  const row = await getDiscoveredProjectById(id);
-  if (!row || row.organization_id !== access.organizationId) {
+  // Verify project belongs to org using service client (avoids cookie-context issues)
+  const service = createServiceSupabaseClient();
+  if (!service) {
+    return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
+  }
+  const { data: projectCheck } = await service
+    .from("discovered_projects")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", access.organizationId)
+    .maybeSingle();
+  if (!projectCheck) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -65,10 +73,12 @@ export async function POST(
   }
 
   const typedRole = role as ChainRole;
-  const node = await upsertChainNode(
-    access.organizationId,
-    id,
-    {
+
+  const { data: node, error: insertError } = await service
+    .from("contractor_chain_nodes")
+    .insert({
+      organization_id: access.organizationId,
+      discovered_project_id: id,
       role: typedRole,
       label: label ?? CHAIN_ROLE_LABELS[typedRole],
       company_name: company_name ?? null,
@@ -79,12 +89,15 @@ export async function POST(
       notes: notes ?? null,
       sort_order: CHAIN_ROLE_ORDER[typedRole],
       created_by: access.userId,
-    },
-    access.userId,
-  );
+    })
+    .select()
+    .maybeSingle();
 
-  if (!node) {
-    return NextResponse.json({ error: "Failed to create node" }, { status: 500 });
+  if (insertError || !node) {
+    return NextResponse.json(
+      { error: insertError?.message ?? "Failed to create node" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ ok: true, node }, { status: 201 });
