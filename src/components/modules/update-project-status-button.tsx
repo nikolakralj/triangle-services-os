@@ -9,24 +9,24 @@ const STATUS_CONFIG: Record<
   { label: string; nextStatus: string; className: string }
 > = {
   new: {
-    label: "Mark contractor chain research",
-    nextStatus: "researching",
+    label: "Mark as reviewing",
+    nextStatus: "reviewing",
     className:
       "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
   },
-  researching: {
+  reviewing: {
     label: "Mark as qualified",
     nextStatus: "qualified",
     className:
       "w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100",
   },
   qualified: {
-    label: "Mark as contacted",
-    nextStatus: "contacted",
+    label: "Mark as pursuing",
+    nextStatus: "pursuing",
     className:
       "w-full rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100",
   },
-  contacted: {
+  pursuing: {
     label: "Mark as won",
     nextStatus: "won",
     className:

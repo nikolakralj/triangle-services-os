@@ -5,11 +5,13 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 const VALID_STATUSES = new Set([
   "new",
-  "researching",
+  "reviewing",
   "qualified",
-  "contacted",
+  "pursuing",
   "won",
-  "rejected",
+  "lost",
+  "archived",
+  "duplicate",
 ]);
 
 export async function PATCH(
