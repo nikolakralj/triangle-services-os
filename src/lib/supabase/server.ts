@@ -3,6 +3,12 @@ import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/env";
 
+type ApiMembership = {
+  organization_id: string;
+  role: string;
+  status?: string;
+};
+
 export function createServiceSupabaseClient() {
   const { url, serviceRoleKey } = getSupabaseConfig();
   if (!url || !serviceRoleKey) return null;
@@ -99,13 +105,21 @@ export async function requireApiAccess(request: Request) {
     return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
-  const { data: member } = await supabase
-    .from("organization_members")
-    .select("organization_id, role, status")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
+  const { data: rpcMember } = await supabase
+    .rpc("get_my_org_membership")
     .maybeSingle();
+
+  const member: ApiMembership | null =
+    (rpcMember as ApiMembership | null) ??
+    (
+      await supabase
+        .from("organization_members")
+        .select("organization_id, role, status")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle()
+    ).data;
 
   if (!member) {
     return { ok: false as const, status: 403, error: "Forbidden" };

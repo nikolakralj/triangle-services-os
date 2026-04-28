@@ -159,6 +159,30 @@ export async function getActivitiesByType(
 }
 
 /**
+ * Get activities for a specific worker
+ */
+export async function getActivitiesByWorker(
+  workerId: string,
+  limit: number = 25,
+): Promise<ActivityRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("activities")
+    .select("*")
+    .eq("worker_id", workerId)
+    .order("occurred_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("getActivitiesByWorker error", error);
+    return [];
+  }
+  return data as ActivityRow[];
+}
+
+/**
  * Get activity by ID
  */
 export async function getActivityById(id: string): Promise<ActivityRow | null> {
@@ -241,8 +265,23 @@ export async function getActivityTypeCount(
   organizationId: string,
   hours: number = 24,
 ): Promise<Record<ActivityRow["activity_type"], number>> {
+  const emptyCounts: Record<ActivityRow["activity_type"], number> = {
+    note: 0,
+    call: 0,
+    email: 0,
+    meeting: 0,
+    linkedin_message: 0,
+    document_sent: 0,
+    document_received: 0,
+    ai_generation: 0,
+    status_change: 0,
+    task_completed: 0,
+    import: 0,
+    other: 0,
+  };
+
   const supabase = await createCookieSupabaseClient();
-  if (!supabase) return {};
+  if (!supabase) return emptyCounts;
 
   const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
@@ -254,7 +293,7 @@ export async function getActivityTypeCount(
 
   if (error) {
     console.error("getActivityTypeCount error", error);
-    return {};
+    return emptyCounts;
   }
 
   const counts: Record<ActivityRow["activity_type"], number> = {

@@ -156,6 +156,107 @@ export async function getHighPriorityContacts(
 }
 
 /**
+ * Search and filter contacts
+ */
+export async function searchAndFilterContacts(
+  organizationId: string,
+  options: {
+    search?: string;
+    roleCategory?: string;
+    country?: string;
+    ownerId?: string;
+    priority?: string;
+  },
+): Promise<ContactRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("contacts")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("do_not_contact", false);
+
+  // Apply filters
+  if (options.roleCategory && options.roleCategory !== "all") {
+    query = query.eq("role_category", options.roleCategory);
+  }
+  if (options.country && options.country !== "all") {
+    query = query.eq("country", options.country);
+  }
+  if (options.ownerId && options.ownerId !== "all") {
+    query = query.eq("owner_id", options.ownerId);
+  }
+  if (options.priority && options.priority !== "all") {
+    query = query.eq("priority", options.priority);
+  }
+
+  // Apply search (across multiple fields)
+  if (options.search && options.search.trim()) {
+    const searchTerm = options.search.toLowerCase();
+    query = query.or(
+      `full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,company_id.eq.${searchTerm}`,
+    );
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("searchAndFilterContacts error", error);
+    return [];
+  }
+  return data as ContactRow[];
+}
+
+/**
+ * Get unique role categories for filter dropdown
+ */
+export async function getContactRoleCategories(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("role_category")
+    .eq("organization_id", organizationId)
+    .eq("do_not_contact", false)
+    .not("role_category", "is", null);
+
+  if (error) {
+    console.error("getContactRoleCategories error", error);
+    return [];
+  }
+
+  return [...new Set((data as { role_category: string }[]).map((r) => r.role_category))].sort();
+}
+
+/**
+ * Get unique countries for filter dropdown
+ */
+export async function getContactCountries(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("country")
+    .eq("organization_id", organizationId)
+    .eq("do_not_contact", false)
+    .not("country", "is", null);
+
+  if (error) {
+    console.error("getContactCountries error", error);
+    return [];
+  }
+
+  return [...new Set((data as { country: string }[]).map((c) => c.country))].sort();
+}
+
+/**
  * Create new contact
  */
 export async function createContact(

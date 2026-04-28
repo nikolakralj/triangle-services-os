@@ -186,6 +186,133 @@ export async function getWorkersByCountry(
 }
 
 /**
+ * Search and filter workers
+ */
+export async function searchAndFilterWorkers(
+  organizationId: string,
+  options: {
+    search?: string;
+    role?: string;
+    availability?: string;
+    country?: string;
+    skill?: string;
+  },
+): Promise<WorkerRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("workers")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
+
+  if (options.role && options.role !== "all") {
+    query = query.eq("role", options.role);
+  }
+  if (options.availability && options.availability !== "all") {
+    query = query.eq("availability_status", options.availability);
+  }
+  if (options.country && options.country !== "all") {
+    query = query.eq("country", options.country);
+  }
+  if (options.skill && options.skill !== "all") {
+    query = query.contains("skills", [options.skill]);
+  }
+
+  if (options.search && options.search.trim()) {
+    const searchTerm = options.search.toLowerCase();
+    query = query.or(
+      `full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,role.ilike.%${searchTerm}%`,
+    );
+  }
+
+  const { data, error } = await query.order("full_name", { ascending: true });
+
+  if (error) {
+    console.error("searchAndFilterWorkers error", error);
+    return [];
+  }
+  return data as WorkerRow[];
+}
+
+/**
+ * Get unique roles for filter dropdown
+ */
+export async function getWorkerRoles(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("workers")
+    .select("role")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .not("role", "is", null);
+
+  if (error) {
+    console.error("getWorkerRoles error", error);
+    return [];
+  }
+
+  return [...new Set((data as { role: string }[]).map((r) => r.role))].sort();
+}
+
+/**
+ * Get unique skills for filter dropdown
+ */
+export async function getWorkerSkills(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("workers")
+    .select("skills")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .not("skills", "is", null);
+
+  if (error) {
+    console.error("getWorkerSkills error", error);
+    return [];
+  }
+
+  const skills = new Set<string>();
+  (data as { skills: string[] }[]).forEach((row) => {
+    row.skills?.forEach((s) => skills.add(s));
+  });
+  return Array.from(skills).sort();
+}
+
+/**
+ * Get unique countries for filter dropdown
+ */
+export async function getWorkerCountries(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("workers")
+    .select("country")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .not("country", "is", null);
+
+  if (error) {
+    console.error("getWorkerCountries error", error);
+    return [];
+  }
+
+  return [...new Set((data as { country: string }[]).map((c) => c.country))].sort();
+}
+
+/**
  * Create new worker
  */
 export async function createWorker(

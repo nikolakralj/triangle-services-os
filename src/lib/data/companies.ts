@@ -116,6 +116,139 @@ export function rowToCompany(r: CompanyRow): Company {
   };
 }
 
+/**
+ * Search and filter companies
+ */
+export async function searchAndFilterCompanies(
+  organizationId: string,
+  options: {
+    search?: string;
+    status?: string;
+    sector?: string;
+    country?: string;
+    priority?: string;
+    ownerId?: string;
+  },
+): Promise<CompanyRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("companies")
+    .select("*")
+    .eq("organization_id", organizationId);
+
+  // Apply filters
+  if (options.status && options.status !== "all") {
+    query = query.eq("company_status", options.status);
+  }
+  if (options.sector && options.sector !== "all") {
+    query = query.contains("sectors", [options.sector]);
+  }
+  if (options.country && options.country !== "all") {
+    query = query.eq("country", options.country);
+  }
+  if (options.priority && options.priority !== "all") {
+    query = query.eq("priority", options.priority);
+  }
+  if (options.ownerId && options.ownerId !== "all") {
+    query = query.eq("owner_id", options.ownerId);
+  }
+
+  // Apply search
+  if (options.search && options.search.trim()) {
+    const searchTerm = options.search.toLowerCase();
+    query = query.or(
+      `name.ilike.%${searchTerm}%,legal_name.ilike.%${searchTerm}%,website_domain.ilike.%${searchTerm}%`,
+    );
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("searchAndFilterCompanies error", error);
+    return [];
+  }
+  return data as CompanyRow[];
+}
+
+/**
+ * Get unique company statuses for filter dropdown
+ */
+export async function getCompanyStatuses(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("company_status")
+    .eq("organization_id", organizationId)
+    .not("company_status", "is", null);
+
+  if (error) {
+    console.error("getCompanyStatuses error", error);
+    return [];
+  }
+
+  return [
+    ...new Set((data as { company_status: string }[]).map((c) => c.company_status)),
+  ].sort();
+}
+
+/**
+ * Get unique sectors for filter dropdown
+ */
+export async function getCompanySectors(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("sectors")
+    .eq("organization_id", organizationId)
+    .not("sectors", "is", null);
+
+  if (error) {
+    console.error("getCompanySectors error", error);
+    return [];
+  }
+
+  const sectors = new Set<string>();
+  (data as { sectors: string[] | null }[]).forEach((row) => {
+    row.sectors?.forEach((s) => sectors.add(s));
+  });
+  return Array.from(sectors).sort();
+}
+
+/**
+ * Get unique countries for filter dropdown
+ */
+export async function getCompanyCountries(
+  organizationId: string,
+): Promise<string[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("companies")
+    .select("country")
+    .eq("organization_id", organizationId)
+    .not("country", "is", null);
+
+  if (error) {
+    console.error("getCompanyCountries error", error);
+    return [];
+  }
+
+  return [
+    ...new Set((data as { country: string }[]).map((c) => c.country)),
+  ].sort();
+}
+
 export async function createCompany(
   organizationId: string,
   userId: string,

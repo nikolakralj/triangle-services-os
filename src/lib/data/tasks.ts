@@ -49,7 +49,7 @@ export async function listTasks(
     .from("tasks")
     .select("*")
     .eq("organization_id", organizationId)
-    .order("due_date", { ascending: true, nullsLast: true })
+    .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -73,7 +73,7 @@ export async function listOpenTasks(
     .select("*")
     .eq("organization_id", organizationId)
     .neq("status", "done")
-    .order("due_date", { ascending: true, nullsLast: true })
+    .order("due_date", { ascending: true, nullsFirst: false })
     .order("priority", { ascending: false });
 
   if (error) {
@@ -154,7 +154,7 @@ export async function getTasksByAssignee(
     .select("*")
     .eq("assigned_to_id", userId)
     .neq("status", "done")
-    .order("due_date", { ascending: true, nullsLast: true })
+    .order("due_date", { ascending: true, nullsFirst: false })
     .order("priority", { ascending: false });
 
   if (error) {
@@ -179,7 +179,7 @@ export async function getTasksByEntity(
     .select("*")
     .eq("related_entity_type", entityType)
     .eq("related_entity_id", entityId)
-    .order("due_date", { ascending: true, nullsLast: true })
+    .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -207,6 +207,53 @@ export async function getTaskById(id: string): Promise<TaskRow | null> {
     return null;
   }
   return data as TaskRow | null;
+}
+
+/**
+ * Search and filter tasks
+ */
+export async function searchAndFilterTasks(
+  organizationId: string,
+  options: {
+    search?: string;
+    status?: string;
+    assignedToId?: string;
+    priority?: string;
+  },
+): Promise<TaskRow[]> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("tasks")
+    .select("*")
+    .eq("organization_id", organizationId);
+
+  if (options.status && options.status !== "all") {
+    query = query.eq("status", options.status);
+  }
+  if (options.assignedToId && options.assignedToId !== "all") {
+    query = query.eq("assigned_to_id", options.assignedToId);
+  }
+  if (options.priority && options.priority !== "all") {
+    query = query.eq("priority", options.priority);
+  }
+
+  if (options.search && options.search.trim()) {
+    const searchTerm = options.search.toLowerCase();
+    query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+  }
+
+  const { data, error } = await query.order("due_date", {
+    ascending: true,
+    nullsFirst: false,
+  });
+
+  if (error) {
+    console.error("searchAndFilterTasks error", error);
+    return [];
+  }
+  return data as TaskRow[];
 }
 
 /**
