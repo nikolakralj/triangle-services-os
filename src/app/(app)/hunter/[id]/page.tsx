@@ -18,6 +18,10 @@ import {
   getDiscoveredProjectById,
   rowToDiscoveredProject,
 } from "@/lib/data/discovered-projects";
+import { listCompanies, rowToCompany } from "@/lib/data/companies";
+import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
+import { PromoteProjectButton } from "@/components/modules/promote-project-button";
+import { UpdateProjectStatusButton } from "@/components/modules/update-project-status-button";
 import {
   buildCommercialReadiness,
   buildContractorChain,
@@ -37,11 +41,18 @@ export default async function DiscoveredProjectDetailPage({
 }) {
   const { id } = await params;
   const session = await requireSession();
-  const row = await getDiscoveredProjectById(id);
+
+  const [row, companyRows, stageRows] = await Promise.all([
+    getDiscoveredProjectById(id),
+    listCompanies(session.organizationId),
+    listPipelineStages(session.organizationId),
+  ]);
 
   if (!row || row.organization_id !== session.organizationId) notFound();
 
   const project = rowToDiscoveredProject(row);
+  const companies = companyRows.map(rowToCompany);
+  const stages = stageRows.map(rowToPipelineStage);
   const readiness = buildCommercialReadiness(project);
   const contractorChain = buildContractorChain(project);
   const packageOpportunities = buildPackageOpportunities(project);
@@ -253,9 +264,10 @@ export default async function DiscoveredProjectDetailPage({
           <Card>
             <CardHeader title="Actions" />
             <CardContent className="space-y-2">
-              <button className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Mark contractor chain research
-              </button>
+              <UpdateProjectStatusButton
+                projectId={project.id}
+                currentStatus={project.status}
+              />
               <button
                 className={cn(
                   "w-full rounded-md px-3 py-2 text-sm font-semibold text-white",
@@ -267,9 +279,13 @@ export default async function DiscoveredProjectDetailPage({
               >
                 Prepare outreach
               </button>
-              <button className="w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                Promote to Opportunity
-              </button>
+              <PromoteProjectButton
+                projectName={project.projectName}
+                country={project.country}
+                estimatedValueEur={project.estimatedValueEur}
+                companies={companies}
+                stages={stages}
+              />
               <button className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Match workers
               </button>
