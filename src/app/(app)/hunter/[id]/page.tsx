@@ -159,15 +159,6 @@ export default async function DiscoveredProjectDetailPage({
             </div>
           </PersistedCollapsible>
 
-          <PersistedCollapsible
-            storageKey={`hunter:${project.id}:graph`}
-            title="Chain graph (Sprint C target)"
-            description="Graph placeholder: owner/developer/GC/EPC/MEP/electrical/contacts/packages with confidence-weighted edges and gap nodes."
-          >
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-              Graph view is queued for Sprint C (UI/Graph Usability). Current fallback is the chain list and grouped queue above.
-            </div>
-          </PersistedCollapsible>
 
           <PersistedCollapsible
             storageKey={`hunter:${project.id}:packages`}

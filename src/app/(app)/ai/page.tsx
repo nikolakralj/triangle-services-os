@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/common/page-header";
-import { AIAssistant } from "@/components/modules/ai-assistant";
+import { GlobalOrchestratorWorkspace } from "@/components/modules/global-orchestrator-workspace";
 import { getSession } from "@/lib/auth/session";
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listContacts, rowToContact } from "@/lib/data/contacts";
@@ -37,7 +37,7 @@ export default async function AIPage() {
         title="AI Assistant"
         description="Internal business-development assistant for lead scoring, summaries, outreach drafts, call scripts, proposal outlines and document drafts."
       />
-      <AIAssistant
+      <GlobalOrchestratorWorkspace
         companies={companies}
         contacts={enrichedContacts}
         opportunities={enrichedOpportunities}
