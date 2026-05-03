@@ -1,6 +1,6 @@
-import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createProjectPackage } from "@/lib/data/project-packages";
+import type { ChainRole } from "@/lib/data/contractor-chain-shared";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,12 +81,12 @@ const ROLE_ORDER: Record<string, number> = {
 // Normalize free-form role text from AI into a valid chain_role enum value.
 // AI often returns synonyms or uppercase ("MEP", "OPERATOR", "General Contractor")
 // — map them all to canonical lowercase enum values.
-function normalizeChainRole(input: unknown): keyof typeof ROLE_ORDER {
+function normalizeChainRole(input: unknown): ChainRole {
   const raw = String(input ?? "").toLowerCase().trim();
-  if (raw in ROLE_ORDER) return raw as keyof typeof ROLE_ORDER;
+  if (raw in ROLE_ORDER) return raw as ChainRole;
 
   // Synonyms / variations
-  const synonyms: Record<string, keyof typeof ROLE_ORDER> = {
+  const synonyms: Record<string, ChainRole> = {
     operator: "owner",
     "owner/operator": "owner",
     "owner / operator": "owner",
@@ -124,7 +124,7 @@ function normalizeChainRole(input: unknown): keyof typeof ROLE_ORDER {
     if (raw.includes(key)) return value;
   }
   for (const key of Object.keys(ROLE_ORDER)) {
-    if (raw.includes(key)) return key as keyof typeof ROLE_ORDER;
+    if (raw.includes(key)) return key as ChainRole;
   }
 
   return "other";
@@ -377,7 +377,7 @@ export async function acceptResearchSuggestion(params: {
       row.org_id,
       row.project_id,
       {
-        role: normalizedRole,
+        role: normalizedRole as ChainRole,
         label: displayLabel,
         company_name: companyName,
         company_id: companyId,
@@ -385,6 +385,8 @@ export async function acceptResearchSuggestion(params: {
         confidence: row.confidence ?? null,
         rationale: row.evidence_text.substring(0, 500),
         sort_order: ROLE_ORDER[normalizedRole],
+        notes: null,
+        created_by: params.userId,
       },
       params.userId
     );

@@ -18,7 +18,7 @@ import {
 } from "@/lib/data/discovered-projects";
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
-import { getChainNodes } from "@/lib/data/contractor-chain";
+import { getChainNodes, type ContractorChainNodeRow } from "@/lib/data/contractor-chain";
 import {
   listResearchRuns,
   listResearchSuggestions,
@@ -346,7 +346,7 @@ function PackageOpportunityCard({
             <Waypoints className={cn("h-4 w-4", opportunity.isAccepted ? "text-emerald-600" : "text-sky-600")} />
             <p className="text-sm font-semibold text-slate-900">{opportunity.title}</p>
             {opportunity.isAccepted && (
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 py-0 h-5 text-[10px] border-emerald-200">
+              <Badge intent="success" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 py-0 h-5 text-[10px] border-emerald-200">
                 Accepted
               </Badge>
             )}

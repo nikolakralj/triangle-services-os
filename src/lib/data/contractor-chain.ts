@@ -1,6 +1,15 @@
 import "server-only";
 import { createCookieSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
+import { 
+  type ContractorChainNodeRow, 
+  type BuyerContactRow, 
+  type ChainRole, 
+  type ChainKnowledgeLevel,
+  CHAIN_ROLE_ORDER,
+  CHAIN_ROLE_LABELS
+} from "./contractor-chain-shared";
+
 export * from "./contractor-chain-shared";
 
 // ─── Contractor chain CRUD ─────────────────────────────────────────────────

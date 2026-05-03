@@ -608,7 +608,11 @@ async function executeProposalTool(params: {
       const suggestionId = String(args.suggestion_id ?? "");
       if (!suggestionId) return { ok: false, error: "Missing suggestion_id" };
 
-      const ok = await acceptResearchSuggestion(suggestionId, orgId, userId);
+      const { ok } = await acceptResearchSuggestion({
+        suggestionId,
+        orgId,
+        userId,
+      });
       await audit(
         orgId,
         userId,
