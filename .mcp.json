@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "triangle": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp",
+      "headers": {
+        "Authorization": "Bearer tri_live_nk_7f3a9b2e4d1c8f6a0e5b3d9c2f7a4e1b"
+      }
+    }
+  }
+}

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 import {
-  upsertChainNode,
   CHAIN_ROLE_LABELS,
   CHAIN_ROLE_ORDER,
   type ChainRole,

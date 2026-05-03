@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TrendingUp, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -119,9 +120,9 @@ export function PromoteProjectButton({
                   {companies.length === 0 && (
                     <p className="mt-1 text-xs text-amber-600">
                       No companies yet.{" "}
-                      <a href="/companies" className="underline">
+                      <Link href="/companies" className="underline">
                         Add one first.
-                      </a>
+                      </Link>
                     </p>
                   )}
                 </div>

@@ -1,4 +1,5 @@
 import type { DiscoveredProject } from "@/lib/data/discovered-projects";
+import type { ProjectPackageRow } from "@/lib/data/project-packages";
 
 export type KnowledgeLevel = "known" | "inferred" | "unknown";
 
@@ -19,6 +20,8 @@ export type PackageOpportunity = {
   sizeRange: string;
   phaseFit: string;
   confidence: number;
+  isAccepted?: boolean;
+  contractorNodeId?: string;
 };
 
 export type CommercialReadiness = {
@@ -202,6 +205,53 @@ export function buildPackageOpportunities(project: DiscoveredProject): PackageOp
   }
 
   return packages.sort((a, b) => b.confidence - a.confidence);
+}
+
+export function mergePackageOpportunities(
+  heuristicPackages: PackageOpportunity[],
+  dbPackages: ProjectPackageRow[],
+  project: DiscoveredProject
+): PackageOpportunity[] {
+  const merged: PackageOpportunity[] = [];
+
+  // 1. Add DB packages (Accepted)
+  for (const pkg of dbPackages) {
+    merged.push({
+      id: pkg.id,
+      title: pkg.title,
+      summary: pkg.summary || "",
+      roles: pkg.roles,
+      sizeRange: pkg.estimated_crew_size ? `${pkg.estimated_crew_size} people` : "Unknown",
+      phaseFit: "Confirmed research",
+      confidence: pkg.confidence ?? 100,
+      isAccepted: true,
+      contractorNodeId: pkg.contractor_node_id ?? undefined,
+    });
+  }
+
+  // 2. Add Heuristic packages (Inferred)
+  // Only add heuristics if they don't obviously overlap with an accepted package
+  // (e.g. if we have an accepted "Electrical fit-out", maybe we don't need the heuristic one)
+  for (const hp of heuristicPackages) {
+    const isRedundant = dbPackages.some(
+      (dp) => dp.title.toLowerCase().includes(hp.title.toLowerCase()) || 
+              hp.title.toLowerCase().includes(dp.title.toLowerCase())
+    );
+    
+    if (!isRedundant) {
+      merged.push({
+        ...hp,
+        isAccepted: false,
+      });
+    }
+  }
+
+  return merged.sort((a, b) => {
+    // Accepted always wins, then confidence
+    if (a.isAccepted && !b.isAccepted) return -1;
+    if (!a.isAccepted && b.isAccepted) return 1;
+    return b.confidence - a.confidence;
+  });
 }
 
 export function buildCommercialReadiness(project: DiscoveredProject): CommercialReadiness {

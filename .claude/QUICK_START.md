@@ -22,6 +22,9 @@ tail -f .claude/activity/*.log
 
 Done. ✅
 
+Before adding any new runtime agent, read `.claude/ADDING_AGENTS.md`.
+The current system is queue-driven and hardcoded in places, so agent definitions in config files do not become executable by themselves.
+
 ## What Just Happened?
 
 **You made a commit** →

@@ -4,9 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  CircleDashed,
   ExternalLink,
-  LocateFixed,
   ShieldAlert,
   Waypoints,
 } from "lucide-react";
@@ -21,27 +19,37 @@ import {
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
 import { getChainNodes } from "@/lib/data/contractor-chain";
+import {
+  listResearchRuns,
+  listResearchSuggestions,
+} from "@/lib/data/research";
+import { listProjectPackages } from "@/lib/data/project-packages";
 import { PromoteProjectButton } from "@/components/modules/promote-project-button";
 import { UpdateProjectStatusButton } from "@/components/modules/update-project-status-button";
 import { ContractorChainPanel } from "@/components/modules/contractor-chain-panel";
+import { ResearchQueueWorkspace } from "@/components/modules/research-queue-workspace";
+import { PersistedCollapsible } from "@/components/modules/persisted-collapsible";
 import {
   buildCommercialReadiness,
   buildContractorChain,
   buildPackageOpportunities,
+  mergePackageOpportunities,
   getPhaseCommercialContext,
   getPhaseLabel,
   type CommercialReadiness,
-  type ContractorChainNode,
   type PackageOpportunity,
 } from "@/lib/hunter-commercial";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export default async function DiscoveredProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string; showWeak?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
   const session = await requireSession();
 
   const [row, companyRows, stageRows] = await Promise.all([
@@ -50,8 +58,14 @@ export default async function DiscoveredProjectDetailPage({
     listPipelineStages(session.organizationId),
   ]);
 
-  // Load saved contractor chain nodes in parallel after we have the project id
-  const savedChainNodes = row ? await getChainNodes(id) : [];
+  const [savedChainNodes, allResearchSuggestions, researchRuns, dbPackages] = row
+    ? await Promise.all([
+        getChainNodes(id, session.organizationId),
+        listResearchSuggestions(id, session.organizationId),
+        listResearchRuns(id, session.organizationId),
+        listProjectPackages(id, session.organizationId),
+      ])
+    : [[], [], [], []];
 
   if (!row || row.organization_id !== session.organizationId) notFound();
 
@@ -60,7 +74,12 @@ export default async function DiscoveredProjectDetailPage({
   const stages = stageRows.map(rowToPipelineStage);
   const readiness = buildCommercialReadiness(project);
   const contractorChain = buildContractorChain(project);
-  const packageOpportunities = buildPackageOpportunities(project);
+  const heuristicPackages = buildPackageOpportunities(project);
+  const packageOpportunities = mergePackageOpportunities(heuristicPackages, dbPackages, project);
+  const latestResearchRun = researchRuns[0] ?? null;
+  const pendingSuggestionCount = allResearchSuggestions.filter((s) => s.status === "pending").length;
+  const activeView = query.view === "overview" || query.view === "graph" ? query.view : "queue";
+  const showWeakDefault = query.showWeak === "true";
 
   return (
     <>
@@ -81,150 +100,107 @@ export default async function DiscoveredProjectDetailPage({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
-          <Card className="border-slate-200">
-            <CardHeader
-              title="Commercial readiness"
-              description="This project is only useful if we can identify a route to buyer and a package worth offering."
+          <PersistedCollapsible
+            storageKey={`hunter:${project.id}:chain`}
+            title="Contractor chain"
+            description="Accepted intelligence. This is the working map of who may control the project packages."
+            defaultOpen
+          >
+            {savedChainNodes.length === 0 ? (
+              <div className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                No accepted chain nodes yet. Ask the research agent to map owner, developer, GC, MEP and electrical roles, then accept the useful findings.
+              </div>
+            ) : null}
+            <ContractorChainPanel
+              projectId={project.id}
+              savedNodes={savedChainNodes}
+              inferredNodes={contractorChain.map((n) => ({
+                id: n.id,
+                label: n.label,
+                company: n.company,
+                level: n.level,
+                confidence: n.confidence,
+                rationale: n.rationale,
+              }))}
             />
-            <CardContent className="space-y-4">
-              <ReadinessBanner readiness={readiness} />
-              <div className="grid gap-3 md:grid-cols-2">
-                <MetricCard
-                  label="Attack point"
-                  value={readiness.attackPoint}
-                  helper="Best current company or role to pursue next."
-                />
-                <MetricCard
-                  label="Next action"
-                  value={readiness.nextAction}
-                  helper="The next commercial move this record suggests right now."
-                />
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Commercial check
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
-                  {getPhaseCommercialContext(project.phase)}
-                </p>
-                <ul className="mt-3 space-y-2">
-                  {readiness.reasons.map((reason) => (
-                    <li key={reason} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-slate-400" />
-                      {reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+          </PersistedCollapsible>
 
           <Card>
-            <CardHeader
-              title="Contractor chain"
-              description="Saved nodes are persistent. AI suggestions below are inferred and not yet confirmed. Hover a node to edit or remove it."
-            />
+            <CardHeader title="Research inbox" description="Agent findings land here for review. Accepting a contractor/contact moves it into the chain above." />
             <CardContent>
-              <ContractorChainPanel
+              <ResearchQueueWorkspace
                 projectId={project.id}
-                savedNodes={savedChainNodes}
-                inferredNodes={contractorChain.map((n) => ({
-                  id: n.id,
-                  label: n.label,
-                  company: n.company,
-                  level: n.level,
-                  confidence: n.confidence,
-                  rationale: n.rationale,
-                }))}
+                suggestions={allResearchSuggestions}
+                latestResearchRun={latestResearchRun}
+                pendingCount={pendingSuggestionCount}
+                showWeakDefault={showWeakDefault}
+                viewMode={activeView}
+                savedChainNodes={savedChainNodes}
+                dbPackages={dbPackages}
               />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader
-              title="Package opportunities"
-              description="These are package hypotheses, not promises. The point is to translate project intelligence into specific offers of any credible size."
-            />
-            <CardContent className="space-y-3">
-              {packageOpportunities.map((pkg) => (
-                <PackageOpportunityCard key={pkg.id} opportunity={pkg} />
-              ))}
-            </CardContent>
-          </Card>
+          <PersistedCollapsible
+            storageKey={`hunter:${project.id}:commercial`}
+            title="Commercial readiness"
+            description="Secondary context: route-to-buyer framing, attack point, and phase context."
+          >
+            <div className="space-y-4">
+              <ReadinessBanner readiness={readiness} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <MetricCard label="Attack point" value={readiness.attackPoint} helper="Best current company or role to pursue next." />
+                <MetricCard label="Next action" value={readiness.nextAction} helper="The next commercial move this record suggests right now." />
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Commercial check</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{getPhaseCommercialContext(project.phase)}</p>
+              </div>
+            </div>
+          </PersistedCollapsible>
 
-          <Card>
-            <CardHeader title="Project facts" />
-            <CardContent className="grid gap-4 md:grid-cols-2">
+          <PersistedCollapsible
+            storageKey={`hunter:${project.id}:graph`}
+            title="Chain graph (Sprint C target)"
+            description="Graph placeholder: owner/developer/GC/EPC/MEP/electrical/contacts/packages with confidence-weighted edges and gap nodes."
+          >
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              Graph view is queued for Sprint C (UI/Graph Usability). Current fallback is the chain list and grouped queue above.
+            </div>
+          </PersistedCollapsible>
+
+          <PersistedCollapsible
+            storageKey={`hunter:${project.id}:packages`}
+            title="Package opportunities"
+            description="Package hypotheses generated from current project context."
+          >
+            <div className="space-y-3">
+              {packageOpportunities.map((pkg) => (
+                <PackageOpportunityCard 
+                  key={pkg.id} 
+                  opportunity={pkg} 
+                  contractor={pkg.contractorNodeId ? savedChainNodes.find(n => n.id === pkg.contractorNodeId) : undefined}
+                />
+              ))}
+            </div>
+          </PersistedCollapsible>
+
+          <PersistedCollapsible storageKey={`hunter:${project.id}:facts`} title="Project facts">
+            <div className="grid gap-4 md:grid-cols-2">
               <Info label="Client / operator" value={project.clientCompany ?? "-"} />
               <Info label="General contractor" value={project.generalContractor ?? "-"} />
               <Info label="Type" value={project.projectType ?? "-"} />
               <Info label="Capacity" value={project.capacity ?? "-"} />
-              <Info
-                label="Country"
-                value={
-                  project.country
-                    ? `${project.country}${project.countryCode ? ` (${project.countryCode})` : ""}`
-                    : "-"
-                }
-              />
+              <Info label="Country" value={project.country ? `${project.country}${project.countryCode ? ` (${project.countryCode})` : ""}` : "-"} />
               <Info label="City" value={project.city ?? "-"} />
-              <Info
-                label="Estimated value"
-                value={project.estimatedValueEur ? formatCurrency(project.estimatedValueEur) : "-"}
-              />
+              <Info label="Estimated value" value={project.estimatedValueEur ? formatCurrency(project.estimatedValueEur) : "-"} />
               <Info label="Phase" value={getPhaseLabel(project.phase)} />
-              <Info
-                label="Phase confidence"
-                value={
-                  project.phaseConfidence !== undefined ? `${project.phaseConfidence}%` : "-"
-                }
-              />
+              <Info label="Phase confidence" value={project.phaseConfidence !== undefined ? `${project.phaseConfidence}%` : "-"} />
               <Info label="Estimated start" value={project.estimatedStartDate ?? "-"} />
-              <Info
-                label="Estimated completion"
-                value={project.estimatedCompletionDate ?? "-"}
-              />
-              <Info
-                label="Peak workforce month"
-                value={project.peakWorkforceMonth ?? "-"}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader title="Labor relevance" />
-            <CardContent className="space-y-4">
-              <p className="text-sm text-slate-700">
-                <b>Total estimated crew:</b> {project.estimatedCrewSize ?? "Unknown"}
-              </p>
-              {project.crewBreakdown && Object.keys(project.crewBreakdown).length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {Object.entries(project.crewBreakdown).map(([role, count]) => (
-                    <div
-                      key={role}
-                      className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50 px-3 py-2"
-                    >
-                      <span className="text-sm text-slate-700">{role.replace(/_/g, " ")}</span>
-                      <span className="text-sm font-bold text-slate-900">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No role breakdown yet. Use package opportunities above as the first commercial hypothesis.
-                </p>
-              )}
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  AI match reasoning
-                </p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {project.aiMatchReasoning ?? "-"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              <Info label="Estimated completion" value={project.estimatedCompletionDate ?? "-"} />
+              <Info label="Peak workforce month" value={project.peakWorkforceMonth ?? "-"} />
+            </div>
+          </PersistedCollapsible>
         </div>
 
         <div className="space-y-4">
@@ -355,60 +331,25 @@ function ReadinessBanner({ readiness }: { readiness: CommercialReadiness }) {
   );
 }
 
-function ContractorChainRow({ node }: { node: ContractorChainNode }) {
-  const tone = {
-    known: {
-      icon: CheckCircle2,
-      badge: "Known",
-      shell: "border-emerald-200 bg-emerald-50",
-      text: "text-emerald-950",
-    },
-    inferred: {
-      icon: LocateFixed,
-      badge: "Inferred",
-      shell: "border-amber-200 bg-amber-50",
-      text: "text-amber-950",
-    },
-    unknown: {
-      icon: CircleDashed,
-      badge: "Unknown",
-      shell: "border-slate-200 bg-slate-50",
-      text: "text-slate-700",
-    },
-  }[node.level];
-
-  const Icon = tone.icon;
-
-  return (
-    <div className={cn("rounded-lg border p-3", tone.shell)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Icon className={cn("h-4 w-4", tone.text)} />
-            <p className="text-sm font-semibold text-slate-900">{node.label}</p>
-            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              {tone.badge}
-            </span>
-            {node.confidence !== undefined ? (
-              <span className="text-xs text-slate-500">{node.confidence}%</span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm text-slate-900">{node.company ?? "-"}</p>
-          <p className="mt-1 text-xs leading-5 text-slate-600">{node.rationale}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PackageOpportunityCard({ opportunity }: { opportunity: PackageOpportunity }) {
+function PackageOpportunityCard({ 
+  opportunity, 
+  contractor 
+}: { 
+  opportunity: PackageOpportunity;
+  contractor?: ContractorChainNodeRow;
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Waypoints className="h-4 w-4 text-sky-600" />
+            <Waypoints className={cn("h-4 w-4", opportunity.isAccepted ? "text-emerald-600" : "text-sky-600")} />
             <p className="text-sm font-semibold text-slate-900">{opportunity.title}</p>
+            {opportunity.isAccepted && (
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 py-0 h-5 text-[10px] border-emerald-200">
+                Accepted
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-sm leading-6 text-slate-700">{opportunity.summary}</p>
         </div>
@@ -420,6 +361,9 @@ function PackageOpportunityCard({ opportunity }: { opportunity: PackageOpportuni
         <FactPill label="Phase fit" value={opportunity.phaseFit} />
         <FactPill label="Package size" value={opportunity.sizeRange} />
         <FactPill label="Roles" value={opportunity.roles.join(", ")} />
+        {contractor && (
+          <FactPill label="Owner" value={contractor.company_name ?? contractor.label} />
+        )}
       </div>
     </div>
   );

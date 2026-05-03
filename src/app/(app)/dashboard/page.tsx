@@ -23,7 +23,6 @@ import {
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listContacts } from "@/lib/data/contacts";
 import {
-  listOpenTasks,
   getOverdueTasks,
   getTasksDueThisWeek,
   rowToTask,

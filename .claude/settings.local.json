@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__triangle__list_projects",
+      "mcp__triangle__propose_chain_node"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "triangle"
+  ]
+}

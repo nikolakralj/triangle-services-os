@@ -62,6 +62,33 @@ export async function createCookieSupabaseClient() {
 }
 
 export async function requireApiAccess(request: Request) {
+  // ── Static API key (for MCP / partner access) ──────────────────────────────
+  // Set MCP_API_KEY + MCP_ORGANIZATION_ID + MCP_USER_ID in .env.local
+  // The key never expires — revoke by removing it from env.
+  const apiKey = process.env.MCP_API_KEY;
+  if (apiKey) {
+    const bearer = request.headers.get("authorization");
+    const token = bearer?.startsWith("Bearer ") ? bearer.slice(7) : null;
+    if (token && token === apiKey) {
+      const orgId = process.env.MCP_ORGANIZATION_ID ?? "";
+      const userId = process.env.MCP_USER_ID ?? "";
+      if (!orgId || !userId) {
+        return {
+          ok: false as const,
+          status: 500,
+          error: "MCP_ORGANIZATION_ID and MCP_USER_ID must be set alongside MCP_API_KEY.",
+        };
+      }
+      return {
+        ok: true as const,
+        demo: false,
+        userId,
+        organizationId: orgId,
+        role: "admin",
+      };
+    }
+  }
+
   const { isConfigured } = getSupabaseConfig();
 
   if (!isConfigured) {
@@ -105,21 +132,20 @@ export async function requireApiAccess(request: Request) {
     return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
-  const { data: rpcMember } = await supabase
-    .rpc("get_my_org_membership")
-    .maybeSingle();
-
-  const member: ApiMembership | null =
-    (rpcMember as ApiMembership | null) ??
-    (
-      await supabase
+  // Always use the service client for org membership lookup so we bypass RLS
+  // (the user JWT is already verified above; we just need their membership row)
+  const svc = createServiceSupabaseClient();
+  const memberQuery = svc
+    ? await svc
         .from("organization_members")
         .select("organization_id, role, status")
         .eq("user_id", user.id)
         .eq("status", "active")
         .limit(1)
         .maybeSingle()
-    ).data;
+    : { data: null };
+
+  const member: ApiMembership | null = memberQuery.data as ApiMembership | null;
 
   if (!member) {
     return { ok: false as const, status: 403, error: "Forbidden" };

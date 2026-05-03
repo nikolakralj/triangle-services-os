@@ -170,6 +170,16 @@ Agents communicate via this JSON file:
 | `.claude/watchers/file-watcher.js` | File changes → Antigravity trigger |
 | `.claude/coordinator/orchestrator.js` | Central orchestration hub |
 
+## Adding Agents
+
+Read `.claude/ADDING_AGENTS.md` before introducing any new runtime agent.
+
+Important:
+
+- `config.json` and `devpit-config.yaml` are not enough by themselves
+- new agents must be wired into `orchestrator.js`
+- some producer must write a matching `action` into `task-queue.json`
+
 ## Activity Logs
 
 **Location**: `.claude/activity/`

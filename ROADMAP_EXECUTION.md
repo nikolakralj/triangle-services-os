@@ -141,10 +141,10 @@ Success criteria:
 
 ## Immediate Priorities
 
-1. stabilize and commit current Hunter work
-2. clean current repo state and separate unfinished work from proven work
-3. improve Hunter result quality
-4. design contractor chain schema and UI
+1. stabilize and commit current Hunter + Research Workbench slices
+2. fix reliability issues in conversational research (duplicate IDs, long-thread stability, summary refresh cadence)
+3. improve Hunter result quality (exclusion list, angle rotation, recency discipline)
+4. build the package recommendation engine from accepted chain + project phase
 
 ## Explicit Non-Priorities Right Now
 

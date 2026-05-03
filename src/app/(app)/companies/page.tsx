@@ -9,7 +9,6 @@ import {
   getCompanySectors,
   getCompanyCountries,
 } from "@/lib/data/companies";
-import { listWorkers, rowToWorker } from "@/lib/data/workers";
 
 export default async function CompaniesPage({
   searchParams,
@@ -26,7 +25,7 @@ export default async function CompaniesPage({
   const ownerId = params.ownerId ? String(params.ownerId) : "";
   const priority = params.priority ? String(params.priority) : "";
 
-  const [rows, statuses, sectors, countries, workers] = await Promise.all([
+  const [rows, statuses, sectors, countries] = await Promise.all([
     searchAndFilterCompanies(session.organizationId, {
       search: search || undefined,
       status: status || undefined,
@@ -38,11 +37,9 @@ export default async function CompaniesPage({
     getCompanyStatuses(session.organizationId),
     getCompanySectors(session.organizationId),
     getCompanyCountries(session.organizationId),
-    listWorkers(session.organizationId),
   ]);
 
   const companies = rows.map(rowToCompany);
-  const workersList = workers.map(rowToWorker);
   const caps = capabilities(session.role);
 
   return (
@@ -55,7 +52,6 @@ export default async function CompaniesPage({
         statuses={statuses}
         sectors={sectors}
         countries={countries}
-        workers={workersList}
         initialSearch={search}
         initialStatus={status}
         initialSector={sector}

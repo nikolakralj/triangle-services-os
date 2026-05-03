@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/field";
-import type { Worker } from "@/lib/types";
 
 export function CompaniesFilterForm({
   statuses,
   sectors,
   countries,
-  workers,
   initialSearch,
   initialStatus,
   initialSector,
@@ -22,7 +20,6 @@ export function CompaniesFilterForm({
   statuses: string[];
   sectors: string[];
   countries: string[];
-  workers: Worker[];
   initialSearch: string;
   initialStatus: string;
   initialSector: string;

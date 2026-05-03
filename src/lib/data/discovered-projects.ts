@@ -279,3 +279,31 @@ export async function getDiscoveredProjectStats(
     wonCount: rows.filter((r) => r.status === "won").length,
   };
 }
+
+/**
+ * Get names + countries of all already-known projects for a sector.
+ * Used to build the exclusion list in Hunter prompts.
+ */
+export async function getKnownProjectNames(
+  organizationId: string,
+  sectorId?: string,
+): Promise<Array<{ name: string; country: string | null }>> {
+  const service = createServiceSupabaseClient();
+  if (!service) return [];
+
+  let query = service
+    .from("discovered_projects")
+    .select("project_name, country")
+    .eq("organization_id", organizationId)
+    .not("status", "eq", "duplicate");
+
+  if (sectorId) query = query.eq("sector_id", sectorId);
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  return (data as { project_name: string; country: string | null }[]).map((r) => ({
+    name: r.project_name,
+    country: r.country,
+  }));
+}

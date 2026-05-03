@@ -1,94 +1,31 @@
 import "server-only";
 import { createCookieSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
-export type ChainKnowledgeLevel = "known" | "inferred" | "unknown";
-
-export type ChainRole =
-  | "owner"
-  | "developer"
-  | "epc"
-  | "gc"
-  | "mep"
-  | "electrical"
-  | "intermediary"
-  | "other";
-
-export type ContractorChainNodeRow = {
-  id: string;
-  organization_id: string;
-  discovered_project_id: string;
-  role: ChainRole;
-  label: string;
-  company_name: string | null;
-  company_id: string | null;
-  level: ChainKnowledgeLevel;
-  confidence: number | null;
-  rationale: string | null;
-  notes: string | null;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-};
-
-export type BuyerContactRow = {
-  id: string;
-  organization_id: string;
-  discovered_project_id: string;
-  chain_node_id: string | null;
-  contact_id: string | null;
-  full_name: string | null;
-  job_title: string | null;
-  company_name: string | null;
-  email: string | null;
-  linkedin_url: string | null;
-  buyer_role: string | null;
-  priority: number;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-};
-
-// ─── Role display labels ───────────────────────────────────────────────────
-
-export const CHAIN_ROLE_LABELS: Record<ChainRole, string> = {
-  owner: "Owner / operator",
-  developer: "Developer",
-  epc: "EPC contractor",
-  gc: "General contractor",
-  mep: "MEP contractor",
-  electrical: "Electrical contractor",
-  intermediary: "Labor intermediary",
-  other: "Other",
-};
-
-// Default sort order per role
-export const CHAIN_ROLE_ORDER: Record<ChainRole, number> = {
-  owner: 0,
-  developer: 1,
-  epc: 2,
-  gc: 3,
-  mep: 4,
-  electrical: 5,
-  intermediary: 6,
-  other: 7,
-};
+export * from "./contractor-chain-shared";
 
 // ─── Contractor chain CRUD ─────────────────────────────────────────────────
 
 export async function getChainNodes(
   discoveredProjectId: string,
+  organizationId?: string,
 ): Promise<ContractorChainNodeRow[]> {
-  const supabase = await createCookieSupabaseClient();
+  const supabase = organizationId
+    ? createServiceSupabaseClient()
+    : await createCookieSupabaseClient();
   if (!supabase) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("contractor_chain_nodes")
     .select("*")
     .eq("discovered_project_id", discoveredProjectId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("getChainNodes error", error);
@@ -106,6 +43,40 @@ export async function upsertChainNode(
   const service = createServiceSupabaseClient();
   if (!service) return null;
 
+  // Find existing node to prevent duplicates
+  let query = service
+    .from("contractor_chain_nodes")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("discovered_project_id", discoveredProjectId)
+    .eq("role", node.role);
+
+  if (node.company_name) {
+    query = query.eq("company_name", node.company_name);
+  } else {
+    query = query.is("company_name", null);
+  }
+
+  const { data: existing } = await query.limit(1).maybeSingle();
+
+  if (existing) {
+    const { data, error } = await service
+      .from("contractor_chain_nodes")
+      .update({
+        ...node,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error("upsertChainNode update error", error);
+      return null;
+    }
+    return data as ContractorChainNodeRow | null;
+  }
+
   const { data, error } = await service
     .from("contractor_chain_nodes")
     .insert({
@@ -119,7 +90,7 @@ export async function upsertChainNode(
     .maybeSingle();
 
   if (error) {
-    console.error("upsertChainNode error", error);
+    console.error("upsertChainNode insert error", error);
     return null;
   }
   return data as ContractorChainNodeRow | null;
@@ -224,16 +195,25 @@ export async function seedChainFromAI(
 
 export async function getBuyerContacts(
   discoveredProjectId: string,
+  organizationId?: string,
 ): Promise<BuyerContactRow[]> {
-  const supabase = await createCookieSupabaseClient();
+  const supabase = organizationId
+    ? createServiceSupabaseClient()
+    : await createCookieSupabaseClient();
   if (!supabase) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("buyer_contacts")
     .select("*")
     .eq("discovered_project_id", discoveredProjectId)
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true });
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("getBuyerContacts error", error);

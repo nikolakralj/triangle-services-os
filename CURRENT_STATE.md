@@ -21,6 +21,21 @@ Current direction:
 - Hunter feature exists in code
 - Hunter can discover projects and write them to the database
 - OpenAI is now the active Hunter provider
+- contractor-chain final tables and project UI exist
+- Option C research-workbench foundation exists:
+  - authenticated `/api/mcp` route
+  - read-only MCP context tools
+  - suggestion-only MCP proposal tools
+  - `research_suggestions` review panel on project detail
+  - audit table support through `ai_tool_calls`
+- conversational research agent is live:
+  - `/api/research/chat`
+  - project-level memory via `research_conversations` + `research_messages`
+  - tool-driven suggestions from chat into `research_suggestions`
+- one-shot advanced research run is live:
+  - `/api/research/run`
+  - `research_runs` + `research_sources` + `research_suggestions` writes
+  - run trigger UI on Hunter project detail page
 
 ## What Is Still Partial
 
@@ -28,9 +43,12 @@ Current direction:
 - the pipeline is visually improved but not fully backed by real opportunity data
 - company detail still lacks fully wired related data
 - AI and dashboard areas still need stronger grounding in real database state
-- contractor-chain workflow does not exist yet
-- buyer mapping does not exist yet
-- crew package recommendation does not exist yet
+- multi-agent research orchestrator (specialist-agent fan-out) is not implemented yet
+- public-records, web-source, auditor, people, and strategy agents are not implemented yet
+- accepted package suggestions do not yet become rich final package records
+- buyer mapping exists only as early data structures and suggestions
+- crew package recommendation exists as project-detail hypotheses, not a full matching engine
+- migrations `004_research_workbench.sql` and `005_research_conversations.sql` must be applied to Supabase before full live testing
 
 ## Repo Reality Check
 
@@ -59,8 +77,8 @@ This means:
 
 1. stabilize current Hunter work and make it trustworthy
 2. clean and commit the current product pivot in coherent slices
-3. add contractor-chain mapping
-4. add buyer mapping
+3. apply and verify research-workbench migration in Supabase
+4. stabilize research chat + advanced run reliability
 5. connect project intelligence to concrete crew packages
 
 ## Things To Be Careful About
@@ -79,6 +97,7 @@ Start here:
 3. read `WORKFLOW_SIGNAL_TO_PLACEMENT.md`
 4. read `ROADMAP_EXECUTION.md`
 5. read `DECISIONS.md`
-6. read this file
+6. read `RESEARCH_WORKBENCH.md`
+7. read this file
 
 Then inspect the current git status before making assumptions about what is already committed.

@@ -44,7 +44,8 @@ export async function proxy(request: NextRequest) {
   const isAuthPath =
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/register");
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/api/"); // API routes authenticate themselves
 
   if (!user && !isAuthPath) {
     const loginUrl = request.nextUrl.clone();

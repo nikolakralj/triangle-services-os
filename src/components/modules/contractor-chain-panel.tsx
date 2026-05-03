@@ -18,7 +18,18 @@ import type {
   ContractorChainNodeRow,
   ChainRole,
   ChainKnowledgeLevel,
-} from "@/lib/data/contractor-chain";
+} from "@/lib/data/contractor-chain-shared";
+
+const CHAIN_ROLE_ORDER: Record<ChainRole, number> = {
+  owner: 0,
+  developer: 1,
+  epc: 2,
+  gc: 3,
+  mep: 4,
+  electrical: 5,
+  intermediary: 6,
+  other: 7,
+};
 
 const ROLE_OPTIONS: { value: ChainRole; label: string }[] = [
   { value: "owner", label: "Owner / operator" },
@@ -59,11 +70,9 @@ const LEVEL_CONFIG: Record<
 
 function ChainNodeRow({
   node,
-  projectId,
   onRefresh,
 }: {
   node: ContractorChainNodeRow;
-  projectId: string;
   onRefresh: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -481,7 +490,6 @@ export function ContractorChainPanel({
             <ChainNodeRow
               key={node.id}
               node={node}
-              projectId={projectId}
               onRefresh={handleRefresh}
             />
           ))}
@@ -534,3 +542,5 @@ export function ContractorChainPanel({
     </div>
   );
 }
+
+

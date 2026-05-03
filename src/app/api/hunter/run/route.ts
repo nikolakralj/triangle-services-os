@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/supabase/server";
+import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 import { getSectorById, rowToSector } from "@/lib/data/sectors";
 import {
   insertDiscoveredProject,
   findByFingerprint,
+  getKnownProjectNames,
 } from "@/lib/data/discovered-projects";
 import { startHuntRun, completeHuntRun } from "@/lib/data/hunt-runs";
 import { seedChainFromAI } from "@/lib/data/contractor-chain";
@@ -47,6 +48,26 @@ type AIProject = {
   source_text?: string;
   source_date?: string;
 };
+
+function normalizeForKey(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function projectKey(name: string | null | undefined, country: string | null | undefined) {
+  return `${normalizeForKey(name)}__${normalizeForKey(country) || "global"}`;
+}
+
+function isSourceDateRecent(sourceDate: string | null | undefined, maxAgeDays: number) {
+  if (!sourceDate) return false;
+  const parsed = new Date(sourceDate);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  return parsed.getTime() >= cutoff;
+}
 
 const VALID_PHASES = new Set([
   "announced",
@@ -103,6 +124,22 @@ export async function POST(request: Request) {
 
   const sector = rowToSector(sectorRow);
 
+  // Fetch known projects for this sector (exclusion list)
+  const knownProjects = await getKnownProjectNames(access.organizationId, sector.id);
+
+  // Count past successful hunt runs for this sector → drives angle rotation
+  const service = createServiceSupabaseClient();
+  let huntRunIndex = 0;
+  if (service) {
+    const { count } = await service
+      .from("hunt_runs")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", access.organizationId)
+      .eq("sector_id", sector.id)
+      .eq("status", "success");
+    huntRunIndex = count ?? 0;
+  }
+
   // Start audit log entry
   const huntRun = await startHuntRun({
     organizationId: access.organizationId,
@@ -123,13 +160,15 @@ export async function POST(request: Request) {
   let aiCostUsd = 0;
   let rawResultsCount = 0;
   let duplicatesFiltered = 0;
+  let staleFiltered = 0;
+  let knownFiltered = 0;
   let newProjectsInserted = 0;
 
   try {
     // ======================================================
     // 1. Call OpenAI with web search to find projects
     // ======================================================
-    const userPrompt = buildHunterUserPrompt(sector);
+    const userPrompt = buildHunterUserPrompt(sector, { knownProjects, huntRunIndex });
     const aiResponse = await callOpenAIHunter({
       systemPrompt: HUNTER_SYSTEM_PROMPT,
       userPrompt,
@@ -159,11 +198,27 @@ export async function POST(request: Request) {
     rawResultsCount = aiProjects.length;
     const webSources = collectWebSources(aiResponse);
 
+    const knownProjectKeys = new Set(
+      knownProjects.map((p) => projectKey(p.name, p.country)),
+    );
+
     // ======================================================
-    // 2. Insert each project (with dedup by fingerprint)
+    // 2. Insert each project with strict server-side filters
     // ======================================================
     for (const ai of aiProjects) {
       if (!ai.project_name) continue;
+
+      // Hard recency filter (60 days). Prompt asks for it, but we enforce it here.
+      if (!isSourceDateRecent(ai.source_date, 60)) {
+        staleFiltered++;
+        continue;
+      }
+
+      // Hard exclusion filter against known projects by normalized name+country.
+      if (knownProjectKeys.has(projectKey(ai.project_name, ai.country))) {
+        knownFiltered++;
+        continue;
+      }
 
       const fingerprint = generateProjectFingerprint(
         ai.project_name,
@@ -271,11 +326,11 @@ export async function POST(request: Request) {
       sourcesQueried: 1,
       rawResultsCount,
       aiClassifiedCount: rawResultsCount,
-      duplicatesFiltered,
+      duplicatesFiltered: duplicatesFiltered + staleFiltered + knownFiltered,
       newProjectsInserted,
       aiTokensUsed,
       aiCostUsd,
-      logSummary: `Hunted ${sector.name} via OpenAI web_search. Found ${rawResultsCount} projects, ${newProjectsInserted} new.`,
+      logSummary: `Hunted ${sector.name} via OpenAI web_search. Raw ${rawResultsCount}, new ${newProjectsInserted}, duplicate ${duplicatesFiltered}, stale ${staleFiltered}, known ${knownFiltered}.`,
       startedAt,
     });
 
@@ -284,6 +339,8 @@ export async function POST(request: Request) {
       huntRunId: huntRun.id,
       newProjects: newProjectsInserted,
       duplicates: duplicatesFiltered,
+      staleFiltered,
+      knownFiltered,
       total: rawResultsCount,
       aiCostUsd,
       aiTokensUsed,
@@ -297,7 +354,7 @@ export async function POST(request: Request) {
       sourcesQueried: 1,
       rawResultsCount,
       aiClassifiedCount: 0,
-      duplicatesFiltered,
+      duplicatesFiltered: duplicatesFiltered + staleFiltered + knownFiltered,
       newProjectsInserted,
       aiTokensUsed,
       aiCostUsd,
