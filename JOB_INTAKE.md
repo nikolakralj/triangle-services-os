@@ -69,6 +69,49 @@ src/app/api/job-intake/
   leads/[id]/reply/ GET/POST/PATCH — draft, edit, mark sent.
 ```
 
+## Two ways in: our IMAP, or someone else's bot
+
+`POST /api/job-intake/ingest` is a source-agnostic front door. An external agent —
+a Grok/Claude bot with verified Gmail OAuth, Zapier, an Airtable automation — posts
+raw messages and this route runs **the same pipeline the IMAP sync runs**: classify →
+score with the org's house rules → dedupe → store.
+
+```
+POST /api/job-intake/ingest
+Authorization: Bearer $MCP_API_KEY
+{
+  "mailbox": "ralph.loesekamm@triangle-services.com",
+  "messages": [
+    { "messageId": "<...>", "from": "...", "fromName": "...",
+      "subject": "...", "sentAt": "...", "body": "..." }
+  ]
+}
+→ { received, stored, alreadySeen, opportunities, leadsCreated,
+    noiseDiscarded, skipped[], errors[] }
+```
+
+**Callers send raw material, never conclusions.** If each bot did its own extraction,
+scores would drift between sources and the house rules in Settings would do nothing.
+One pipe, one set of rules, one set of numbers, regardless of who fed it.
+
+**Why this exists:** bot platforms have verified Google/Microsoft OAuth, which we
+cannot cheaply obtain (see the OAuth section below). Letting them own the connector
+while we own the scoring keeps both advantages — and avoids our pipeline data living
+in a vendor's silo.
+
+**This is also the multi-user answer.** Bots are per-person assistants; two people
+running two separate bots would otherwise have two disconnected views. Both post here
+instead, `mailbox` records whose inbox each lead came through (a `mail_accounts` row
+with `provider='external'` and no credentials), and both people open the same ranked
+pipeline. The "via <mailbox>" label only renders once leads arrive from more than one
+mailbox, so it stays quiet for a single user.
+
+Verified 2026-08-25: a bot-shaped payload with one real opportunity and one newsletter
+returned `opportunities: 1, noiseDiscarded: 1`, scored the Austria rail depot lead
+**90** ("ramping up resources… across two sites"), attributed it to the posting
+mailbox, and flagged `missing_fields: [rate, location]`. Re-posting the same
+`messageId` returned `alreadySeen: 1, stored: 0`. Unauthenticated → 401.
+
 ## Scoring
 
 `team_potential` bands, in `extract.ts`:

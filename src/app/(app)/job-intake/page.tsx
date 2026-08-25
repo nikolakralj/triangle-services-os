@@ -83,6 +83,12 @@ export default async function JobIntakePage({
     listJobLeads(session.organizationId, { status, sort }),
   ]);
 
+  // Attribution only earns screen space once a second person is feeding the
+  // pipeline — with one mailbox, "via nikola@…" on every card is just noise.
+  const sourceMailboxCount = new Set(
+    leads.map((l) => l.sourceMailbox).filter(Boolean),
+  ).size;
+
   // Newest draft per lead, so each card can show its reply inline.
   const draftLists = await Promise.all(
     leads.map((l) => listReplyDrafts(l.id, session.organizationId)),
@@ -199,6 +205,7 @@ export default async function JobIntakePage({
               key={lead.id}
               lead={lead}
               draft={draftByLead.get(lead.id) ?? null}
+              showSource={sourceMailboxCount > 1}
             />
           ))}
         </div>
@@ -254,9 +261,12 @@ function scoreTone(score: number | null) {
 function LeadCard({
   lead,
   draft,
+  showSource,
 }: {
   lead: JobLead;
   draft: LeadReplyDraft | null;
+  /** Only worth showing once leads arrive from more than one mailbox. */
+  showSource: boolean;
 }) {
   const tone = scoreTone(lead.teamPotential);
 
@@ -280,6 +290,9 @@ function LeadCard({
             {lead.receivedAt
               ? ` · ${new Date(lead.receivedAt).toLocaleDateString()}`
               : ""}
+            {showSource && lead.sourceMailbox ? (
+              <span className="text-slate-400"> · via {lead.sourceMailbox}</span>
+            ) : null}
           </p>
           {lead.technologies.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">

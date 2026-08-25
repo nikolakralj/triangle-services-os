@@ -36,6 +36,8 @@ export interface JobLead {
   /** Joined from inbound_emails when available. */
   subject: string | null;
   receivedAt: string | null;
+  /** Which mailbox this arrived through — matters once two people feed it. */
+  sourceMailbox: string | null;
 }
 
 export interface IntakeCounts {
@@ -49,7 +51,11 @@ export interface IntakeCounts {
 
 type LeadRow = Record<string, unknown>;
 
-function rowToLead(row: LeadRow, email?: Record<string, unknown> | null): JobLead {
+function rowToLead(
+  row: LeadRow,
+  email?: Record<string, unknown> | null,
+  sourceMailbox?: string | null,
+): JobLead {
   return {
     id: String(row.id),
     inboundEmailId: (row.inbound_email_id as string) ?? null,
@@ -80,6 +86,7 @@ function rowToLead(row: LeadRow, email?: Record<string, unknown> | null): JobLea
     createdAt: String(row.created_at ?? ""),
     subject: (email?.subject as string) ?? null,
     receivedAt: (email?.sent_at as string) ?? null,
+    sourceMailbox: sourceMailbox ?? null,
   };
 }
 
@@ -121,17 +128,40 @@ export async function listJobLeads(
     .filter((id): id is string => Boolean(id));
 
   const emailMap = new Map<string, Record<string, unknown>>();
+  const accountIds = new Set<string>();
   if (emailIds.length > 0) {
     const { data: emails } = await svc
       .from("inbound_emails")
-      .select("id, subject, sent_at")
+      .select("id, subject, sent_at, mail_account_id")
       .in("id", emailIds);
-    for (const e of emails ?? []) emailMap.set(e.id as string, e);
+    for (const e of emails ?? []) {
+      emailMap.set(e.id as string, e);
+      if (e.mail_account_id) accountIds.add(e.mail_account_id as string);
+    }
   }
 
-  const leads = data.map((row) =>
-    rowToLead(row, emailMap.get(String(row.inbound_email_id))),
-  );
+  // Which mailbox each lead arrived through. Only matters once more than one
+  // person feeds the pipeline, but it's cheap to carry.
+  const mailboxMap = new Map<string, string>();
+  if (accountIds.size > 0) {
+    const { data: accounts } = await svc
+      .from("mail_accounts")
+      .select("id, email_address")
+      .in("id", Array.from(accountIds));
+    for (const a of accounts ?? []) {
+      mailboxMap.set(a.id as string, a.email_address as string);
+    }
+  }
+
+  const leads = data.map((row) => {
+    const email = emailMap.get(String(row.inbound_email_id));
+    const accountId = email?.mail_account_id as string | undefined;
+    return rowToLead(
+      row,
+      email,
+      accountId ? mailboxMap.get(accountId) ?? null : null,
+    );
+  });
 
   // Date ordering happens here rather than in SQL: the date that matters is
   // when the recruiter sent the mail, which lives on inbound_emails, not on
