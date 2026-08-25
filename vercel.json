@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/job-intake/sync",
+      "schedule": "*/15 8-19 * * 1-5"
+    }
+  ]
+}

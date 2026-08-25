@@ -14,7 +14,9 @@ import {
   AlertCircle,
   PlusCircle,
   Search,
+  ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface ToolCallRecord {
@@ -46,7 +48,8 @@ const TOOL_LABELS: Record<string, { label: string; icon: any; color: string }> =
   search_crm_companies: { label: "CRM Search", icon: Search, color: "text-amber-600 bg-amber-50" },
   search_talent: { label: "Talent Search", icon: Users, color: "text-sky-600 bg-sky-50" },
   create_crm_lead: { label: "Lead Created", icon: PlusCircle, color: "text-emerald-600 bg-emerald-50" },
-  web_search: { label: "Web Intelligence", icon: Globe, color: "text-violet-600 bg-violet-50" },
+  create_discovered_project: { label: "Project Created", icon: Building2, color: "text-violet-600 bg-violet-50" },
+  web_search: { label: "Web Intelligence", icon: Globe, color: "text-slate-600 bg-slate-50" },
 };
 
 function ToolCallChip({ call }: { call: ToolCallRecord }) {
@@ -61,9 +64,33 @@ function ToolCallChip({ call }: { call: ToolCallRecord }) {
     summary = `Skills: ${skills}`;
   } else if (call.name === "create_crm_lead") {
     summary = String(call.arguments.name ?? "");
+  } else if (call.name === "create_discovered_project") {
+    summary = String(call.arguments.project_name ?? "");
   }
 
   const ok = call.result.ok !== false;
+
+  if (call.name === "create_discovered_project" && ok && call.result.project_id) {
+    return (
+      <div className="mt-2 mb-1">
+        <Link 
+          href={`/hunter/${call.result.project_id}`}
+          className="group flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 p-3 hover:bg-sky-100 hover:border-sky-300 transition-all shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm text-sky-600">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-sky-900">{call.result.project_name || summary}</p>
+              <p className="text-[10px] font-medium text-sky-600">Open Project Workbench</p>
+            </div>
+          </div>
+          <ArrowRight className="h-4 w-4 text-sky-400 group-hover:text-sky-600 transform group-hover:translate-x-1 transition-all" />
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-xs", meta.color)}>
@@ -142,14 +169,15 @@ export function GlobalChatPanel() {
       try {
         // Use a default global identifier or just rely on the API finding the last global chat
         const res = await fetch("/api/ai/chat?global=true");
-        // Note: I haven't implemented GET in /api/ai/chat yet, but I'll add it.
-        // For now, let's just assume a clean start or implement GET soon.
-        if (res.ok) {
-          const data = await res.json();
-          setMessages(data.messages || []);
-          setConversationId(data.conversationId);
-        }
-      } catch {} finally { setHistoryLoading(false); }
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const text = await res.text();
+        if (!text) return; // Empty history is fine
+        const data = JSON.parse(text);
+        setMessages(data.messages || []);
+        setConversationId(data.conversationId);
+      } catch (err: any) {
+        console.error("Global chat history load error:", err);
+      } finally { setHistoryLoading(false); }
     }
     load();
   }, []);
@@ -173,12 +201,40 @@ export function GlobalChatPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, conversationId: conversationId || undefined }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setMessages(prev => [...prev, { id: data.messageId || makeClientMessageId(), role: "assistant", content: data.text, toolCalls: data.toolCalls || [], citations: data.citations || [], createdAt: new Date().toISOString() }]);
+      
+      const responseText = await res.text();
+      if (!res.ok) {
+        let errorMsg = `Server error (${res.status})`;
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMsg = errorData.error || errorMsg;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+
+      const data = JSON.parse(responseText);
+      setMessages(prev => [...prev, { 
+        id: data.messageId || makeClientMessageId(), 
+        role: "assistant", 
+        content: data.text, 
+        toolCalls: data.toolCalls || [], 
+        citations: data.citations || [], 
+        createdAt: new Date().toISOString() 
+      }]);
       setConversationId(data.conversationId);
     } catch (err: any) {
-      setMessages(prev => [...prev, { id: makeClientMessageId(), role: "system_note", content: err.message, toolCalls: [], citations: [], createdAt: new Date().toISOString() }]);
+      const errorMessage = err.message === "Unexpected end of JSON input" 
+        ? "The search took too long or the server connection was lost. Please try a shorter query."
+        : err.message;
+        
+      setMessages(prev => [...prev, { 
+        id: makeClientMessageId(), 
+        role: "system_note", 
+        content: errorMessage, 
+        toolCalls: [], 
+        citations: [], 
+        createdAt: new Date().toISOString() 
+      }]);
     } finally { setLoading(false); }
   };
 

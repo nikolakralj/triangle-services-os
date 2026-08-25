@@ -381,6 +381,26 @@ export interface ProjectMemorySnapshot {
     summary: string;
     confidence: number | null;
   }>;
+  /** Concrete project_packages rows that exist for this project (live, not suggestions). */
+  existingPackages: Array<{
+    id: string;
+    title: string;
+    summary: string | null;
+    roles: string[];
+    size: number | null;
+    confidence: number | null;
+    status: string;
+  }>;
+  /** Live contractor_chain_nodes for this project (so agent can reference node IDs). */
+  acceptedChainNodes: Array<{
+    id: string;
+    company: string;
+    role: string;
+    label: string;
+    confidence: number | null;
+  }>;
+  /** Human-authored freeform note for this project (the "project memory"). */
+  note: string | null;
 }
 
 /**
@@ -410,28 +430,54 @@ export async function buildProjectMemory(params: {
       acceptedFacts: [],
       rejectedAttempts: [],
       pendingProposals: [],
+      existingPackages: [],
+      acceptedChainNodes: [],
+      note: null,
     };
   }
 
-  const [projectRes, suggestionsRes] = await Promise.all([
-    svc
-      .from("discovered_projects")
-      .select(
-        "id, project_name, country, city, phase, project_type, client_company, general_contractor, source_url, ai_summary, estimated_value_eur",
-      )
-      .eq("id", params.projectId)
-      .eq("organization_id", params.orgId)
-      .maybeSingle(),
-    svc
-      .from("research_suggestions")
-      .select(
-        "id, suggestion_type, payload_json, status, confidence, source_url, rejection_reason",
-      )
-      .eq("project_id", params.projectId)
-      .eq("org_id", params.orgId)
-      .order("created_at", { ascending: false })
-      .limit(200),
-  ]);
+  const [projectRes, suggestionsRes, packagesRes, chainNodesRes, noteRes] =
+    await Promise.all([
+      svc
+        .from("discovered_projects")
+        .select(
+          "id, project_name, country, city, phase, project_type, client_company, general_contractor, source_url, ai_summary, estimated_value_eur",
+        )
+        .eq("id", params.projectId)
+        .eq("organization_id", params.orgId)
+        .maybeSingle(),
+      svc
+        .from("research_suggestions")
+        .select(
+          "id, suggestion_type, payload_json, status, confidence, source_url, rejection_reason",
+        )
+        .eq("project_id", params.projectId)
+        .eq("org_id", params.orgId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      svc
+        .from("project_packages")
+        .select("id, title, summary, roles, estimated_crew_size, confidence, status")
+        .eq("project_id", params.projectId)
+        .eq("org_id", params.orgId)
+        .neq("status", "archived")
+        .order("created_at", { ascending: false }),
+      svc
+        .from("contractor_chain_nodes")
+        .select("id, company_name, role, label, confidence")
+        .eq("discovered_project_id", params.projectId)
+        .eq("organization_id", params.orgId)
+        .order("sort_order", { ascending: true }),
+      svc
+        .from("project_notes")
+        .select("body")
+        .eq("project_id", params.projectId)
+        .eq("org_id", params.orgId)
+        .maybeSingle(),
+    ]);
+
+  const noteBody = (noteRes.data as { body: string | null } | null)?.body ?? null;
+  const note = noteBody && noteBody.trim().length > 0 ? noteBody.trim() : null;
 
   const project = projectRes.data ?? {
     id: params.projectId,
@@ -481,6 +527,42 @@ export async function buildProjectMemory(params: {
     }
   }
 
+  const existingPackages: ProjectMemorySnapshot["existingPackages"] = (
+    (packagesRes.data ?? []) as Array<{
+      id: string;
+      title: string;
+      summary: string | null;
+      roles: string[] | null;
+      estimated_crew_size: number | null;
+      confidence: number | null;
+      status: string;
+    }>
+  ).map((p) => ({
+    id: p.id,
+    title: p.title,
+    summary: p.summary,
+    roles: Array.isArray(p.roles) ? p.roles : [],
+    size: p.estimated_crew_size,
+    confidence: p.confidence,
+    status: p.status,
+  }));
+
+  const acceptedChainNodes: ProjectMemorySnapshot["acceptedChainNodes"] = (
+    (chainNodesRes.data ?? []) as Array<{
+      id: string;
+      company_name: string | null;
+      role: string;
+      label: string;
+      confidence: number | null;
+    }>
+  ).map((n) => ({
+    id: n.id,
+    company: n.company_name ?? "",
+    role: n.role,
+    label: n.label,
+    confidence: n.confidence,
+  }));
+
   return {
     project: {
       id: (project as { id: string }).id,
@@ -500,6 +582,9 @@ export async function buildProjectMemory(params: {
     acceptedFacts: accepted,
     rejectedAttempts: rejected,
     pendingProposals: pending,
+    existingPackages,
+    acceptedChainNodes,
+    note,
   };
 }
 
@@ -514,7 +599,12 @@ function summarizeSuggestion(
     return `${String(payload.name ?? "?")} @ ${String(payload.company ?? "?")} (${String(payload.title ?? "?")})`;
   }
   if (type === "package_opportunity") {
-    return `${String(payload.package_type ?? "?")} → ${String(payload.likely_buyer ?? "?")}`;
+    // Support both old (package_type/likely_buyer) and new (title/summary) payloads
+    const title = payload.title ?? payload.package_type ?? "?";
+    const buyer = payload.likely_buyer ?? "?";
+    const size = payload.size ?? null;
+    const sizeBit = size ? ` (${size} workers)` : "";
+    return `${String(title)} → ${String(buyer)}${sizeBit}`;
   }
   if (type === "note") {
     return String(payload.content ?? "").substring(0, 120);

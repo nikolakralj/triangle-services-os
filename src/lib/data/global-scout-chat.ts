@@ -1,10 +1,9 @@
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { type ResearchMessageRow, type ResearchConversationRow } from "./research-chat";
 
-const GLOBAL_PROJECT_ID = "00000000-0000-0000-0000-000000000000";
-
 /**
- * Find or create a global conversation for an organization
+ * Find or create a global conversation for an organization.
+ * Global conversations have a NULL project_id.
  */
 export async function getOrCreateGlobalConversation(params: {
   orgId: string;
@@ -16,7 +15,7 @@ export async function getOrCreateGlobalConversation(params: {
   const { data: existing } = await svc
     .from("research_conversations")
     .select("*")
-    .eq("project_id", GLOBAL_PROJECT_ID)
+    .is("project_id", null)
     .eq("org_id", params.orgId)
     .order("last_active_at", { ascending: false })
     .limit(1)
@@ -28,7 +27,7 @@ export async function getOrCreateGlobalConversation(params: {
     .from("research_conversations")
     .insert({
       org_id: params.orgId,
-      project_id: GLOBAL_PROJECT_ID,
+      project_id: null,
       started_by: params.userId,
       title: "Global Scout Chat",
     })

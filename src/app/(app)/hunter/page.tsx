@@ -3,7 +3,6 @@ import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectorSwitcher } from "@/components/modules/sector-switcher";
 import { DiscoveredProjectsTable } from "@/components/modules/discovered-projects-table";
-import { HuntNowButton } from "@/components/modules/hunt-now-button";
 import { requireSession } from "@/lib/auth/session";
 import { listSectors, rowToSector } from "@/lib/data/sectors";
 import {
@@ -81,9 +80,8 @@ export default async function HunterPage({
   return (
     <>
       <PageHeader
-        title="Hunter"
-        description={`AI-powered project discovery for ${activeSector.name}. Finds new construction projects, scores opportunity fit, and matches to your worker pool.`}
-        actions={<HuntNowButton sectorId={activeSector.id} />}
+        title="Signal Inbox"
+        description={`Raw intelligence queue for ${activeSector.name}. Projects here were found by the Global Scout or automated feeds.`}
       />
 
       <SectorSwitcher sectors={sectors} activeSectorId={activeSector.id} />
@@ -154,6 +152,42 @@ export default async function HunterPage({
         </Card>
       )}
 
+      {/* Status filter pills — every project ever discovered, findable by status */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Status:
+        </span>
+        {[
+          { key: "", label: "All" },
+          { key: "new", label: "New" },
+          { key: "reviewing", label: "Reviewing" },
+          { key: "qualified", label: "Qualified" },
+          { key: "pursuing", label: "Pursuing" },
+          { key: "won", label: "Won" },
+          { key: "lost", label: "Lost" },
+          { key: "archived", label: "Archived" },
+        ].map(({ key, label }) => {
+          const qs = new URLSearchParams();
+          qs.set("sector", activeSector.id);
+          if (key) qs.set("status", key);
+          if (countryFilter) qs.set("country", countryFilter);
+          const active = (statusFilter ?? "") === key;
+          return (
+            <Link
+              key={key || "all"}
+              href={`/hunter?${qs.toString()}`}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                active
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+
       {/* Country filter pills */}
       {activeSector.targetCountries.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -161,7 +195,12 @@ export default async function HunterPage({
             Country:
           </span>
           <Link
-            href={`/hunter?sector=${activeSector.id}`}
+            href={(() => {
+              const qs = new URLSearchParams();
+              qs.set("sector", activeSector.id);
+              if (statusFilter) qs.set("status", statusFilter);
+              return `/hunter?${qs.toString()}`;
+            })()}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
               !countryFilter
                 ? "border-sky-300 bg-sky-50 text-sky-800"
@@ -170,19 +209,25 @@ export default async function HunterPage({
           >
             All
           </Link>
-          {activeSector.targetCountries.map((cc) => (
-            <Link
-              key={cc}
-              href={`/hunter?sector=${activeSector.id}&country=${cc}`}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                countryFilter === cc
-                  ? "border-sky-300 bg-sky-50 text-sky-800"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {cc}
-            </Link>
-          ))}
+          {activeSector.targetCountries.map((cc) => {
+            const qs = new URLSearchParams();
+            qs.set("sector", activeSector.id);
+            qs.set("country", cc);
+            if (statusFilter) qs.set("status", statusFilter);
+            return (
+              <Link
+                key={cc}
+                href={`/hunter?${qs.toString()}`}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  countryFilter === cc
+                    ? "border-sky-300 bg-sky-50 text-sky-800"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {cc}
+              </Link>
+            );
+          })}
         </div>
       )}
 

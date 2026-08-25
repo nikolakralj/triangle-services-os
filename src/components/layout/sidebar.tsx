@@ -9,89 +9,123 @@ import {
   ClipboardCheck,
   FileText,
   Gauge,
+  Inbox,
   KanbanSquare,
   Radar,
   Settings,
+  ShieldAlert,
   Upload,
   Users,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Gauge },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: any;
+  badge?: string;
+  highlight?: boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
   {
-    href: "/hunter",
-    label: "Hunter",
-    icon: Radar,
-    badge: "AI",
-    highlight: true,
+    label: "Core Workflow",
+    items: [
+      { href: "/ai", label: "Global Scout", icon: Bot, highlight: true, badge: "AI" },
+      { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "NEW" },
+      { href: "/hunter", label: "Signal Inbox", icon: Radar },
+      { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
+      { href: "/workers", label: "Talent Pool", icon: UserRound },
+      { href: "/workers/cert-checklist", label: "Cert Alerts", icon: ShieldAlert },
+      { href: "/documents", label: "Compliance", icon: FileText },
+    ],
   },
-  { href: "/companies", label: "Companies", icon: Building2 },
-  { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
-  { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
-  { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/workers", label: "Workers", icon: UserRound },
-  { href: "/ai", label: "AI Assistant", icon: Bot },
-  { href: "/imports", label: "Imports", icon: Upload },
-  { href: "/settings", label: "Settings", icon: Settings },
+  {
+    label: "Database",
+    items: [
+      { href: "/companies", label: "Companies", icon: Building2 },
+      { href: "/contacts", label: "Contacts", icon: Users },
+      { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { href: "/dashboard", label: "Metrics", icon: Gauge },
+      { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
+      { href: "/imports", label: "Data Imports", icon: Upload },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:block">
-      <div className="border-b border-slate-100 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-          Private OS
-        </p>
-        <h1 className="mt-2 text-lg font-semibold leading-tight text-slate-950">
-          Triangle Services
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50 lg:flex">
+      <div className="border-b border-slate-200 bg-white p-5 shadow-sm">
+        <h1 className="text-xl font-black tracking-tight text-slate-900">
+          Triangle<span className="text-sky-600">OS</span>
         </h1>
-        <p className="mt-1 text-xs text-slate-500">Business Development OS</p>
+        <p className="mt-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Project to Placement</p>
       </div>
-      <nav className="space-y-1 p-2.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          const highlight = "highlight" in item && item.highlight;
-          const badge = "badge" in item ? item.badge : undefined;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition",
-                active
-                  ? "bg-slate-900 text-white"
-                  : highlight
-                    ? "bg-gradient-to-r from-sky-50 to-emerald-50 text-sky-900 hover:from-sky-100 hover:to-emerald-100 ring-1 ring-sky-200"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="flex-1">{item.label}</span>
-              {badge && (
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                    active
-                      ? "bg-white/20 text-white"
-                      : "bg-emerald-500 text-white",
-                  )}
-                >
-                  {badge}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <h3 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              {group.label}
+            </h3>
+            <nav className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const highlight = item.highlight;
+                const badge = item.badge;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                      active
+                        ? highlight
+                          ? "bg-sky-600 text-white shadow-md shadow-sky-200"
+                          : "bg-white text-sky-700 shadow-sm border border-slate-200"
+                        : highlight
+                          ? "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-100"
+                          : "text-slate-600 hover:bg-slate-200 hover:text-slate-900",
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4", active && !highlight ? "text-sky-600" : "")} />
+                    <span className="flex-1">{item.label}</span>
+                    {badge && (
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                          active && highlight
+                            ? "bg-white/20 text-white"
+                            : "bg-sky-500 text-white shadow-sm",
+                        )}
+                      >
+                        {badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
+      </div>
     </aside>
   );
 }

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { WorkerCertificatesPanel } from "@/components/modules/worker-certificates-panel";
 import type {
   Activity,
   Company,
@@ -328,7 +329,7 @@ export function WorkerDetail({
                     : "n/a"
               }
             />
-            <Info label="Reliability" value={`${worker.reliabilityScore}/5`} />
+            <Info label="Reliability" value={`${worker.reliabilityScore}/100`} />
             <Info label="Status" value={worker.status} />
           </CardContent>
         </Card>
@@ -350,6 +351,7 @@ export function WorkerDetail({
             <Score label="Reliability" value={worker.reliabilityScore} />
           </CardContent>
         </Card>
+        <WorkerCertificatesPanel workerId={worker.id} />
         {tasks && (
           <SideList
             title="Tasks"
@@ -401,12 +403,12 @@ function Score({ label, value }: { label: string; value: number }) {
     <div>
       <div className="mb-1 flex justify-between text-sm">
         <span>{label}</span>
-        <span>{value}/5</span>
+        <span>{value}/100</span>
       </div>
       <div className="h-2 rounded-full bg-slate-100">
         <div
           className="h-2 rounded-full bg-sky-500"
-          style={{ width: `${value * 20}%` }}
+          style={{ width: `${value}%` }}
         />
       </div>
     </div>

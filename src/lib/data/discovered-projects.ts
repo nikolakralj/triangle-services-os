@@ -243,6 +243,18 @@ export async function updateDiscoveredProjectStatus(
   return !error;
 }
 
+export async function deleteDiscoveredProject(id: string): Promise<boolean> {
+  const supabase = await createCookieSupabaseClient();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("discovered_projects")
+    .delete()
+    .eq("id", id);
+
+  return !error;
+}
+
 export async function getDiscoveredProjectStats(
   organizationId: string,
   sectorId?: string,

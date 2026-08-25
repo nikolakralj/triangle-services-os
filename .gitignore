@@ -47,3 +47,6 @@ import_leads.sql
 
 /playwright-report/
 /test-results/
+
+# Agent-local config — contains API tokens, never commit
+.codex/

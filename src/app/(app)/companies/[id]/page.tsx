@@ -22,6 +22,8 @@ import {
   enrichTasksWithOwnerNames,
   enrichActivitiesWithCreatorNames,
 } from "@/lib/data/utils";
+import { getCompanyCrossProjectIntel } from "@/lib/data/company-intel";
+import { CompanyIntelligencePanel } from "@/components/modules/company-intelligence-panel";
 
 export default async function CompanyDetailPage({
   params,
@@ -37,12 +39,14 @@ export default async function CompanyDetailPage({
   const company = rowToCompany(row);
 
   // Fetch related data in parallel
-  const [contactRows, opportunityRows, taskRows, activityRows] = await Promise.all([
-    getContactsByCompany(id),
-    getOpportunitiesByCompany(id),
-    getTasksByEntity("company", id),
-    getActivitiesByCompany(id),
-  ]);
+  const [contactRows, opportunityRows, taskRows, activityRows, crossProjectIntel] =
+    await Promise.all([
+      getContactsByCompany(id),
+      getOpportunitiesByCompany(id),
+      getTasksByEntity("company", id),
+      getActivitiesByCompany(id),
+      getCompanyCrossProjectIntel(company.name, session.organizationId),
+    ]);
 
   const contacts = contactRows.map(rowToContact);
   const opportunities = opportunityRows.map(rowToOpportunity);
@@ -59,8 +63,11 @@ export default async function CompanyDetailPage({
     <>
       <PageHeader
         title={company.name}
-        description="Company record with contacts, opportunities, tasks, documents, activity and AI actions."
+        description="Company record with contacts, opportunities, tasks, documents, activity and cross-project intelligence."
       />
+      {crossProjectIntel && (
+        <CompanyIntelligencePanel intel={crossProjectIntel} />
+      )}
       <CompanyDetail
         company={company}
         contacts={enrichedContacts}

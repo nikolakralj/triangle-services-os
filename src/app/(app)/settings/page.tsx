@@ -1,6 +1,8 @@
 import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { MailboxSettingsPanel } from "@/components/modules/mailbox-settings-panel";
+import { IntakeRulesPanel } from "@/components/modules/intake-rules-panel";
 import {
   COMPANY_TYPES,
   COUNTRIES,
@@ -9,6 +11,8 @@ import {
 } from "@/lib/constants";
 
 const sections = [
+  "Job Intake mailboxes",
+  "What the agent looks for",
   "Organization",
   "Users",
   "Pipeline stages",
@@ -40,6 +44,24 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
+          <Card>
+            <CardHeader
+              title="Job Intake mailboxes"
+              description="Mailboxes the agent reads for agency opportunities."
+            />
+            <CardContent>
+              <MailboxSettingsPanel />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader
+              title="What the agent looks for"
+              description="Your own scoring rules. The AI reads these on every email."
+            />
+            <CardContent>
+              <IntakeRulesPanel />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader
               title="Organization"

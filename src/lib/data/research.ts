@@ -315,6 +315,18 @@ export async function acceptResearchSuggestion(params: {
   const svc = createServiceSupabaseClient();
   if (!svc) throw new Error("Database unavailable");
 
+  // Defensive: reject anything that isn't a real UUID before it reaches
+  // Postgres, otherwise the uuid column cast throws a raw driver error
+  // (e.g. an agent passing the literal string "undefined").
+  if (
+    typeof params.suggestionId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      params.suggestionId.trim(),
+    )
+  ) {
+    throw new Error("Invalid suggestion id");
+  }
+
   // Fetch the suggestion (verify org ownership)
   const { data: suggestion, error: fetchErr } = await svc
     .from("research_suggestions")

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { DiscoveredProject } from "@/lib/data/discovered-projects";
 import { formatCurrency } from "@/lib/utils";
+import { DeleteProjectButton } from "./delete-project-button";
 
 const PHASE_LABELS: Record<string, string> = {
   announced: "Announced",
@@ -116,6 +117,9 @@ export function DiscoveredProjectsTable({
                     </span>
                   )}
                   <Badge>{project.status}</Badge>
+                  <div className="ml-auto flex items-center">
+                    <DeleteProjectButton projectId={project.id} />
+                  </div>
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
