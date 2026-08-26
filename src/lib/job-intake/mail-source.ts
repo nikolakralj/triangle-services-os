@@ -1,5 +1,6 @@
 import "server-only";
 import { ImapFlow, type FetchMessageObject } from "imapflow";
+import { isObviousNoiseHeader } from "./clean-email";
 
 // ---------------------------------------------------------------------------
 // Reading mailboxes.
@@ -223,42 +224,13 @@ function toFetchedMessage(
   };
 }
 
-// ── cheap pre-filter ────────────────────────────────────────────────────────
-//
-// Runs on the envelope alone, before any body download or LLM call. These are
-// senders that are never a human recruiter writing about a real project. The
-// model still classifies everything that gets past this — the filter only has
-// to be *safe*, not clever, so it matches infrastructure senders rather than
-// guessing at content.
-
-const NOISE_SENDER = [
-  /@.*\.linkedin\.com$/i,
-  /noreply@.*linkedin\.com$/i,
-  /@builtin\.com$/i,
-  /@indeed(mail)?\.com$/i,
-  /@.*\.glassdoor\.com$/i,
-  /@substack\.com$/i,
-  /@udemy(mail)?\.com$/i,
-  /@.*\.harvard\.edu$/i,
-  /@.*mygreatlearning\.com$/i,
-  /@freecodecamp\.org$/i,
-  /^(no-?reply|donotreply|mailer-daemon|bounce|notifications?)@/i,
-];
-
-const NOISE_SUBJECT = [
-  /is popular in your network/i,
-  /your (job )?application (to|was)/i,
-  /new .* job matches/i,
-  /job alert/i,
-  /^re-?engage|unsubscribe/i,
-];
-
+// Cheap envelope pre-filter — shared with the ingest endpoint; lives in
+// clean-email.ts so both intake paths reject the same noise.
 function isObviousNoise(msg: FetchMessageObject): boolean {
-  const address = msg.envelope?.from?.[0]?.address ?? "";
-  const subject = msg.envelope?.subject ?? "";
-  if (address && NOISE_SENDER.some((re) => re.test(address))) return true;
-  if (subject && NOISE_SUBJECT.some((re) => re.test(subject))) return true;
-  return false;
+  return isObviousNoiseHeader(
+    msg.envelope?.from?.[0]?.address ?? null,
+    msg.envelope?.subject ?? null,
+  );
 }
 
 // ── body-structure walking ──────────────────────────────────────────────────

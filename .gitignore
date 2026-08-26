@@ -50,3 +50,4 @@ import_leads.sql
 
 # Agent-local config — contains API tokens, never commit
 .codex/
+.mcp.json

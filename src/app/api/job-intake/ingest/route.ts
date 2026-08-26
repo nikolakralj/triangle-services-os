@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 import { classifyAndExtract, shouldKeepBody } from "@/lib/job-intake/extract";
+import { isObviousNoiseHeader } from "@/lib/job-intake/clean-email";
+import { verifyMachineToken, hasScope } from "@/lib/auth/machine";
 import {
   recordInboundEmail,
   createJobLead,
@@ -83,16 +85,35 @@ async function resolveExternalAccount(
   return (created?.id as string) ?? null;
 }
 
+const REQUIRED_SCOPE = "job_intake.ingest";
+
 export async function POST(request: Request) {
-  const access = await requireApiAccess(request);
-  if (!access.ok) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-  if (access.demo) {
-    return NextResponse.json(
-      { error: "Ingest is not available in demo mode." },
-      { status: 403 },
-    );
+  // Preferred: a scoped machine credential (tri_mc_…). A bot's token can do
+  // this one job and nothing else — blast-radius containment. Falls back to
+  // a signed-in session or the legacy admin key for humans and dev use.
+  let organizationId: string;
+
+  const machine = await verifyMachineToken(request);
+  if (machine) {
+    if (!hasScope(machine, REQUIRED_SCOPE)) {
+      return NextResponse.json(
+        { error: `Credential "${machine.name}" lacks the ${REQUIRED_SCOPE} scope.` },
+        { status: 403 },
+      );
+    }
+    organizationId = machine.orgId;
+  } else {
+    const access = await requireApiAccess(request);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+    if (access.demo) {
+      return NextResponse.json(
+        { error: "Ingest is not available in demo mode." },
+        { status: 403 },
+      );
+    }
+    organizationId = access.organizationId;
   }
 
   let payload: { mailbox?: string; messages?: IncomingMessage[] };
@@ -120,9 +141,9 @@ export async function POST(request: Request) {
   }
 
   const mailbox = payload.mailbox?.trim().toLowerCase() || null;
-  const mailAccountId = await resolveExternalAccount(access.organizationId, mailbox);
+  const mailAccountId = await resolveExternalAccount(organizationId, mailbox);
   // Loaded once, not per message.
-  const houseRules = (await getIntakeRules(access.organizationId))?.body ?? null;
+  const houseRules = (await getIntakeRules(organizationId))?.body ?? null;
 
   const result = {
     received: messages.length,
@@ -150,6 +171,16 @@ export async function POST(request: Request) {
       continue;
     }
 
+    // Bots are deliberately dumb — they forward everything and make no
+    // classification decisions (see JOB_INTAKE.md). So the cheap envelope
+    // filter runs HERE, before the LLM call, same as the IMAP path. Matches
+    // are dropped without a stored row, exactly like IMAP skips them.
+    if (isObviousNoiseHeader(msg.from ?? null, subject)) {
+      result.noiseDiscarded += 1;
+      result.skipped.push({ index, reason: "noise sender/subject" });
+      continue;
+    }
+
     try {
       const extraction = await classifyAndExtract({
         subject,
@@ -165,7 +196,7 @@ export async function POST(request: Request) {
       if (!keepBody) result.noiseDiscarded += 1;
 
       const stored = await recordInboundEmail({
-        orgId: access.organizationId,
+        orgId: organizationId,
         mailAccountId,
         providerMessageId: messageId,
         providerThreadId: msg.threadId ?? null,
@@ -194,7 +225,7 @@ export async function POST(request: Request) {
       if (extraction.classification === "job_opportunity" && extraction.lead) {
         result.opportunities += 1;
         const leadId = await createJobLead({
-          orgId: access.organizationId,
+          orgId: organizationId,
           inboundEmailId: stored.id,
           contactEmail: msg.from ?? null,
           lead: extraction.lead,

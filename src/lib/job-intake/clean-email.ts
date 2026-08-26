@@ -99,6 +99,48 @@ function collapse(text: string): string {
     .trim();
 }
 
+// ── cheap envelope noise filter ─────────────────────────────────────────────
+//
+// Runs on sender/subject alone, before any body handling or LLM call. These
+// are infrastructure senders that are never a human recruiter writing about a
+// real project. The model still classifies everything that gets past this —
+// the filter only has to be *safe*, not clever.
+//
+// Shared by both intake paths: the IMAP fetcher (skips the body download) and
+// /api/job-intake/ingest (skips the LLM call when a deliberately-dumb bot
+// forwards its whole inbox — see JOB_INTAKE.md, "Make Bob dumber").
+
+const NOISE_SENDER = [
+  /@.*\.linkedin\.com$/i,
+  /noreply@.*linkedin\.com$/i,
+  /@builtin\.com$/i,
+  /@indeed(mail)?\.com$/i,
+  /@.*\.glassdoor\.com$/i,
+  /@substack\.com$/i,
+  /@udemy(mail)?\.com$/i,
+  /@.*\.harvard\.edu$/i,
+  /@.*mygreatlearning\.com$/i,
+  /@freecodecamp\.org$/i,
+  /^(no-?reply|donotreply|mailer-daemon|bounce|notifications?)@/i,
+];
+
+const NOISE_SUBJECT = [
+  /is popular in your network/i,
+  /your (job )?application (to|was)/i,
+  /new .* job matches/i,
+  /job alert/i,
+  /^re-?engage|unsubscribe/i,
+];
+
+export function isObviousNoiseHeader(
+  fromAddress: string | null | undefined,
+  subject: string | null | undefined,
+): boolean {
+  if (fromAddress && NOISE_SENDER.some((re) => re.test(fromAddress))) return true;
+  if (subject && NOISE_SUBJECT.some((re) => re.test(subject))) return true;
+  return false;
+}
+
 export interface CleanedEmail {
   text: string;
   originalLength: number;
