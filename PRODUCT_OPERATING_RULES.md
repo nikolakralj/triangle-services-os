@@ -1,8 +1,20 @@
 # Product Operating Rules
 
-## Prime Directive
+## Prime Directive (updated 2026-08-27)
 
-Triangle Services is building a project-to-placement operating system.
+Triangle is an AI-native staffing agency operating system: humans manage a
+workforce of AI employees operating on shared staffing-company data.
+
+The durable objects are the company's: employees (agent_instances),
+assignments, findings, approvals, outcomes, and the domain database. Providers
+are swappable badges-and-brains underneath.
+
+Project-to-placement remains strategically central — as Business Playbook 01,
+performed by the workforce, not as the top-level definition of the product.
+The supply-first direction (available workers -> find them work) is an equal
+first-class workflow.
+
+## Playbook 01 — Project to Placement
 
 The goal is to help Triangle move from early industrial project signals to real crew placements.
 

@@ -9,17 +9,20 @@ future AI working on this repo) builds toward the same picture.
 
 | Company concept | What it is in Triangle |
 |---|---|
-| Employment contract | `machine_credentials` row — scoped, revocable |
+| Employee | `agent_instances` row — the durable identity, provider-independent |
+| Security badge | `machine_credentials` — scoped, revocable, hashed. **The badge is NOT the employee**: rotating a leaked token must never split the employee's history (it nearly did on 27 Aug — that incident is why this distinction exists) |
+| Brain / workstation | `agent_provider_bindings` — Grok today, anything tomorrow, swapped without touching identity |
 | Job description | scopes on the credential (`job_intake.ingest` = "you do intake, nothing else") |
 | Role handbook | `agents/<name>.md` in this repo |
 | Company policy | `agents/shared-constitution.md` |
-| Assignments from the boss | `agent_tasks` — queued in the dashboard, fetched each run |
+| Assignment / mission | `agent_assignments` — durable objective with priority, deadline, constraints, and attached business objects (workers, projects, jobs) as context |
+| Quick note from the boss | `agent_tasks` — lightweight messages, fetched each run |
 | Reporting back | `POST /api/agent/inbox` + the Instructions log |
 | Timesheet / activity | `agent_runs` feed |
 | Training and experience | house rules, reply style, accepted/rejected leads, notes — **in the database** |
 | Manager sign-off | approval gates: suggestions queue, drafts that never auto-send |
-| Hiring | create a credential + write the role file |
-| Firing | `--revoke` — one command, effective immediately |
+| Hiring | create the `agent_instance` + provider binding + badge + role file |
+| Firing | retire the instance + revoke its badge; history stays |
 | Board members | `organization_members` roles (admin/partner) — Nikola and Ralph equal |
 
 ## The most important rule: the company remembers, not the worker
@@ -50,6 +53,27 @@ awaits approval, what is blocked — the CEO's morning briefing.
 **Later:** a unified approvals desk (one queue across research suggestions,
 drafts, and any future consequential action), and per-agent cost tracking in
 `agent_runs` so the "payroll" is visible.
+
+## The central work object is the Assignment
+
+Free-text instructions were the v0. The real unit of work is an assignment:
+a title, an objective, a priority, a deadline, constraints, and — crucially —
+**attached business objects as context**. "Find work for THESE four PCS7
+engineers" attaches the four worker records; "find people for THIS package"
+attaches the package. That one object carries both directions of the
+business, demand-first and supply-first, with the same machinery.
+
+## How an employee learns (four layers, all in Triangle)
+
+1. **Company facts** — the domain tables (workers, jobs, projects, outcomes).
+2. **Role playbook** — versioned instructions in `agents/*.md`.
+3. **Outcome history** — accepted/rejected findings, replies, placements, runs.
+4. **Lessons** — future: the system proposes a playbook change with evidence
+   ("German system integrators converted 3.2x better for PCS7"), a human
+   approves it, the playbook version bumps. An agent never silently rewrites
+   its own instructions.
+
+Swap the provider and all four layers survive. The company learned, not the model.
 
 ## The second employee is mostly hired already
 

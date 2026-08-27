@@ -1,12 +1,36 @@
 # Vision
 
-## What Triangle Services Is Actually Building
+## North Star (updated 2026-08-27)
+
+Triangle is an AI-native staffing agency operating system.
+
+Humans manage the company. AI agents are digital employees. Triangle owns the
+shared memory, business data, deterministic rules, permissions, approvals,
+assignments, outcomes and audit trail. External AI providers (Grok, OpenAI,
+local models) are replaceable execution backends for those employees.
+
+We are not building software that helps an agency use AI. We are building the
+agency itself as software — humans manage it, AI employees perform jobs, and
+Triangle owns the company memory and controls.
+
+The platform must serve BOTH directions of the staffing business:
+
+- demand-first: project/job -> understand requirement -> find workers -> submit crew
+- supply-first: available workers -> assignment to an AI employee -> search the
+  market -> propose opportunities -> human approves next action
+
+Triangle stays domain-specific to staffing, recruiting and technical
+contracting. It is NOT a generic build-any-agent platform — that would mean
+competing with the model vendors instead of using them.
+
+## Business Playbook 01 — Project / Demand to Crew Placement
+
+Everything below this line is the first proven commercial workflow — one
+playbook the workforce executes, not the definition of the whole product.
 
 Triangle Services is not building a generic CRM.
 
-The real product is an internal operating system for turning early industrial project signals into crew placements.
-
-The target flow is:
+The playbook turns early industrial project signals into crew placements:
 
 `project signal -> qualified project -> contractor chain -> buyer contacts -> crew package -> outreach -> follow-up -> placement`
 
