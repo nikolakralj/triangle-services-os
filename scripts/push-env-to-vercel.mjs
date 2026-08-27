@@ -3,7 +3,7 @@
 // project. Run this YOURSELF — values go straight from your file to your
 // Vercel account and are never printed, logged, or shown to an AI.
 //
-//   node scripts/push-env-to-vercel.mjs preview
+//   node scripts/push-env-to-vercel.mjs          (all environments)
 //   node scripts/push-env-to-vercel.mjs production
 //
 // Safe to re-run: it removes an existing value before adding the new one.
@@ -12,13 +12,11 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
-// Default to ALL environments. Setting only `preview` is a classic trap:
-// the production URL then runs with no config and silently falls back to
-// demo mode, which bypasses login and shows seeded data.
+// Default to ALL environments. Setting only `preview` is a classic trap: the
+// production URL then runs with no config and silently falls back to demo
+// mode, which bypasses login and shows seeded data.
 const arg = process.argv[2] ?? "all";
-const targets = arg === "all"
-  ? ["production", "preview", "development"]
-  : [arg];
+const targets = arg === "all" ? ["production", "preview", "development"] : [arg];
 if (!targets.every((t) => ["preview", "production", "development"].includes(t))) {
   console.error("Usage: node scripts/push-env-to-vercel.mjs [all|preview|production|development]");
   process.exit(1);
@@ -58,16 +56,24 @@ if (!env.CRON_ORGANIZATION_ID) env.CRON_ORGANIZATION_ID = env.DEFAULT_ORGANIZATI
 const toPush = [...REQUIRED, ...OPTIONAL, "CRON_SECRET", "CRON_ORGANIZATION_ID"]
   .filter((k) => env[k]);
 
-for (const key of toPush) {
-  // Remove first so re-runs update rather than fail on duplicate.
-  spawnSync("npx", ["vercel", "env", "rm", key, target, "--yes"],
-    { stdio: "ignore", shell: true });
-  const res = spawnSync("npx", ["vercel", "env", "add", key, target],
-    { input: env[key], stdio: ["pipe", "ignore", "pipe"], shell: true });
-  const ok = res.status === 0;
-  console.log(`${ok ? "  ok  " : " FAIL "} ${key}`);
-  if (!ok) console.error(String(res.stderr).trim().split("\n").slice(-2).join("\n"));
+let failures = 0;
+for (const target of targets) {
+  console.log("\n--- " + target + " ---");
+  for (const key of toPush) {
+    // Remove first so re-runs update rather than fail on duplicate.
+    spawnSync("npx", ["vercel", "env", "rm", key, target, "--yes"],
+      { stdio: "ignore", shell: true });
+    const res = spawnSync("npx", ["vercel", "env", "add", key, target],
+      { input: env[key], stdio: ["pipe", "ignore", "pipe"], shell: true });
+    const ok = res.status === 0;
+    if (!ok) failures++;
+    console.log((ok ? "  ok   " : " FAIL  ") + key);
+    if (!ok) console.error(String(res.stderr).trim().split("\n").slice(-2).join("\n"));
+  }
 }
 
-console.log(`\nDone (${target}). Values were never printed.`);
-console.log("ENCRYPTION_KEY was copied from .env.local — required, or connected mailboxes cannot be decrypted.");
+console.log("\nDone (" + targets.join(", ") + "). Values were never printed.");
+if (failures) console.log(failures + " failed — see messages above.");
+console.log("ENCRYPTION_KEY was copied from .env.local; it must match or connected mailboxes cannot be decrypted.");
+console.log("\nNow redeploy so the new config is picked up:");
+console.log("  npx vercel --prod");

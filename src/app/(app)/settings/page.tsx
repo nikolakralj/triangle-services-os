@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MailboxSettingsPanel } from "@/components/modules/mailbox-settings-panel";
 import { IntakeRulesPanel } from "@/components/modules/intake-rules-panel";
+import { ChangePasswordPanel } from "@/components/modules/change-password-panel";
 import {
   COMPANY_TYPES,
   COUNTRIES,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/constants";
 
 const sections = [
+  "Your account",
   "Job Intake mailboxes",
   "What the agent looks for",
   "Organization",
@@ -44,6 +46,15 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
+          <Card>
+            <CardHeader
+              title="Your account"
+              description="Change the password you use to sign in."
+            />
+            <CardContent>
+              <ChangePasswordPanel />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader
               title="Job Intake mailboxes"
