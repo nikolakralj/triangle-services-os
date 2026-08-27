@@ -73,11 +73,9 @@ if (!res.ok) {
   console.error(`Failed (${res.status}):`, body);
   if (body.includes("23505")) {
     console.error(
-      "
-An ACTIVE credential with that name already exists. Revoke it first:
-" +
-      `  node scripts/create-machine-credential.mjs --revoke ${name}`,
+      "\nAn ACTIVE credential with that name already exists. Revoke it first:",
     );
+    console.error(`  node scripts/create-machine-credential.mjs --revoke ${name}`);
   }
   process.exit(1);
 }
