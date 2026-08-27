@@ -20,6 +20,27 @@ export interface AgentInfo {
   status: string;
   lastUsedAt: string | null;
   createdAt: string;
+  // The human face — feedback was that raw credential names read "too
+  // technical". Fallbacks keep older rows presentable.
+  displayName: string;
+  roleTitle: string;
+  emoji: string;
+  description: string | null;
+  /** Scopes translated to plain words ("process incoming job emails"). */
+  duty: string;
+  /** Active within the last 24h. */
+  onDuty: boolean;
+}
+
+const SCOPE_LABEL: Record<string, string> = {
+  "job_intake.ingest": "process incoming job emails",
+  "research.suggestion.create": "propose research findings for review",
+  admin: "full access",
+};
+
+function prettifyName(name: string): string {
+  const stripped = name.replace(/^triangle_/, "").replace(/_/g, " ").trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
 export interface AgentTask {
@@ -45,17 +66,29 @@ export async function listAgents(orgId: string): Promise<AgentInfo[]> {
   if (!svc) return [];
   const { data } = await svc
     .from("machine_credentials")
-    .select("name, scopes, status, last_used_at, created_at")
+    .select("name, scopes, status, last_used_at, created_at, display_name, role_title, emoji, description")
     .eq("org_id", orgId)
     .eq("status", "active")
     .order("created_at");
-  return (data ?? []).map((r) => ({
-    name: r.name as string,
-    scopes: Array.isArray(r.scopes) ? (r.scopes as string[]) : [],
-    status: r.status as string,
-    lastUsedAt: (r.last_used_at as string) ?? null,
-    createdAt: r.created_at as string,
-  }));
+  return (data ?? []).map((r) => {
+    const scopes = Array.isArray(r.scopes) ? (r.scopes as string[]) : [];
+    const lastUsedAt = (r.last_used_at as string) ?? null;
+    return {
+      name: r.name as string,
+      scopes,
+      status: r.status as string,
+      lastUsedAt,
+      createdAt: r.created_at as string,
+      displayName: (r.display_name as string) || prettifyName(r.name as string),
+      roleTitle: (r.role_title as string) || "Assistant",
+      emoji: (r.emoji as string) || "🤖",
+      description: (r.description as string) ?? null,
+      duty: scopes.map((sc) => SCOPE_LABEL[sc] ?? sc).join(", "),
+      onDuty:
+        lastUsedAt !== null &&
+        Date.now() - new Date(lastUsedAt).getTime() < 24 * 60 * 60 * 1000,
+    };
+  });
 }
 
 export async function listAgentTasks(

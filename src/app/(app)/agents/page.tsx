@@ -29,8 +29,8 @@ export default async function AgentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Agents"
-        description="Your external workforce. Queue instructions here — each agent picks them up on its next run and reports back. Nothing here sends email or changes records without the usual approvals."
+        title="Your team"
+        description="The people who work for you — they just happen to be software. Hand over tasks, see what they did, and nothing goes out to a client without your sign-off."
       />
       <AgentConsole agents={agents} tasks={tasks} runs={runs} />
     </div>

@@ -54,8 +54,10 @@ if (a === "--revoke") {
 
 const name = a;
 const scopes = (b ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+// Optional presentation args — how the agent appears on the team page.
+const [, , , , displayName, roleTitle, emoji] = process.argv;
 if (!name || scopes.length === 0) {
-  console.error("Usage: node scripts/create-machine-credential.mjs <name> <scope>[,scope...]");
+  console.error("Usage: node scripts/create-machine-credential.mjs <name> <scope>[,scope...] [displayName] [roleTitle] [emoji]");
   process.exit(1);
 }
 
@@ -65,7 +67,12 @@ const token_hash = createHash("sha256").update(token, "utf8").digest("hex");
 const res = await fetch(`${SUPABASE_URL}/rest/v1/machine_credentials`, {
   method: "POST",
   headers,
-  body: JSON.stringify({ org_id: ORG_ID, name, token_hash, scopes }),
+  body: JSON.stringify({
+    org_id: ORG_ID, name, token_hash, scopes,
+    display_name: displayName ?? null,
+    role_title: roleTitle ?? null,
+    emoji: emoji ?? null,
+  }),
 });
 
 if (!res.ok) {
