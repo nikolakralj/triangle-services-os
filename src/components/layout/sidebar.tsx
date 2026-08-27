@@ -41,6 +41,7 @@ const navGroups: NavGroup[] = [
       { href: "/ai", label: "Global Scout", icon: Bot, highlight: true, badge: "AI" },
       { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "NEW" },
       { href: "/agents", label: "Workforce", icon: Cpu },
+      { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
       { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
       { href: "/workers", label: "Talent Pool", icon: UserRound },

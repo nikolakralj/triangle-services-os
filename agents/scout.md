@@ -62,9 +62,29 @@ modify any Triangle record; your only write is the assignment report. Do not
 scrape behind logins. Do not invent a company, contact, project or number
 that is not in a source you can cite.
 
-## Later
+## Discovering something Triangle has never heard of
 
-When the findings endpoint ships, Scout will file structured proposals that
-appear as approvable cards instead of prose reports. Until then, prose in the
-assignment result is the contract — it is read by a human, so write it for a
-human.
+The research MCP tools all need a `project_id`, so they only work on projects
+that already exist. For anything new — a plant, a company, a contact Triangle
+has no record of — use:
+
+```
+POST {TRIANGLE_URL}/api/agent/findings
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+
+{ "findingType": "project",          // project | company | contact | other
+  "payload": { "project_name": "...", "country": "...", "client_company": "..." },
+  "sourceUrl": "https://...",         // required
+  "evidenceText": "the quoted line",  // required, 10+ chars
+  "confidence": 85,
+  "assignmentId": "...",              // optional, links it to the job
+  "idempotencyKey": "scout:project:<source-url>" }
+```
+
+It lands in Approvals as a proposal. When a human accepts it, it becomes a
+real project — and from that moment you can enrich it with the normal
+research tools. You cannot accept your own findings; that is the point.
+
+Report negatives too. "No electrical subcontractor found under ANDRITZ" is a
+finding: it means the EPC is the likely buyer. An absence, sourced, is worth
+more than an invented name.
