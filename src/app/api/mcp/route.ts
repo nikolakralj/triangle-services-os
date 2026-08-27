@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { verifyMachineToken } from "@/lib/auth/machine";
 import {
   createServiceSupabaseClient,
   requireApiAccess,
@@ -485,8 +486,55 @@ async function selectMany(
   return data ?? [];
 }
 
+// Which scope each tool needs when the caller is a machine (a bot with a
+// tri_mc_ badge). Humans with a session are unaffected. Tools absent from
+// this map are never available to machines — notably anything that would
+// ACCEPT or REJECT a suggestion, which stays a human decision.
+const TOOL_SCOPE: Record<string, string> = {
+  // reads — an agent must be able to check what already exists before proposing
+  get_project: "research.read",
+  get_research_context: "research.read",
+  list_projects: "research.read",
+  list_chain_nodes: "research.read",
+  list_buyer_contacts: "research.read",
+  list_project_notes: "research.read",
+  list_research_sources: "research.read",
+  list_research_suggestions: "research.read",
+  // proposals — everything lands in the pending queue for human review
+  propose_chain_node: "research.suggestion.create",
+  propose_buyer_contact: "research.suggestion.create",
+  propose_package_opportunity: "research.suggestion.create",
+  propose_note: "research.suggestion.create",
+};
+
+// A badge scoped to propose implicitly may read — you cannot avoid
+// duplicates without first checking what is already there.
+function machineMayUse(
+  scopes: string[],
+  toolName: string,
+): boolean {
+  const needed = TOOL_SCOPE[toolName];
+  if (!needed) return false;
+  if (scopes.includes("admin")) return true;
+  if (scopes.includes(needed)) return true;
+  return (
+    needed === "research.read" && scopes.includes("research.suggestion.create")
+  );
+}
+
 export async function POST(request: Request) {
-  const access = await requireApiAccess(request);
+  // Prefer a scoped machine badge (a bot). Fall back to session/admin for
+  // humans and dev use.
+  const machine = await verifyMachineToken(request);
+  const access = machine
+    ? {
+        ok: true as const,
+        demo: false,
+        userId: `agent:${machine.name}`,
+        organizationId: machine.orgId,
+        role: "agent",
+      }
+    : await requireApiAccess(request);
   if (!access.ok) return rpcError(null, -32001, access.error ?? "Unauthorized");
 
   try {
@@ -529,12 +577,21 @@ export async function POST(request: Request) {
     return rpcError(id, -32602, `Unknown tool: ${String(toolName)}`);
   }
 
+  if (machine && !machineMayUse(machine.scopes, String(toolName))) {
+    return rpcError(
+      id,
+      -32003,
+      `Credential "${machine.name}" is not allowed to use ${String(toolName)}. ` +
+        "Accepting or rejecting suggestions is a human decision.",
+    );
+  }
+
   try {
     const output = await executeTool(toolName, toolArgs, access.organizationId, access.userId);
     await logAiToolCall({
       orgId: access.organizationId,
       userId: access.userId,
-      agentName: "mcp_client",
+      agentName: machine ? machine.name : "mcp_client",
       toolName,
       inputJson: toolArgs,
       outputJson: { output },
@@ -547,7 +604,7 @@ export async function POST(request: Request) {
     await logAiToolCall({
       orgId: access.organizationId,
       userId: access.userId,
-      agentName: "mcp_client",
+      agentName: machine ? machine.name : "mcp_client",
       toolName: String(toolName),
       inputJson: toolArgs,
       outputJson: {},
