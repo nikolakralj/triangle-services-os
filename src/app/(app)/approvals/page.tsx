@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { getSession } from "@/lib/auth/session";
-import { FindingsInbox } from "@/components/modules/findings-inbox";
-import { listFindings } from "@/lib/data/findings";
+import { ApprovalsQueue } from "@/components/modules/approvals-queue";
+import { listApprovals, type ApprovalStatus } from "@/lib/data/approvals";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-// One place for management decisions. Today it holds agent findings — the
-// discoveries that would become real records. Research suggestions and reply
-// drafts still live on their own screens; they belong here next, so there is
-// a single queue rather than one per feature.
+// One place for management decisions — every proposal from every employee,
+// whichever table it happens to live in. Before this page merged them,
+// research suggestions were only visible inside the project they belonged to,
+// which meant you had to already know where to look to find work waiting on you.
 export default async function ApprovalsPage({
   searchParams,
 }: {
@@ -27,18 +27,18 @@ export default async function ApprovalsPage({
   }
 
   const query = await searchParams;
-  const status =
+  const status: ApprovalStatus =
     query.status === "accepted" || query.status === "rejected"
       ? query.status
       : "pending";
 
-  const findings = await listFindings(session.organizationId, { status });
+  const items = await listApprovals(session.organizationId, { status });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Approvals"
-        description="Decisions only you can make. Nothing an employee discovers becomes a real record until you accept it here."
+        description="Decisions only a human can make. Nothing an employee finds becomes a real record until you accept it here."
       />
 
       <div className="flex flex-wrap gap-1.5">
@@ -58,16 +58,14 @@ export default async function ApprovalsPage({
             )}
           >
             {label}
+            {key === "pending" && items.length > 0 && status === "pending"
+              ? ` · ${items.length}`
+              : ""}
           </Link>
         ))}
       </div>
 
-      <FindingsInbox findings={findings} />
-
-      <p className="text-xs text-slate-500">
-        Research suggestions on a specific project are still reviewed on that
-        project&apos;s page, and reply drafts on Job Intake. Both move here next.
-      </p>
+      <ApprovalsQueue items={items} readOnly={status !== "pending"} />
     </div>
   );
 }

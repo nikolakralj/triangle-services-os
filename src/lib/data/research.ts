@@ -337,6 +337,13 @@ export async function acceptResearchSuggestion(params: {
 
   if (fetchErr) throw new Error(fetchErr.message);
   if (!suggestion) throw new Error("Suggestion not found");
+  // Accepting something already accepted is a harmless retry — a double-click,
+  // or two people working the same queue. Accepting something already REJECTED
+  // is not: reporting success there would tell the caller a record exists when
+  // the row stays rejected. Say so instead.
+  if (suggestion.status === "rejected") {
+    throw new Error("Suggestion was already rejected");
+  }
   if (suggestion.status !== "pending") {
     return { ok: true, finalRecordId: suggestion.final_record_id ?? undefined };
   }

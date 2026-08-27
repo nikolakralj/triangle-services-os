@@ -252,6 +252,12 @@ async function executeTool(
   const service = createServiceSupabaseClient();
   if (!service) throw new Error("Database unavailable");
 
+  // A machine's userId is `agent:<credential name>`. Carry that name onto the
+  // suggestion so Approvals can say "Scout filed this" instead of naming the
+  // subsystem that wrote the row. Humans keep the old subsystem label.
+  const filedBy = (fallback: string) =>
+    userId.startsWith("agent:") ? userId.slice("agent:".length) : fallback;
+
   const parsed = toolSchemas[name].parse(args);
 
   if ("project_id" in parsed && parsed.project_id) {
@@ -363,7 +369,7 @@ async function executeTool(
         sourceUrl: p.source_url,
         sourceDate: p.source_date,
         evidenceText: p.evidence_text,
-        createdByAgent: "mcp_research_agent",
+        createdByAgent: filedBy("mcp_research_agent"),
       });
     }
 
@@ -386,7 +392,7 @@ async function executeTool(
         sourceUrl: p.source_url,
         sourceDate: p.source_date,
         evidenceText: p.evidence_text,
-        createdByAgent: "mcp_people_assistant",
+        createdByAgent: filedBy("mcp_people_assistant"),
       });
     }
 
@@ -405,7 +411,7 @@ async function executeTool(
         sourceUrl: p.source_url,
         sourceDate: p.source_date,
         evidenceText: p.evidence_text,
-        createdByAgent: "mcp_commercial_strategy_agent",
+        createdByAgent: filedBy("mcp_commercial_strategy_agent"),
       });
     }
 
@@ -420,7 +426,7 @@ async function executeTool(
         sourceUrl: p.source_url,
         sourceDate: p.source_date,
         evidenceText: p.evidence_text,
-        createdByAgent: "mcp_research_agent",
+        createdByAgent: filedBy("mcp_research_agent"),
       });
     }
 

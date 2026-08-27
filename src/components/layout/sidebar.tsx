@@ -68,7 +68,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ approvalsCount = 0 }: { approvalsCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -92,7 +92,11 @@ export function Sidebar() {
                   pathname === item.href ||
                   (item.href !== "/dashboard" && pathname.startsWith(item.href));
                 const highlight = item.highlight;
-                const badge = item.badge;
+                // A live count beats a static label: work waiting on a human
+                // has to be visible from anywhere in the app, not only once
+                // you've opened the right project.
+                const pending = item.href === "/approvals" && approvalsCount > 0;
+                const badge = pending ? String(approvalsCount) : item.badge;
                 return (
                   <Link
                     key={item.href}
@@ -116,7 +120,9 @@ export function Sidebar() {
                           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                           active && highlight
                             ? "bg-white/20 text-white"
-                            : "bg-sky-500 text-white shadow-sm",
+                            : pending
+                              ? "bg-amber-500 text-white shadow-sm"
+                              : "bg-sky-500 text-white shadow-sm",
                         )}
                       >
                         {badge}
