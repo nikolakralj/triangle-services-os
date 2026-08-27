@@ -273,17 +273,21 @@ export function AgentConsole({
                       className={
                         e.onDuty
                           ? "inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
-                          : "inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
+                          : e.neverStarted
+                            ? "inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                            : "inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500"
                       }
                     >
                       <span
                         className={
                           e.onDuty
                             ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-                            : "h-1.5 w-1.5 rounded-full bg-slate-400"
+                            : e.neverStarted
+                              ? "h-1.5 w-1.5 rounded-full bg-amber-500"
+                              : "h-1.5 w-1.5 rounded-full bg-slate-400"
                         }
                       />
-                      {e.onDuty ? "On duty" : "Off duty"}
+                      {e.onDuty ? "On duty" : e.neverStarted ? "Not started" : "Off duty"}
                     </span>
                   </div>
                   <p className="text-xs font-medium text-sky-700">
@@ -299,10 +303,17 @@ export function AgentConsole({
                     {e.provider ? `works on ${e.provider}` : "no workstation yet"}
                     {" · "}
                     {e.openAssignments === 0
-                      ? "free"
-                      : `${e.openAssignments} open assignment${e.openAssignments === 1 ? "" : "s"}`}
+                      ? "nothing waiting"
+                      : `${e.openAssignments} waiting`}
                     {e.lastUsedAt ? ` · seen ${friendlyTime(e.lastUsedAt)}` : ""}
                   </p>
+                  {e.neverStarted && e.openAssignments > 0 && (
+                    <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-[11px] leading-relaxed text-amber-800">
+                      {e.displayName} has work waiting but has never contacted
+                      Triangle. Paste the instructions and token into the bot,
+                      then ask it to run once.
+                    </p>
+                  )}
                 </div>
               </div>
             ))

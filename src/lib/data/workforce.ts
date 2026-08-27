@@ -24,6 +24,8 @@ export interface WorkforceEmployee {
   providerRef: string | null;
   lastUsedAt: string | null;
   onDuty: boolean;
+  /** Hired but has never called Triangle — "Off duty" would be misleading. */
+  neverStarted: boolean;
   openAssignments: number;
   badgeName: string | null;
 }
@@ -126,6 +128,7 @@ export async function listWorkforce(orgId: string): Promise<WorkforceEmployee[]>
       onDuty:
         lastUsedAt !== null &&
         Date.now() - new Date(lastUsedAt).getTime() < 24 * 60 * 60 * 1000,
+      neverStarted: lastUsedAt === null,
       openAssignments: openCounts.get(i.id as string) ?? 0,
       badgeName: badge?.name ?? null,
     };

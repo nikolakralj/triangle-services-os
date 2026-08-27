@@ -93,7 +93,9 @@ if (prior.ok && prior.body?.length) {
       role_key: roleKey,
       display_name: displayName ?? roleKey,
       emoji: emoji ?? null,
-      description: roleTitle ?? null,
+      // roleTitle is the job title shown on the card; description is prose.
+      department: null,
+      description: roleTitle ? `${roleTitle}.` : null,
       role_version: "v1",
     }),
   });
