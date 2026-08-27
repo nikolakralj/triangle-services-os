@@ -8,6 +8,7 @@ import {
   createJobLead,
   getIntakeRules,
 } from "@/lib/data/job-intake";
+import { logAgentRun } from "@/lib/data/agents";
 
 // ---------------------------------------------------------------------------
 // POST /api/job-intake/ingest
@@ -238,6 +239,23 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // Every run leaves a row in the activity feed, whoever fed it.
+  await logAgentRun({
+    orgId: organizationId,
+    agentName: machine?.name ?? "dashboard-session",
+    source: "ingest",
+    summary: {
+      mailbox,
+      received: result.received,
+      stored: result.stored,
+      alreadySeen: result.alreadySeen,
+      opportunities: result.opportunities,
+      leadsCreated: result.leadsCreated,
+      noiseDiscarded: result.noiseDiscarded,
+      errors: result.errors.length,
+    },
+  });
 
   return NextResponse.json(result);
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { ingestAllAccounts } from "@/lib/job-intake/ingest";
 import { safeEqual } from "@/lib/job-intake/credentials";
+import { logAgentRun } from "@/lib/data/agents";
 
 // IMAP + Buffer need the Node runtime, not Edge.
 export const runtime = "nodejs";
@@ -86,6 +87,14 @@ export async function POST(request: Request) {
     }),
     { fetched: 0, leadsCreated: 0, noiseDiscarded: 0, alreadySeen: 0, errors: 0 },
   );
+
+  // The IMAP fallback shows up in the same activity feed as the bots.
+  await logAgentRun({
+    orgId,
+    agentName: isCron ? "imap-cron" : "imap-sync",
+    source: "imap",
+    summary: totals,
+  });
 
   return NextResponse.json({ totals, summaries });
 }

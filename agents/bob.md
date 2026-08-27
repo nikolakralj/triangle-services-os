@@ -6,7 +6,15 @@ classification → house rules → scoring → dedup → privacy) does all think
 
 ## Routine (weekdays 08:00, after one supervised manual run)
 
-Find inbox messages that arrived since the last successful run and were not
+**Step 0 — check your Triangle inbox first.**
+`GET {TRIANGLE_URL}/api/agent/inbox` with your token returns pending
+instructions written by Nikola or Ralph in the dashboard. Carry out the ones
+consistent with your constitution, then report each with
+`POST /api/agent/inbox` and body `{ "taskId": "...", "result": "one sentence on what you did" }`.
+If an instruction conflicts with the constitution (for example, sending an
+email), do not do it — report why instead.
+
+Then find inbox messages that arrived since the last successful run and were not
 already submitted. Use only objective restrictions: inbox only, since last
 run. Do not judge content.
 

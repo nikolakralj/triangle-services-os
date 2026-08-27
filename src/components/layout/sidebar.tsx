@@ -8,6 +8,7 @@ import {
   Building2,
   ClipboardCheck,
   FileText,
+  Cpu,
   Gauge,
   Inbox,
   KanbanSquare,
@@ -39,6 +40,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/ai", label: "Global Scout", icon: Bot, highlight: true, badge: "AI" },
       { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "NEW" },
+      { href: "/agents", label: "Agents", icon: Cpu },
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
       { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
       { href: "/workers", label: "Talent Pool", icon: UserRound },
