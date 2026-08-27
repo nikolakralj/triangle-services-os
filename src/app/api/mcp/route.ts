@@ -500,6 +500,10 @@ const TOOL_SCOPE: Record<string, string> = {
   list_project_notes: "research.read",
   list_research_sources: "research.read",
   list_research_suggestions: "research.read",
+  // evidence logging — a researcher must be able to record the sources it
+  // checked, including dead ends. Scout hit this on his first real run:
+  // three source writes were rejected because the tool was missing here.
+  log_research_source: "research.suggestion.create",
   // proposals — everything lands in the pending queue for human review
   propose_chain_node: "research.suggestion.create",
   propose_buyer_contact: "research.suggestion.create",
