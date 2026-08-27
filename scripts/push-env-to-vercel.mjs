@@ -12,9 +12,15 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
-const target = process.argv[2] ?? "preview";
-if (!["preview", "production", "development"].includes(target)) {
-  console.error("Usage: node scripts/push-env-to-vercel.mjs <preview|production|development>");
+// Default to ALL environments. Setting only `preview` is a classic trap:
+// the production URL then runs with no config and silently falls back to
+// demo mode, which bypasses login and shows seeded data.
+const arg = process.argv[2] ?? "all";
+const targets = arg === "all"
+  ? ["production", "preview", "development"]
+  : [arg];
+if (!targets.every((t) => ["preview", "production", "development"].includes(t))) {
+  console.error("Usage: node scripts/push-env-to-vercel.mjs [all|preview|production|development]");
   process.exit(1);
 }
 
