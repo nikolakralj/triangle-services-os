@@ -49,6 +49,9 @@ if (a === "--revoke") {
   );
   const rows = await res.json();
   console.log(res.ok && rows.length ? `Revoked ${b}.` : `Nothing revoked (not found?).`);
+  // Explicit flush + exit: on Windows, leaving keep-alive sockets open at exit
+  // makes libuv print a scary "Assertion failed" line after a successful run.
+  await new Promise((r) => setTimeout(r, 50));
   process.exit(res.ok ? 0 : 1);
 }
 
@@ -146,3 +149,5 @@ console.log(`  name:   ${name}`);
 console.log(`  scopes: ${scopes.join(", ")}`);
 console.log(`  token:  ${token}\n`);
 console.log("Never paste this token into a chat with any AI. Bot config only.");
+await new Promise((r) => setTimeout(r, 50));
+process.exit(0);
