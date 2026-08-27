@@ -19,6 +19,74 @@ calls.
 `triangle-services-os`, Hobby plan). Supabase project `mpyxxqcwmrrrwsvjcsvx`.
 Env vars are set in all three Vercel environments.
 
+## STATE AS OF 28 Aug — read this first
+
+**The system works end to end. Nothing has been sent to a customer yet.**
+
+    18 leads found           15 never opened
+    3  replies drafted        0 actually sent
+    53 suggestions accepted   0 became outreach
+    3  worker matches         0 packets sent to a client
+
+That gap — not any missing feature — is why progress feels stalled. The
+highest-value action available is a human sending one reply, not more code.
+
+### Live and working
+
+- **Bob** (Inbox Coordinator, Grok) — weekday 08:00 routine posts raw inbox
+  mail to `/api/job-intake/ingest`. Airtable retired. Refused a research
+  assignment as out-of-role and recorded why: the constitution holds.
+- **Scout** (Project Researcher, Grok) — connected to the research MCP with a
+  scoped badge. First run filed 5 sourced suggestions on the Salzgitter
+  hydrogen plant, including the valuable negative "no electrical sub under
+  ANDRITZ", which identifies the EPC as the crew buyer.
+- **Workforce model** (migration 023) — employee (`agent_instances`) is
+  durable; credential is only a badge; provider binding swappable.
+  `agent_assignments` can attach workers as context, so "find work for THESE
+  people" carries the people.
+- **Findings + Approvals** — `/api/agent/findings` lets an agent report
+  something Triangle has never heard of; accepting promotes it to a real
+  project. Agents cannot approve their own work (session-only endpoint).
+- **Scoped MCP** — read + propose for research badges; accept/reject refused
+  to all machines.
+
+### Agreed plan (28 Aug), in order
+
+1. **Human sends one reply** from Job Intake. Nothing blocks this.
+2. **Triage the backlog** — 15 untouched leads, 48 unreviewed suggestions.
+   The accept/reject decisions are the training signal.
+3. **One crew packet to a real buyer** — exercises matching + certificates +
+   PDF, all currently untested in anger.
+
+Only then improve the interface, informed by what actually slowed the user
+down.
+
+### Explicitly deferred (advisor proposals reviewed and declined for now)
+
+- **Collaboration Field / spatial org canvas** — a map for orgs that have
+  lost track of who does what. At 2 humans + 2 agents it is designing for an
+  imagined company. Revisit at 5+ agents doing concurrent work.
+- **"Generic hybrid work OS"** — a business pivot, not a design decision. The
+  staffing vertical earns the money. Keep clean module boundaries so the
+  option stays open; pay no refactoring cost for genericism until a second
+  real use case exists.
+- Employee detail pages, performance/cost analytics, outcome attribution,
+  agent catalog + "Hire" flow. All good, all cheaper once real usage exists.
+
+### Small, agreed next builds (~2 days, not 2 weeks)
+
+1. Bulk reject on suggestions (makes triage minutes, not an hour)
+2. Task-first assignment — describe the work, Triangle recommends who can do
+   it. The one structural fix every advisor agreed on, and Bob proved it.
+3. Sidebar hierarchy: Today · Work · Team · Decisions · Agency
+
+### Note for advisors and future agents
+
+Three separate reviews have now audited `master` and concluded this work does
+not exist. It does — on `wip-jules-2026-05-03T18-13-13-596Z`, 70+ commits,
+migrations 001-023. `master` is the original MVP and has zero migration
+files. Set the default branch or merge before asking anyone to review.
+
 ## Where we stopped — the one open task
 
 **Bob (a Grok bot) has now reached the ingest endpoint manually. Do not turn on
