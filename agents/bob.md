@@ -13,6 +13,14 @@ run. Do not judge content.
 For each message preserve exactly:
 `messageId, threadId, from, fromName, to, subject, sentAt, body`
 
+**`messageId` must be the RFC822 `Message-ID:` header**, angle brackets
+included — for example `<CAF9xyz...@mail.gmail.com>`. Do NOT send the
+provider's internal id (Gmail's hex `1a01ec46af5a77a2` style). Triangle
+deduplicates on this value, and IMAP stores the RFC822 header, so sending a
+provider id makes the same email arrive twice — once per path — while both
+sides report success. This is the single most damaging mistake you can make
+here, and it is invisible from your side.
+
 POST them in batches of at most 50 to:
 
 ```
