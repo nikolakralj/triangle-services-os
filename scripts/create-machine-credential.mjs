@@ -64,6 +64,56 @@ if (!name || scopes.length === 0) {
 const token = `tri_mc_${randomBytes(24).toString("hex")}`;
 const token_hash = createHash("sha256").update(token, "utf8").digest("hex");
 
+// ── The employee is durable; this badge must belong to one. ──
+// Re-badging (rotation) reuses the existing employee found via any prior
+// credential with the same name. A first-time hire creates the employee and
+// its provider binding (default grok) in one go.
+async function rest(path, opts = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers, ...opts });
+  const body = await r.json().catch(() => null);
+  return { ok: r.ok, status: r.status, body };
+}
+
+let agent_instance_id = null;
+let provider_binding_id = null;
+
+const prior = await rest(
+  `machine_credentials?org_id=eq.${ORG_ID}&name=eq.${encodeURIComponent(name)}&agent_instance_id=not.is.null&select=agent_instance_id,provider_binding_id&limit=1`,
+);
+if (prior.ok && prior.body?.length) {
+  agent_instance_id = prior.body[0].agent_instance_id;
+  provider_binding_id = prior.body[0].provider_binding_id;
+  console.log("Re-badging existing employee (history preserved).");
+} else {
+  const roleKey = name.replace(/^triangle_/, "");
+  const inst = await rest("agent_instances", {
+    method: "POST",
+    body: JSON.stringify({
+      org_id: ORG_ID,
+      role_key: roleKey,
+      display_name: displayName ?? roleKey,
+      emoji: emoji ?? null,
+      description: roleTitle ?? null,
+      role_version: "v1",
+    }),
+  });
+  if (!inst.ok) {
+    console.error("Could not create the employee:", JSON.stringify(inst.body).slice(0, 200));
+    process.exit(1);
+  }
+  agent_instance_id = inst.body[0].id;
+  const bind = await rest("agent_provider_bindings", {
+    method: "POST",
+    body: JSON.stringify({
+      org_id: ORG_ID,
+      agent_instance_id,
+      provider: "grok",
+    }),
+  });
+  if (bind.ok) provider_binding_id = bind.body[0].id;
+  console.log(`Employee created: ${displayName ?? roleKey} (${roleKey}).`);
+}
+
 const res = await fetch(`${SUPABASE_URL}/rest/v1/machine_credentials`, {
   method: "POST",
   headers,
@@ -72,6 +122,8 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/machine_credentials`, {
     display_name: displayName ?? null,
     role_title: roleTitle ?? null,
     emoji: emoji ?? null,
+    agent_instance_id,
+    provider_binding_id,
   }),
 });
 

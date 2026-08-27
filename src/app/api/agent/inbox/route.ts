@@ -4,6 +4,10 @@ import {
   listPendingTasksForAgent,
   completeAgentTask,
 } from "@/lib/data/agents";
+import {
+  listOpenAssignmentsForInstance,
+  completeAssignment,
+} from "@/lib/data/workforce";
 
 // ---------------------------------------------------------------------------
 // The agent-facing side of the Agent Console.
@@ -32,16 +36,22 @@ export async function GET(request: Request) {
   }
 
   const tasks = await listPendingTasksForAgent(machine.orgId, machine.name);
+  // Durable assignments, with business context hydrated (e.g. the worker
+  // records for "find work for these people"). Fetching starts the shift.
+  const assignments = machine.agentInstanceId
+    ? await listOpenAssignmentsForInstance(machine.orgId, machine.agentInstanceId)
+    : [];
 
   return NextResponse.json({
     agent: machine.name,
+    assignments,
     tasks: tasks.map((t) => ({
       id: t.id,
       instruction: t.instruction,
       createdAt: t.createdAt,
     })),
     note:
-      "Carry out instructions consistent with your constitution, then POST { taskId, result } here. Never send email; never invent facts.",
+      "Work assignments first (POST { assignmentId, result } when done, add failed: true if you could not). Quick notes: POST { taskId, result }. Never send email; never invent facts.",
   });
 }
 
@@ -54,7 +64,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { taskId?: string; result?: string };
+  let body: { taskId?: string; assignmentId?: string; result?: string; failed?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -62,7 +72,35 @@ export async function POST(request: Request) {
   }
 
   const taskId = String(body.taskId ?? "").trim();
+  const assignmentId = String(body.assignmentId ?? "").trim();
   const result = String(body.result ?? "").trim();
+
+  if (assignmentId) {
+    if (!result) {
+      return NextResponse.json({ error: "result is required." }, { status: 400 });
+    }
+    if (!machine.agentInstanceId) {
+      return NextResponse.json(
+        { error: "This badge is not linked to an employee." },
+        { status: 400 },
+      );
+    }
+    const done = await completeAssignment({
+      assignmentId,
+      orgId: machine.orgId,
+      agentInstanceId: machine.agentInstanceId,
+      resultSummary: result,
+      failed: body.failed === true,
+    });
+    if (!done) {
+      return NextResponse.json(
+        { error: "No open assignment with that id belongs to this employee." },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ ok: true, assignmentId });
+  }
+
   if (!taskId || !result) {
     return NextResponse.json(
       { error: "taskId and result are both required." },
