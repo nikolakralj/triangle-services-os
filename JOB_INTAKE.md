@@ -45,8 +45,9 @@ IMAP mailbox
 | `job_intake_rules` | One editable text block per org, injected into the classification prompt. |
 
 Migrations: `013_job_intake.sql`, `014_mail_account_credentials.sql`,
-`015_lead_reply_drafts.sql`, `016_job_intake_rules.sql`. All applied to the live
-Supabase project. RLS on every table, scoped to active `organization_members`.
+`015_lead_reply_drafts.sql`, `016_job_intake_rules.sql`,
+`020_job_intake_reply_style.sql`. All applied to the live Supabase project. RLS
+on every table, scoped to active `organization_members`.
 
 ## Files
 
@@ -128,6 +129,20 @@ always scores at least 75"* moved a 4-month single rail role from **20 → 75**.
 
 House rules can change priorities and scores. They **cannot** authorise inventing
 facts — the anti-invention instruction is restated after them so it has the last word.
+
+## Reply style memory
+
+Added 2026-08-27. Settings → Reply style stores a plain-English memory block in
+`job_intake_rules.reply_style`. It is injected only into `draftLeadReply()` so it
+changes tone, structure and recurring asks in drafted replies, not classification
+or scoring.
+
+The Job Intake cards also have a collapsed **Original email** panel for stored
+opportunity bodies. This keeps the list calm while letting Nikola/Ralph work a
+lead from the dashboard without returning to Gmail or Grok.
+
+This still does **not** send email. The current workflow remains: draft → edit →
+copy/send manually → mark "I sent this".
 
 ## Hard rules — do not weaken these
 

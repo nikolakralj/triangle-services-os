@@ -358,7 +358,21 @@ function LeadCard({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
+      <div className="space-y-3 border-t border-slate-100 px-4 py-3">
+        {lead.emailBody ? (
+          <details className="group rounded-lg border border-slate-200 bg-slate-50/60">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-slate-700 marker:hidden">
+              <span className="inline-flex items-center gap-1.5">
+                Original email
+                <span className="text-slate-400 group-open:hidden">show</span>
+                <span className="hidden text-slate-400 group-open:inline">hide</span>
+              </span>
+            </summary>
+            <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t border-slate-200 bg-white px-3 py-2 font-sans text-xs leading-relaxed text-slate-700">
+              {lead.emailBody}
+            </pre>
+          </details>
+        ) : null}
         <LeadReplyPanel
           leadId={lead.id}
           contactName={lead.contactName}

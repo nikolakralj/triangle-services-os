@@ -70,6 +70,7 @@ Reply with JSON only:
 export async function draftLeadReply(params: {
   lead: JobLead;
   originalSubject: string | null;
+  replyStyle?: string | null;
   model?: string;
 }): Promise<DraftedReply> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -100,6 +101,10 @@ export async function draftLeadReply(params: {
   const userContent = [
     `COMPANY:\n${COMPANY_PROFILE}`,
     "",
+    (params.replyStyle ?? "").trim()
+      ? `TRIANGLE REPLY STYLE MEMORY:\n${params.replyStyle?.trim()}`
+      : null,
+    (params.replyStyle ?? "").trim() ? "" : null,
     `THEIR EMAIL SUBJECT: ${params.originalSubject ?? lead.roleTitle}`,
     "",
     `WHAT WE KNOW FROM THEIR EMAIL:\n${known || "(very little)"}`,
@@ -111,7 +116,7 @@ export async function draftLeadReply(params: {
       : "THEY ASKED US FOR: nothing specific",
     "",
     `WRITE IN: ${lang.name}`,
-  ].join("\n");
+  ].filter((part): part is string => typeof part === "string").join("\n");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

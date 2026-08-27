@@ -21,28 +21,57 @@ Env vars are set in all three Vercel environments.
 
 ## Where we stopped — the one open task
 
-**Bob (a Grok bot) has never successfully called the ingest endpoint.**
+**Bob (a Grok bot) has now reached the ingest endpoint manually. Do not turn on
+his routine yet.**
 
-Evidence from the database, not from what Bob says:
+Current database evidence, not from what Bob says:
 
 ```
-select max(last_used_at) from machine_credentials;              -- NULL
-select count(*) from inbound_emails;                            -- 76, unchanged
+select name, scopes, status, created_at, last_used_at
+  from machine_credentials
+ where name = 'triangle_bob_nikola';
+
+-- 2026-08-27 verification:
+-- old exposed row: revoked, last_used_at 2026-08-27 07:52:45.763+00
+-- replacement row: active, last_used_at 2026-08-27 08:02:48.919+00
+
+select count(*) from inbound_emails;                            -- 79
+select count(*) from inbound_emails
+ where created_at > timestamptz '2026-08-25 10:08:10.689118+00'; -- 3
 select count(*) from mail_accounts where provider='external';   -- 0
 ```
 
-`last_used_at` is stamped on ANY authenticated request, including rejected
-ones. NULL means no request ever arrived.
+The original duplicate-name rotation failure was fixed by migration
+`019_machine_credentials_rotation.sql`: revoked credential rows remain for
+audit, but only active rows are unique by `(org_id, name)`. The exposed token is
+dead. A fresh active credential exists, but its plaintext cannot be recovered;
+if Bob loses it, revoke and create a new one again.
 
-Bob claimed twice he was "posting now". He also caught, on his own, that he was
-about to send Gmail internal hex ids instead of RFC822 Message-IDs — which
-would have duplicated every email, one copy per path, with both sides
-reporting success. He said he was remapping. Then nothing arrived.
+The three new messages did not blow up the total to ~86, so the Message-ID
+mapping appears to be sane. They produced three low-priority g2 leads:
 
-**Next step: find out why.** Ask him for the exact URL and HTTP status code he
-received. If he cannot answer concretely, he never made the request. Likely
-causes in order: token truncated on copy (it wrapped across two lines in the
-UI), wrong URL, or he silently fell back to Airtable.
+- PLC commissioning/programming engineer, Germany, score 35
+- Commissioning Engineer, Prum, Germany, score 35
+- Commissioning Engineer / Automation / Configuration, Belgium, score 35
+
+The scores look directionally correct for Triangle: all three are single-role
+contractor opportunities with no crew/package signal. One extractor blemish:
+the PLC lead rationale mentions "6 or 12 months" while `duration_months` is
+null and `duration` is still in `missing_fields`; fix that prompt/schema drift
+before trusting automation.
+
+Remaining gap: mailbox/source attribution. `resolveExternalAccount()` currently
+reuses an existing `mail_accounts` row when Bob posts a mailbox address that is
+already connected by IMAP, so `provider='external'` stays at 0 and the UI shows
+the lead as arriving via the existing mailbox. That means `external` account
+count is not a reliable proof of whether Bob posted when the mailbox overlaps.
+Before enabling Bob's routine, add explicit source-path attribution or logging
+for external ingests.
+
+**Next step:** keep running Bob manually. For every run, ask him for the exact
+URL, HTTP status code, and JSON response. Success should show high
+`alreadySeen` on replays, total emails staying near 79, no duplicate spike, and
+`machine_credentials.last_used_at` moving forward.
 
 ### Verify Bob independently — do not trust his self-reported counts
 
@@ -51,17 +80,19 @@ UI), wrong URL, or he silently fell back to Airtable.
 select count(*) from inbound_emails
  where created_at > timestamptz '2026-08-25 10:08:10.689118+00';
 
--- 76 before. If this jumps to ~86, Message-IDs did NOT match and every
--- email is now duplicated across the IMAP and bot paths.
+-- 79 after Bob's first successful manual ingest. If this jumps unexpectedly,
+-- Message-IDs may not match and emails may be duplicating across paths.
 select count(*) from inbound_emails;
 
 -- was the token used at all?
 select name, scopes, last_used_at from machine_credentials;
 ```
 
-**Success looks like:** high `alreadySeen`, total emails staying near 76, and a
-new `mail_accounts` row with `provider='external'`. High `alreadySeen` is the
-GOOD outcome — it proves both paths agree on message identity.
+**Success looks like:** high `alreadySeen`, total emails staying near 79, no
+unexpected duplicate spike, and `machine_credentials.last_used_at` moving
+forward. High `alreadySeen` is the GOOD outcome — it proves both paths agree on
+message identity. Do not rely on `mail_accounts.provider='external'` yet when
+Bob posts a mailbox that already exists as an IMAP account.
 
 ## Architecture — do not redesign this
 

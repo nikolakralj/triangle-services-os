@@ -3,6 +3,7 @@ import { requireApiAccess } from "@/lib/supabase/server";
 import { draftLeadReply } from "@/lib/job-intake/draft-reply";
 import {
   getJobLead,
+  getReplyStyleMemory,
   listReplyDrafts,
   createReplyDraft,
   updateReplyDraft,
@@ -60,9 +61,11 @@ export async function POST(
 
   let drafted;
   try {
+    const replyStyle = await getReplyStyleMemory(access.organizationId);
     drafted = await draftLeadReply({
       lead,
       originalSubject: lead.subject,
+      replyStyle: replyStyle?.body ?? null,
     });
   } catch (err) {
     return NextResponse.json(

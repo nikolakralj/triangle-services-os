@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MailboxSettingsPanel } from "@/components/modules/mailbox-settings-panel";
 import { IntakeRulesPanel } from "@/components/modules/intake-rules-panel";
+import { ReplyStylePanel } from "@/components/modules/reply-style-panel";
 import { ChangePasswordPanel } from "@/components/modules/change-password-panel";
 import {
   COMPANY_TYPES,
@@ -15,6 +16,7 @@ const sections = [
   "Your account",
   "Job Intake mailboxes",
   "What the agent looks for",
+  "Reply style",
   "Organization",
   "Users",
   "Pipeline stages",
@@ -71,6 +73,15 @@ export default function SettingsPage() {
             />
             <CardContent>
               <IntakeRulesPanel />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader
+              title="Reply style"
+              description="How Triangle should sound when drafting replies."
+            />
+            <CardContent>
+              <ReplyStylePanel />
             </CardContent>
           </Card>
           <Card>

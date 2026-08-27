@@ -36,6 +36,8 @@ export interface JobLead {
   /** Joined from inbound_emails when available. */
   subject: string | null;
   receivedAt: string | null;
+  /** Cleaned original body text, stored only for real opportunities. */
+  emailBody: string | null;
   /** Which mailbox this arrived through — matters once two people feed it. */
   sourceMailbox: string | null;
 }
@@ -86,6 +88,7 @@ function rowToLead(
     createdAt: String(row.created_at ?? ""),
     subject: (email?.subject as string) ?? null,
     receivedAt: (email?.sent_at as string) ?? null,
+    emailBody: (email?.body_text as string) ?? null,
     sourceMailbox: sourceMailbox ?? null,
   };
 }
@@ -132,7 +135,7 @@ export async function listJobLeads(
   if (emailIds.length > 0) {
     const { data: emails } = await svc
       .from("inbound_emails")
-      .select("id, subject, sent_at, mail_account_id")
+      .select("id, subject, sent_at, body_text, mail_account_id")
       .in("id", emailIds);
     for (const e of emails ?? []) {
       emailMap.set(e.id as string, e);
@@ -355,6 +358,11 @@ export interface IntakeRules {
   updatedAt: string | null;
 }
 
+export interface ReplyStyleMemory {
+  body: string;
+  updatedAt: string | null;
+}
+
 /** The org's own scoring/classification rules. Null when never written. */
 export async function getIntakeRules(orgId: string): Promise<IntakeRules | null> {
   const svc = createServiceSupabaseClient();
@@ -369,6 +377,7 @@ export async function getIntakeRules(orgId: string): Promise<IntakeRules | null>
 }
 
 const MAX_RULES_LENGTH = 8000;
+const MAX_REPLY_STYLE_LENGTH = 6000;
 
 export async function upsertIntakeRules(params: {
   orgId: string;
@@ -392,6 +401,51 @@ export async function upsertIntakeRules(params: {
     .maybeSingle();
   if (error || !data) return null;
   return { body: data.body ?? "", updatedAt: data.updated_at ?? null };
+}
+
+/** Plain-English guidance for how Triangle replies to recruiters. */
+export async function getReplyStyleMemory(
+  orgId: string,
+): Promise<ReplyStyleMemory | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data, error } = await svc
+    .from("job_intake_rules")
+    .select("reply_style, updated_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    body: typeof data.reply_style === "string" ? data.reply_style : "",
+    updatedAt: data.updated_at ?? null,
+  };
+}
+
+export async function upsertReplyStyleMemory(params: {
+  orgId: string;
+  body: string;
+  userId: string | null;
+}): Promise<ReplyStyleMemory | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data, error } = await svc
+    .from("job_intake_rules")
+    .upsert(
+      {
+        org_id: params.orgId,
+        reply_style: (params.body ?? "").slice(0, MAX_REPLY_STYLE_LENGTH),
+        updated_by: params.userId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id" },
+    )
+    .select("reply_style, updated_at")
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    body: typeof data.reply_style === "string" ? data.reply_style : "",
+    updatedAt: data.updated_at ?? null,
+  };
 }
 
 // ── reply drafts ────────────────────────────────────────────────────────────
@@ -443,7 +497,7 @@ export async function getJobLead(
   if (data.inbound_email_id) {
     const { data: e } = await svc
       .from("inbound_emails")
-      .select("id, subject, sent_at")
+      .select("id, subject, sent_at, body_text")
       .eq("id", data.inbound_email_id as string)
       .maybeSingle();
     email = e ?? null;

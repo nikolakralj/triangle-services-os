@@ -47,7 +47,11 @@ import_leads.sql
 
 /playwright-report/
 /test-results/
+.playwright-mcp/
 
 # Agent-local config — contains API tokens, never commit
 .codex/
 .mcp.json
+
+# Supabase CLI local project metadata
+supabase/.temp/
