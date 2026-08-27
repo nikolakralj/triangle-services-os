@@ -69,8 +69,16 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/machine_credentials`, {
 });
 
 if (!res.ok) {
-  console.error(`Failed (${res.status}):`, await res.text());
-  console.error("If the name exists, revoke it first or pick a new name.");
+  const body = await res.text();
+  console.error(`Failed (${res.status}):`, body);
+  if (body.includes("23505")) {
+    console.error(
+      "
+An ACTIVE credential with that name already exists. Revoke it first:
+" +
+      `  node scripts/create-machine-credential.mjs --revoke ${name}`,
+    );
+  }
   process.exit(1);
 }
 
