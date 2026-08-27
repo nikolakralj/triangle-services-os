@@ -23,6 +23,8 @@ export interface MachineAccess {
   credentialId: string;
   name: string;
   scopes: string[];
+  /** The durable employee this badge belongs to (null for unlinked legacy badges). */
+  agentInstanceId: string | null;
 }
 
 export function hashToken(token: string): string {
@@ -47,7 +49,7 @@ export async function verifyMachineToken(
 
   const { data } = await svc
     .from("machine_credentials")
-    .select("id, org_id, name, scopes, status")
+    .select("id, org_id, name, scopes, status, agent_instance_id")
     .eq("token_hash", hashToken(token))
     .maybeSingle();
 
@@ -65,6 +67,7 @@ export async function verifyMachineToken(
     credentialId: data.id as string,
     name: data.name as string,
     scopes: Array.isArray(data.scopes) ? (data.scopes as string[]) : [],
+    agentInstanceId: (data.agent_instance_id as string) ?? null,
   };
 }
 
