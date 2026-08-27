@@ -454,11 +454,29 @@ export async function acceptResearchSuggestion(params: {
   }
 
   if (row.suggestion_type === "package_opportunity") {
+    // Two producers file this type with different shapes: the in-app research
+    // loop writes {title, summary, roles, size}, the MCP tool writes
+    // {package_type, likely_buyer, reason}. Reading only the first shape meant
+    // every agent-sourced package landed as "Discovered Package" with no roles
+    // — twelve identically-named rows, useless in the matching panel. Accept
+    // both. Roles and crew size stay empty rather than invented; a human fills
+    // those in, which is the whole point of the approval step.
+    const packageType = payload.package_type ? String(payload.package_type).trim() : "";
+    const likelyBuyer = payload.likely_buyer ? String(payload.likely_buyer).trim() : "";
+    const typeLabel = packageType
+      ? packageType.charAt(0).toUpperCase() + packageType.slice(1)
+      : "";
+    const derivedTitle = typeLabel
+      ? likelyBuyer
+        ? `${typeLabel} — ${likelyBuyer}`
+        : typeLabel
+      : "";
+
     const { id: insertedId } = (await createProjectPackage({
       orgId: row.org_id,
       projectId: row.project_id,
-      title: String(payload.title || "Discovered Package"),
-      summary: String(payload.summary || row.evidence_text),
+      title: String(payload.title || derivedTitle || "Discovered Package"),
+      summary: String(payload.summary || payload.reason || row.evidence_text),
       roles: Array.isArray(payload.roles) ? payload.roles.map(String) : [],
       estimatedCrewSize: typeof payload.size === "number" ? payload.size : undefined,
       confidence: row.confidence ?? undefined,
