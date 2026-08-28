@@ -70,15 +70,36 @@ up where you left off rather than starting again.
 
 ## What a good report looks like
 
-Put the findings in your `result` text, each with its source URL. For example:
+A human reads this. Write it the way you would hand it to a manager who has
+two minutes — a one-line answer first, then the candidates, ranked.
 
-> Three candidates. (1) BASF Ludwigshafen electrical upgrade, EPC is Bilfinger,
-> likely buyer is their E&I subcontractor — 12-month scope starting Q4,
-> source: <url>, quote: "…". Fits Anton and Jana (both cable pulling, DE
-> ready). (2) … (3) …
+Open with a single sentence: what you found and where the best chance is.
+Then each candidate on its own line, starting with `(1) `, `(2) `, `(3) ` at
+the beginning of the line. Keep the numbers in order and use them only for
+candidates — writing "weaker than (1) and (2)" mid-sentence reads as a fourth
+candidate.
+
+Inside a candidate, in this order: who owns the project, who actually buys the
+labour, the quoted evidence, `Source: <url>`, and `Confidence NN`. Put every
+URL after the word Source so it can be turned into a link — a bare URL in the
+middle of a sentence is unreadable.
+
+> Three candidates for 15 electricians + 2 supervisors. Best chance is a
+> smaller electrical GU, not the hyperscale owner.
+>
+> (1) BEST FIT — BASF Ludwigshafen electrical upgrade. Owner BASF, EPC
+> Bilfinger, labour buyer is their E&I subcontractor. 12-month scope from Q4.
+> "…quoted line from the source…" Fits Anton and Jana (cable pulling, DE
+> ready). Source: https://… Confidence 90.
+>
+> (2) …
 
 Fewer strong findings beat many weak ones. Be honest about confidence: high
 only for explicit statements in primary sources.
+
+Say what you did NOT do, and why, at the end — "did not re-propose JSM", "did
+not chase YEXIO, looks handed over". A manager needs to know where you stopped
+as much as what you found.
 
 ## Forbidden
 

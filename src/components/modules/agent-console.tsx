@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
 import { HireEmployee } from "@/components/modules/hire-employee";
+import { AgentReport } from "@/components/modules/agent-report";
 import type { AgentTask, AgentRun } from "@/lib/data/agents";
 import type {
   WorkforceEmployee,
@@ -520,15 +521,11 @@ export function AgentConsole({
                     </div>
                   </div>
                   {a.resultSummary && (
-                    <div className="mt-2 flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                      <span className="text-base leading-none">{face(a.agentInstanceId)}</span>
-                      <p className="text-xs leading-relaxed text-slate-600">
-                        <span className="font-medium text-slate-700">
-                          {called(a.agentInstanceId)}:
-                        </span>{" "}
-                        {a.resultSummary}
-                      </p>
-                    </div>
+                    <AgentReport
+                      text={a.resultSummary}
+                      authorName={called(a.agentInstanceId)}
+                      authorEmoji={face(a.agentInstanceId)}
+                    />
                   )}
                   {a.status !== "cancelled" && (
                     <AssignmentThread
@@ -606,8 +603,17 @@ export function AgentConsole({
                         {friendlyTime(t.createdAt)}
                       </p>
                       {t.result && (
-                        <p className="mt-1 rounded bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
-                          {badgeFace(t.agentName)} {t.result}
+                        <AgentReport
+                          text={t.result}
+                          authorName={badgeCalled(t.agentName)}
+                          authorEmoji={badgeFace(t.agentName)}
+                        />
+                      )}
+                      {!t.result && t.status === "pending" && (
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {t.deliveredAt
+                            ? `Picked up ${friendlyTime(t.deliveredAt)} — no answer yet`
+                            : "Not picked up yet"}
                         </p>
                       )}
                     </div>

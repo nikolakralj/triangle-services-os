@@ -51,6 +51,8 @@ export interface AgentTask {
   result: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** When the agent actually fetched it — null means it has never been seen. */
+  deliveredAt: string | null;
 }
 
 export interface AgentRun {
@@ -99,7 +101,7 @@ export async function listAgentTasks(
   if (!svc) return [];
   const { data } = await svc
     .from("agent_tasks")
-    .select("id, agent_name, instruction, status, result, created_at, completed_at")
+    .select("id, agent_name, instruction, status, result, created_at, completed_at, delivered_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 50);
@@ -111,6 +113,7 @@ export async function listAgentTasks(
     result: (r.result as string) ?? null,
     createdAt: r.created_at as string,
     completedAt: (r.completed_at as string) ?? null,
+    deliveredAt: (r.delivered_at as string) ?? null,
   }));
 }
 
@@ -130,7 +133,7 @@ export async function createAgentTask(params: {
       instruction: params.instruction.slice(0, 4000),
       created_by: params.userId,
     })
-    .select("id, agent_name, instruction, status, result, created_at, completed_at")
+    .select("id, agent_name, instruction, status, result, created_at, completed_at, delivered_at")
     .maybeSingle();
   if (error || !data) return null;
   return {
@@ -141,6 +144,7 @@ export async function createAgentTask(params: {
     result: (data.result as string) ?? null,
     createdAt: data.created_at as string,
     completedAt: (data.completed_at as string) ?? null,
+    deliveredAt: (data.delivered_at as string) ?? null,
   };
 }
 
@@ -168,12 +172,28 @@ export async function listPendingTasksForAgent(
   if (!svc) return [];
   const { data } = await svc
     .from("agent_tasks")
-    .select("id, agent_name, instruction, status, result, created_at, completed_at")
+    .select("id, agent_name, instruction, status, result, created_at, completed_at, delivered_at")
     .eq("org_id", orgId)
     .eq("agent_name", agentName)
     .eq("status", "pending")
     .order("created_at");
-  return (data ?? []).map((r) => ({
+
+  const rows = data ?? [];
+
+  // Record that the agent has now been handed these. Without it the screen
+  // says "Assigned" whether the bot has never seen the note or read it an hour
+  // ago and done nothing — and those need different reactions from a manager.
+  // First delivery only: the stamp is when it was first handed over, not the
+  // last time it was polled.
+  const undelivered = rows.filter((r) => !r.delivered_at).map((r) => r.id as string);
+  if (undelivered.length > 0) {
+    await svc
+      .from("agent_tasks")
+      .update({ delivered_at: new Date().toISOString() })
+      .in("id", undelivered);
+  }
+
+  return rows.map((r) => ({
     id: r.id as string,
     agentName: r.agent_name as string,
     instruction: r.instruction as string,
@@ -181,6 +201,7 @@ export async function listPendingTasksForAgent(
     result: (r.result as string) ?? null,
     createdAt: r.created_at as string,
     completedAt: (r.completed_at as string) ?? null,
+    deliveredAt: (r.delivered_at as string) ?? null,
   }));
 }
 
