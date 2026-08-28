@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { WorkersTable } from "@/components/modules/simple-table";
 import { WorkersFilterForm } from "@/components/modules/workers-filter";
@@ -53,7 +54,17 @@ export default async function WorkersPage({
       <PageHeader
         title="Workers"
         description={`${workers.length} worker${workers.length !== 1 ? "s" : ""} - availability and capability tracking for delivery planning.`}
-        actions={<Button variant="primary">Add worker</Button>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/imports"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
+            >
+              Import from CSV
+            </Link>
+            <Button variant="primary">Add worker</Button>
+          </div>
+        }
       />
       <WorkersFilterForm
         roles={roles}
