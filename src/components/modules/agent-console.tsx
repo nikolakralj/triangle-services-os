@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
+import { HireEmployee } from "@/components/modules/hire-employee";
 import type { AgentTask, AgentRun } from "@/lib/data/agents";
 import type {
   WorkforceEmployee,
@@ -263,10 +264,13 @@ export function AgentConsole({
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
           AI employees
         </p>
+        <div className="mb-3">
+          <HireEmployee />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {employees.length === 0 ? (
             <p className="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
-              Nobody hired yet.
+              Nobody hired yet. Hire one above — it takes about a minute.
             </p>
           ) : (
             employees.map((e) => (
