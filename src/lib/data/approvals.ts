@@ -196,13 +196,15 @@ export async function listApprovals(
       kind: "finding",
       itemType: f.finding_type as string,
       headline: String(
-        p.full_name ?? p.project_name ?? p.name ?? p.company ?? f.finding_type,
+        p.full_name ?? p.project_name ?? p.company_name ?? p.name ?? p.company ?? f.finding_type,
       ),
       // Never the CV text itself — that is tens of thousands of characters and
       // belongs behind the decision, not in the queue.
       detail:
         [
           p.role,
+          p.parent ? `Part of ${String(p.parent)}` : null,
+          p.project ? `On ${String(p.project)}` : null,
           p.country,
           Array.isArray(p.certificates) && p.certificates.length
             ? (p.certificates as string[]).join(", ")

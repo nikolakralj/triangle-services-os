@@ -171,7 +171,7 @@ export async function acceptFinding(params: {
 
   const { data: finding } = await svc
     .from("agent_findings")
-    .select("id, finding_type, payload, source_url, evidence_text, status")
+    .select("id, finding_type, payload, source_url, evidence_text, status, confidence")
     .eq("id", params.findingId)
     .eq("org_id", params.orgId)
     .maybeSingle();
@@ -209,6 +209,87 @@ export async function acceptFinding(params: {
     if (project) {
       promotedTo = "discovered_project";
       entityId = project.id as string;
+    }
+  }
+
+  if (finding.finding_type === "company") {
+    const companyName = String(
+      payload.company_name ?? payload.name ?? payload.company ?? "",
+    ).trim();
+    if (!companyName) return null;
+
+    const roleText = String(payload.role ?? "").trim();
+
+    // A company Scout finds is only worth the queue if it lands somewhere it
+    // will be seen again. So: create or find the company record, then — when
+    // the finding names the project — put it on that project's contractor
+    // chain, which is the screen someone actually opens.
+    const { createCompany, searchAndFilterCompanies } = await import("./companies");
+    const existing = await searchAndFilterCompanies(params.orgId, {
+      search: companyName,
+    });
+    const match = existing.find(
+      (c) => c.name.toLowerCase() === companyName.toLowerCase(),
+    );
+
+    let companyId: string | null = match?.id ?? null;
+    if (!companyId) {
+      const created = await createCompany(params.orgId, params.userId ?? "", {
+        name: companyName,
+        company_status: "research",
+        priority: "medium",
+        sectors: roleText ? [roleText] : [],
+        source_url: (finding.source_url as string) ?? undefined,
+        description: [
+          roleText ? `Role: ${roleText}` : null,
+          payload.parent ? `Part of ${String(payload.parent)}` : null,
+          payload.project ? `Found on ${String(payload.project)}` : null,
+        ]
+          .filter(Boolean)
+          .join(". "),
+      });
+      if (created.ok) companyId = created.id;
+    }
+
+    if (companyId) {
+      promotedTo = "company";
+      entityId = companyId;
+
+      const projectName = String(payload.project ?? "").trim();
+      if (projectName) {
+        // Matched by name because that is all the finding carries. A miss just
+        // means no chain node — the company still exists, so nothing is lost.
+        const { data: project } = await svc
+          .from("discovered_projects")
+          .select("id")
+          .eq("organization_id", params.orgId)
+          .ilike("project_name", projectName)
+          .limit(1)
+          .maybeSingle();
+
+        if (project) {
+          const { normalizeChainRole } = await import("./research");
+          const { upsertChainNode } = await import("./contractor-chain");
+          const role = normalizeChainRole(roleText);
+          await upsertChainNode(
+            params.orgId,
+            project.id as string,
+            {
+              role,
+              label: roleText || role,
+              company_name: companyName,
+              company_id: companyId,
+              level: "known",
+              confidence: (finding.confidence as number) ?? null,
+              rationale: String(finding.evidence_text ?? "").slice(0, 500),
+              sort_order: 50,
+              notes: null,
+              created_by: params.userId,
+            },
+            params.userId ?? "",
+          );
+        }
+      }
     }
   }
 

@@ -81,7 +81,7 @@ const ROLE_ORDER: Record<string, number> = {
 // Normalize free-form role text from AI into a valid chain_role enum value.
 // AI often returns synonyms or uppercase ("MEP", "OPERATOR", "General Contractor")
 // — map them all to canonical lowercase enum values.
-function normalizeChainRole(input: unknown): ChainRole {
+export function normalizeChainRole(input: unknown): ChainRole {
   const raw = String(input ?? "").toLowerCase().trim();
   if (raw in ROLE_ORDER) return raw as ChainRole;
 
