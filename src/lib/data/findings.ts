@@ -212,6 +212,98 @@ export async function acceptFinding(params: {
     }
   }
 
+  if (finding.finding_type === "worker") {
+    const name = String(payload.full_name ?? payload.name ?? "").trim();
+    if (!name) return null;
+
+    const asList = (v: unknown) =>
+      Array.isArray(v) ? v.map(String).filter(Boolean) : [];
+
+    // Re-uploading a CV for someone already on the books should enrich them,
+    // not create a second copy of the same person.
+    const email = payload.email ? String(payload.email).toLowerCase() : null;
+    const { data: existing } = await svc
+      .from("workers")
+      .select("id, skills, certificates, languages")
+      .eq("organization_id", params.orgId)
+      .or(email ? `email.eq.${email},full_name.ilike.${name}` : `full_name.ilike.${name}`)
+      .limit(1);
+
+    const incoming = {
+      role: payload.role ? String(payload.role) : null,
+      email,
+      phone: payload.phone ? String(payload.phone) : null,
+      country: payload.country ? String(payload.country) : null,
+      city: payload.city ? String(payload.city) : null,
+      skills: asList(payload.skills),
+      certificates: asList(payload.certificates),
+      languages: asList(payload.languages),
+    };
+
+    const merge = (current: unknown, add: string[]) => {
+      const have = Array.isArray(current) ? current.map(String) : [];
+      const lower = new Set(have.map((v) => v.toLowerCase()));
+      return [...have, ...add.filter((v) => !lower.has(v.toLowerCase()))];
+    };
+
+    if (existing && existing.length > 0) {
+      const row = existing[0];
+      const { error } = await svc
+        .from("workers")
+        .update({
+          ...(incoming.role ? { role: incoming.role } : {}),
+          ...(incoming.email ? { email: incoming.email } : {}),
+          ...(incoming.phone ? { phone: incoming.phone } : {}),
+          ...(incoming.country ? { country: incoming.country } : {}),
+          ...(incoming.city ? { city: incoming.city } : {}),
+          skills: merge(row.skills, incoming.skills),
+          certificates: merge(row.certificates, incoming.certificates),
+          languages: merge(row.languages, incoming.languages),
+          updated_by: params.userId,
+        })
+        .eq("id", row.id as string);
+      if (!error) {
+        promotedTo = "worker";
+        entityId = row.id as string;
+      }
+    } else {
+      const { data: created } = await svc
+        .from("workers")
+        .insert({
+          organization_id: params.orgId,
+          full_name: name.slice(0, 200),
+          role: incoming.role,
+          email: incoming.email,
+          phone: incoming.phone,
+          country: incoming.country,
+          city: incoming.city,
+          skills: incoming.skills,
+          certificates: incoming.certificates,
+          languages: incoming.languages,
+          availability_status: "unknown",
+          status: "candidate",
+          created_by: params.userId,
+          updated_by: params.userId,
+        })
+        .select("id")
+        .maybeSingle();
+      if (created) {
+        promotedTo = "worker";
+        entityId = created.id as string;
+      }
+    }
+
+    // Attach the CV to whoever it turned out to be, so the original document
+    // lives on the person rather than in an inbox nobody opens again.
+    if (entityId && payload.cv_document_id) {
+      await svc
+        .from("documents")
+        .update({ linked_entity_type: "worker", linked_entity_id: entityId })
+        .eq("id", String(payload.cv_document_id))
+        .eq("organization_id", params.orgId);
+    }
+  }
+
   await svc
     .from("agent_findings")
     .update({

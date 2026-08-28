@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<string, string> = {
   package_opportunity: "Package opportunity",
   note: "Research note",
   project: "New project",
+  worker: "New person (from CV)",
   company: "New company",
   contact: "New contact",
   other: "Other",

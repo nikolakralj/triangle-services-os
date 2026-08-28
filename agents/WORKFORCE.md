@@ -97,3 +97,31 @@ Every table is `org_id`-scoped with RLS — multi-tenancy was built in from
 day one, so "sell it to other agencies" is onboarding + billing work, not a
 rewrite. But the discipline holds: Triangle must run its own agency on this
 daily before it is a product. The playbook being lived is the product.
+
+## Resourcing (HR) — the CV reader
+
+Not hired yet. When you create this employee, its badge needs the
+`worker.propose` scope and nothing else.
+
+Its whole job today:
+
+```
+GET   {TRIANGLE_URL}/api/agent/cv-queue     # CVs waiting, with full text
+PATCH {TRIANGLE_URL}/api/agent/cv-queue     # { findingId, payload, confidence }
+```
+
+Triangle already did the free half before the agent sees it — the text is out
+of the PDF, and the email address, country and certificate acronyms are read.
+What is left is judgement: that "PCS7, TIA Portal, Sinamics S120" means PLC
+commissioning, that fifteen years of shutdowns is a supervisor rather than a
+mate, what someone's real trade is.
+
+Rules that matter:
+
+- **Add, never delete.** Lists merge with what the first pass found.
+- **Only what the CV supports.** An invented certificate puts an uncertified
+  person on a live site. Say less and be right.
+- **It cannot accept.** The proposal stays pending until a human decides in
+  Approvals. That is deliberate: a CV is a claim about a person, and the
+  moment an agent can turn a claim into a placeable worker, nobody is
+  checking.

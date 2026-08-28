@@ -195,8 +195,25 @@ export async function listApprovals(
       id: f.id as string,
       kind: "finding",
       itemType: f.finding_type as string,
-      headline: String(p.project_name ?? p.name ?? p.company ?? f.finding_type),
-      detail: [p.client_company, p.country].filter(Boolean).join(" · ") || null,
+      headline: String(
+        p.full_name ?? p.project_name ?? p.name ?? p.company ?? f.finding_type,
+      ),
+      // Never the CV text itself — that is tens of thousands of characters and
+      // belongs behind the decision, not in the queue.
+      detail:
+        [
+          p.role,
+          p.country,
+          Array.isArray(p.certificates) && p.certificates.length
+            ? (p.certificates as string[]).join(", ")
+            : null,
+          Array.isArray(p.languages) && p.languages.length
+            ? (p.languages as string[]).join(", ")
+            : null,
+          p.client_company,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
       confidence: (f.confidence as number) ?? null,
       sourceUrl: (f.source_url as string) ?? null,
       evidenceText: (f.evidence_text as string) ?? null,
