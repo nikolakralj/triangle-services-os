@@ -7,6 +7,7 @@ import {
   Wind,
   Hammer,
   Briefcase,
+  Layers,
   Lock,
 } from "lucide-react";
 import type { Sector } from "@/lib/data/sectors";
@@ -31,15 +32,32 @@ export function SectorSwitcher({
 
   const handleSwitch = (sectorId: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("sector", sectorId);
+    if (sectorId === "all") params.delete("sector");
+    else params.set("sector", sectorId);
     // Reset country/status filters on sector switch
     params.delete("country");
     params.delete("status");
-    router.push(`?${params.toString()}`);
+    const qs = params.toString();
+    router.push(qs ? `?${qs}` : "/hunter");
   };
 
   return (
     <div className="mb-4 flex flex-wrap gap-2">
+      {/* Projects arrive from agents without a sector, and filtering by one
+          hid every single project on this page. "All" is the honest default:
+          you can narrow, but nothing is invisible by accident. */}
+      <button
+        onClick={() => handleSwitch("all")}
+        className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${
+          !activeSectorId
+            ? "border-slate-900 bg-slate-900 text-white"
+            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+        }`}
+      >
+        <Layers className="h-4 w-4" />
+        <span>All</span>
+      </button>
+
       {sectors.map((sector) => {
         const Icon = ICON_MAP[sector.icon] ?? Briefcase;
         const isActive = sector.id === activeSectorId;

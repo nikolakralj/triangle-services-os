@@ -184,10 +184,42 @@ export async function acceptFinding(params: {
   if (finding.finding_type === "project") {
     const name = String(payload.project_name ?? payload.name ?? "").trim();
     if (!name) return null;
+
+    // File it under a sector. Projects promoted without one were invisible on
+    // Signal Inbox, which filters by sector — 21 projects existed and the page
+    // showed an empty list. Match on what the finding says, fall back to the
+    // org's active sector; null only if the org has no sectors at all.
+    const haystack = [
+      name,
+      payload.project_type,
+      payload.sector,
+      payload.summary,
+      finding.evidence_text,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const { data: sectors } = await svc
+      .from("sectors")
+      .select("id, name, is_active")
+      .eq("organization_id", params.orgId);
+
+    const words = (n: string) =>
+      n.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+    const matched = (sectors ?? []).find((s) =>
+      words(s.name as string).some((w) => haystack.includes(w)),
+    );
+    const sectorId =
+      (matched?.id as string | undefined) ??
+      ((sectors ?? []).find((s) => s.is_active)?.id as string | undefined) ??
+      null;
+
     const { data: project } = await svc
       .from("discovered_projects")
       .insert({
         organization_id: params.orgId,
+        sector_id: sectorId,
         project_name: name.slice(0, 300),
         country: payload.country ? String(payload.country) : null,
         city: payload.city ? String(payload.city) : null,

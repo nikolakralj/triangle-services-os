@@ -34,13 +34,14 @@ export default async function HunterPage({
   const sectorRows = await listSectors(session.organizationId);
   const sectors = sectorRows.map(rowToSector);
 
-  // Determine active sector: requested → first active → first
-  const activeSector =
-    sectors.find((s) => s.id === requestedSectorId) ??
-    sectors.find((s) => s.isActive) ??
-    sectors[0];
+  // No sector in the URL means "all". Defaulting to one sector meant every
+  // project an agent filed — which arrives with no sector at all — was hidden,
+  // and this page showed an empty list while 21 projects existed.
+  const activeSector = requestedSectorId
+    ? sectors.find((s) => s.id === requestedSectorId)
+    : undefined;
 
-  if (!activeSector) {
+  if (sectors.length === 0) {
     return (
       <>
         <PageHeader
@@ -62,14 +63,14 @@ export default async function HunterPage({
   // Load discovered projects + stats + recent runs in parallel
   const [projectRows, stats, runRows] = await Promise.all([
     listDiscoveredProjects(session.organizationId, {
-      sectorId: activeSector.id,
+      sectorId: activeSector?.id,
       status: statusFilter,
       countryCode: countryFilter,
       limit: 50,
     }),
-    getDiscoveredProjectStats(session.organizationId, activeSector.id),
+    getDiscoveredProjectStats(session.organizationId, activeSector?.id),
     listHuntRuns(session.organizationId, {
-      sectorId: activeSector.id,
+      sectorId: activeSector?.id,
       limit: 1,
     }),
   ]);
@@ -81,10 +82,14 @@ export default async function HunterPage({
     <>
       <PageHeader
         title="Signal Inbox"
-        description={`Raw intelligence queue for ${activeSector.name}. Projects here were found by the Global Scout or automated feeds.`}
+        description={
+          activeSector
+            ? `Raw intelligence queue for ${activeSector.name}. Everything your employees found, waiting to be qualified.`
+            : "Everything your employees found, waiting to be qualified."
+        }
       />
 
-      <SectorSwitcher sectors={sectors} activeSectorId={activeSector.id} />
+      <SectorSwitcher sectors={sectors} activeSectorId={activeSector?.id} />
 
       {/* Stats row */}
       <div className="mb-4 grid gap-3 md:grid-cols-4">
@@ -168,7 +173,7 @@ export default async function HunterPage({
           { key: "archived", label: "Archived" },
         ].map(({ key, label }) => {
           const qs = new URLSearchParams();
-          qs.set("sector", activeSector.id);
+          if (activeSector) qs.set("sector", activeSector.id);
           if (key) qs.set("status", key);
           if (countryFilter) qs.set("country", countryFilter);
           const active = (statusFilter ?? "") === key;
@@ -189,7 +194,7 @@ export default async function HunterPage({
       </div>
 
       {/* Country filter pills */}
-      {activeSector.targetCountries.length > 0 && (
+      {activeSector && activeSector.targetCountries.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Country:
