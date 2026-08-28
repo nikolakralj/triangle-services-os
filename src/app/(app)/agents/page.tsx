@@ -53,6 +53,7 @@ export default async function WorkforcePage() {
         assignments={assignments}
         workers={workers}
         projects={projects}
+        canHire={session.role === "admin"}
         tasks={tasks}
         runs={runs}
       />

@@ -108,6 +108,7 @@ export function AgentConsole({
   assignments,
   workers,
   projects,
+  canHire,
   tasks,
   runs,
 }: {
@@ -116,6 +117,8 @@ export function AgentConsole({
   assignments: Assignment[];
   workers: WorkerLite[];
   projects: ProjectLite[];
+  /** Issuing credentials is an admin action; partners see the team, not the door. */
+  canHire: boolean;
   tasks: AgentTask[];
   runs: AgentRun[];
 }) {
@@ -265,9 +268,11 @@ export function AgentConsole({
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
           AI employees
         </p>
-        <div className="mb-3">
-          <HireEmployee />
-        </div>
+        {canHire && (
+          <div className="mb-3">
+            <HireEmployee />
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {employees.length === 0 ? (
             <p className="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
