@@ -25,9 +25,11 @@ export type WorkerRow = {
   reliability_score: number;
   quality_score: number;
   safety_score: number;
+  has_passport: boolean | null;
   has_a1_possible: boolean;
   has_own_tools: boolean;
   has_car: boolean;
+  notes: string | null;
   status: "active" | "inactive" | "blacklisted" | "candidate";
   created_at: string;
   updated_at: string;

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
-import { WorkersTable } from "@/components/modules/simple-table";
+import { WorkerCards } from "@/components/modules/worker-cards";
 import { WorkersFilterForm } from "@/components/modules/workers-filter";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
+import { countNotesByWorker } from "@/lib/data/worker-notes";
 import {
   searchAndFilterWorkers,
   rowToWorker,
@@ -34,7 +35,7 @@ export default async function WorkersPage({
   const country = params.country ? String(params.country) : "";
   const skill = params.skill ? String(params.skill) : "";
 
-  const [workerRows, roles, skills, countries] = await Promise.all([
+  const [workerRows, allRows, roles, skills, countries] = await Promise.all([
     searchAndFilterWorkers(session.organizationId, {
       search: search || undefined,
       role: role || undefined,
@@ -42,6 +43,7 @@ export default async function WorkersPage({
       country: country || undefined,
       skill: skill || undefined,
     }),
+    searchAndFilterWorkers(session.organizationId, {}),
     getWorkerRoles(session.organizationId),
     getWorkerSkills(session.organizationId),
     getWorkerCountries(session.organizationId),
@@ -49,11 +51,20 @@ export default async function WorkersPage({
 
   const workers = workerRows.map(rowToWorker);
 
+  // Who already has history recorded — a card showing "3 notes" is the cue
+  // that there is something to read before putting this person forward.
+  const noteCounts = Object.fromEntries(
+    await countNotesByWorker(
+      workers.map((w) => w.id),
+      session.organizationId,
+    ),
+  );
+
   return (
     <>
       <PageHeader
         title="Workers"
-        description={`${workers.length} worker${workers.length !== 1 ? "s" : ""} - availability and capability tracking for delivery planning.`}
+        description="Who you can put on a job, what they can do, and when they are free."
         actions={
           <div className="flex items-center gap-2">
             <Link
@@ -73,10 +84,12 @@ export default async function WorkersPage({
         initialSearch={search}
         initialRole={role}
         initialAvailability={availability}
+        resultCount={workers.length}
+        totalCount={allRows.length}
         initialCountry={country}
         initialSkill={skill}
       />
-      <WorkersTable workers={workers} />
+      <WorkerCards workers={workers} noteCounts={noteCounts} />
     </>
   );
 }
