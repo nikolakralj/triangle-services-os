@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bot,
   BriefcaseBusiness,
   Building2,
   ClipboardCheck,
@@ -38,7 +37,6 @@ const navGroups: NavGroup[] = [
   {
     label: "Core Workflow",
     items: [
-      { href: "/ai", label: "Global Scout", icon: Bot, highlight: true, badge: "AI" },
       { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "NEW" },
       { href: "/agents", label: "Workforce", icon: Cpu },
       { href: "/approvals", label: "Approvals", icon: ClipboardCheck },

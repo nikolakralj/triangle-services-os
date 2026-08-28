@@ -10,6 +10,5 @@ export async function deleteProjectAction(projectId: string) {
   if (!success) {
     throw new Error("Failed to delete project");
   }
-  revalidatePath("/ai");
   revalidatePath("/hunter");
 }
