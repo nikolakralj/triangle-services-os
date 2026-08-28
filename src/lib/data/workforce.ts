@@ -1,5 +1,9 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import {
+  countMessagesByAssignment,
+  takeThreadForBot,
+} from "@/lib/data/assignment-threads";
 
 // ---------------------------------------------------------------------------
 // Workforce data layer (agent_instances era).
@@ -49,6 +53,12 @@ export interface Assignment {
   completedAt: string | null;
   /** Attached business objects, summarised for display. */
   workers: Array<{ id: string; name: string }>;
+  /** The project this job is about, if it is about one. */
+  projectId: string | null;
+  projectName: string | null;
+  /** Thread size, and how many of your messages the agent has not fetched. */
+  messageCount: number;
+  awaitingAgent: number;
 }
 
 export interface WorkerLite {
@@ -171,6 +181,7 @@ export async function createAssignment(params: {
   dueAt?: string | null;
   constraints?: Record<string, unknown>;
   workerIds?: string[];
+  projectId?: string | null;
   userId: string | null;
 }): Promise<{ id: string } | null> {
   const svc = createServiceSupabaseClient();
@@ -186,6 +197,7 @@ export async function createAssignment(params: {
       priority: params.priority ?? "normal",
       due_at: params.dueAt ?? null,
       constraints: params.constraints ?? {},
+      project_id: params.projectId ?? null,
       created_by: params.userId,
     })
     .select("id")
@@ -216,7 +228,7 @@ export async function listAssignments(
   const { data } = await svc
     .from("agent_assignments")
     .select(
-      "id, agent_instance_id, title, objective, status, priority, due_at, result_summary, created_at, completed_at",
+      "id, agent_instance_id, title, objective, status, priority, due_at, result_summary, created_at, completed_at, project_id",
     )
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
@@ -256,19 +268,43 @@ export async function listAssignments(
     });
   }
 
-  return rows.map((r) => ({
-    id: r.id as string,
-    agentInstanceId: r.agent_instance_id as string,
-    title: r.title as string,
-    objective: r.objective as string,
-    status: r.status as Assignment["status"],
-    priority: r.priority as Assignment["priority"],
-    dueAt: (r.due_at as string) ?? null,
-    resultSummary: (r.result_summary as string) ?? null,
-    createdAt: r.created_at as string,
-    completedAt: (r.completed_at as string) ?? null,
-    workers: byAssignment.get(r.id as string) ?? [],
-  }));
+  // Project names, so the list says what a job is about without opening it.
+  const projectIds = Array.from(
+    new Set(rows.map((r) => r.project_id).filter(Boolean) as string[]),
+  );
+  const projectNames = new Map<string, string>();
+  if (projectIds.length > 0) {
+    const { data: ps } = await svc
+      .from("discovered_projects")
+      .select("id, project_name")
+      .in("id", projectIds);
+    for (const p of ps ?? []) projectNames.set(p.id as string, p.project_name as string);
+  }
+
+  const threads = await countMessagesByAssignment(ids, orgId);
+
+  return rows.map((r) => {
+    const t = threads.get(r.id as string);
+    return {
+      id: r.id as string,
+      agentInstanceId: r.agent_instance_id as string,
+      title: r.title as string,
+      objective: r.objective as string,
+      status: r.status as Assignment["status"],
+      priority: r.priority as Assignment["priority"],
+      dueAt: (r.due_at as string) ?? null,
+      resultSummary: (r.result_summary as string) ?? null,
+      createdAt: r.created_at as string,
+      completedAt: (r.completed_at as string) ?? null,
+      workers: byAssignment.get(r.id as string) ?? [],
+      projectId: (r.project_id as string) ?? null,
+      projectName: r.project_id
+        ? projectNames.get(r.project_id as string) ?? null
+        : null,
+      messageCount: t?.total ?? 0,
+      awaitingAgent: t?.awaitingAgent ?? 0,
+    };
+  });
 }
 
 export async function cancelAssignment(
@@ -295,6 +331,15 @@ export interface AssignmentForBot {
   dueAt: string | null;
   constraints: Record<string, unknown>;
   workers: Array<Record<string, unknown>>;
+  /** The project this job is about, when it is about one. */
+  project: { id: string; name: string } | null;
+  /** Everything said on this job so far, oldest first. */
+  thread: Array<{ from: string; text: string; at: string }>;
+  /**
+   * Human messages the bot has not been handed before. These are the ones it
+   * still owes an answer to — the rest of the thread is context.
+   */
+  newQuestions: string[];
 }
 
 /**
@@ -309,7 +354,7 @@ export async function listOpenAssignmentsForInstance(
   if (!svc) return [];
   const { data } = await svc
     .from("agent_assignments")
-    .select("id, title, objective, priority, due_at, constraints, status")
+    .select("id, title, objective, priority, due_at, constraints, status, project_id")
     .eq("org_id", orgId)
     .eq("agent_instance_id", agentInstanceId)
     .in("status", ["queued", "active"])
@@ -357,15 +402,38 @@ export async function listOpenAssignmentsForInstance(
     byAssignment.get(k)!.push(w);
   }
 
-  return rows.map((r) => ({
-    id: r.id as string,
-    title: r.title as string,
-    objective: r.objective as string,
-    priority: r.priority as string,
-    dueAt: (r.due_at as string) ?? null,
-    constraints: (r.constraints as Record<string, unknown>) ?? {},
-    workers: byAssignment.get(r.id as string) ?? [],
-  }));
+  // Hand over the conversation and stamp the human messages delivered, so the
+  // bot is told exactly once what it still owes an answer to.
+  const threads = await takeThreadForBot(ids, orgId);
+
+  const projectIds = Array.from(
+    new Set(rows.map((r) => r.project_id).filter(Boolean) as string[]),
+  );
+  const projectNames = new Map<string, string>();
+  if (projectIds.length > 0) {
+    const { data: ps } = await svc
+      .from("discovered_projects")
+      .select("id, project_name")
+      .in("id", projectIds);
+    for (const p of ps ?? []) projectNames.set(p.id as string, p.project_name as string);
+  }
+
+  return rows.map((r) => {
+    const t = threads.get(r.id as string);
+    const pid = (r.project_id as string) ?? null;
+    return {
+      id: r.id as string,
+      title: r.title as string,
+      objective: r.objective as string,
+      priority: r.priority as string,
+      dueAt: (r.due_at as string) ?? null,
+      constraints: (r.constraints as Record<string, unknown>) ?? {},
+      workers: byAssignment.get(r.id as string) ?? [],
+      project: pid ? { id: pid, name: projectNames.get(pid) ?? "unknown project" } : null,
+      thread: t?.thread ?? [],
+      newQuestions: t?.newQuestions ?? [],
+    };
+  });
 }
 
 /** A bot finishing ITS OWN assignment. Identity comes from the badge. */

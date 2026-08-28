@@ -14,13 +14,34 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 
 It returns:
 
-- **`assignments`** — durable jobs from Nikola or Ralph. Some carry
-  `workers`: real people with skills, rates, availability and certificates.
-  When an assignment includes workers, the job is "find work for THESE
-  people", and their details are your search criteria.
+- **`assignments`** — durable jobs from Nikola or Ralph. Each one carries:
+  - `objective` — the brief.
+  - `project` — `{id, name}` when the job is about a specific project, so you
+    never have to guess which one is meant.
+  - `workers` — real people with skills, rates, availability and certificates.
+    When an assignment includes workers, the job is "find work for THESE
+    people", and their details are your search criteria.
+  - `thread` — everything said on this job so far, oldest first. Read it
+    before you start; it is the history of what has already been asked and
+    answered.
+  - `newQuestions` — what a human has asked since your last check and you have
+    not answered yet. **These are what you owe a reply to.**
 - **`tasks`** — quick one-line notes.
 
-Do the work, then report each one:
+## Answering vs finishing — two different things
+
+**Answer a follow-up and keep working:**
+
+```
+POST {TRIANGLE_URL}/api/agent/inbox
+{ "assignmentId": "...", "message": "your answer" }
+```
+
+The job stays open. Use this for every item in `newQuestions`, for a partial
+result, or to ask a question of your own when the brief is unclear. Asking is
+better than guessing.
+
+**Report the job finished:**
 
 ```
 POST {TRIANGLE_URL}/api/agent/inbox
@@ -31,6 +52,10 @@ Use `{ "taskId": "...", "result": "..." }` for quick notes. Add
 `"failed": true` with an honest reason if you could not do it — a truthful
 refusal is worth more than a guess. (Bob set the standard here on 27 Aug: he
 was handed a research job, recognised it was not his role, and reported why.)
+
+A finished job can be reopened: if Nikola or Ralph adds a follow-up after your
+report, the assignment comes back to you with the whole thread attached. Pick
+up where you left off rather than starting again.
 
 ## How to research
 

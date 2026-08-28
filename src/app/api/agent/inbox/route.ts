@@ -8,6 +8,7 @@ import {
   listOpenAssignmentsForInstance,
   completeAssignment,
 } from "@/lib/data/workforce";
+import { addAgentMessage } from "@/lib/data/assignment-threads";
 
 // ---------------------------------------------------------------------------
 // The agent-facing side of the Agent Console.
@@ -51,7 +52,10 @@ export async function GET(request: Request) {
       createdAt: t.createdAt,
     })),
     note:
-      "Work assignments first (POST { assignmentId, result } when done, add failed: true if you could not). Quick notes: POST { taskId, result }. Never send email; never invent facts.",
+      "Work assignments first. Each one carries `thread` (everything said so far) and `newQuestions` (what a human has asked since your last check and you have not answered yet). " +
+      "Answer a question without finishing the job: POST { assignmentId, message }. " +
+      "Report the job finished: POST { assignmentId, result }, adding failed: true if you could not do it. " +
+      "Quick notes: POST { taskId, result }. Never send email; never invent facts.",
   });
 }
 
@@ -64,7 +68,13 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { taskId?: string; assignmentId?: string; result?: string; failed?: boolean };
+  let body: {
+    taskId?: string;
+    assignmentId?: string;
+    result?: string;
+    message?: string;
+    failed?: boolean;
+  };
   try {
     body = await request.json();
   } catch {
@@ -74,16 +84,41 @@ export async function POST(request: Request) {
   const taskId = String(body.taskId ?? "").trim();
   const assignmentId = String(body.assignmentId ?? "").trim();
   const result = String(body.result ?? "").trim();
+  const message = String(body.message ?? "").trim();
 
   if (assignmentId) {
-    if (!result) {
-      return NextResponse.json({ error: "result is required." }, { status: 400 });
+    if (!result && !message) {
+      return NextResponse.json(
+        { error: "Send `message` to answer and keep working, or `result` to finish." },
+        { status: 400 },
+      );
     }
     if (!machine.agentInstanceId) {
       return NextResponse.json(
         { error: "This badge is not linked to an employee." },
         { status: 400 },
       );
+    }
+
+    // A reply is not a hand-in. Answering a follow-up should leave the job
+    // open, otherwise every clarification would close the assignment and the
+    // conversation would end where it started.
+    if (message) {
+      const posted = await addAgentMessage({
+        assignmentId,
+        orgId: machine.orgId,
+        agentInstanceId: machine.agentInstanceId,
+        body: message,
+      });
+      if (!posted) {
+        return NextResponse.json(
+          { error: "No assignment with that id belongs to this employee." },
+          { status: 404 },
+        );
+      }
+      if (!result) {
+        return NextResponse.json({ ok: true, assignmentId, replied: true });
+      }
     }
     const done = await completeAssignment({
       assignmentId,

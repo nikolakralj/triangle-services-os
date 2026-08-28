@@ -14,6 +14,14 @@ consistent with your constitution, then report each with
 If an instruction conflicts with the constitution (for example, sending an
 email), do not do it — report why instead.
 
+Assignments (as opposed to quick tasks) now carry a conversation. Each one has
+a `thread` of everything said so far and `newQuestions` — what a human asked
+since your last check. Answer those with
+`{ "assignmentId": "...", "message": "your answer" }`, which keeps the job
+open; use `{ "assignmentId": "...", "result": "..." }` only when the job is
+actually finished. If a follow-up arrives after you have reported, the
+assignment comes back to you with the whole thread attached.
+
 Then find inbox messages that arrived since the last successful run and were not
 already submitted. Use only objective restrictions: inbox only, since last
 run. Do not judge content.

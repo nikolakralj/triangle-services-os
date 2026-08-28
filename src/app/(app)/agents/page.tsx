@@ -8,6 +8,7 @@ import {
   listAssignments,
   listWorkersLite,
 } from "@/lib/data/workforce";
+import { listDiscoveredProjects } from "@/lib/data/discovered-projects";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,20 @@ export default async function WorkforcePage() {
     );
   }
 
-  const [humans, employees, assignments, workers, tasks, runs] = await Promise.all([
-    listHumans(session.organizationId),
-    listWorkforce(session.organizationId),
-    listAssignments(session.organizationId),
-    listWorkersLite(session.organizationId),
-    listAgentTasks(session.organizationId, { limit: 12 }),
-    listAgentRuns(session.organizationId),
-  ]);
+  const [humans, employees, assignments, workers, projectRows, tasks, runs] =
+    await Promise.all([
+      listHumans(session.organizationId),
+      listWorkforce(session.organizationId),
+      listAssignments(session.organizationId),
+      listWorkersLite(session.organizationId),
+      listDiscoveredProjects(session.organizationId),
+      listAgentTasks(session.organizationId, { limit: 12 }),
+      listAgentRuns(session.organizationId),
+    ]);
+
+  // So a job can be filed against the project it is about, instead of the
+  // agent only knowing which project because you typed its name.
+  const projects = projectRows.map((p) => ({ id: p.id, name: p.project_name }));
 
   return (
     <div className="space-y-6">
@@ -45,6 +52,7 @@ export default async function WorkforcePage() {
         employees={employees}
         assignments={assignments}
         workers={workers}
+        projects={projects}
         tasks={tasks}
         runs={runs}
       />

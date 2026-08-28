@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     priority?: string;
     dueAt?: string;
     workerIds?: string[];
+    projectId?: string;
   };
   try {
     body = await request.json();
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
     objective,
     priority,
     dueAt: dueAt && !isNaN(dueAt.getTime()) ? dueAt.toISOString() : null,
+    projectId: body.projectId ? String(body.projectId) : null,
     workerIds: Array.isArray(body.workerIds)
       ? body.workerIds.map((w) => String(w)).slice(0, 50)
       : [],

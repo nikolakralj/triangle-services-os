@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AssignmentThread } from "@/components/modules/assignment-thread";
 import type { AgentTask, AgentRun } from "@/lib/data/agents";
 import type {
   WorkforceEmployee,
@@ -19,6 +20,11 @@ import type {
   Assignment,
   WorkerLite,
 } from "@/lib/data/workforce";
+
+export interface ProjectLite {
+  id: string;
+  name: string;
+}
 
 // ---------------------------------------------------------------------------
 // The Workforce page — the company, not a console.
@@ -99,6 +105,7 @@ export function AgentConsole({
   employees,
   assignments,
   workers,
+  projects,
   tasks,
   runs,
 }: {
@@ -106,6 +113,7 @@ export function AgentConsole({
   employees: WorkforceEmployee[];
   assignments: Assignment[];
   workers: WorkerLite[];
+  projects: ProjectLite[];
   tasks: AgentTask[];
   runs: AgentRun[];
 }) {
@@ -117,6 +125,7 @@ export function AgentConsole({
   const [objective, setObjective] = useState("");
   const [priority, setPriority] = useState<Assignment["priority"]>("normal");
   const [dueAt, setDueAt] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
   const [showWorkers, setShowWorkers] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -160,6 +169,7 @@ export function AgentConsole({
           objective,
           priority,
           dueAt: dueAt || undefined,
+          projectId: projectId || undefined,
           workerIds: Array.from(selectedWorkers),
         }),
       });
@@ -171,6 +181,7 @@ export function AgentConsole({
       setTitle("");
       setObjective("");
       setDueAt("");
+      setProjectId("");
       setSelectedWorkers(new Set());
       setShowWorkers(false);
       router.refresh();
@@ -361,6 +372,20 @@ export function AgentConsole({
               className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
             />
           </div>
+          {projects.length > 0 && (
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="mt-2 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            >
+              <option value="">No particular project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
           <textarea
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
@@ -461,6 +486,7 @@ export function AgentConsole({
                         {a.dueAt
                           ? ` · due ${new Date(a.dueAt).toLocaleDateString([], { day: "numeric", month: "short" })}`
                           : ""}
+                        {a.projectName ? ` · ${a.projectName}` : ""}
                         {a.workers.length > 0
                           ? ` · with ${a.workers.map((w) => w.name).join(", ")}`
                           : ""}
@@ -499,6 +525,15 @@ export function AgentConsole({
                         {a.resultSummary}
                       </p>
                     </div>
+                  )}
+                  {a.status !== "cancelled" && (
+                    <AssignmentThread
+                      assignmentId={a.id}
+                      messageCount={a.messageCount}
+                      awaitingAgent={a.awaitingAgent}
+                      agentName={called(a.agentInstanceId)}
+                      finished={a.status === "completed" || a.status === "failed"}
+                    />
                   )}
                 </li>
               );
