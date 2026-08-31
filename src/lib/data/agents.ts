@@ -4,7 +4,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // ---------------------------------------------------------------------------
 // Agent Console data layer.
 //
-// The console is how Nikola and Ralph steer external agents WITHOUT opening
+// The console is how authorized organization members steer external agents without opening
 // the bot platform's own app: instructions written here are fetched by each
 // agent at the start of its run (GET /api/agent/inbox), and every run —
 // bot-fed or IMAP fallback — leaves a row in agent_runs.

@@ -631,7 +631,7 @@ export async function GET() {
     name: "triangle-research-mcp",
     version: "2.0.0",
     description:
-      "Triangle Services research workbench MCP. Read context, log sources, propose evidence-backed suggestions, and review them.",
+      "Project-to-placement research workbench MCP. Read tenant context, log sources, propose evidence-backed suggestions, and review them.",
     protocol: "MCP Streamable HTTP",
     endpoint: "/api/mcp",
     tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),

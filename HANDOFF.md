@@ -1,4 +1,47 @@
-# Handoff — 27 Aug 2026
+# Handoff — 30 Aug 2026
+
+## Sellable-product update — 30 Aug 2026
+
+- Adopted a sellable vertical product strategy: contract-to-crew OS for
+  boutique technical staffing, crew-supply, and labor-subcontracting agencies.
+- Triangle Services remains tenant zero; customer discovery starts now in
+  parallel with first-contract work.
+- Added `docs/strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md` and
+  `AUTONOMOUS_WORK_QUEUE.md`.
+- Implemented the repository side of PZ-001: organization operating profile,
+  Settings API/UI, and tenant-aware Job Intake classification/reply drafting.
+- Added migration `027_organization_operating_profile.sql`; it is **not applied
+  to production** by this work.
+- Next queue item after verification is PZ-002, the commercial identity leakage
+  audit. Do not start billing, broad integrations, or self-serve onboarding
+  without their evidence gates.
+
+## Strategy/current-state update — 29 Aug 2026
+
+The operational diagnosis below remains correct: the system works internally
+but has not recorded a real commercial send or packet delivery.
+
+The long-term product direction has now been researched and adopted in:
+
+- `ROADMAP.md` — gate-based 24–36 month contract-to-crew roadmap;
+- `ROADMAP_EXECUTION.md` — current commercial-activation cycle;
+- `SOFTWARE_AGENT_INSTRUCTIONS.md` — mandatory product/development-agent
+  protocol;
+- `CURRENT_STATE.md` — refreshed implementation and live-data audit.
+
+Important additions since this handoff:
+
+- migrations now run through `026_agent_replies.sql`;
+- assignment conversations, worker memory, CV proposal intake, packet-send
+  tracking, and one Approvals queue exist;
+- Bob, Scout, and Hanna are active database identities, but Hanna has no
+  canonical role file and must not receive expanded authority;
+- the generic hybrid work OS and Collaboration Field remain deferred;
+- the adopted long-term category is a vertical contract-to-crew OS, not a
+  generic agent platform.
+
+Read the newer documents before using any older “next feature” note in this
+handoff.
 
 Continuing agent: read this first, then `JOB_INTAKE.md` (self-contained module
 doc), then `CURRENT_STATE.md` (whole-repo status).

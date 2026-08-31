@@ -9,6 +9,7 @@ import {
   getIntakeRules,
 } from "@/lib/data/job-intake";
 import { logAgentRun } from "@/lib/data/agents";
+import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // POST /api/job-intake/ingest
@@ -142,9 +143,13 @@ export async function POST(request: Request) {
   }
 
   const mailbox = payload.mailbox?.trim().toLowerCase() || null;
-  const mailAccountId = await resolveExternalAccount(organizationId, mailbox);
+  const [mailAccountId, rules, organization] = await Promise.all([
+    resolveExternalAccount(organizationId, mailbox),
+    getIntakeRules(organizationId),
+    getOrganizationOperatingProfile(organizationId),
+  ]);
   // Loaded once, not per message.
-  const houseRules = (await getIntakeRules(organizationId))?.body ?? null;
+  const houseRules = rules?.body ?? null;
 
   const result = {
     received: messages.length,
@@ -191,6 +196,7 @@ export async function POST(request: Request) {
         // Callers usually forward HTML; plain text is fine too.
         bodyIsHtml: msg.bodyIsHtml ?? /<[a-z][\s\S]*>/i.test(body),
         houseRules,
+        organization,
       });
 
       const keepBody = shouldKeepBody(extraction.classification);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/constants";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,9 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Triangle Services Business Development OS",
-  description:
-    "Private internal CRM and agency operating system for Triangle Services.",
+  title: PRODUCT_NAME,
+  description: `${PRODUCT_TAGLINE} for contract staffing, crew suppliers, recruiters, and delivery teams.`,
 };
 
 export default function RootLayout({

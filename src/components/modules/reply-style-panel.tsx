@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 
 const EXAMPLES = [
   "Keep replies short and direct. No sales language.",
-  "Always position Triangle as a supplier of teams, not one freelancer.",
+  "Position the company as a supplier, not as one job seeker.",
   "Ask for headcount and whether a supplier crew is acceptable.",
-  "Do not promise CVs, rates or availability until Nikola confirms.",
+  "Do not promise CVs, rates or availability until a human operator confirms.",
   "Use English unless the recruiter wrote clearly in German or French.",
 ];
 
@@ -77,7 +77,7 @@ export function ReplyStylePanel() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">
-        Write how Triangle should sound when replying to recruiters. These notes
+        Write how your organization should sound when replying. These notes
         guide drafts only; nothing is sent automatically.
       </p>
 
@@ -90,7 +90,7 @@ export function ReplyStylePanel() {
             onChange={(e) => setBody(e.target.value)}
             rows={7}
             placeholder={
-              "e.g.\nKeep replies short and direct.\nPosition Triangle as a supplier of teams, not one freelancer.\nAsk whether the client accepts a supplier crew."
+              "e.g.\nKeep replies short and direct.\nPosition us as a supplier, not one job seeker.\nAsk whether the client accepts a supplier crew."
             }
             className="w-full resize-y rounded-md border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
           />

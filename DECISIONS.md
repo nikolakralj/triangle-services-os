@@ -89,6 +89,208 @@ Why:
 - the rules clarify what not to build and what counts as done
 - contractor-chain mapping and package hypotheses must stay central
 
+### 2026-08-29: Contract-to-crew is the product category
+
+Decision:
+
+- define Triangle as a human-led, AI-assisted contract-to-crew operating
+  system for cross-border technical staffing and subcontracting
+
+Why:
+
+- the software already discovers, researches, drafts, matches, and produces
+  packets, but no commercial send or packet delivery is recorded
+- value is created by a buyer route, order, mobilization, delivery, payment,
+  and margin—not by agent activity
+- this category keeps project-to-placement while adding contract, delivery,
+  and economics that the old roadmap omitted
+
+### 2026-08-29: AI employees are a capability, not the market wedge
+
+Decision:
+
+- keep provider-independent identity, scopes, assignments, approvals, memory,
+  and audit
+- do not position generic AI-workforce management as Triangle's primary
+  product
+
+Why:
+
+- OpenAI, Microsoft, Google, LangChain, Relevance, Taskade, Sintra, and other
+  horizontal platforms compete at that layer
+- Triangle's potential moat is staffing/subcontracting domain truth and real
+  outcome data
+
+### 2026-08-29: Defer generic hybrid work OS and Collaboration Field
+
+Decision:
+
+- do not build the generic shell or spatial organization canvas now
+- reconsider the Collaboration Field only after at least five agents and
+  several humans create demonstrated ownership/coordination pain
+- reconsider a horizontal product only after two paying non-staffing
+  verticals prove a valuable common core
+
+Why:
+
+- the proposals contain useful UX patterns but solve an imagined scale problem
+- Triangle currently needs commercial activation and delivery proof
+
+### 2026-08-29: Use commercial evidence gates
+
+Decision:
+
+- roadmap phases advance only through real external and delivery evidence
+- code, screens, AI output, accepted suggestions, and internal statuses do not
+  advance a phase by themselves
+
+Why:
+
+- the product has passed a partial technical test but not a business test
+- evidence gates prevent architecture/design work from substituting for buyer
+  exposure
+
+### 2026-08-29: The success object is contract-qualified
+
+Decision:
+
+- upgrade the “qualified project package opportunity” to a
+  **contract-qualified crew opportunity**
+
+Why:
+
+- a plausible project, buyer, and package still omit engagement model,
+  economics, country/legal feasibility, supplier approval, real supply, and
+  mobilization
+
+### 2026-08-29: Supply-first and demand-first are equal lanes
+
+Decision:
+
+- support available people -> package -> find demand and
+  signal/demand -> requirement -> find people as one converging workflow
+
+Why:
+
+- current high-scoring demand is PCS7/automation while stored supply is
+  electrical installation
+- Triangle must choose work from deliverable capacity, not AI-inferred demand
+  alone
+
+### 2026-08-29: External actions remain human
+
+Decision:
+
+- keep email, packet submission, supplier registration, commercial
+  commitments, and personal-data sharing human-controlled
+- preserve AI draft and final sent content separately
+
+Why:
+
+- manual action is not the current bottleneck
+- legal, privacy, deliverability, duplicate-action, and trust risks outweigh
+  premature automation
+
+### 2026-08-29: Durable orchestration is gated
+
+Decision:
+
+- keep current Next.js/Supabase/API patterns while they work
+- evaluate a durable workflow runtime only after a proven process outlives a
+  request, requires independent retries, pauses for approval, or must resume
+  after crash/deploy
+
+Why:
+
+- current architecture is sufficient for commercial activation
+- durable execution is useful infrastructure, not a product direction or
+  justification for a rewrite
+
+### 2026-08-29: External productization follows internal proof
+
+Decision:
+
+- sell/pilot the software only after Triangle uses it weekly for real revenue,
+  proves repeatability, and finds a paying design partner with the same
+  vertical problem
+
+Why:
+
+- multi-tenant foundations exist, but onboarding, security, support, data
+  rights, integrations, and billing should be driven by an actual customer
+- the likely external product is a vertical contract-to-crew OS, not a generic
+  agent platform
+
+**Superseded in timing, not category, by the 30 August 2026 design-partner
+decision below.** Internal revenue proof and external problem/pilot validation
+now run in parallel; generic SaaS build remains gated.
+
+### 2026-08-30: Build a sellable vertical product with Triangle as tenant zero
+
+Decision:
+
+- the software is intended to be sold, but as a vertical contract-to-crew OS
+  rather than generic HR, CRM, agent, or marketplace software
+- the first external ICP is a 2–25 person European technical contract
+  staffing, crew-supply, or labor-subcontracting business
+- solo recruiters are a later starter tier; corporate HR, job seekers, generic
+  freelancers, and large enterprises are not the first buyer
+
+Why:
+
+- established vendors already crowd generic ATS/CRM, sourcing, outreach, and
+  agent features
+- Triangle's differentiated workflow connects project/buyer intelligence,
+  truthful crew packaging, governed commercial action, cross-border delivery,
+  and margin
+
+### 2026-08-30: External customer discovery begins during Phase 0
+
+Decision:
+
+- interview comparable agencies and crew suppliers now
+- require repeated pain, a concrete commitment, and a paid scoped pilot before
+  building external-customer features beyond tenant safety
+- Triangle commercial proof remains a parallel gate rather than a reason to
+  delay all market learning for 12 months
+
+Why:
+
+- early interviews prevent Nikola's tacit workflow from becoming hardcoded
+- a paid pilot is stronger evidence than feature enthusiasm
+- dual-track validation keeps product work connected to contract revenue
+
+### 2026-08-30: Tenant identity is the first productization boundary
+
+Decision:
+
+- commercial AI must read a human-approved organization profile and sign-off
+- no tenant may inherit Triangle/Nikola identity from code constants
+- new tenants must complete required identity fields before AI commercial
+  drafting
+
+Why:
+
+- organization isolation is incomplete if prompts or outputs leak another
+  tenant's commercial identity even when database rows are correctly scoped
+
+### 2026-08-30: Recruitment AI governance is a product requirement
+
+Decision:
+
+- preserve human oversight, provenance, evaluation, logs, correction paths,
+  and purpose limits from the first external pilot
+- do not infer sensitive traits, use emotion recognition, or automate final
+  employment decisions
+- obtain qualified legal review before marketing EU AI Act compliance
+
+Why:
+
+- AI used to filter or evaluate candidates can fall within the EU AI Act's
+  high-risk employment category
+- trust work added late is expensive and does not repair missing historical
+  evidence
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

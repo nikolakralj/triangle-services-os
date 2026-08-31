@@ -65,12 +65,6 @@ export async function callOpenAIHunter(params: {
     tools: [
       {
         type: "web_search",
-        user_location: {
-          type: "approximate",
-          country: "HR",
-          city: "Zagreb",
-          region: "Zagreb",
-        },
       },
     ],
     tool_choice: "auto",

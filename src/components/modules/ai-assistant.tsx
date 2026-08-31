@@ -15,7 +15,7 @@ const actions = [
   ["follow_up_email", "Generate follow-up email"],
   ["call_script", "Generate call script"],
   ["proposal_draft", "Generate proposal outline"],
-  ["weekly_report", "Generate weekly Ralph report"],
+  ["weekly_report", "Generate weekly commercial report"],
   ["document_template", "Generate document template"],
 ];
 

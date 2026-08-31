@@ -5,103 +5,213 @@
 This file is the honest status report for the repo.
 It should tell a future agent what is real, what is partial, and what still needs cleanup.
 
-## Product Direction
+## Current product direction — updated 30 August 2026
 
-Current direction:
+Triangle is a human-led, AI-assisted contract-to-crew operating system for
+cross-border technical staffing and subcontracting.
 
-- the app started as a private internal CRM / agency OS
-- it is now evolving toward a project-to-placement operating system
-- the Hunter module is the first visible expression of that pivot
+The software is intended to become a sellable vertical product for boutique
+technical contract staffing and crew-supply businesses. Triangle Services is
+tenant zero. External customer discovery now runs in parallel with Triangle's
+commercial activation; generic HR/CRM/agent-platform productization remains
+rejected.
 
-## What Is Real Today
+The current phase is commercial activation, not another product redesign.
+The software can ingest, research, draft, match, and generate packets. It has
+not yet proven real sends, buyer response, contract conversion, mobilization,
+payment, or margin.
 
-- Next.js app shell exists
-- Supabase schema, auth, and RLS foundation exist
-- companies module is partially wired to real Supabase data
-- Hunter feature exists in code
-- Hunter can discover projects and write them to the database
-- OpenAI is now the active Hunter provider
-- contractor-chain final tables and project UI exist
-- Option C research-workbench foundation exists:
-  - authenticated `/api/mcp` route
-  - read-only MCP context tools
-  - suggestion-only MCP proposal tools
-  - `research_suggestions` review panel on project detail
-  - audit table support through `ai_tool_calls`
-- conversational research agent is live:
-  - `/api/research/chat`
-  - project-level memory via `research_conversations` + `research_messages`
-  - tool-driven suggestions from chat into `research_suggestions`
-- one-shot advanced research run is live:
-  - `/api/research/run`
-  - `research_runs` + `research_sources` + `research_suggestions` writes
-  - run trigger UI on Hunter project detail page
+The adopted long-term direction is in `ROADMAP.md`; the current ordered work
+and freeze list are in `ROADMAP_EXECUTION.md`; autonomous product work is
+ordered in `AUTONOMOUS_WORK_QUEUE.md`. The buyer/competition/pricing research
+is in `docs/strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md`.
 
-## What Is Still Partial
+## Repository and branch reality
 
-- many non-Hunter pages still rely partly or heavily on sample data
-- the pipeline is visually improved but not fully backed by real opportunity data
-- company detail still lacks fully wired related data
-- AI and dashboard areas still need stronger grounding in real database state
-- multi-agent research orchestrator (specialist-agent fan-out) is not implemented yet
-- public-records, web-source, auditor, people, and strategy agents are not implemented yet
-- accepted package suggestions do not yet become rich final package records
-- buyer mapping exists only as early data structures and suggestions
-- crew package recommendation exists as project-detail hypotheses, not a full matching engine
-- migrations `004_research_workbench.sql` and `005_research_conversations.sql` must be applied to Supabase before full live testing
+- Live local project:
+  `C:\Users\nikol\Projects\triangle-services-os`.
+- Active branch:
+  `wip-jules-2026-05-03T18-13-13-596Z`, not `main`.
+- Latest commit at this audit: `88430ac`.
+- The old OneDrive copy is not the project to edit.
+- Repository migrations now run through
+  `supabase/migrations/028_organization_defaults.sql`. Migrations `027` and
+  `028` have not been applied to production in this work.
+- The worktree contains the strategy/roadmap reconciliation plus the first
+  tenant productization slice. Preserve it; do not treat untracked files as
+  disposable.
 
-## Repo Reality Check
+## What is implemented
 
-At the time this file was created, the working tree includes substantial uncommitted work beyond the original MVP.
+### Demand and commercial intake
 
-That includes:
+- IMAP and external/bot email ingestion;
+- privacy-aware classification and body retention;
+- team-potential scoring, house rules, deduplication, and CSV export;
+- reply drafting, editing, copying, and manual “I sent this” recording;
+- project discovery/Hunter with source and commercial scoring;
+- opportunities and pipeline foundations.
 
-- Hunter pages and APIs
-- Hunter data layer
-- sector and discovered project components
-- changes in several core pages and shared modules
+### Project, buyer, and package intelligence
 
-This means:
+- contractor-chain final records and UI;
+- buyer-contact suggestions/final records;
+- research runs, sources, suggestions, chat memory, and tool audit;
+- unified Approvals queue for research and agent findings;
+- project packages and required-document inference;
+- worker matching, submission states, markdown/PDF packet generation;
+- packet-send tracking, recipient/channel/response status, and placement-fee
+  field.
 
-- the repo contains real progress
-- but the current working tree is not yet a clean, fully stabilized slice
+### Supply and worker truth
 
-## Known Important Truths
+- worker list, filters, profile, notes, import, and CV upload/extraction;
+- worker-document upload, expiry, certificate types, and document readiness;
+- AI CV proposals through a human approval queue;
+- matching against package roles and worker availability.
 
-- finding a project is not enough
-- the real buyer is often not the owner or headline brand
-- contractor-chain mapping is the next strategic module
-- generic CRM polish is not the highest-value work right now
+### Agent workforce
 
-## Current Development Priorities
+- provider-independent `agent_instances`;
+- scoped/revocable machine credentials and provider bindings;
+- quick tasks, durable assignments, worker/project context, and conversations;
+- agent runs, findings, human approvals, delivery/seen state, and result
+  reporting;
+- Bob (Inbox Coordinator), Scout (Project Researcher), and Hanna (HR) are
+  active identities in the live database;
+- only Bob and Scout currently have canonical role files. Hanna has no
+  `agents/hanna.md` file and should be treated as governance-incomplete.
 
-1. stabilize current Hunter work and make it trustworthy
-2. clean and commit the current product pivot in coherent slices
-3. apply and verify research-workbench migration in Supabase
-4. stabilize research chat + advanced run reliability
-5. connect project intelligence to concrete crew packages
+### Trust/platform
 
-## Things To Be Careful About
+- Next.js 16.2.4 / React 19.2.4 application;
+- Supabase auth, service-client membership pattern, RLS, and org-scoped APIs;
+- static machine API access with scoped tokens;
+- version and ship utilities;
+- authenticated application routes.
 
-- do not assume a discovered project is automatically commercially useful
-- do not confuse project owner visibility with labor buyer visibility
-- do not let the app drift back into generic CRM priorities
-- do not overclaim AI confidence where the contractor chain is still inferred
+### Sellability foundation — repository implementation 30 August 2026
 
-## If Another Agent Picks This Up
+- tenant operating profile fields and idempotent migration `027`;
+- admin/partner organization settings API and UI;
+- operating model, offer mode, factual positioning, exact sign-off, currency,
+  and timezone;
+- tenant profile injected into both IMAP/external intake classification and
+  reply drafting;
+- reply drafting returns `409` when required tenant identity is incomplete;
+- Triangle's existing positioning is seeded only for the Triangle organization
+  when migration `027` is applied;
+- general AI, research, imports, submission packets, login metadata, top-bar,
+  documents, and MCP runtime identity now use the product brand or active
+  tenant profile as appropriate;
+- static runtime sample records were removed;
+- tenant-scoped document upload, role-filtered listing, signed access, vendor
+  checklist linking, and approval are implemented;
+- migration `028` seeds pipeline and readiness defaults for every new tenant;
+- `npm run check:tenant-identity` prevents tenant-zero identity regressions.
+- `/onboarding` exposes nine evidence-backed setup gates and the exact blocker
+  for safe intake, a targeted draft, and a buyer-linked first package;
+- Settings navigation now targets real configuration panels rather than inert
+  section buttons.
 
-Start here:
+Verification completed locally: `npx tsc --noEmit`, focused ESLint, and
+`git diff --check` pass. Live migration/application behavior remains unverified
+until an authorized production migration and signed-in smoke test.
 
-0. if the work is about email intake / job leads, read `JOB_INTAKE.md` — it is self-contained
-1. read `VISION.md`
-2. read `PRODUCT_OPERATING_RULES.md`
-3. read `WORKFLOW_SIGNAL_TO_PLACEMENT.md`
-4. read `ROADMAP_EXECUTION.md`
-5. read `DECISIONS.md`
-6. read `RESEARCH_WORKBENCH.md`
-7. read this file
+## Live operating baseline — 29 August 2026
 
-Then inspect the current git status before making assumptions about what is already committed.
+| Object | State |
+|---|---|
+| Job leads | 24; 21 new, 3 reviewing |
+| Priority leads | 4 scoring 70+ |
+| Reply drafts | 3 draft, 0 sent |
+| Discovered projects | 18, all new |
+| Contractor-chain nodes | 11 |
+| Buyer contacts | 3 |
+| Research suggestions | 31; 22 accepted, 8 pending, 1 rejected |
+| Project packages | 2 |
+| Worker matches | 3, all marked placed |
+| Packet sends | 0 |
+| Opportunities | 1 |
+| Companies / contacts | 166 / 0 |
+| Available workers | 3 |
+| Agent identities | 3 |
+| Assignments | 4; 2 cancelled, 1 failed, 1 completed |
+| Assignment messages | 0 |
+
+The three `placed` worker-match records have no corresponding packet send,
+commercial progression, mobilization, or payment record. Do not report them as
+proven placements.
+
+### Supply-demand mismatch
+
+The four high-priority leads are automation/PCS7/offline-programming demand.
+The stored available supply is:
+
+- electrician;
+- cable puller;
+- electrical supervisor.
+
+The package “Electrical installation crew — 50 electricians, 8 months” claims
+far more capacity than the database can prove. The “Commissioning — ANDRITZ”
+package has no roles. Supply truth and package reconciliation are the first
+operational requirement.
+
+## What is still missing or unproven
+
+### Commercial
+
+- no external reply or packet send is recorded;
+- no complete lead/project-to-qualified-requirement promotion;
+- buyer/procurement/contract route is not a first-class completed workflow;
+- supplier/prequalification is not tracked;
+- no landed-cost, price-floor, payment-term, or contribution-margin model;
+- no proposal/order/PO truth;
+- no systematic next-action/due-date closure across active objects.
+
+### Delivery
+
+- no contract/job-order module;
+- no crew reservation/conflict prevention;
+- no mobilization, posting/A1/site-readiness workflow;
+- no timesheets/client approval;
+- no invoice/payment/receivables and realized-margin truth;
+- existing placement states can be set without real-world evidence.
+
+### Product/platform
+
+- several foundations are proven only by compile/auth checks, not sustained use;
+- automated tests and production observability are still shallow;
+- backup/restore and incident-response evidence is not documented;
+- the active Hanna identity lacks a repository role playbook;
+- production deployment state should be checked before assuming the latest
+  branch commit is on the public alias.
+
+## Current priority
+
+1. human-confirm supply and choose one truthful package;
+2. work and triage the current high-priority demand;
+3. record five real human sends and follow-ups;
+4. send and record one appropriate capability/crew packet;
+5. start real buyer/procurement/supplier conversations;
+6. build only a verified blocker exposed by those actions.
+
+The generic hybrid work OS, Collaboration Field, agent analytics/catalog,
+additional agents, autonomous outbound, broad Hunter expansion, marketplace,
+and speculative enterprise features are deferred.
+
+## If another agent picks this up
+
+1. Read `AGENTS.md`.
+2. Follow the mandatory order in `SOFTWARE_AGENT_INSTRUCTIONS.md`.
+3. Read `ROADMAP.md` and the active gate in `ROADMAP_EXECUTION.md`.
+4. For Job Intake, read `JOB_INTAKE.md`.
+5. For runtime agents, read `agents/WORKFORCE.md`,
+   `agents/shared-constitution.md`, and the affected role file.
+6. Inspect branch, status, routes, migrations, and live state before building.
+
+Do not re-plan already implemented features from stale session logs below.
+The dated logs remain useful history, but this audited section is current.
 
 ---
 

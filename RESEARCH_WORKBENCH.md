@@ -8,7 +8,11 @@ It is not a generic chatbot and it is not a LinkedIn scraper.
 
 The goal is to turn a discovered project into reviewed commercial intelligence:
 
-`project -> evidence -> contractor chain -> buyer candidates -> package opportunities -> human approval`
+`project -> evidence -> contractor chain -> buyer/procurement route -> package hypothesis -> human approval -> next commercial action`
+
+Research is supporting work. An accepted suggestion is not a commercial win
+until it contributes to a buyer route, qualified requirement, supplier action,
+proposal, order, or delivery.
 
 ## Current Implementation
 
@@ -20,6 +24,12 @@ Implemented in code:
 - `src/app/api/research/suggestions/[id]/route.ts`
 - `src/components/modules/research-suggestions-panel.tsx`
 - project detail page shows pending research suggestions
+- `src/app/api/research/chat/route.ts` with persistent project conversation
+- `src/app/api/research/run/route.ts` for one-shot advanced research
+- unified `/approvals` queue across research suggestions and agent findings
+- agent findings can propose previously unknown projects/companies/contacts
+- accepted company findings can create a company and place it on a project
+  contractor chain
 
 The MCP route is authenticated, org-scoped, Zod-validated, rate-limited, and logs tool calls to `ai_tool_calls`.
 
@@ -30,7 +40,9 @@ The MCP route is authenticated, org-scoped, Zod-validated, rate-limited, and log
 - `research_suggestions`
 - `ai_tool_calls`
 
-Important: apply migration `004_research_workbench.sql` to Supabase before testing MCP suggestions in the live app.
+The live project has migrations through `026_agent_replies.sql` applied/useful
+features beyond the original foundation. Always verify live schema rather than
+assuming this early setup note is still current.
 
 ## Tool Boundary
 
@@ -103,19 +115,20 @@ Do not convert uncertainty into fake confidence.
 
 ## What Is Still Missing
 
-This is foundation, not the full multi-agent system.
+The workbench is functional, but commercial closure is still missing:
 
-Still needed:
-
-- UI button: Run Advanced Research
-- research run creation and status timeline
-- sources checked panel
-- evidence detail view
-- edit-and-accept UI
-- orchestrator prompt / agent runner
-- public records agent implementation
-- browser-assisted people workflow
-- package opportunity final table or richer accepted state
+- buyer/procurement/contract route is not a complete first-class workflow;
+- accepted package suggestions are still thinner than a contract-ready
+  package;
+- accepted research does not consistently require an owner, next action, and
+  due date;
+- buyer coverage is low in live data;
+- source/action/outcome attribution is not complete;
+- structured rejection reasons and bulk triage may be useful if real backlog
+  work proves the need;
+- dedicated public-procurement/supplier-route monitors are deferred until the
+  selected package and target accounts are proven;
+- no multi-agent specialist fan-out is required in the current roadmap phase.
 
 ## Definition Of Done
 
@@ -131,3 +144,5 @@ The research workbench is useful when it can answer:
 
 A suggestion without source evidence is incomplete.
 A project without a next commercial action is incomplete.
+Accepted research without a downstream action remains stored knowledge, not a
+qualified opportunity.

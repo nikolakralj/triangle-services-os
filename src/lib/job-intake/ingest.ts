@@ -8,6 +8,7 @@ import {
   createJobLead,
   getIntakeRules,
 } from "@/lib/data/job-intake";
+import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // The ingestion run: fetch → clean → classify → store.
@@ -155,7 +156,11 @@ export async function ingestAccount(
   summary.fetched = messages.length;
 
   // Loaded once per run, not per message.
-  const houseRules = (await getIntakeRules(orgId))?.body ?? null;
+  const [rules, organization] = await Promise.all([
+    getIntakeRules(orgId),
+    getOrganizationOperatingProfile(orgId),
+  ]);
+  const houseRules = rules?.body ?? null;
 
   for (const msg of messages) {
     try {
@@ -166,6 +171,7 @@ export async function ingestAccount(
         body: msg.body,
         bodyIsHtml: msg.bodyIsHtml,
         houseRules,
+        organization,
       });
 
       const keepBody = shouldKeepBody(result.classification);

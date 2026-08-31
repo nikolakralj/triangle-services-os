@@ -1,5 +1,6 @@
 import "server-only";
 import type { JobLead } from "@/lib/data/job-intake";
+import type { OrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // Drafting the reply to an agency email.
@@ -13,14 +14,6 @@ import type { JobLead } from "@/lib/data/job-intake";
 //
 // NOTHING HERE SENDS MAIL. It produces text a human reads, edits and sends.
 // ---------------------------------------------------------------------------
-
-/**
- * Triangle's positioning, in the words Nikola actually used to a recruiter:
- * "an automation and industrial services company operating from Bulgaria and
- * Croatia, supporting projects..." Kept as a constant so it is easy to edit
- * in one place.
- */
-const COMPANY_PROFILE = `Triangle Services is an automation and industrial services company operating from Bulgaria and Croatia. We supply teams of specialist contractors — PLC/PCS7/TIA Portal programmers, commissioning and electrical engineers, supervisors — to industrial projects across Europe and the USA. We can contract through our EU company and handle posting, A1 certificates and compliance for our people.`;
 
 const ASK_TEXT: Record<string, string> = {
   headcount: "how many people the client needs for this scope",
@@ -47,29 +40,40 @@ export interface DraftedReply {
   language: string;
 }
 
-const SYSTEM_PROMPT = `You draft replies to recruitment agencies on behalf of Triangle Services.
+function offerDescription(profile: OrganizationOperatingProfile): string {
+  if (profile.offerMode === "teams") return "a supplier team or subcontracted crew";
+  if (profile.offerMode === "individuals") return "one or more supplied specialists";
+  return "individual specialists or a supplier team / subcontracted crew";
+}
 
-The recruiter thinks they are talking to one freelance engineer. Your job is to reply in a way that (a) keeps the conversation warm, (b) repositions Triangle as a company that can supply a TEAM, and (c) extracts the commercial facts the recruiter left out.
+function buildSystemPrompt(profile: OrganizationOperatingProfile): string {
+  const offer = offerDescription(profile);
+  return `You draft replies to recruitment agencies or end clients on behalf of ${profile.name}.
+
+The sender may think they are talking to one job seeker or freelance engineer. Your job is to reply in a way that (a) keeps the conversation warm, (b) truthfully positions ${profile.name} as a business that can provide ${offer}, and (c) extracts the commercial facts the sender left out.
 
 Write like an experienced operator, not a salesperson.
 
 Hard rules:
 - Short. 120-180 words of body text. Recruiters skim.
 - Open by referencing the SPECIFIC role and project they wrote about. No "I hope this email finds you well".
-- State plainly what Triangle is and that it can provide multiple people. Do NOT invent worker counts, names, CVs, rates or availability — you do not know the roster.
+- State plainly what ${profile.name} is and what it can provide, using only the approved company profile. Do NOT invent worker counts, names, CVs, rates or availability — you do not know the roster.
 - Ask ONLY for the missing facts listed in MISSING. Put them as a short bulleted list, not a paragraph of questions.
-- Always include the key question, phrased naturally: whether the client would consider a supplier team / subcontracted crew rather than individual freelancers.
+- Always include the key question, phrased naturally: whether the client would consider ${offer}.
 - If the recruiter asked for a CV or phone number, acknowledge it and say it will follow — do NOT claim it is attached.
 - No pricing. No commitments on dates. No legal or contractual terms.
-- Sign off as Nikola Kralj, Triangle Services. No fake phone numbers, addresses or links.
+- Use this exact approved sign-off and do not add fake phone numbers, addresses, names, or links:
+${profile.replySignoff}
 - Plain text only. No markdown, no bold, no headers.
 
 Reply with JSON only:
 {"subject":"Re: ...","body":"the full email text including greeting and sign-off"}`;
+}
 
 export async function draftLeadReply(params: {
   lead: JobLead;
   originalSubject: string | null;
+  organization: OrganizationOperatingProfile;
   replyStyle?: string | null;
   model?: string;
 }): Promise<DraftedReply> {
@@ -99,10 +103,10 @@ export async function draftLeadReply(params: {
   ].filter(Boolean).join("\n");
 
   const userContent = [
-    `COMPANY:\n${COMPANY_PROFILE}`,
+    `APPROVED COMPANY PROFILE:\n${params.organization.companyProfile}`,
     "",
     (params.replyStyle ?? "").trim()
-      ? `TRIANGLE REPLY STYLE MEMORY:\n${params.replyStyle?.trim()}`
+      ? `${params.organization.name.toUpperCase()} REPLY STYLE MEMORY:\n${params.replyStyle?.trim()}`
       : null,
     (params.replyStyle ?? "").trim() ? "" : null,
     `THEIR EMAIL SUBJECT: ${params.originalSubject ?? lead.roleTitle}`,
@@ -127,7 +131,7 @@ export async function draftLeadReply(params: {
     body: JSON.stringify({
       model: params.model ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(params.organization) },
         { role: "user", content: userContent },
       ],
       temperature: 0.4,

@@ -13,7 +13,7 @@ import {
 //         workers as context ("find work for THESE people").
 // PATCH — take an open assignment back.
 //
-// Session-authenticated: this is Nikola/Ralph managing the workforce from
+// Session-authenticated: authorized organization members manage the workforce from
 // the dashboard.
 // ---------------------------------------------------------------------------
 

@@ -8,7 +8,7 @@ import { createAgentTask, cancelAgentTask, listAgents } from "@/lib/data/agents"
 // POST  /api/agents/tasks — write an instruction for an agent.
 // PATCH /api/agents/tasks — cancel a pending instruction.
 //
-// Session-authenticated: this is Nikola/Ralph steering agents from the
+// Session-authenticated: authorized organization members steer agents from the
 // dashboard instead of the bot platform's own app.
 // ---------------------------------------------------------------------------
 

@@ -403,7 +403,7 @@ export async function upsertIntakeRules(params: {
   return { body: data.body ?? "", updatedAt: data.updated_at ?? null };
 }
 
-/** Plain-English guidance for how Triangle replies to recruiters. */
+/** Plain-English guidance for how the organization replies to recruiters. */
 export async function getReplyStyleMemory(
   orgId: string,
 ): Promise<ReplyStyleMemory | null> {

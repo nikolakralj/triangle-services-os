@@ -1,17 +1,26 @@
 import Link from "next/link";
 import { AlertTriangle, FileText, Link2Off, Clock } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { DocumentUploadPanel } from "@/components/modules/document-upload-panel";
 import { getSession } from "@/lib/auth/session";
-import { listDocuments, summarizeDocuments } from "@/lib/data/documents";
+import {
+  listDocumentChecklist,
+  listDocuments,
+  summarizeDocuments,
+} from "@/lib/data/documents";
 
 export const dynamic = "force-dynamic";
 
 // Every file the organization actually holds, and which of them are about to
 // stop being valid. This page previously rendered eight invented documents
-// from sample-data under a description promising Supabase Storage — the
+// from static demo rows under a description promising Supabase Storage — the
 // storage was real, the page was not.
-export default async function DocumentsPage() {
-  const session = await getSession();
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checklist?: string }>;
+}) {
+  const [session, params] = await Promise.all([getSession(), searchParams]);
   if (!session?.organizationId) {
     return (
       <PageHeader
@@ -21,8 +30,12 @@ export default async function DocumentsPage() {
     );
   }
 
-  const docs = await listDocuments(session.organizationId);
+  const [docs, checklistItems] = await Promise.all([
+    listDocuments(session.organizationId, { role: session.role }),
+    listDocumentChecklist(session.organizationId),
+  ]);
   const stats = summarizeDocuments(docs);
+  const canManage = session.role === "admin" || session.role === "partner";
 
   const CATEGORY_LABEL: Record<string, string> = {
     cv: "CVs",
@@ -58,9 +71,35 @@ export default async function DocumentsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Compliance"
-        description="Every document the organization holds, and which of them are about to stop being valid."
+        title="Documents & compliance"
+        description="Private tenant documents, vendor readiness, and expiry risk backed by Supabase Storage."
       />
+
+      {canManage ? (
+        <DocumentUploadPanel
+          checklistItems={checklistItems.map((item) => ({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+          }))}
+          initialChecklistItemId={params.checklist}
+        />
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/documents/checklist"
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-sky-300 hover:text-sky-700"
+        >
+          Vendor readiness checklist
+        </Link>
+        <Link
+          href="/documents/templates"
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-sky-300 hover:text-sky-700"
+        >
+          Draft templates
+        </Link>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -143,9 +182,16 @@ export default async function DocumentsPage() {
                           href={`/workers/${d.linkedEntityId}`}
                           className="text-xs font-medium text-sky-700 hover:text-sky-900"
                         >
-                          Open
+                          Worker
                         </Link>
                       )}
+                      <Link
+                        href={`/api/documents/${d.id}/signed-url?redirect=1`}
+                        target="_blank"
+                        className="text-xs font-medium text-sky-700 hover:text-sky-900"
+                      >
+                        Open file
+                      </Link>
                     </div>
                   </div>
                 ))}

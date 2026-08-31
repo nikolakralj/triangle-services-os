@@ -6,7 +6,7 @@ import {
 } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
-// GET /api/job-intake/reply-style — read how Triangle wants replies written
+// GET /api/job-intake/reply-style — read how the organization wants replies written
 // PUT /api/job-intake/reply-style — replace that plain-English memory
 //
 // This affects draft generation only. It never sends email.

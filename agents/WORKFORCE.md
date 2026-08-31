@@ -1,127 +1,230 @@
-# The workforce model
+# Triangle workforce model
 
-Nikola's framing, adopted as the product vision: **agents are employees,
-Triangle is the company, the humans are the board.** This file maps the
-metaphor onto what the system actually does, so every future agent (and every
-future AI working on this repo) builds toward the same picture.
+**Updated:** 29 August 2026
 
-## The metaphor is already the architecture
+This file explains how runtime business agents fit the actual product. Product
+and coding agents must also follow `SOFTWARE_AGENT_INSTRUCTIONS.md`.
 
-| Company concept | What it is in Triangle |
+## The model
+
+Humans manage Triangle. Agents perform narrow, reviewable jobs. Triangle owns
+the truth, permissions, playbooks, assignments, evidence, approvals, outcomes,
+and learning.
+
+The AI-employee metaphor is useful for operating the company. It is not the
+company's external product category and is never permission to imitate human
+authority.
+
+| Company concept | Triangle implementation |
 |---|---|
-| Employee | `agent_instances` row — the durable identity, provider-independent |
-| Security badge | `machine_credentials` — scoped, revocable, hashed. **The badge is NOT the employee**: rotating a leaked token must never split the employee's history (it nearly did on 27 Aug — that incident is why this distinction exists) |
-| Brain / workstation | `agent_provider_bindings` — Grok today, anything tomorrow, swapped without touching identity |
-| Job description | scopes on the credential (`job_intake.ingest` = "you do intake, nothing else") |
-| Role handbook | `agents/<name>.md` in this repo |
+| Employee identity | `agent_instances` — durable and provider-independent |
+| Security badge | `machine_credentials` — scoped, revocable, hashed; never the employee identity |
+| Brain/workstation | `agent_provider_bindings` — swappable provider/model |
+| Job description | role key, machine scopes, and `agents/<role>.md` |
 | Company policy | `agents/shared-constitution.md` |
-| Assignment / mission | `agent_assignments` — durable objective with priority, deadline, constraints, and attached business objects (workers, projects, jobs) as context |
-| Quick note from the boss | `agent_tasks` — lightweight messages, fetched each run |
-| Reporting back | `POST /api/agent/inbox` + the Instructions log |
-| Timesheet / activity | `agent_runs` feed |
-| Training and experience | house rules, reply style, accepted/rejected leads, notes — **in the database** |
-| Manager sign-off | approval gates: suggestions queue, drafts that never auto-send |
-| Hiring | create the `agent_instance` + provider binding + badge + role file |
-| Firing | retire the instance + revoke its badge; history stays |
-| Board members | `organization_members` roles (admin/partner) — Nikola and Ralph equal |
+| Assignment | `agent_assignments` with objective, constraints, priority, deadline, and attached domain context |
+| Assignment conversation | `assignment_messages` |
+| Quick note | `agent_tasks` |
+| Work report | agent inbox result/message and `agent_runs` |
+| Proposal | `agent_findings` or `research_suggestions` |
+| Manager sign-off | human-only Approvals and domain transition |
+| Experience | accepted/rejected work plus real commercial/delivery outcomes |
+| Hiring | instance + role file + minimum scopes + provider binding + review path |
+| Firing | retire instance + revoke credentials; preserve history |
 
-## The most important rule: the company remembers, not the worker
+## The one memory rule
 
-A human employee walks out with their experience. Here it is the opposite —
-**all experience lives in Triangle**, never in the agent:
+**The company learns; the provider does not own the learning.**
 
-- what a good lead looks like → house rules
-- how we write to recruiters → reply style
-- what worked and what didn't → accepted/rejected leads, run history
-- who our people are → workers, certificates, availability
+Canonical knowledge remains in Triangle:
 
-So a "new hire" is senior on day one: point a fresh agent at the same
-endpoints and it inherits everything. And when a better model appears (Grok →
-Claude → local), the swap loses nothing, because the worker never owned the
-memory. This is deliberate. Do not move learning into bot-side memory.
+- people, skills, availability, rates, and documents;
+- jobs, projects, requirements, buyers, and packages;
+- house rules and role playbooks;
+- messages actually sent and replies received;
+- submissions, mobilization, quality, payment, and margin;
+- accepted/rejected proposals and approved lessons.
 
-## The interface, in stages
+Agent-side memory and chat history may help continuity, but must be rechecked
+against Triangle before any important statement or action.
 
-**Now (live):** `/agents` — roster, instruction queue, activity feed.
-`/job-intake` — the first employee's output, scored and reviewable.
+## Live workforce state
 
-**Next:** a personnel file per agent — its role file rendered from this repo,
-its KPIs from `agent_runs` (leads found, acceptance rate, errors), its open
-assignments. Plus a **Today** screen: what the workforce did overnight, what
-awaits approval, what is blocked — the CEO's morning briefing.
+The database currently has three active identities:
 
-**Later:** a unified approvals desk (one queue across research suggestions,
-drafts, and any future consequential action), and per-agent cost tracking in
-`agent_runs` so the "payroll" is visible.
+### Bob — Inbox Coordinator
 
-## The central work object is the Assignment
+- canonical file: `agents/bob.md`;
+- moves raw inbox messages into Triangle;
+- does not classify, score, reply, archive, or contact anyone;
+- value: reliable, idempotent transport into the shared pipeline.
 
-Free-text instructions were the v0. The real unit of work is an assignment:
-a title, an objective, a priority, a deadline, constraints, and — crucially —
-**attached business objects as context**. "Find work for THESE four PCS7
-engineers" attaches the four worker records; "find people for THIS package"
-attaches the package. That one object carries both directions of the
-business, demand-first and supply-first, with the same machinery.
+### Scout — Project Researcher
 
-## How an employee learns (four layers, all in Triangle)
+- canonical file: `agents/scout.md`;
+- researches public sources, contractor chains, buyer routes, and work suited
+  to attached workers/packages;
+- reports evidence-backed findings;
+- does not contact anyone or approve its own work.
 
-1. **Company facts** — the domain tables (workers, jobs, projects, outcomes).
-2. **Role playbook** — versioned instructions in `agents/*.md`.
-3. **Outcome history** — accepted/rejected findings, replies, placements, runs.
-4. **Lessons** — future: the system proposes a playbook change with evidence
-   ("German system integrators converted 3.2x better for PCS7"), a human
-   approves it, the playbook version bumps. An agent never silently rewrites
-   its own instructions.
+### Hanna — HR
 
-Swap the provider and all four layers survive. The company learned, not the model.
+- active `agent_instances` record exists;
+- no canonical `agents/hanna.md` file exists as of this update;
+- therefore the role is governance-incomplete.
 
-## The second employee is mostly hired already
+Do not schedule, expand scopes, or treat Hanna as production-ready until a
+management-approved role file defines inputs, outputs, evidence, forbidden
+actions, privacy rules, approval path, and quality measures.
 
-The planned Scout ("find projects where our available electricians fit,
-search Europe, flag tenders that need a crew of 10") is ~80% built
-server-side: worker availability and certificates exist, the matching engine
-exists, the research/suggestion queue exists. Hiring Scout = one credential +
-`agents/scout.md` (already drafted) + a routine. No new architecture.
+## Assignment is the work object
 
-## Hire like a real company
+An assignment expresses an outcome:
 
-One warning the metaphor carries well: every employee costs payroll (seats,
-runs) and management attention (reviewing their output). Do not staff up
-because it is exciting. Hire when the workload demands it, one role at a
-time, and only after the previous hire is reliable. Bob first. Scout second.
-Nothing third until both earn their keep.
+- title and objective;
+- priority and deadline;
+- constraints;
+- attached workers, project, or job;
+- assigned agent;
+- conversation;
+- result and state.
 
-## Selling it one day
+Task-first delegation is the long-term UX direction: define the outcome and
+context first, then recommend an eligible employee. Do not route a project
+research task to Bob or a mailbox-ingest task to Scout.
 
-Every table is `org_id`-scoped with RLS — multi-tenancy was built in from
-day one, so "sell it to other agencies" is onboarding + billing work, not a
-rewrite. But the discipline holds: Triangle must run its own agency on this
-daily before it is a product. The playbook being lived is the product.
+An assignment result is not automatically a final business record. Results
+and findings must enter the relevant domain review/action workflow.
 
-## Resourcing (HR) — the CV reader
+## Agent work lifecycle
 
-Not hired yet. When you create this employee, its badge needs the
-`worker.propose` scope and nothing else.
-
-Its whole job today:
-
-```
-GET   {TRIANGLE_URL}/api/agent/cv-queue     # CVs waiting, with full text
-PATCH {TRIANGLE_URL}/api/agent/cv-queue     # { findingId, payload, confidence }
+```text
+human defines outcome and attaches Triangle context
+-> Triangle checks role/scopes
+-> agent fetches assignment
+-> agent researches/processes within role
+-> agent reports evidence/result
+-> human reviews consequential proposal
+-> deterministic domain transition
+-> human external action
+-> commercial/delivery outcome
+-> approved learning
 ```
 
-Triangle already did the free half before the agent sees it — the text is out
-of the PDF, and the email address, country and certificate acronyms are read.
-What is left is judgement: that "PCS7, TIA Portal, Sinamics S120" means PLC
-commissioning, that fifteen years of shutdowns is a supervisor rather than a
-mate, what someone's real trade is.
+Agents may answer follow-up messages without closing the assignment. A
+completed/failed assignment can be reopened by a human follow-up and must
+retain its conversation.
 
-Rules that matter:
+## Hiring gate
 
-- **Add, never delete.** Lists merge with what the first pass found.
-- **Only what the CV supports.** An invented certificate puts an uncertified
-  person on a live site. Say less and be right.
-- **It cannot accept.** The proposal stays pending until a human decides in
-  Approvals. That is deliberate: a CV is a claim about a person, and the
-  moment an agent can turn a claim into a placeable worker, nobody is
-  checking.
+Do not hire because a role sounds useful.
+
+A new runtime employee is justified only when:
+
+1. a repeated, measured workload exists;
+2. the work has stable inputs and outputs;
+3. a current human/agent bottleneck is identified;
+4. the role can operate with narrow scopes;
+5. a person can review its consequential output;
+6. expected time/value exceeds provider cost and management attention;
+7. Bob/Scout/current roles are reliable enough that a new role will not hide
+   unresolved failures;
+8. the active roadmap phase allows it.
+
+Every hire requires:
+
+- one role file in `agents/`;
+- constitution reference;
+- role key and durable identity;
+- provider binding;
+- minimum credential scopes;
+- stable idempotency behavior;
+- inputs, outputs, sources, and evidence;
+- forbidden actions and refusal behavior;
+- quality/commercial metrics;
+- budget/schedule;
+- retirement and credential-revocation plan.
+
+No role file means no production role.
+
+## Performance hierarchy
+
+### Business impact
+
+- qualified buyer/procurement conversations influenced;
+- concrete requirements/RFQs originated;
+- proposals/orders influenced;
+- placements/mobilizations influenced;
+- paid margin influenced.
+
+### Work quality
+
+- source and evidence accuracy;
+- accepted/rejected finding rate;
+- buyer-route accuracy;
+- useful action rate;
+- hallucination/error rate;
+- human edit and review burden;
+- time saved.
+
+### Technical diagnostics
+
+- runs, duration, retries, failures;
+- provider/model and cost;
+- tool usage;
+- credential/scope errors.
+
+Do not display or optimize technical activity as if it were business impact.
+Outcome attribution becomes meaningful only after real outcomes exist.
+
+## Interface progression
+
+### Now
+
+- Workforce roster and assignments;
+- assignment conversations and result visibility;
+- one Approvals queue;
+- Job Intake, Hunter, talent, packages, and delivery records remain domain
+  workspaces.
+
+The immediate management view should emphasize real work needing action:
+unreviewed demand, drafts ready for human send, follow-ups, packet delivery,
+supplier routes, and blockers.
+
+### After commercial proof
+
+- task-first assignment and capability warnings;
+- clear ownership/next action/due date;
+- role/work queues;
+- outcome-linked employee profiles;
+- cost/quality evaluation with enough comparable work;
+- approved playbook-learning loop.
+
+### After multi-user coordination pain
+
+Consider richer Team/Work/Decisions views or a Collaboration Field only at the
+gate in `ROADMAP.md`. A spatial map is not a current need and must never
+replace the contract/crew/delivery workflow.
+
+## External product boundary
+
+Triangle must first run its own business on this system and produce repeatable
+paid outcomes. If sold externally, the likely product is a vertical
+contract-to-crew OS for similar agencies.
+
+Provider-independent workforce foundations are useful optionality. They do not
+justify a generic hybrid work OS before paying non-staffing customers prove a
+common problem.
+
+## Non-negotiable runtime boundaries
+
+- Triangle is canonical truth.
+- Each credential is narrow, revocable, and tied to one role.
+- Agents cannot approve their own proposals.
+- Agents do not send external communication.
+- Agents do not make legal, compliance, worker-status, or price commitments.
+- Agents do not share personal data outside Triangle.
+- Agents do not silently rewrite playbooks.
+- Agents include stable source/idempotency identifiers.
+- Failures and out-of-role requests are reported honestly.
+- Human approval and real external action remain visible.

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { draftLeadReply } from "@/lib/job-intake/draft-reply";
 import {
+  getOrganizationOperatingProfile,
+  isOrganizationProfileComplete,
+} from "@/lib/data/organization-profile";
+import {
   getJobLead,
   getReplyStyleMemory,
   listReplyDrafts,
@@ -61,10 +65,23 @@ export async function POST(
 
   let drafted;
   try {
-    const replyStyle = await getReplyStyleMemory(access.organizationId);
+    const [replyStyle, organization] = await Promise.all([
+      getReplyStyleMemory(access.organizationId),
+      getOrganizationOperatingProfile(access.organizationId),
+    ]);
+    if (!isOrganizationProfileComplete(organization)) {
+      return NextResponse.json(
+        {
+          error:
+            "Complete the organization profile and reply sign-off in Settings before drafting commercial communication.",
+        },
+        { status: 409 },
+      );
+    }
     drafted = await draftLeadReply({
       lead,
       originalSubject: lead.subject,
+      organization,
       replyStyle: replyStyle?.body ?? null,
     });
   } catch (err) {

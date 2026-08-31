@@ -3,6 +3,10 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { getSession } from "@/lib/auth/session";
 import { countPendingApprovals } from "@/lib/data/approvals";
+import {
+  DEMO_ORGANIZATION_PROFILE,
+  getOrganizationOperatingProfile,
+} from "@/lib/data/organization-profile";
 
 export default async function AppLayout({
   children,
@@ -14,9 +18,12 @@ export default async function AppLayout({
 
   // Carried in the chrome so proposals waiting on a human are visible from
   // every page, not only from the one project they were filed against.
-  const approvalsCount = session?.organizationId
-    ? await countPendingApprovals(session.organizationId)
-    : 0;
+  const [approvalsCount, organizationProfile] = session?.organizationId
+    ? await Promise.all([
+        countPendingApprovals(session.organizationId),
+        getOrganizationOperatingProfile(session.organizationId),
+      ])
+    : [0, DEMO_ORGANIZATION_PROFILE];
 
   return (
     <AuthGate>
@@ -26,6 +33,7 @@ export default async function AppLayout({
           <Topbar
             displayName={session?.email ?? ""}
             role={session?.role ?? ""}
+            organizationName={organizationProfile?.name ?? ""}
           />
           <main className="mx-auto max-w-[1760px] px-4 py-4 xl:px-5">
             {children}

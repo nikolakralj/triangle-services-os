@@ -34,6 +34,11 @@ import {
   createOutreachDraft,
   type OutreachChannel,
 } from "@/lib/data/outreach";
+import {
+  getOrganizationOperatingProfile,
+  isOrganizationProfileComplete,
+  type OrganizationOperatingProfile,
+} from "@/lib/data/organization-profile";
 
 // ── Request validation ───────────────────────────────────────────────────────
 
@@ -48,12 +53,6 @@ const postSchema = z.object({
 const TOOL_DEFINITIONS = [
   {
     type: "web_search" as const,
-    user_location: {
-      type: "approximate" as const,
-      country: "HR",
-      city: "Zagreb",
-      region: "Zagreb",
-    },
   },
   {
     type: "function" as const,
@@ -121,7 +120,7 @@ const TOOL_DEFINITIONS = [
     type: "function" as const,
     name: "propose_package",
     description:
-      "Propose a sellable labor package — a concrete crew offering Triangle Services could pitch to a specific contractor (the likely buyer). When accepted, this becomes a real project_packages row that drives outreach. Be specific: what crew, what scope, what size, to whom.",
+      "Propose a sellable labor package — a concrete crew or specialist offering the active organization could pitch to a specific contractor (the likely buyer). When accepted, this becomes a real project_packages row that drives outreach. Be specific: what crew, what scope, what size, to whom.",
     strict: false,
     parameters: {
       type: "object",
@@ -134,7 +133,7 @@ const TOOL_DEFINITIONS = [
         summary: {
           type: "string",
           description:
-            "1-3 sentences: what scope, why it fits this project, what makes Triangle Services credible to deliver it",
+            "1-3 sentences: what scope, why it fits this project, and what approved seller capabilities support delivery",
         },
         roles: {
           type: "array",
@@ -264,6 +263,7 @@ const TOOL_DEFINITIONS = [
 
 function buildSystemPrompt(
   memory: ProjectMemorySnapshot,
+  profile: OrganizationOperatingProfile,
   olderSummary?: string | null,
 ): string {
   const {
@@ -325,7 +325,9 @@ function buildSystemPrompt(
           : "");
 
   return [
-    "You are a commercial research agent for Triangle Services, a labor-supply business that provides specialist contractors (electrical, mechanical, welding, PLC, commissioning) to large industrial projects.",
+    `You are a commercial research agent for ${profile.name}.`,
+    `Approved seller profile: ${profile.companyProfile}`,
+    `Operating model: ${profile.operatingModel}. Offer mode: ${profile.offerMode}.`,
     "",
     "Your job: research projects, map the contractor chain, find buyer contacts, identify package opportunities. You communicate with the user in chat.",
     "",
@@ -347,6 +349,7 @@ function buildSystemPrompt(
     "6. Owner is often NOT the labor buyer. The actual buyer is usually the GC, EPC, or MEP package owner.",
     "7. Prefer fewer strong findings over many weak ones.",
     "8. When proposing a package, ALWAYS attach it to the most likely buyer (a GC/EPC/MEP, not the owner). Estimate a real crew size based on project scale and phase. Example: a 100MW data center in fit-out phase typically needs 60-120 electricians + 20-40 mechanical workers + 8-15 commissioning engineers. Use these heuristics, don't return vague 'electrical package' suggestions.",
+    "8a. Never propose capabilities, worker roles, delivery coverage, certifications, or scale that are not supported by the approved seller profile or verified app records.",
     "9. Outreach drafts must be specific and personalized. Reference the project name, the buyer's role, and the package being pitched. NO generic templates ('I am writing to introduce...'). LinkedIn connection notes are short and curious — NOT sales pitches. The DM after acceptance is where you mention the package. Email cold has a short subject (≤7 words), opens with a specific observation about the project, then the package, then a low-friction CTA ('worth a 15-min intro call?'). Always match the language of the project's country (English for UK/Ireland, French for France, etc. — but if unsure, default to English).",
     "",
     "## Project facts",
@@ -739,7 +742,7 @@ async function executeProposalTool(params: {
       const sourceUrl =
         typeof args.source_url === "string" && args.source_url.length > 0
           ? args.source_url
-          : "https://triangle-services.local/research-note";
+          : "https://local.invalid/research-note";
       const result = await createResearchSuggestion({
         projectId,
         orgId,
@@ -965,6 +968,20 @@ export async function POST(request: NextRequest) {
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  if (access.demo) {
+    return NextResponse.json(
+      { error: "Research chat is not available in demo mode." },
+      { status: 403 },
+    );
+  }
+
+  const profile = await getOrganizationOperatingProfile(access.organizationId);
+  if (!isOrganizationProfileComplete(profile)) {
+    return NextResponse.json(
+      { error: "Complete the organization profile before running research." },
+      { status: 409 },
+    );
+  }
 
   let body: z.infer<typeof postSchema>;
   try {
@@ -1033,7 +1050,11 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
-  const systemPrompt = buildSystemPrompt(memory, conversationCtx.summaryOfOlder);
+  const systemPrompt = buildSystemPrompt(
+    memory,
+    profile,
+    conversationCtx.summaryOfOlder,
+  );
 
   // Recent history excluding the just-saved user message (it's already at the end)
   const conversationHistory = conversationCtx.recentMessages

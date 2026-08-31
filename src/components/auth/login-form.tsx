@@ -7,6 +7,7 @@ import { LockKeyhole, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/constants";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { sanitizeNextPath } from "@/lib/security/redirects";
 
@@ -65,10 +66,10 @@ export function LoginForm() {
       <Card className="w-full max-w-md p-6">
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-            Triangle Services
+            {PRODUCT_NAME}
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            Business Development OS
+            {PRODUCT_TAGLINE}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             Private invite-only workspace. Access by invitation only.
@@ -85,7 +86,7 @@ export function LoginForm() {
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="nikola@triangle.example"
+                placeholder="you@company.example"
               />
             </div>
           </label>

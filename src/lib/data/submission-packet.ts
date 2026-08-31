@@ -42,6 +42,7 @@ export type PdfPacketWorker = {
 };
 
 export type PdfPacketData = {
+  organizationName: string;
   packageTitle: string;
   projectName: string;
   countryCode: string | null;
@@ -118,6 +119,7 @@ export type SubmissionPacketResult = {
 export async function buildSubmissionPacket(
   packageId: string,
   orgId: string,
+  organizationName: string,
 ): Promise<SubmissionPacketResult | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -232,7 +234,7 @@ export async function buildSubmissionPacket(
     );
     if (quality > 0) {
       lines.push(
-        `- **Triangle track record:** ${quality}/100 (reliability ${w.reliability_score}, quality ${w.quality_score}, safety ${w.safety_score})`,
+        `- **Delivery record:** ${quality}/100 (reliability ${w.reliability_score}, quality ${w.quality_score}, safety ${w.safety_score})`,
       );
     }
     lines.push(`- **Match score for this package:** ${row.match_score}%`);
@@ -296,7 +298,9 @@ export async function buildSubmissionPacket(
   lines.push("- Confirm role/headcount fit");
   lines.push("- Confirm start date and duration");
   lines.push("- Confirm commercial rate per role");
-  lines.push("- Triangle Services to share certificates and references for shortlisted workers");
+  lines.push(
+    `- ${organizationName} to share certificates and references for shortlisted workers`,
+  );
   if (project?.source_url) {
     lines.push("");
     lines.push(`Project source: ${project.source_url}`);
@@ -318,6 +322,7 @@ export async function buildSubmissionPacket(
 export async function buildPdfPacketData(
   packageId: string,
   orgId: string,
+  organizationName: string,
 ): Promise<PdfPacketData | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -452,6 +457,7 @@ export async function buildPdfPacketData(
   );
 
   return {
+    organizationName,
     packageTitle: pkg.title,
     projectName: project?.project_name ?? "Unknown project",
     countryCode: project?.country_code ?? null,

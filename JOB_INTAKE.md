@@ -1,13 +1,29 @@
 # Job Intake
 
 Reads agency/recruiter email, turns it into scored opportunities, and drafts replies.
-Added 2026-08-25. Self-contained — you can work on this module without reading the rest of the repo.
+Added 2026-08-25. Productization boundary added 2026-08-30. Read the
+repository operating rules before changing behavior.
+
+## Current operating note — 29 August 2026
+
+The module works, but the commercial loop has not been activated:
+
+- 24 leads exist;
+- 21 remain `new`;
+- 4 score 70+;
+- 3 reply drafts exist;
+- 0 replies are marked sent.
+
+The immediate requirement is human review, send, follow-up, and outcome
+recording. Do not expand ingestion or redesign the interface before the current
+high-priority leads are worked. See `ROADMAP_EXECUTION.md`.
 
 ## Why it exists
 
-Nikola and Ralph receive recruiter emails constantly at their personal Gmail
-addresses. Every one is an advert aimed at **one freelance engineer**. Triangle's
-business is supplying **crews** — 3 to 15 people, or a framework agreement.
+The original Triangle workflow receives recruiter emails aimed at **one
+freelance engineer**, while Triangle's business is supplying specialists and
+crews. External tenants may offer teams, individuals, or both; their factual
+positioning comes from the organization operating profile.
 
 So the module answers a different question from the one the email asks:
 
@@ -43,11 +59,16 @@ IMAP mailbox
 | `job_leads` | The structured opportunity. `team_potential` 0–100, `missing_fields[]` drives the reply, `duplicate_of_id` links repeats. |
 | `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived — "sent" only records that a human sent it. |
 | `job_intake_rules` | One editable text block per org, injected into the classification prompt. |
+| `organizations` profile columns | Tenant business/offer model, approved positioning, sign-off, currency, and timezone used by commercial AI. |
 
 Migrations: `013_job_intake.sql`, `014_mail_account_credentials.sql`,
 `015_lead_reply_drafts.sql`, `016_job_intake_rules.sql`,
-`020_job_intake_reply_style.sql`. All applied to the live Supabase project. RLS
-on every table, scoped to active `organization_members`.
+`020_job_intake_reply_style.sql`, and
+`027_organization_operating_profile.sql`. Migrations through `020` are known
+applied to the live Supabase project. Migration `027` exists in the repository
+but production application is not verified. RLS protects intake tables; the
+organization profile API verifies membership then uses the service client for
+the scoped organization row.
 
 ## Files
 
@@ -56,11 +77,12 @@ src/lib/job-intake/
   mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later.
   clean-email.ts    HTML→text + signature stripping. Pure, no server imports.
   extract.ts        Classify + extract + score. Holds the prompt and the score bands.
-  draft-reply.ts    Writes the reply. Holds COMPANY_PROFILE.
+  draft-reply.ts    Writes the reply using the active organization profile.
   credentials.ts    AES-256-GCM encrypt/decrypt, resolveMailboxPassword, safeEqual.
   ingest.ts         Orchestrates a run. Idempotent, never throws.
 
 src/lib/data/job-intake.ts        Data layer (leads, counts, drafts, rules).
+src/lib/data/organization-profile.ts Tenant operating profile data boundary.
 src/app/(app)/job-intake/page.tsx The list, stat tiles, filters, sorting.
 src/app/api/job-intake/
   sync/             POST — run ingestion. Session or CRON_SECRET.
@@ -68,6 +90,7 @@ src/app/api/job-intake/
   rules/            GET/PUT — the org's own scoring rules.
   export/           GET — CSV, honours current filter + sort.
   leads/[id]/reply/ GET/POST/PATCH — draft, edit, mark sent.
+  ../settings/organization-profile/ GET/PUT — tenant identity and positioning.
 ```
 
 ## Two ways in: our IMAP, or someone else's bot
@@ -127,8 +150,33 @@ Settings → "What the agent looks for", and injected *after* the built-in guida
 via `withHouseRules()`. Verified working: adding *"Rail and rolling stock work
 always scores at least 75"* moved a 4-month single rail role from **20 → 75**.
 
-House rules can change priorities and scores. They **cannot** authorise inventing
+The organization's approved profile is injected before the scoring rules, so
+relevance is evaluated against that tenant's real offer rather than a Triangle
+constant. House rules can change priorities and scores. They **cannot** authorise inventing
 facts — the anti-invention instruction is restated after them so it has the last word.
+
+## Organization operating profile
+
+Added 2026-08-30 as the first sellability boundary. Settings → Organization
+stores:
+
+- organization name;
+- business model;
+- whether it supplies teams, individuals, or both;
+- factual company positioning;
+- exact reply sign-off;
+- default currency and timezone.
+
+Both IMAP and external/bot ingestion load this profile once per run and pass it
+to classification. Reply drafting requires a non-empty organization name,
+company profile, and sign-off; otherwise the route returns `409` and directs an
+admin/partner to Settings. This prevents a new tenant from speaking as Triangle
+or Nikola because of a code constant.
+
+Migration `027` seeds the existing Triangle row so current drafting behavior is
+preserved after it is applied. New organizations start with an empty profile
+and must configure it. This setting still cannot authorize auto-send, invented
+claims, prices, commitments, or worker disclosure.
 
 ## Reply style memory
 
@@ -232,9 +280,10 @@ three real opportunities from the same domain and was classified `other`.
 ## Not built yet
 
 - **Rescore button** — house rules only apply to future syncs; existing leads keep old scores.
-- **Promote a lead** → `discovered_project` + `project_package`, then run the existing
-  worker matching against it. `job_leads.discovered_project_id` exists and is unused.
-  This is the highest-value next step: it joins Job Intake to the crew/CV/A1 machinery
-  that already works.
+- **Promote a qualified lead** into the common contract-qualified requirement
+  workflow, then connect the appropriate project/package and worker readiness.
+  `job_leads.discovered_project_id` exists and is unused. This is a Phase 1
+  product item after current high-priority leads are worked and real
+  qualification conversations reveal the required fields.
 - **Parallel classification** — currently sequential, ~2s per email.
 - **Ralph's mailbox** — not connected. He connects it himself; nobody sees his password.

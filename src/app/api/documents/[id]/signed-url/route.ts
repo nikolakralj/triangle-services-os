@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { documents } from "@/lib/sample-data";
 import {
   createServiceSupabaseClient,
   requireApiAccess,
@@ -39,15 +38,14 @@ export async function GET(
   const { id } = await context.params;
   const service = createServiceSupabaseClient();
 
-  if (!service || access.demo) {
-    const document = documents.find((item) => item.id === id);
-    if (!document)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({
-      signedUrl: "#demo-signed-url",
-      message:
-        "Demo mode: configure Supabase Storage to generate real private signed URLs.",
-    });
+  if (access.demo) {
+    return NextResponse.json(
+      { error: "Documents are not available in demo mode." },
+      { status: 403 },
+    );
+  }
+  if (!service) {
+    return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
   }
 
   const { data: document, error } = await service
@@ -69,5 +67,8 @@ export async function GET(
 
   if (signedError)
     return NextResponse.json({ error: signedError.message }, { status: 500 });
+  if (new URL(request.url).searchParams.get("redirect") === "1") {
+    return NextResponse.redirect(data.signedUrl);
+  }
   return NextResponse.json({ signedUrl: data.signedUrl });
 }

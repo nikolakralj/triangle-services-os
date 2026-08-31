@@ -1,6 +1,7 @@
 import type { PipelineStage } from "@/lib/types";
 
-export const ORGANIZATION_NAME = "Triangle Services";
+export const PRODUCT_NAME = "Triangle OS";
+export const PRODUCT_TAGLINE = "Contract-to-Crew Operating System";
 
 export const COMPANY_TYPES = [
   "epc_contractor",

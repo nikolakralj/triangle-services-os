@@ -12,14 +12,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
-import { ORGANIZATION_NAME } from "@/lib/constants";
 
 export function Topbar({
   displayName,
   role,
+  organizationName,
 }: {
   displayName?: string;
   role?: string;
+  organizationName?: string;
 }) {
   const label = displayName
     ? `${displayName}${role ? ` / ${role}` : ""}`
@@ -39,7 +40,7 @@ export function Topbar({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
           <span className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium leading-4 text-slate-700">
-            {ORGANIZATION_NAME}
+            {organizationName || "Organization"}
           </span>
           {label ? (
             <span className="h-9 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium leading-4 text-emerald-700">

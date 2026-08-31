@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BriefcaseBusiness,
+  Banknote,
   Building2,
   ClipboardCheck,
   FileText,
@@ -17,13 +18,15 @@ import {
   Upload,
   Users,
   UserRound,
+  ListChecks,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   badge?: string;
   highlight?: boolean;
 };
@@ -42,6 +45,8 @@ const navGroups: NavGroup[] = [
       { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
       { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
+      { href: "/commercial", label: "Requirements", icon: BriefcaseBusiness },
+      { href: "/delivery", label: "Delivery & Margin", icon: Banknote },
       { href: "/workers", label: "Talent Pool", icon: UserRound },
       { href: "/workers/cert-checklist", label: "Cert Alerts", icon: ShieldAlert },
       { href: "/documents", label: "Compliance", icon: FileText },
@@ -58,6 +63,7 @@ const navGroups: NavGroup[] = [
   {
     label: "System",
     items: [
+      { href: "/onboarding", label: "Setup Readiness", icon: ListChecks },
       { href: "/dashboard", label: "Metrics", icon: Gauge },
       { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
       { href: "/imports", label: "Data Imports", icon: Upload },

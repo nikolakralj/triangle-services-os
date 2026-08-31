@@ -7,7 +7,7 @@ import { SCOPE_BY_VALUE } from "@/lib/data/agent-scopes";
 // POST /api/agents/employees — hire an AI employee.
 //
 // Until now this was scripts/create-machine-credential.mjs, run in a terminal.
-// That is fine for me and useless for Ralph, and an operating system whose
+// That is fine for a single operator and insufficient for a multi-user operating system whose
 // staffing model requires a shell is not one anyone else can run.
 //
 // Creates three things that are deliberately separate:

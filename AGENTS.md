@@ -10,23 +10,52 @@ Before building product features, read:
 
 - `VISION.md`
 - `PRODUCT_OPERATING_RULES.md`
+- `ROADMAP.md`
+- `ROADMAP_EXECUTION.md`
+- `SOFTWARE_AGENT_INSTRUCTIONS.md`
 - `WORKFLOW_SIGNAL_TO_PLACEMENT.md`
 - `RESEARCH_WORKBENCH.md`
-- `ROADMAP_EXECUTION.md`
 - `DECISIONS.md`
 - `CURRENT_STATE.md`
 
 Triangle Services is not building a generic CRM.
-The product is a project-to-placement operating system.
+It is also not building a generic hybrid work OS.
 
-The core workflow is:
+The product is a human-led, AI-assisted contract-to-crew operating system for
+cross-border technical staffing and subcontracting.
 
-`signal -> qualified project -> contractor chain -> buyer contacts -> crew package -> outreach -> opportunity -> placement`
+The demand-first workflow is:
 
-Do not treat a discovered project, company record, news article, or AI summary as a win.
-The win is a qualified project package opportunity with a plausible buyer, a specific crew package, and a next commercial action.
+`signal -> qualified requirement -> contractor chain -> buyer/procurement route -> crew package -> human action -> order -> mobilization -> payment`
+
+The supply-first workflow is:
+
+`human-confirmed available people -> sellable package -> target buyer/procurement route -> qualified requirement -> order -> mobilization -> payment`
+
+Do not treat a discovered project, company record, contact, news article, AI
+summary, accepted suggestion, generated packet, or completed assignment as a
+win.
+
+The commercial success object is a contract-qualified crew opportunity with a
+real buyer/route, scope, headcount, timing, engagement model, economics,
+country/legal feasibility, credible supply, and a dated next human action.
+
+Final proof is delivered work, payment, and known positive contribution margin.
 
 The project owner is usually not the labor buyer.
+
+The current phase and freeze list are authoritative in
+`ROADMAP_EXECUTION.md`. Do not pull later roadmap features forward without
+the required evidence gate.
+
+AI agents propose and report. Humans approve final records, external
+communication, commercial commitments, personal-data sharing, and
+mobilization. Provider/model is not the employee identity. Triangle's database
+is truth; agent memory is context.
+
+For Job Intake work, also read `JOB_INTAKE.md`. For agent/workforce work, also
+read `agents/WORKFORCE.md`, `agents/shared-constitution.md`, and the
+affected role file.
 
 # Pitfalls we have already hit (don't repeat)
 

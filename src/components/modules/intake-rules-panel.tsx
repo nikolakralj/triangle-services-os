@@ -77,7 +77,7 @@ export function IntakeRulesPanel() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">
-        Write in plain English what Triangle actually wants. These rules are read
+        Write in plain English what your organization actually wants. These rules are read
         by the AI on every email it classifies, and they take priority over the
         built-in scoring. One instruction per line.
       </p>

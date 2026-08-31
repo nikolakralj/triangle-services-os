@@ -496,7 +496,7 @@ export default function SubmissionPacketPdf({ data }: { data: PdfPacketData }) {
   return (
     <Document
       title={`Crew Submission — ${data.packageTitle}`}
-      author="Triangle Services"
+      author={data.organizationName}
       subject="Crew Submission Packet"
     >
       <Page size="A4" style={s.page}>
@@ -507,7 +507,7 @@ export default function SubmissionPacketPdf({ data }: { data: PdfPacketData }) {
             <Text style={s.headerSub}>{data.packageTitle}</Text>
           </View>
           <View>
-            <Text style={s.headerBrand}>Triangle Services</Text>
+            <Text style={s.headerBrand}>{data.organizationName}</Text>
             <Text style={s.headerBrandSub}>Project to Placement</Text>
           </View>
         </View>
@@ -554,7 +554,7 @@ export default function SubmissionPacketPdf({ data }: { data: PdfPacketData }) {
             "Confirm role/headcount fit",
             "Confirm start date and duration",
             "Confirm commercial rate per role",
-            "Triangle Services to share certificates and references for shortlisted workers",
+            `${data.organizationName} to share certificates and references for shortlisted workers`,
           ].map((step, i) => (
             <View key={i} style={s.bulletRow}>
               <Text style={s.bullet}>›</Text>
@@ -565,7 +565,7 @@ export default function SubmissionPacketPdf({ data }: { data: PdfPacketData }) {
 
         {/* Page footer */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>Triangle Services · Confidential</Text>
+          <Text style={s.footerText}>{data.organizationName} · Confidential</Text>
           <Text style={s.footerText}>Generated {date}</Text>
         </View>
       </Page>

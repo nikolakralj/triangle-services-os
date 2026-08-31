@@ -6,6 +6,10 @@ import SubmissionPacketPdf from "@/lib/pdf/submission-packet-pdf";
 import React from "react";
 import type { ReactElement } from "react";
 import type { DocumentProps } from "@react-pdf/renderer";
+import {
+  getOrganizationOperatingProfile,
+  isOrganizationProfileComplete,
+} from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // GET /api/packages/[id]/submission-packet/pdf
@@ -30,7 +34,19 @@ export async function GET(
     );
   }
 
-  const data = await buildPdfPacketData(packageId, access.organizationId);
+  const profile = await getOrganizationOperatingProfile(access.organizationId);
+  if (!isOrganizationProfileComplete(profile)) {
+    return NextResponse.json(
+      { error: "Complete the organization profile before creating buyer documents." },
+      { status: 409 },
+    );
+  }
+
+  const data = await buildPdfPacketData(
+    packageId,
+    access.organizationId,
+    profile.name,
+  );
   if (!data) {
     return NextResponse.json({ error: "Package not found or access denied." }, { status: 404 });
   }

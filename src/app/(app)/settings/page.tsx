@@ -5,6 +5,7 @@ import { MailboxSettingsPanel } from "@/components/modules/mailbox-settings-pane
 import { IntakeRulesPanel } from "@/components/modules/intake-rules-panel";
 import { ReplyStylePanel } from "@/components/modules/reply-style-panel";
 import { ChangePasswordPanel } from "@/components/modules/change-password-panel";
+import { OrganizationProfilePanel } from "@/components/modules/organization-profile-panel";
 import {
   COMPANY_TYPES,
   COUNTRIES,
@@ -13,18 +14,12 @@ import {
 } from "@/lib/constants";
 
 const sections = [
-  "Your account",
-  "Job Intake mailboxes",
-  "What the agent looks for",
-  "Reply style",
-  "Organization",
-  "Users",
-  "Pipeline stages",
-  "Company types",
-  "Sectors",
-  "Document categories",
-  "AI settings",
-  "Import settings",
+  { label: "Your account", href: "#account" },
+  { label: "Job Intake mailboxes", href: "#mailboxes" },
+  { label: "What the agent looks for", href: "#intake-rules" },
+  { label: "Reply style", href: "#reply-style" },
+  { label: "Organization", href: "#organization" },
+  { label: "Business defaults", href: "#business-defaults" },
 ];
 
 export default function SettingsPage() {
@@ -38,17 +33,18 @@ export default function SettingsPage() {
         <Card>
           <CardContent className="space-y-2">
             {sections.map((section) => (
-              <button
-                key={section}
+              <a
+                key={section.href}
+                href={section.href}
                 className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
               >
-                {section}
-              </button>
+                {section.label}
+              </a>
             ))}
           </CardContent>
         </Card>
         <div className="space-y-4">
-          <Card>
+          <Card id="account" className="scroll-mt-20">
             <CardHeader
               title="Your account"
               description="Change the password you use to sign in."
@@ -57,7 +53,7 @@ export default function SettingsPage() {
               <ChangePasswordPanel />
             </CardContent>
           </Card>
-          <Card>
+          <Card id="mailboxes" className="scroll-mt-20">
             <CardHeader
               title="Job Intake mailboxes"
               description="Mailboxes the agent reads for agency opportunities."
@@ -66,7 +62,7 @@ export default function SettingsPage() {
               <MailboxSettingsPanel />
             </CardContent>
           </Card>
-          <Card>
+          <Card id="intake-rules" className="scroll-mt-20">
             <CardHeader
               title="What the agent looks for"
               description="Your own scoring rules. The AI reads these on every email."
@@ -75,32 +71,25 @@ export default function SettingsPage() {
               <IntakeRulesPanel />
             </CardContent>
           </Card>
-          <Card>
+          <Card id="reply-style" className="scroll-mt-20">
             <CardHeader
               title="Reply style"
-              description="How Triangle should sound when drafting replies."
+              description="How your organization should sound when drafting replies."
             />
             <CardContent>
               <ReplyStylePanel />
             </CardContent>
           </Card>
-          <Card>
+          <Card id="organization" className="scroll-mt-20">
             <CardHeader
               title="Organization"
-              description="Default organization is Triangle Services."
+              description="The factual identity and commercial positioning used by your AI-assisted workflows."
             />
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-medium">Name</p>
-                <p className="text-sm text-slate-500">Triangle Services</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium">Timezone</p>
-                <p className="text-sm text-slate-500">Europe/Zagreb</p>
-              </div>
+            <CardContent>
+              <OrganizationProfilePanel />
             </CardContent>
           </Card>
-          <Card>
+          <Card id="business-defaults" className="scroll-mt-20">
             <CardHeader title="Business defaults" />
             <CardContent className="space-y-4">
               <div>

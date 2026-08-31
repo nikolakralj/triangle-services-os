@@ -1,343 +1,362 @@
 # Product Operating Rules
 
-## Prime Directive (updated 2026-08-27)
+## Prime directive — updated 29 August 2026
 
-Triangle is an AI-native staffing agency operating system: humans manage a
-workforce of AI employees operating on shared staffing-company data.
+Triangle is a human-led, AI-assisted **contract-to-crew operating system** for
+technical staffing and subcontracting.
 
-The durable objects are the company's: employees (agent_instances),
-assignments, findings, approvals, outcomes, and the domain database. Providers
-are swappable badges-and-brains underneath.
+Every serious product change must help Triangle:
 
-Project-to-placement remains strategically central — as Business Playbook 01,
-performed by the workforce, not as the top-level definition of the product.
-The supply-first direction (available workers -> find them work) is an equal
-first-class workflow.
+- prove deliverable supply;
+- qualify real demand;
+- find the buyer/procurement/contract route;
+- create a truthful package and commercial offer;
+- perform and record a human commercial action;
+- secure an order;
+- mobilize and deliver;
+- invoice, collect payment, and learn actual margin.
 
-## Playbook 01 — Project to Placement
+Triangle is not a generic CRM and is not a generic hybrid work OS. AI employees
+are supporting capabilities, not the product category.
 
-The goal is to help Triangle move from early industrial project signals to real crew placements.
+## Core workflows
 
-The core workflow is:
+### Demand-first
 
-`signal -> qualified project -> contractor chain -> buyer contacts -> crew package -> outreach -> opportunity -> placement`
+```text
+signal
+-> reviewed lead/project
+-> qualified requirement
+-> contractor chain
+-> buyer/procurement route
+-> crew/specialist package
+-> human action
+-> proposal/order
+-> placement/mobilization
+-> delivery/payment
+```
 
-The app is not a generic CRM.
-The CRM is supporting infrastructure.
+### Supply-first
 
-The central commercial question is:
+```text
+human-confirmed available people
+-> truthful package
+-> target account/project
+-> buyer/procurement route
+-> qualified requirement
+-> proposal/order
+-> placement/mobilization
+-> delivery/payment
+```
 
-Can Triangle place 10-20+ workers on this project, through the right buyer, at the right phase?
+The CRM and agent workforce are supporting infrastructure for these workflows.
 
-## Success Object
+## What counts as success
 
-Do not treat these as wins:
+### Not success
 
-- project discovered
-- news article summarized
-- company record created
-- generic lead added
-- AI summary generated
+- project or job discovered;
+- article or email summarized;
+- company/contact record created;
+- AI score produced;
+- research suggestion accepted;
+- worker matched;
+- packet generated;
+- agent assignment completed;
+- status manually changed to `placed`;
+- framework signed but nobody mobilized.
 
-The real success object is a qualified project package opportunity.
+### Intermediate success
 
-A qualified project package opportunity has:
+- relevant human-approved message actually sent;
+- buyer/procurement conversation;
+- supplier registration/prequalification progressing;
+- requirement confirmed;
+- proposal issued;
+- MSA/framework/job order/PO secured;
+- worker accepted and mobilization scheduled.
 
-- real project
-- relevant sector
-- relevant country
-- suitable timing
-- likely electrical / MEP / industrial labor demand
-- contractor-chain visibility
-- likely buyer or buyer role
-- specific crew package
-- next commercial action
+### Final proof
+
+- worker/crew mobilized and delivered;
+- invoice accepted and paid;
+- contribution margin known;
+- outcome and learning connected to its source, buyer route, package, people,
+  actions, and agent contribution.
+
+## Contract-qualified crew opportunity
+
+An opportunity must have:
+
+1. current demand evidence;
+2. a company able to buy, subcontract, or introduce the work;
+3. buyer/procurement/onboarding route;
+4. scope or role package;
+5. headcount or credible range;
+6. timing, duration, location, and shifts;
+7. acceptable engagement model;
+8. rate/budget/price logic;
+9. country/legal feasibility state;
+10. supplier-prequalification feasibility;
+11. credible worker coverage and mobilization date;
+12. owner, next action, and due date.
+
+If these are absent, keep the item in an earlier state and show the unknowns.
 
 ## Vocabulary
 
 ### Signal
 
-A signal is a clue.
+A clue: email, job advert, news, permit, tender, award, financing, contractor
+announcement, hiring spike, worker availability, or referral.
 
-Examples:
+A signal is not an opportunity.
 
-- news article
-- planning permit
-- tender
-- financing announcement
-- construction start
-- contractor announcement
-- hiring spike
+### Discovered project
 
-A signal is not a sales opportunity.
+A source-backed record answering what, where, who, sector, phase, and timing.
+It is not ready for outreach unless the buyer route and package are credible.
 
-### Discovered Project
+### Lead
 
-A discovered project is a verified or semi-verified project record.
+Unqualified demand or account input. A high AI score makes it a review
+priority, not a commercial truth.
 
-It should answer:
+### Qualified requirement
 
-- what is being built?
-- where?
-- by whom?
-- what sector?
-- what phase?
-- what sources support it?
+Buyer-confirmed demand with sufficient scope, people, timing, location,
+engagement, commercial, onboarding, and next-step information.
 
-It is still not enough for outreach.
+### Contractor chain
 
-### Contractor Chain
+The relationship from owner/developer through EPC/GC, MEP, electrical or
+automation contractor, specialist subcontractor, agency, and labor supplier.
 
-The contractor chain is the missing middle between project news and labor sales.
+The owner/headline brand is usually not the labor buyer.
 
-It should map:
+### Buyer/procurement route
 
-- owner / operator
-- developer
-- owner's representative
-- EPC
-- general contractor
-- MEP contractor
-- electrical contractor
-- specialist subcontractor
-- labor intermediary
+The person, role, process, portal, framework, recruiter, or approved supplier
+path through which Triangle can legally and commercially receive work.
 
-The project owner is usually not the labor buyer.
+### Attack point
 
-### Buyer Candidate
+The best current organization/role/process to approach next. “Unknown” is an
+acceptable state. An invented contact is not.
 
-A buyer candidate is a person or role who could influence labor buying.
+### Crew/specialist package
 
-Examples:
+A specific offer backed by real supply, for example:
 
-- project director
-- construction manager
-- MEP manager
-- electrical package manager
-- site manager
-- subcontract manager
-- procurement manager
-- workforce / mobilization lead
+`1 electrical supervisor + 6 electricians for an 8-week fit-out window`.
 
-### Crew Package
+A package includes scope, exclusions, coverage, timing, readiness,
+commercial model, and constraints. “We can provide manpower” is not a package.
 
-A crew package is the commercial offer.
+### Proposal
 
-Examples:
+A human-approved commercial offer linked to a qualified requirement, buyer,
+package, price assumptions, dependencies, validity, and next decision date.
 
-- 20 cable pullers + 2 supervisors
-- 12 electricians for fit-out
-- 10 tray installers + 1 foreman
-- 8 commissioning technicians
-- 15 workers for night shift cable pulling
+### Placement
 
-Bad:
+Client acceptance of a named person or crew under a real commercial route.
+Matching or internal shortlisting is not placement.
 
-`We can provide manpower.`
+### Mobilization
 
-Good:
+The approved worker/crew is scheduled and cleared to start at a real site.
 
-`20 cable pullers + 2 supervisors for 8-12 weeks during electrical fit-out.`
+### Delivery
 
-### Opportunity
+Work is performed and evidenced through attendance/timesheet, quality/safety,
+client acceptance, invoice, payment, and outcome.
 
-Only create or promote a real opportunity when there is enough commercial shape:
+## Facts, inferences, and unknowns
 
-- project is real
-- phase is relevant
-- contractor chain has at least one attack point
-- buyer or buyer role is identified
-- crew package is plausible
-- next action is clear
+AI output must distinguish:
 
-This protects the pipeline from filling with low-quality project headlines.
+- **fact:** directly supported by a source or approved record;
+- **inference:** plausible interpretation with rationale;
+- **unknown:** missing information that requires research or human confirmation.
 
-## Commercial Operating Rules
+Unknown means unknown. Confidence does not convert inference into fact.
+
+Every material external claim must have a source or human owner.
+
+## Supply truth rules
+
+1. Availability is stale unless a human confirmed it recently; default target
+   is within 14 days for an active package.
+2. A package cannot claim headcount beyond credible confirmed coverage.
+3. Store country, travel, language, rate, engagement, document, and
+   mobilization constraints.
+4. Reserve/hold workers before promising them to multiple buyers.
+5. Worker records and CV extractions are claims requiring human approval.
+6. Document presence is not legal eligibility; legal/site requirements need a
+   responsible human or qualified adviser.
+7. An empty role list cannot produce a meaningful match.
+8. Never force a weak match to complete a workflow.
+
+## Demand and buyer rules
 
 1. News is only a signal.
-2. A project owner is not automatically the labor buyer.
-3. Do not create outreach from a project headline alone.
-4. Every serious project needs a contractor-chain map.
-5. Every serious project needs a package hypothesis.
-6. AI must separate facts from inferences.
-7. Every important claim needs source provenance.
-8. Unknown contractor-chain fields should remain visibly unknown.
-9. Do not hide uncertainty behind fake confidence.
-10. The app should always recommend the next commercial action.
+2. A job advert may be workload evidence but not supplier acceptance.
+3. The project owner is not automatically the labor buyer.
+4. Serious projects need a contractor chain and attack point.
+5. Serious leads need buyer authority or a contracting route.
+6. Buyer contacts require source provenance and human review.
+7. Public tenders may be more useful for identifying the winning prime than
+   for Triangle bidding the full contract.
+8. An account without a current reason, route, owner, and next action remains
+   research backlog.
 
-## Facts, Inferences, Unknowns
+## Commercial rules
 
-AI output must separate:
+1. Every pursued record has an owner, next action, and due date.
+2. Preserve AI draft and final sent text separately.
+3. Generated does not mean reviewed; reviewed does not mean sent.
+4. Record recipient, sender, channel, version, send time, follow-up, response,
+   objection, and outcome.
+5. A packet send is a commercial event; PDF generation is not.
+6. Rate/price recommendations must show landed-cost assumptions and margin
+   range, not model intuition.
+7. Engagement model, payment term, funding exposure, scope, supervision,
+   travel, accommodation, and timesheet responsibility must be explicit before
+   commitment.
+8. Legal, tax, payroll, insurance, immigration, posting, and labor-leasing
+   conclusions require qualified human review.
+9. Do not reduce price without understanding total economics.
+10. Do not use autonomous outreach to compensate for a weak package or route.
 
-- facts
-- inferences
-- unknowns
+## External-action rules
 
-Example:
+Nothing in the current product automatically sends email or submits a packet.
 
-Fact:
+AI may draft. A human:
 
-- The project was announced by source X.
+- reviews;
+- edits;
+- chooses the recipient;
+- sends/submits outside Triangle;
+- records the real action and next date.
 
-Inference:
+Named CVs, certificates, or personal data are shared only for a justified
+purpose and appropriate recipient. Use anonymized capability first when
+appropriate.
 
-- Electrical fit-out demand is likely because this is a large data center project.
+No agent may publish, delete, archive, register, accept terms, sign, pay, make a
+binding claim, or contact a third party without explicit authority.
 
-Unknown:
+## Agent rules
 
-- The MEP contractor has not been identified yet.
+1. Triangle is truth; bot memory is context.
+2. Provider/model is replaceable and is not the employee identity.
+3. Every runtime identity has a role file, minimum scopes, inputs, outputs,
+   forbidden actions, and human review path.
+4. Agents send raw material or evidence-backed proposals, not hidden final
+   writes.
+5. Suggestions/findings remain the source of AI proposals.
+6. Agents cannot approve their own work.
+7. Stable source IDs and idempotency keys are mandatory.
+8. A truthful refusal is better than out-of-role action.
+9. Hire a new role only after repeated workload exists and prior agents earn
+   their management cost.
+10. Measure useful outcomes, accuracy, time saved, and review burden—not task
+    or token volume.
 
-Unknown means unknown.
-Do not rewrite unknowns as confident claims.
+## Product and UX rules
 
-## Attack Point
+1. The main operator question is: **What must happen next to move toward a
+   profitable contract or successful delivery?**
+2. Use live data. Production screens must not present sample data as truth.
+3. Make missing information and uncertainty visible.
+4. Favor action queues and progressive disclosure over decorative dashboards.
+5. Task-first delegation is preferred: define the outcome and attach context
+   before choosing an agent.
+6. A unified approvals/decisions queue is good; it must preserve the domain
+   context and consequence of each item.
+7. Agent technical details stay secondary to commercial/delivery state.
+8. Do not replace domain language with generic “mission/member” language where
+   it makes the work less precise.
+9. Reconsider spatial/Collaboration Field UX only after real multi-user/agent
+   coordination pain meets the gate in `ROADMAP.md`.
+10. Accessibility and mobile operation are requirements, not polish.
 
-Every project should have an attack point.
+## Build rules
 
-The attack point is the best current company or role to approach next.
+Build a feature only when it:
 
-Examples:
+- removes a verified current blocker;
+- completes a missing real state transition;
+- reduces legal/privacy/data risk;
+- saves meaningful operator time in a used workflow;
+- or is required by the current roadmap gate.
 
-- owner
-- developer
-- GC
-- EPC
-- MEP contractor
-- electrical subcontractor
-- labor agency
-- site manager
-- procurement contact
+Before building, define operator, object, before/after state, evidence, next
+action, metric, and risk. See `SOFTWARE_AGENT_INSTRUCTIONS.md`.
 
-Most projects start with:
+Do not build:
 
-`attack point unknown`
+- generic CRM features detached from contract-to-crew;
+- duplicate functionality already present;
+- agent theater or provider dashboards without enough outcome data;
+- new orchestration because it is fashionable;
+- autonomous outbound;
+- generic marketplace/network features without liquidity;
+- speculative enterprise features without a design-partner requirement;
+- cosmetic redesign while real commercial action is blocked by process, not UI.
 
-The app should move them toward:
+## Module definitions of done
 
-`attack point identified`
+### Job Intake
 
-This is more useful than generic CRM status.
+Useful when raw inbox material becomes a correctly prioritized, human-worked
+qualification conversation with final sent text, follow-up, and outcome.
 
-Suggested project commercial statuses:
+### Hunter/project discovery
 
-- signal found
-- project verified
-- too early
-- too late
-- contractor chain needed
-- attack point found
-- buyer candidate found
-- package ready
-- outreach ready
-- outreach sent
-- in conversation
-- opportunity created
-- workers submitted
-- mobilization
-- won
-- lost
-- monitor
+Useful when a selected project leads to a verified contractor/buyer route,
+package hypothesis, human action, and qualified requirement—not when it returns
+more projects.
 
-## Do Not Build
+### Contractor chain
 
-Do not build generic CRM features unless they support project-to-placement.
+Useful when known/inferred/unknown relationships and evidence reveal the best
+current labor-buyer or procurement attack point.
 
-Do not make dashboards that summarize fake or sample data as if it were real.
+### Research workbench
 
-Do not treat AI-generated project summaries as verified facts.
+Useful when suggestions are sourced, reviewed, and connected to a next human
+action. Accepted research without action is stored knowledge, not conversion.
 
-Do not create outreach from project headlines alone.
+### Package/matching
 
-Do not rank projects only by size, investment value, or media attention.
+Useful when the package is backed by confirmed supply, roles, readiness,
+commercial assumptions, and client-relevant submission—not when a score is
+computed.
 
-Do not hide missing contractor-chain data.
+### Submission packet
 
-Do not prioritize owner contacts when the likely buyer is downstream.
+Useful when an appropriate version reaches a real recipient, follow-up is set,
+and response/outcome is recorded.
 
-Do not call something an opportunity until there is a plausible buyer and package.
+### Workforce/agents
 
-## Hunter Definition Of Done
+Useful when scoped agents reliably reduce time or increase quality in a real
+commercial/delivery workflow without increasing hidden risk or review burden.
 
-Hunter is not done when it finds projects.
+### Opportunity/pipeline
 
-Hunter is useful when it can produce a small number of project records that include:
+Useful when statuses reflect buyer-confirmed commercial reality through order,
+mobilization, invoice, payment, and loss reason.
 
-- source-backed project summary
-- sector
-- country
-- project phase
-- timing estimate
-- labor relevance
-- reason for keeping or rejecting
-- confidence score
-- missing contractor-chain fields
-- recommended next action
+## Roadmap control
 
-A Hunter result without a next commercial action is incomplete.
+The active priorities and freeze list live in `ROADMAP_EXECUTION.md`. Future
+agents may not skip a phase gate because a later feature is easy, popular, or
+requested by a third-party proposal.
 
-## Contractor Chain Definition Of Done
-
-Contractor-chain mapping is useful when a project can show:
-
-- owner / operator
-- developer
-- EPC or GC if known
-- MEP contractor if known
-- electrical contractor if known
-- labor intermediary if known
-- confidence per relationship
-- source per relationship
-- unknown roles clearly marked
-- best current attack point
-
-The chain does not need to be complete to be useful.
-But the system must clearly show what is known, what is inferred, and what is unknown.
-
-## Crew Package Engine Definition Of Done
-
-The crew package engine should translate project intelligence into a concrete labor offer.
-
-It should consider:
-
-- sector
-- project phase
-- likely work package
-- country
-- duration estimate
-- headcount estimate
-- supervision requirement
-- worker availability
-- compliance risk
-- revenue potential
-
-The output should be specific enough for outreach.
-
-## Next Product Module
-
-The next serious module should be:
-
-Project Detail: Contractor Chain + Package Hypothesis
-
-For every discovered project, the page should show:
-
-- project facts
-- sources
-- phase
-- commercial score
-- labor relevance
-- contractor chain
-- known unknowns
-- likely attack point
-- recommended crew package
-- next action
-
-Once this page exists, outreach becomes grounded.
-Without this page, outreach is guessing.
-
-## Product Philosophy
-
-News finds the project.
-Contractor-chain mapping finds the buyer.
-Crew-package logic creates the offer.
-Outreach starts the deal.
-Worker delivery makes the money.
+Management can change direction. Record the change and evidence in
+`DECISIONS.md`, then reconcile `VISION.md`, `ROADMAP.md`,
+`ROADMAP_EXECUTION.md`, and `CURRENT_STATE.md`.

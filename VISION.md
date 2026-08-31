@@ -1,109 +1,200 @@
 # Vision
 
-## North Star (updated 2026-08-27)
+## North Star — updated 29 August 2026
 
-Triangle is an AI-native staffing agency operating system.
+Triangle is a human-led, AI-assisted **contract-to-crew operating system for
+cross-border technical staffing and subcontracting**.
 
-Humans manage the company. AI agents are digital employees. Triangle owns the
-shared memory, business data, deterministic rules, permissions, approvals,
-assignments, outcomes and audit trail. External AI providers (Grok, OpenAI,
-local models) are replaceable execution backends for those employees.
+The system helps Triangle turn truthful worker capacity and verified demand
+into:
 
-We are not building software that helps an agency use AI. We are building the
-agency itself as software — humans manage it, AI employees perform jobs, and
-Triangle owns the company memory and controls.
+- a real buyer/procurement route;
+- a contract-qualified requirement;
+- a specific, deliverable crew or specialist package;
+- a human-approved commercial action;
+- a proposal, framework, job order, or PO;
+- safe mobilization and delivery;
+- a paid invoice and known contribution margin.
 
-The platform must serve BOTH directions of the staffing business:
+The product is successful when Triangle repeatedly wins and delivers profitable
+work. It is not successful merely because it finds projects, creates records,
+generates AI output, or displays an active agent workforce.
 
-- demand-first: project/job -> understand requirement -> find workers -> submit crew
-- supply-first: available workers -> assignment to an AI employee -> search the
-  market -> propose opportunities -> human approves next action
+## Role of AI agents
 
-Triangle stays domain-specific to staffing, recruiting and technical
-contracting. It is NOT a generic build-any-agent platform — that would mean
-competing with the model vendors instead of using them.
+Humans manage the company and retain authority over consequential decisions.
+AI agents perform narrow jobs: ingestion, research, extraction, drafting,
+matching assistance, monitoring, and reporting.
 
-## Business Playbook 01 — Project / Demand to Crew Placement
+Triangle owns:
 
-Everything below this line is the first proven commercial workflow — one
-playbook the workforce executes, not the definition of the whole product.
+- company and worker truth;
+- role playbooks;
+- permissions and scoped credentials;
+- assignments and approvals;
+- deterministic rules;
+- evidence and audit;
+- commercial and delivery outcomes;
+- approved organizational learning.
 
-Triangle Services is not building a generic CRM.
+External providers—Grok, OpenAI, local models, or future services—are
+replaceable execution backends.
 
-The playbook turns early industrial project signals into crew placements:
+```text
+agent identity != provider
+agent identity != credential
+agent memory != company truth
+agent activity != commercial success
+```
 
-`project signal -> qualified project -> contractor chain -> buyer contacts -> crew package -> outreach -> follow-up -> placement`
+The AI-employee metaphor may make the product easier to operate. It is a
+capability inside Triangle's business model, not the external business model.
 
-The commercial goal is not "track leads."
-The commercial goal is:
+## The two operating lanes
 
-- find labor demand before competitors do
-- identify the real buyer of electrical / MEP / industrial labor
-- present a concrete crew package at the right project phase
-- place teams of 10-20+ workers on real projects
+### Supply-first
 
-## Core Business Thesis
+```text
+human-confirmed available people
+-> sellable crew/specialist package
+-> target projects, companies, and procurement routes
+-> qualified demand
+-> order
+-> mobilization
+```
 
-Triangle's edge is speed plus relevance:
+### Demand-first
 
-- early project detection
-- understanding which contractor actually buys labor
-- offering supervised technical crews, not generic recruitment
-- matching real worker supply to real package demand
+```text
+inbound job / project / tender / workload signal
+-> qualification
+-> contractor chain and real buyer
+-> commercial requirement
+-> matched, ready people
+-> order
+-> mobilization
+```
 
-This app should eventually help answer, for each discovered project:
+The lanes converge in one contract, delivery, and margin workflow.
 
-1. Is this project real?
-2. Is it early enough to matter?
-3. Who controls the package we care about?
-4. Who is the likely buyer?
-5. What exact crew package should we offer?
-6. Can we credibly fill it?
-7. What should Nikola and Ralph do next?
+## First business playbook — project to placement
 
-## Target Sectors
+```text
+signal
+-> qualified project
+-> contractor chain
+-> buyer/procurement route
+-> crew package
+-> human outreach
+-> qualified requirement
+-> order
+-> placement/mobilization
+-> delivery and payment
+```
 
-Initial focus:
+News finds the project. Contractor-chain mapping finds the likely buyer.
+Supply truth creates a credible offer. Human commercial action starts the deal.
+Delivery and payment prove the business.
 
-- Data centers
+The project owner is usually not the labor buyer. The system must optimize for
+the contractor, subcontractor, procurement, workforce, and supplier routes
+that can actually engage Triangle.
 
-Expansion sectors:
+## Commercial success object
 
-- Automotive / EV plants
-- HVAC and commissioning
-- Steel and heavy industry
+The principal commercial object is a **contract-qualified crew opportunity**.
+It combines:
 
-## Target Buyers
+- current demand;
+- buyer authority or procurement route;
+- scope, headcount, timing, duration, location, and shifts;
+- engagement model and rate/budget logic;
+- country/legal and supplier-onboarding feasibility;
+- credible worker coverage and mobilization date;
+- owner, next action, and due date.
 
-The end client or project owner is not always the real buyer.
+A discovered project, contact, suggestion, score, match, or generated packet is
+supporting evidence—not the win.
 
-Typical buyer chain:
+## Target market
 
-1. Owner / developer
-2. Owner's representative / PM
-3. EPC / general contractor
-4. MEP contractor
-5. Electrical subcontractor
-6. Labor supplier / specialist subcontractor
+### Initial service focus
 
-The app must optimize for finding levels 3-6, because that is usually where labor buying decisions are made.
+Choose the first live offer from supply truth:
 
-## What "Winning" Means
+- supervised electrical installation/fit-out crews; or
+- PCS7/automation/commissioning specialist teams.
 
-The app is successful when it helps Triangle do these things repeatedly:
+Do not claim headcount that the confirmed roster cannot support.
 
-- detect relevant projects before the market fully wakes up
-- prioritize the right projects by timing and labor fit
-- identify likely package owners and buyers
-- generate focused outreach with a concrete labor offer
-- progress conversations into opportunities
-- mobilize real crews onto projects
+### Initial sectors
 
-## Product Principles
+- data centers and high-tech construction;
+- industrial/energy projects and maintenance;
+- automation and commissioning;
+- selected rail/automotive work where Triangle has credible supply.
 
-- build for operators, not spectators
-- prefer practical decision support over flashy AI demos
-- do not automate compliance, legal, or labor claims blindly
-- always preserve source provenance
-- keep commercial reasoning tied to real project phase
-- treat "can we place 20 people here?" as the central question
+Expansion follows profitable delivery evidence, not signal volume.
+
+### Target buyers and routes
+
+- EPC/general contractors;
+- MEP/electrical/automation contractors;
+- specialist subcontractors;
+- procurement/subcontract/workforce managers;
+- approved labor agencies and framework partners;
+- invited supplier/prequalification networks.
+
+## What becomes defensible
+
+Triangle's long-term advantage is not “having agents.” It is the operating
+graph connecting:
+
+- available, verified people;
+- skills, evidence, documents, rates, and country readiness;
+- package and project timing;
+- buyer/procurement/contract route;
+- commercial actions and objections;
+- submissions, mobilization, delivery quality, and safety;
+- invoices, payment behavior, and contribution margin.
+
+The graph improves through real outcomes. Artificial records and AI-generated
+activity do not create defensibility.
+
+## Productization path
+
+1. Run Triangle Services as tenant zero and use the system in current contract
+   work.
+2. Interview comparable technical staffing and crew-supply businesses now,
+   before internal assumptions harden into product architecture.
+3. Remove tenant identity, permission, and onboarding risks needed for a safe
+   paid design-partner pilot.
+4. Win and deliver Triangle work with known economics while one external
+   design partner tests the same core workflow.
+5. Productize only patterns proven across Triangle and at least three paying
+   vertical customers.
+6. Consider a broader platform or network only when real customers prove it.
+
+The primary external buyer is a 2–25 person European technical contract
+staffing, crew-supply, or labor-subcontracting business. Solo recruiters are a
+later starter tier. Corporate HR, job seekers, large enterprises, and generic
+companies seeking work are not the first market.
+
+The generic hybrid work OS and Collaboration Field are explicitly deferred.
+Clean architecture boundaries should preserve optionality, but Triangle will
+not pay refactoring cost for an imagined second market.
+
+## Product principles
+
+- build for operators performing real commercial and delivery work;
+- commercial and delivery truth outrank presentation;
+- require evidence for important claims and states;
+- keep facts, inferences, and unknowns separate;
+- preserve human approval for external and consequential actions;
+- do not automate legal, compliance, worker-status, or commercial claims;
+- keep personal data minimal and purpose-bound;
+- make the next human action explicit;
+- measure mobilization, payment, margin, and repeat use;
+- buy/integrate commodity agent and transport infrastructure;
+- build the domain workflow and outcome graph;
+- advance roadmap phases only when their evidence gates are met.

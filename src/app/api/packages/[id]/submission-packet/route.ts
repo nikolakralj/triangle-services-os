@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { buildSubmissionPacket } from "@/lib/data/submission-packet";
+import {
+  getOrganizationOperatingProfile,
+  isOrganizationProfileComplete,
+} from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // GET /api/packages/[id]/submission-packet
@@ -29,7 +33,19 @@ export async function GET(
     });
   }
 
-  const packet = await buildSubmissionPacket(packageId, access.organizationId);
+  const profile = await getOrganizationOperatingProfile(access.organizationId);
+  if (!isOrganizationProfileComplete(profile)) {
+    return NextResponse.json(
+      { error: "Complete the organization profile before creating buyer documents." },
+      { status: 409 },
+    );
+  }
+
+  const packet = await buildSubmissionPacket(
+    packageId,
+    access.organizationId,
+    profile.name,
+  );
   if (!packet) {
     return NextResponse.json({ error: "Package not found or access denied." }, { status: 404 });
   }

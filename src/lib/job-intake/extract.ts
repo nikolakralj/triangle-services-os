@@ -1,17 +1,17 @@
 import "server-only";
 import { cleanEmailBody } from "./clean-email";
+import type { OrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // Classify an inbound email, and where it is a real agency opportunity,
 // extract the structured job lead.
 //
-// Two things make this Triangle-specific rather than a generic job parser:
+// Two things make this different from a generic job parser:
 //   1. Classification must reject job-board digests and "recruiter is popular
 //      in your network" social noise, which look superficially identical to
 //      real agency mail.
-//   2. Scoring asks "can Triangle supply a CREW here?" — not "is this a good
-//      job for one engineer?" Those two questions rank the same inbox almost
-//      in reverse.
+//   2. Scoring asks whether the active organization can create a commercial
+//      staffing/package opportunity — not whether one person likes the job.
 // ---------------------------------------------------------------------------
 
 export type EmailClassification =
@@ -64,7 +64,24 @@ export interface ExtractionResult {
   cleaning: { originalLength: number; cleanedLength: number; reduction: number };
 }
 
-const SYSTEM_PROMPT = `You triage inbound email for Triangle Services, a company that SUPPLIES CREWS of industrial automation and electrical workers (PLC, PCS7, TIA Portal, SCADA, commissioning, electrical install) to large industrial projects across Europe and the USA.
+function offerDescription(profile: OrganizationOperatingProfile | null): string {
+  if (profile?.offerMode === "teams") return "teams and subcontracted crews";
+  if (profile?.offerMode === "individuals") return "individual specialists";
+  return "individual specialists, teams, or subcontracted crews";
+}
+
+function buildSystemPrompt(
+  profile: OrganizationOperatingProfile | null,
+): string {
+  const organizationName = profile?.name.trim() || "the active organization";
+  const positioning =
+    profile?.companyProfile.trim() ||
+    "A technical staffing and workforce supplier serving project-based clients.";
+
+  return `You triage inbound email for ${organizationName}.
+
+Approved company profile: ${positioning}
+The organization supplies ${offerDescription(profile)}. Use the approved profile to decide relevance; never invent capabilities that are not stated there.
 
 You do two jobs.
 
@@ -86,12 +103,12 @@ Traps you must not fall for:
 ## Job 2 — if and only if classification is job_opportunity, extract the lead
 
 Score team_potential 0-100. This is the ONLY score that matters and it is NOT "how good is this job".
-It answers: can Triangle place MULTIPLE workers or win a framework here?
+It answers: can ${organizationName} create a repeatable commercial placement, team package, or client/framework opportunity here?
 
 - 85-100: explicitly plural or ongoing work. Phrases like "a range of projects", "various projects", "multiple lines", "ramping up resources", "ongoing support", several sites or sectors named.
 - 60-84: one named role, but the context usually scales — large-site commissioning, pharma/automotive ramp-up, 12+ month horizon, "possible extension", warehouse/production line automation.
 - 35-59: a single contractor request of normal length (4-12 months) with no signal it grows.
-- 0-34: short single placement (under ~3 months), or a role Triangle cannot crew.
+- 0-34: short single placement (under ~3 months), or work outside the approved company profile.
 
 team_rationale: one sentence, quoting the phrase that drove the score where there is one.
 
@@ -106,6 +123,7 @@ Rules:
 
 Reply with JSON only, matching this shape:
 {"classification":"...","confidence":0-100,"reason":"short","lead":null or {"agencyName":...,"contactName":...,"clientCompany":...,"roleTitle":...,"country":...,"city":...,"sector":...,"technologies":[],"durationMonths":null,"startDateText":...,"rateText":...,"headcountText":...,"workMode":...,"teamPotential":0,"teamRationale":"...","requestedDocuments":[],"missingFields":[]}}`;
+}
 
 /**
  * Fold the org's own rules into the prompt.
@@ -115,14 +133,18 @@ Reply with JSON only, matching this shape:
  * what counts as relevant, but never to unlock inventing facts. The "never
  * invent" instruction is restated below them so it is the last word.
  */
-function withHouseRules(base: string, houseRules: string | null): string {
+function withHouseRules(
+  base: string,
+  houseRules: string | null,
+  organizationName: string,
+): string {
   const rules = (houseRules ?? "").trim();
   if (!rules) return base;
   return [
     base,
     "",
-    "## House rules from Triangle Services",
-    "The team wrote these. They describe the work Triangle actually wants and",
+    `## House rules from ${organizationName}`,
+    `The team wrote these. They describe the work ${organizationName} actually wants and`,
     "how to weigh it. Apply them when classifying and when scoring team_potential —",
     "they take priority over the generic score bands above where they conflict.",
     "",
@@ -143,6 +165,8 @@ export async function classifyAndExtract(params: {
   model?: string;
   /** Org-authored rules, injected into the prompt. */
   houseRules?: string | null;
+  /** Tenant identity and human-approved commercial positioning. */
+  organization?: OrganizationOperatingProfile | null;
 }): Promise<ExtractionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set.");
@@ -167,7 +191,11 @@ export async function classifyAndExtract(params: {
       messages: [
         {
           role: "system",
-          content: withHouseRules(SYSTEM_PROMPT, params.houseRules ?? null),
+          content: withHouseRules(
+            buildSystemPrompt(params.organization ?? null),
+            params.houseRules ?? null,
+            params.organization?.name.trim() || "the organization",
+          ),
         },
         { role: "user", content: userContent },
       ],

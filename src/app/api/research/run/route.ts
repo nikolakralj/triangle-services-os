@@ -18,6 +18,10 @@ import {
   extractOpenAIText,
   parseOpenAIJson,
 } from "@/lib/ai/openai-client";
+import {
+  getOrganizationOperatingProfile,
+  isOrganizationProfileComplete,
+} from "@/lib/data/organization-profile";
 
 const requestSchema = z.object({
   projectId: z.string().uuid(),
@@ -220,6 +224,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 500 });
   }
 
+  const profile = await getOrganizationOperatingProfile(access.organizationId);
+  if (!isOrganizationProfileComplete(profile)) {
+    return NextResponse.json(
+      { error: "Complete the organization profile before running research." },
+      { status: 409 },
+    );
+  }
+
   const { data: project, error: projectError } = await service
     .from("discovered_projects")
     .select("*")
@@ -290,6 +302,12 @@ export async function POST(request: Request) {
       },
       existing_chain_nodes: chainNodes.data ?? [],
       existing_buyer_contacts: buyerContacts.data ?? [],
+      seller: {
+        name: profile.name,
+        approved_profile: profile.companyProfile,
+        operating_model: profile.operatingModel,
+        offer_mode: profile.offerMode,
+      },
     };
 
     const researchPrompt = [
@@ -299,20 +317,18 @@ export async function POST(request: Request) {
       "- Do not invent facts.",
       "- Prefer fewer strong findings over many weak findings.",
       "- Owner is often not the labor buyer; try to identify GC/EPC/MEP/electrical package owners.",
-      "- Consider labor packages: electrical, mechanical, welding, PLC, commissioning, supervision.",
+      "- Propose only service or labor packages supported by the approved seller profile in the context.",
       "Return plain analysis notes; structured JSON will be requested in the next step.",
       `Context JSON:\n${JSON.stringify(context, null, 2)}`,
     ].join("\n");
 
     const researchCall = await client.responses.create({
       model,
-      instructions:
-        "You are a commercial research agent for Triangle Services. Use web search and provide evidence-backed notes.",
+      instructions: `You are a commercial research agent for ${profile.name}. Use web search and provide evidence-backed notes. Only propose capabilities supported by this approved organization profile: ${profile.companyProfile}`,
       input: researchPrompt,
       tools: [
         {
           type: "web_search",
-          user_location: { type: "approximate", country: "HR", city: "Zagreb", region: "Zagreb" },
         },
       ],
       tool_choice: "auto",
@@ -538,4 +554,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
