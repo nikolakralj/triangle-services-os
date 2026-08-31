@@ -199,15 +199,18 @@ export type OrderListItem = CommercialOrderRow & {
 export type DeliveryWorkspace = {
   order: CommercialOrderRow;
   requirementTitle: string;
+  buyerRoutes: Array<{ id: string; label: string; status: string }>;
   financial: OrderFinancialSummary;
   reservations: ReservationRow[];
   mobilizations: MobilizationRow[];
   checklist: MobilizationChecklistRow[];
   timesheets: TimesheetRow[];
   invoices: InvoiceRow[];
+  invoicedTimesheetIds: string[];
   payments: PaymentRow[];
   costs: DeliveryCostRow[];
   workers: Array<{ id: string; full_name: string; role: string; availability_status: string }>;
+  documents: Array<{ id: string; title: string; category: string }>;
 };
 
 export type OrderCreationOption = {
@@ -309,9 +312,10 @@ export async function getDeliveryWorkspace(orderId: string, orgId: string): Prom
   const { data: order } = await service.from("commercial_orders").select("*").eq("id", orderId).eq("org_id", orgId).maybeSingle();
   if (!order) return null;
   const typedOrder = order as CommercialOrderRow;
-  const [requirementResult, financialResult, reservationsResult, mobilizationsResult, timesheetsResult, invoicesResult, costsResult, workersResult] =
+  const [requirementResult, routesResult, financialResult, reservationsResult, mobilizationsResult, timesheetsResult, invoicesResult, costsResult, workersResult, documentsResult] =
     await Promise.all([
       service.from("commercial_requirements").select("title").eq("id", typedOrder.requirement_id).eq("org_id", orgId).maybeSingle(),
+      service.from("buyer_routes").select("id,buyer_company,contracting_entity,route_type,route_status").eq("requirement_id", typedOrder.requirement_id).eq("org_id", orgId).in("route_status", ["prequalification", "confirmed", "approved"]),
       service.from("order_financial_summary").select("*").eq("order_id", orderId).eq("org_id", orgId).maybeSingle(),
       service.from("worker_reservations").select("*").eq("order_id", orderId).eq("org_id", orgId).order("start_date"),
       service.from("mobilizations").select("*").eq("order_id", orderId).eq("org_id", orgId).order("planned_start_date"),
@@ -319,6 +323,7 @@ export async function getDeliveryWorkspace(orderId: string, orgId: string): Prom
       service.from("invoices").select("*").eq("order_id", orderId).eq("org_id", orgId).order("issue_date", { ascending: false }),
       service.from("delivery_costs").select("*").eq("order_id", orderId).eq("org_id", orgId).order("cost_date", { ascending: false }),
       service.from("workers").select("id,full_name,role,availability_status").eq("organization_id", orgId).eq("status", "active").order("full_name"),
+      service.from("documents").select("id,title,category").eq("organization_id", orgId).order("title"),
     ]);
 
   const reservations = (reservationsResult.data ?? []) as ReservationRow[];
@@ -328,26 +333,36 @@ export async function getDeliveryWorkspace(orderId: string, orgId: string): Prom
   const workerNames = new Map((workersResult.data ?? []).map((worker) => [worker.id, worker.full_name]));
   const mobilizationIds = mobilizations.map((item) => item.id);
   const invoiceIds = (invoicesResult.data ?? []).map((item) => item.id);
-  const [checklistResult, paymentsResult] = await Promise.all([
+  const [checklistResult, paymentsResult, invoiceTimesheetsResult] = await Promise.all([
     mobilizationIds.length > 0
       ? service.from("mobilization_checklist_items").select("*").eq("org_id", orgId).in("mobilization_id", mobilizationIds).order("label")
       : Promise.resolve({ data: [], error: null }),
     invoiceIds.length > 0
       ? service.from("payments").select("*").eq("org_id", orgId).in("invoice_id", invoiceIds).order("payment_date", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    invoiceIds.length > 0
+      ? service.from("invoice_timesheets").select("timesheet_id").eq("org_id", orgId).in("invoice_id", invoiceIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   return {
     order: typedOrder,
     requirementTitle: requirementResult.data?.title ?? "Unknown requirement",
+    buyerRoutes: (routesResult.data ?? []).map((route) => ({
+      id: route.id,
+      label: route.buyer_company || route.contracting_entity || route.route_type,
+      status: route.route_status,
+    })),
     financial: (financialResult.data as OrderFinancialSummary | null) ?? zeroFinancial(typedOrder),
     reservations: reservations.map((item) => ({ ...item, workerName: workerNames.get(item.worker_id) })),
     mobilizations: mobilizations.map((item) => ({ ...item, workerName: workerNames.get(item.worker_id) })),
     checklist: (checklistResult.data ?? []) as MobilizationChecklistRow[],
     timesheets: timesheets.map((item) => ({ ...item, workerName: workerNames.get(item.worker_id) })),
     invoices: (invoicesResult.data ?? []) as InvoiceRow[],
+    invoicedTimesheetIds: (invoiceTimesheetsResult.data ?? []).map((item) => item.timesheet_id),
     payments: (paymentsResult.data ?? []) as PaymentRow[],
     costs: costs.map((item) => ({ ...item, workerName: item.worker_id ? workerNames.get(item.worker_id) : undefined })),
     workers: workersResult.data ?? [],
+    documents: documentsResult.data ?? [],
   };
 }

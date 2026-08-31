@@ -36,6 +36,25 @@ export async function PATCH(
   if (completed && !["admin", "partner"].includes(access.role)) {
     return NextResponse.json({ error: "Only an admin or partner can confirm a completed action." }, { status: 403 });
   }
+  if (input.buyerRouteId) {
+    const { data: route } = await service
+      .from("buyer_routes")
+      .select("id")
+      .eq("id", input.buyerRouteId)
+      .eq("requirement_id", current.requirement_id)
+      .eq("org_id", access.organizationId)
+      .maybeSingle();
+    if (!route) return NextResponse.json({ error: "Buyer route does not match this requirement." }, { status: 404 });
+  }
+  if (input.projectPackageId) {
+    const { data: projectPackage } = await service
+      .from("project_packages")
+      .select("id")
+      .eq("id", input.projectPackageId)
+      .eq("org_id", access.organizationId)
+      .maybeSingle();
+    if (!projectPackage) return NextResponse.json({ error: "Package not found in this organization." }, { status: 404 });
+  }
   const updates: Record<string, unknown> = { updated_by: access.userId };
   const mapping: Array<[keyof typeof input, string]> = [
     ["buyerRouteId", "buyer_route_id"], ["projectPackageId", "project_package_id"],

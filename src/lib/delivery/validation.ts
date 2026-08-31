@@ -196,6 +196,16 @@ export const costCreateSchema = z.object({
   description: optionalText(2_000),
 });
 
+export const costUpdateSchema = z.object({
+  operation: z.literal("update_cost"),
+  costId: z.string().uuid(),
+  costType: z.enum(["labor","payroll_tax","travel","accommodation","per_diem","ppe_tools","training","insurance","admin","financing","other"]).optional(),
+  costState: z.enum(["forecast","committed","actual"]),
+  costDate: optionalDate,
+  amount: optionalMoney,
+  description: optionalText(2_000),
+});
+
 export const deliveryMutationSchema = z.discriminatedUnion("operation", [
   orderCreateSchema,
   orderUpdateSchema,
@@ -209,5 +219,6 @@ export const deliveryMutationSchema = z.discriminatedUnion("operation", [
   invoiceCreateSchema,
   invoiceUpdateSchema,
   paymentCreateSchema,
+  costUpdateSchema,
   costCreateSchema,
 ]);

@@ -81,7 +81,7 @@ export function DeliveryOrderCreate({ options }: { options: OrderCreationOption[
             </Select>
           </label>
           <label className="text-sm font-medium text-slate-700 xl:col-span-2">Confirmed buyer route
-            <Select className="mt-1" name="buyerRouteId" defaultValue=""><option value="">No route linked</option>
+            <Select key={`route-${requirementId}`} className="mt-1" name="buyerRouteId" defaultValue={selected?.routes[0]?.id ?? ""}><option value="">No route linked (draft only)</option>
               {(selected?.routes ?? []).map((route) => <option key={route.id} value={route.id}>{route.label} [{route.status}]</option>)}
             </Select>
           </label>
@@ -90,12 +90,12 @@ export function DeliveryOrderCreate({ options }: { options: OrderCreationOption[
             <option value="job_order">Job order</option><option value="purchase_order">Purchase order</option><option value="rate_card">Rate card</option>
             <option value="placement_order">Placement order</option><option value="other">Other</option>
           </Select></label>
-          <label className="text-sm font-medium text-slate-700 xl:col-span-3">Title<Input className="mt-1" name="title" required /></label>
+          <label className="text-sm font-medium text-slate-700 xl:col-span-3">Title<Input key={`title-${requirementId}`} className="mt-1" name="title" defaultValue={selected?.title ?? ""} required /></label>
           <label className="text-sm font-medium text-slate-700">External reference<Input className="mt-1" name="externalReference" /></label>
           <label className="text-sm font-medium text-slate-700">Buyer contracting entity<Input className="mt-1" name="buyerContractingEntity" /></label>
           <label className="text-sm font-medium text-slate-700 xl:col-span-2">Your legal entity<Input className="mt-1" name="supplierLegalEntity" /></label>
           <label className="text-sm font-medium text-slate-700 xl:col-span-4">Scope<Textarea className="mt-1" name="scopeSummary" /></label>
-          <label className="text-sm font-medium text-slate-700">Currency<Input className="mt-1" name="currency" defaultValue={selected?.currency ?? "EUR"} maxLength={3} /></label>
+          <label className="text-sm font-medium text-slate-700">Currency<Input key={`currency-${requirementId}`} className="mt-1" name="currency" defaultValue={selected?.currency ?? "EUR"} maxLength={3} /></label>
           <label className="text-sm font-medium text-slate-700">Contract value<Input className="mt-1" name="contractValue" type="number" min={0} step="0.01" /></label>
           <label className="text-sm font-medium text-slate-700">Start<Input className="mt-1" name="startDate" type="date" /></label>
           <label className="text-sm font-medium text-slate-700">End<Input className="mt-1" name="endDate" type="date" /></label>

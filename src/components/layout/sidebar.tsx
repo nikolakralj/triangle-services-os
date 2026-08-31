@@ -38,13 +38,19 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
-    label: "Core Workflow",
+    label: "Demand & Projects",
     items: [
-      { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "NEW" },
-      { href: "/agents", label: "Workforce", icon: Cpu },
-      { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
+      { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "LEADS" },
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
       { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
+      { href: "/companies", label: "Companies", icon: Building2 },
+      { href: "/contacts", label: "Contacts", icon: Users },
+      { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
+    ],
+  },
+  {
+    label: "Contract & Crew",
+    items: [
       { href: "/commercial", label: "Requirements", icon: BriefcaseBusiness },
       { href: "/delivery", label: "Delivery & Margin", icon: Banknote },
       { href: "/workers", label: "Talent Pool", icon: UserRound },
@@ -53,11 +59,10 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Database",
+    label: "AI Workforce",
     items: [
-      { href: "/companies", label: "Companies", icon: Building2 },
-      { href: "/contacts", label: "Contacts", icon: Users },
-      { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
+      { href: "/agents", label: "Workforce", icon: Cpu },
+      { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
     ],
   },
   {

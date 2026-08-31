@@ -52,6 +52,24 @@ export async function PATCH(
   if (CONFIRMED_STATUSES.has(nextStatus) && (!evidenceSummary || !nextAction || !nextActionDueAt)) {
     return NextResponse.json({ error: "A confirmed route requires evidence and a dated next action." }, { status: 409 });
   }
+  if (input.chainNodeId) {
+    const { data: node } = await service
+      .from("contractor_chain_nodes")
+      .select("id")
+      .eq("id", input.chainNodeId)
+      .eq("organization_id", access.organizationId)
+      .maybeSingle();
+    if (!node) return NextResponse.json({ error: "Chain node not found in this organization." }, { status: 404 });
+  }
+  if (input.buyerContactId) {
+    const { data: contact } = await service
+      .from("buyer_contacts")
+      .select("id")
+      .eq("id", input.buyerContactId)
+      .eq("organization_id", access.organizationId)
+      .maybeSingle();
+    if (!contact) return NextResponse.json({ error: "Buyer contact not found in this organization." }, { status: 404 });
+  }
 
   const updates: Record<string, unknown> = { updated_by: access.userId };
   const mapping: Array<[keyof typeof input, string]> = [

@@ -57,6 +57,17 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (!route) return NextResponse.json({ error: "Buyer route not found." }, { status: 404 });
   }
+  if (input.projectPackageId) {
+    const { data: projectPackage } = await service
+      .from("project_packages")
+      .select("id")
+      .eq("id", input.projectPackageId)
+      .eq("org_id", access.organizationId)
+      .maybeSingle();
+    if (!projectPackage) {
+      return NextResponse.json({ error: "Package not found in this organization." }, { status: 404 });
+    }
+  }
 
   const now = new Date().toISOString();
   const { data, error } = await service

@@ -8,6 +8,7 @@ import { Input, Select, Textarea } from "@/components/ui/field";
 import type { MobilizationChecklistRow, MobilizationRow, ReservationRow } from "@/lib/data/delivery";
 
 type WorkerOption = { id: string; full_name: string; role: string; availability_status: string };
+type DocumentOption = { id: string; title: string; category: string };
 
 async function mutate(body: Record<string, unknown>) {
   const response = await fetch("/api/delivery", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -18,12 +19,17 @@ async function mutate(body: Record<string, unknown>) {
 function iso(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim(); return text ? new Date(text).toISOString() : undefined;
 }
+function local(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
 
 export function DeliveryCrewPanel({
-  orderId, currency, reservations, mobilizations, checklist, workers,
+  orderId, reservations, mobilizations, checklist, workers, documents,
 }: {
-  orderId: string; currency: string; reservations: ReservationRow[]; mobilizations: MobilizationRow[];
-  checklist: MobilizationChecklistRow[]; workers: WorkerOption[];
+  orderId: string; reservations: ReservationRow[]; mobilizations: MobilizationRow[];
+  checklist: MobilizationChecklistRow[]; workers: WorkerOption[]; documents: DocumentOption[];
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -88,7 +94,7 @@ export function DeliveryCrewPanel({
           <form key={reservation.id} className="grid gap-2 rounded-md border border-slate-200 p-3 lg:grid-cols-[1fr_180px_1fr_auto] lg:items-end" onSubmit={(event) => {
             event.preventDefault(); const form = new FormData(event.currentTarget); run({ operation: "update_reservation", reservationId: reservation.id, status: form.get("status"), confirmationSource: form.get("confirmationSource"), notes: reservation.notes ?? undefined });
           }}>
-            <div><p className="font-medium text-slate-900">{reservation.workerName}</p><p className="text-xs text-slate-500">{reservation.start_date}–{reservation.end_date} · {currency}</p></div>
+            <div><p className="font-medium text-slate-900">{reservation.workerName}</p><p className="text-xs text-slate-500">{reservation.start_date}–{reservation.end_date} · {reservation.confirmation_source || "confirmation not recorded"}</p></div>
             <label className="text-xs font-medium text-slate-600">Status<Select className="mt-1" name="status" defaultValue={reservation.status}><option value="hold">Hold</option><option value="reserved">Reserved</option><option value="confirmed">Confirmed</option><option value="released">Released</option><option value="cancelled">Cancelled</option></Select></label>
             <label className="text-xs font-medium text-slate-600">Confirmation source<Input className="mt-1" name="confirmationSource" defaultValue={reservation.confirmation_source ?? ""} /></label>
             <Button disabled={saving}>Update</Button>
@@ -104,20 +110,26 @@ export function DeliveryCrewPanel({
           return (
             <div key={mobilization.id} className="rounded-md border border-slate-200 p-3">
               <div className="flex flex-wrap items-center gap-2"><p className="font-medium text-slate-900">{mobilization.workerName}</p><Badge>{mobilization.status}</Badge><span className="text-xs text-slate-500">start {mobilization.planned_start_date}</span></div>
-              <form className="mt-3 grid gap-2 lg:grid-cols-[180px_1fr_1fr_auto] lg:items-end" onSubmit={(event) => {
-                event.preventDefault(); const form = new FormData(event.currentTarget); run({ operation: "update_mobilization", mobilizationId: mobilization.id, status: form.get("status"), blockerSummary: form.get("blockerSummary"), nextAction: form.get("nextAction"), nextActionDueAt: iso(form.get("nextActionDueAt")) });
+              <form className="mt-3 grid gap-2 lg:grid-cols-3 xl:grid-cols-7 xl:items-end" onSubmit={(event) => {
+                event.preventDefault(); const form = new FormData(event.currentTarget); run({ operation: "update_mobilization", mobilizationId: mobilization.id, status: form.get("status"), blockerSummary: form.get("blockerSummary"), actualStartAt: iso(form.get("actualStartAt")), actualEndAt: iso(form.get("actualEndAt")), nextAction: form.get("nextAction"), nextActionDueAt: iso(form.get("nextActionDueAt")) });
               }}>
                 <label className="text-xs font-medium text-slate-600">State<Select className="mt-1" name="status" defaultValue={mobilization.status}><option value="planned">Planned</option><option value="blocked">Blocked</option><option value="ready">Ready</option><option value="mobilized">Mobilized</option><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></Select></label>
                 <label className="text-xs font-medium text-slate-600">Blocker<Input className="mt-1" name="blockerSummary" defaultValue={mobilization.blocker_summary ?? ""} /></label>
+                <label className="text-xs font-medium text-slate-600">Actual start<Input className="mt-1" name="actualStartAt" type="datetime-local" defaultValue={local(mobilization.actual_start_at)} /></label>
+                <label className="text-xs font-medium text-slate-600">Actual end<Input className="mt-1" name="actualEndAt" type="datetime-local" defaultValue={local(mobilization.actual_end_at)} /></label>
                 <label className="text-xs font-medium text-slate-600">Next action<Input className="mt-1" name="nextAction" defaultValue={mobilization.next_action ?? ""} /></label>
+                <label className="text-xs font-medium text-slate-600">Next due<Input className="mt-1" name="nextActionDueAt" type="datetime-local" defaultValue={local(mobilization.next_action_due_at)} /></label>
                 <Button disabled={saving}>Update state</Button>
               </form>
               <div className="mt-3 grid gap-2 md:grid-cols-2">
                 {items.map((item) => (
-                  <form key={item.id} className="grid grid-cols-[1fr_140px_auto] items-end gap-2 rounded bg-slate-50 p-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); run({ operation: "update_mobilization_checklist", checklistItemId: item.id, status: form.get("status"), notes: item.notes ?? undefined }); }}>
-                    <p className="text-xs font-medium text-slate-700">{item.label}</p>
-                    <Select name="status" defaultValue={item.status}><option value="missing">Missing</option><option value="in_progress">In progress</option><option value="ready">Ready</option><option value="not_required">Not required</option><option value="blocked">Blocked</option></Select>
-                    <Button disabled={saving}>Save</Button>
+                  <form key={item.id} className="grid gap-2 rounded bg-slate-50 p-2 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); run({ operation: "update_mobilization_checklist", checklistItemId: item.id, status: form.get("status"), evidenceDocumentId: form.get("evidenceDocumentId") || undefined, notes: form.get("notes"), dueAt: iso(form.get("dueAt")) }); }}>
+                    <p className="text-xs font-semibold text-slate-700 sm:col-span-2">{item.label}</p>
+                    <label className="text-xs font-medium text-slate-600">State<Select className="mt-1" name="status" defaultValue={item.status}><option value="missing">Missing</option><option value="in_progress">In progress</option><option value="ready">Ready</option><option value="not_required">Not required</option><option value="blocked">Blocked</option></Select></label>
+                    <label className="text-xs font-medium text-slate-600">Evidence<Select className="mt-1" name="evidenceDocumentId" defaultValue={item.evidence_document_id ?? ""}><option value="">No linked document</option>{documents.map((document) => <option key={document.id} value={document.id}>{document.title} [{document.category}]</option>)}</Select></label>
+                    <label className="text-xs font-medium text-slate-600">Due<Input className="mt-1" name="dueAt" type="datetime-local" defaultValue={local(item.due_at)} /></label>
+                    <label className="text-xs font-medium text-slate-600">Notes<Input className="mt-1" name="notes" defaultValue={item.notes ?? ""} /></label>
+                    <Button className="sm:col-span-2" disabled={saving}>Save readiness item</Button>
                   </form>
                 ))}
               </div>

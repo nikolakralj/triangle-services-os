@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Textarea } from "@/components/ui/field";
-import type { CommercialOrderRow } from "@/lib/data/delivery";
+import type { CommercialOrderRow, DeliveryWorkspace } from "@/lib/data/delivery";
 
 function number(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
@@ -20,7 +20,13 @@ function local(value: string | null) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-export function DeliveryOrderEditor({ order }: { order: CommercialOrderRow }) {
+export function DeliveryOrderEditor({
+  order,
+  buyerRoutes,
+}: {
+  order: CommercialOrderRow;
+  buyerRoutes: DeliveryWorkspace["buyerRoutes"];
+}) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -35,7 +41,7 @@ export function DeliveryOrderEditor({ order }: { order: CommercialOrderRow }) {
     const body = {
       operation: "update_order",
       orderId: order.id,
-      status: value("status"), orderType: value("orderType"), title: value("title"),
+      status: value("status"), buyerRouteId: value("buyerRouteId"), orderType: value("orderType"), title: value("title"),
       externalReference: value("externalReference"), buyerContractingEntity: value("buyerContractingEntity"),
       supplierLegalEntity: value("supplierLegalEntity"), scopeSummary: value("scopeSummary"),
       currency: value("currency"), contractValue: number(form.get("contractValue")),
@@ -61,7 +67,7 @@ export function DeliveryOrderEditor({ order }: { order: CommercialOrderRow }) {
   return (
     <form className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4" onSubmit={save}>
       <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 xl:col-span-4">
-        Signed/active requires a qualified requirement, external reference, both legal entities, start date, payment terms, rate terms, explicit signed time, and human approval.
+        Signed/active requires a qualified requirement, its confirmed buyer route, external reference, both legal entities, start date, payment terms, rate terms, explicit signed time, and human approval.
       </p>
       <label className="text-sm font-medium text-slate-700">Status<Select className="mt-1" name="status" defaultValue={order.status}>
         <option value="draft">Draft</option><option value="under_review">Under review</option><option value="signed">Signed</option>
@@ -71,7 +77,11 @@ export function DeliveryOrderEditor({ order }: { order: CommercialOrderRow }) {
         <option value="nda">NDA</option><option value="msa">MSA</option><option value="framework">Framework</option><option value="sow">Statement of work</option>
         <option value="job_order">Job order</option><option value="purchase_order">Purchase order</option><option value="rate_card">Rate card</option><option value="placement_order">Placement order</option><option value="other">Other</option>
       </Select></label>
-      <label className="text-sm font-medium text-slate-700 xl:col-span-2">Title<Input className="mt-1" name="title" defaultValue={order.title} required /></label>
+      <label className="text-sm font-medium text-slate-700 xl:col-span-2">Confirmed buyer route<Select className="mt-1" name="buyerRouteId" defaultValue={order.buyer_route_id ?? ""}>
+        <option value="">No route linked (draft only)</option>
+        {buyerRoutes.map((route) => <option key={route.id} value={route.id}>{route.label} [{route.status}]</option>)}
+      </Select></label>
+      <label className="text-sm font-medium text-slate-700 xl:col-span-4">Title<Input className="mt-1" name="title" defaultValue={order.title} required /></label>
       <label className="text-sm font-medium text-slate-700">External reference<Input className="mt-1" name="externalReference" defaultValue={order.external_reference ?? ""} /></label>
       <label className="text-sm font-medium text-slate-700">Buyer entity<Input className="mt-1" name="buyerContractingEntity" defaultValue={order.buyer_contracting_entity ?? ""} /></label>
       <label className="text-sm font-medium text-slate-700 xl:col-span-2">Supplier legal entity<Input className="mt-1" name="supplierLegalEntity" defaultValue={order.supplier_legal_entity ?? ""} /></label>

@@ -460,31 +460,40 @@ function PackageSection({
 
   return (
     <Card>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-3 border-b border-slate-100 p-4 text-left"
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <div className="min-w-0">
+      <div className="flex w-full items-center gap-3 border-b border-slate-100 p-4">
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          aria-expanded={open}
+          onClick={() => setOpen((prev) => !prev)}
+        >
           <h3 className="text-sm font-semibold text-slate-950">{pkg.title}</h3>
           <p className="mt-0.5 text-xs text-slate-500">
             {pkg.roles.length > 0 ? pkg.roles.join(", ") : "No roles defined"}
             {pkg.estimatedCrewSize !== null ? ` · Crew: ${pkg.estimatedCrewSize}` : ""}
           </p>
-        </div>
+        </button>
         <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="secondary"
             className="h-8 px-3 text-xs"
             disabled={finding}
-            onClick={(e) => { e.stopPropagation(); void findWorkers(); }}
+            onClick={() => void findWorkers()}
           >
             {finding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
             Find workers
           </Button>
-          {open ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+          <button
+            type="button"
+            aria-label={open ? "Collapse package" : "Expand package"}
+            aria-expanded={open}
+            className="rounded p-1 text-slate-400 hover:bg-slate-100"
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
         </div>
-      </button>
+      </div>
 
       {findError && (
         <div className="flex items-center gap-2 border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700">
