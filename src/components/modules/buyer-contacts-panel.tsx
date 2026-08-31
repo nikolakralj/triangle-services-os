@@ -1,0 +1,235 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  Check,
+  Link2,
+  Loader2,
+  Mail,
+  Pencil,
+  Phone,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+// ---------------------------------------------------------------------------
+// The people who can actually buy.
+//
+// These records existed and were never shown. Peter Östlund — named
+// Geschäftsführer of the company buying the labour on a 110 kV cable route —
+// sat in the database populating a dropdown, and there was no screen on which
+// you could see him, notice he had no address, or add one after finding it.
+//
+// Reachability is the headline here rather than a detail, because it is the
+// single thing standing between research and a conversation.
+// ---------------------------------------------------------------------------
+
+export interface BuyerContactRow {
+  id: string;
+  fullName: string;
+  jobTitle: string | null;
+  companyName: string | null;
+  email: string | null;
+  linkedinUrl: string | null;
+  buyerRole: string | null;
+  notes: string | null;
+}
+
+export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }) {
+  const router = useRouter();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (contacts.length === 0) {
+    return (
+      <p className="text-xs text-slate-500">
+        No buyer contact yet. Map the contractor chain, find who controls the
+        package, then accept a buyer contact from Approvals.
+      </p>
+    );
+  }
+
+  function startEdit(c: BuyerContactRow) {
+    setEditingId(c.id);
+    setEmail(c.email ?? "");
+    setLinkedin(c.linkedinUrl ?? "");
+    setPhone("");
+    setError(null);
+  }
+
+  async function save(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/research/buyer-contacts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          linkedinUrl: linkedin,
+          ...(phone.trim() ? { phone } : {}),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Could not save that.");
+        return;
+      }
+      setEditingId(null);
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const reachableCount = contacts.filter(
+    (c) => c.email || c.linkedinUrl || /Phone:/.test(c.notes ?? ""),
+  ).length;
+
+  return (
+    <div className="space-y-2">
+      {reachableCount < contacts.length && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {contacts.length - reachableCount} of {contacts.length} have no way to
+          reach them. Research can name the right person but cannot find an
+          unpublished address — try the company&apos;s Impressum or legal notice,
+          or call the switchboard and ask who handles the package.
+        </p>
+      )}
+
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {contacts.map((c) => {
+          const phoneNote = (c.notes ?? "").match(/Phone:\s*(.+)/)?.[1];
+          const reachable = Boolean(c.email || c.linkedinUrl || phoneNote);
+          const editing = editingId === c.id;
+
+          return (
+            <div key={c.id} className="p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-950">{c.fullName}</p>
+                  <p className="text-xs text-slate-600">
+                    {[c.jobTitle, c.companyName].filter(Boolean).join(" · ")}
+                  </p>
+                  {c.buyerRole && (
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                      {c.buyerRole}
+                    </p>
+                  )}
+                </div>
+                {!editing && (
+                  <Button
+                    variant="ghost"
+                    className="h-7 shrink-0 px-2 text-xs"
+                    onClick={() => startEdit(c)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    {reachable ? "Edit" : "Add contact details"}
+                  </Button>
+                )}
+              </div>
+
+              {!editing && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {c.email ? (
+                    <a
+                      href={`mailto:${c.email}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-900"
+                    >
+                      <Mail className="h-3 w-3" />
+                      {c.email}
+                    </a>
+                  ) : null}
+                  {phoneNote && (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-600">
+                      <Phone className="h-3 w-3" />
+                      {phoneNote}
+                    </span>
+                  )}
+                  {c.linkedinUrl && (
+                    <a
+                      href={c.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-900"
+                    >
+                      <Link2 className="h-3 w-3" />
+                      LinkedIn
+                    </a>
+                  )}
+                  {!reachable && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                      <AlertCircle className="h-3 w-3" />
+                      No way to reach them
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {editing && (
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    type="email"
+                    className="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Phone (added to notes)"
+                    className="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <input
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    placeholder="https://www.linkedin.com/in/…"
+                    className="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="primary"
+                      className="h-7 px-2.5 text-xs"
+                      disabled={busy}
+                      onClick={() => void save(c.id)}
+                    >
+                      {busy ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                      Save
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      disabled={busy}
+                      onClick={() => setEditingId(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {error && (
+                    <p className="flex items-start gap-1 text-xs text-rose-600">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      {error}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

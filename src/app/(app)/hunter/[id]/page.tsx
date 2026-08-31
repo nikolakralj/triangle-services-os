@@ -33,6 +33,7 @@ import { ResearchSuggestionsPanel } from "@/components/modules/research-suggesti
 import { ResearchChatPanel } from "@/components/modules/research-chat-panel";
 import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel";
 import { OutreachComposer } from "@/components/modules/outreach-composer";
+import { BuyerContactsPanel } from "@/components/modules/buyer-contacts-panel";
 import { WorkerMatchPanel } from "@/components/modules/worker-match-panel";
 import { ProjectNotesPanel } from "@/components/modules/project-notes-panel";
 import { PersistedCollapsible } from "@/components/modules/persisted-collapsible";
@@ -265,6 +266,26 @@ export default async function DiscoveredProjectDetailPage({
                 estimatedCrewSize: p.estimated_crew_size ?? null,
               }))}
             initialMatches={initialMatchesMap}
+          />
+        </PersistedCollapsible>
+
+        <PersistedCollapsible
+          storageKey={`hunter:${project.id}:buyers`}
+          title="Buyer Contacts"
+          description="Who can actually buy, and whether you can reach them."
+          defaultOpen
+        >
+          <BuyerContactsPanel
+            contacts={buyerContacts.map((c) => ({
+              id: c.id,
+              fullName: c.full_name ?? "Unnamed",
+              jobTitle: c.job_title ?? null,
+              companyName: c.company_name ?? null,
+              email: c.email ?? null,
+              linkedinUrl: c.linkedin_url ?? null,
+              buyerRole: c.buyer_role ?? null,
+              notes: c.notes ?? null,
+            }))}
           />
         </PersistedCollapsible>
 
