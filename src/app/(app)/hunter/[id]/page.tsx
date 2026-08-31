@@ -32,6 +32,7 @@ import { ContractorChainPanel } from "@/components/modules/contractor-chain-pane
 import { ResearchSuggestionsPanel } from "@/components/modules/research-suggestions-panel";
 import { ResearchChatPanel } from "@/components/modules/research-chat-panel";
 import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel";
+import { OutreachComposer } from "@/components/modules/outreach-composer";
 import { WorkerMatchPanel } from "@/components/modules/worker-match-panel";
 import { ProjectNotesPanel } from "@/components/modules/project-notes-panel";
 import { PersistedCollapsible } from "@/components/modules/persisted-collapsible";
@@ -272,6 +273,22 @@ export default async function DiscoveredProjectDetailPage({
           title="Outreach"
           description="AI-drafted messages. Never auto-sent — you copy, send, and mark sent here."
         >
+          {/* Creating the first message was the one step missing: the panel
+              below could only manage drafts that already existed. */}
+          <div className="mb-3">
+            <OutreachComposer
+              projectId={project.id}
+              buyers={Object.entries(buyersById).map(([key, b]) => ({
+                key,
+                contactId: b.contactId ?? null,
+                suggestionId: b.suggestionId ?? null,
+                name: b.name,
+                company: b.company,
+                title: b.title ?? null,
+              }))}
+              packages={Object.values(packagesById)}
+            />
+          </div>
           <OutreachDraftsPanel
             drafts={outreachDrafts}
             buyersById={buyersById}
