@@ -28,14 +28,19 @@ completed without a recipient, the final content and a named human; a worker
 cannot hold two overlapping reservations. Verified by attempting each and being
 refused.
 
-**Known false or unfinished:**
-- migration 031 unapplied, so cross-tenant foreign-key checks are not live;
-- the in-app project research panel runs gpt-4.1-mini and returns poor results
-  (it answered a German project with builders in Dartford and California);
-  Scout on Grok does the same job well and costs a flat fee;
-- the vendor document checklist page renders a real table now, but its buttons
-  ("generate AI draft", "mark approved") are not wired;
-- Metrics has two hardcoded zero stat cards (RFQs received, Offers sent).
+**All four items previously listed here as false are now closed:**
+- migration 031 applied 31 August 2026; cross-tenant links are refused —
+  verified by linking a requirement to another tenant's project and being told
+  "Discovered project belongs to another organization";
+- the research panel now uses OPENAI_RESEARCH_MODEL (default gpt-4.1) instead
+  of the cheap global default, and is instructed to reject business-directory
+  and map-listing results rather than repeating them;
+- the vendor checklist buttons WERE already wired — that note was wrong. The
+  status control calls PATCH /api/documents/checklist/[id], which returns 401
+  unauthenticated;
+- the two hardcoded Metrics zeros are replaced by counts from
+  commercial_requirements and commercial_actions. They still read zero, but
+  now because nothing has been sent rather than because nothing was wired.
 
 ## Current product direction — updated 30 August 2026
 

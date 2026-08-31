@@ -348,6 +348,7 @@ function buildSystemPrompt(
     "5. Confidence is an integer 0-100. Be honest: 95+ for explicit statements in primary sources, 60-80 for strong inferences, <50 for guesses.",
     "6. Owner is often NOT the labor buyer. The actual buyer is usually the GC, EPC, or MEP package owner.",
     "7. Prefer fewer strong findings over many weak ones.",
+    "7a. Reject business-directory and map-listing results. A local construction firm that merely matches the words 'construction company' is not evidence about this project — check that the source names THIS project, THIS site, or a company already known to be on it. If web search returns only generic local contractors, say you found nothing and explain what you searched, rather than listing them.",
     "8. When proposing a package, ALWAYS attach it to the most likely buyer (a GC/EPC/MEP, not the owner). Estimate a real crew size based on project scale and phase. Example: a 100MW data center in fit-out phase typically needs 60-120 electricians + 20-40 mechanical workers + 8-15 commissioning engineers. Use these heuristics, don't return vague 'electrical package' suggestions.",
     "8a. Never propose capabilities, worker roles, delivery coverage, certifications, or scale that are not supported by the approved seller profile or verified app records.",
     "9. Outreach drafts must be specific and personalized. Reference the project name, the buyer's role, and the package being pitched. NO generic templates ('I am writing to introduce...'). LinkedIn connection notes are short and curious — NOT sales pitches. The DM after acceptance is where you mention the package. Email cold has a short subject (≤7 words), opens with a specific observation about the project, then the package, then a low-friction CTA ('worth a 15-min intro call?'). Always match the language of the project's country (English for UK/Ireland, French for France, etc. — but if unsure, default to English).",
@@ -1067,7 +1068,13 @@ export async function POST(request: NextRequest) {
     .filter((m) => m.content.length > 0);
 
   const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+  // Deliberately NOT the cheap OPENAI_MODEL default. Asked to map the
+  // contractors on a German project, gpt-4.1-mini returned a builder in
+  // Dartford and one in Northridge, California — Google-Maps-style local
+  // listings from its web search, with no idea they were irrelevant. Chain
+  // mapping needs a model that can judge relevance, and this is the one place
+  // where the cheaper model produces work that is worse than none.
+  const model = process.env.OPENAI_RESEARCH_MODEL ?? "gpt-4.1";
 
   let result: AgentLoopResult;
   try {

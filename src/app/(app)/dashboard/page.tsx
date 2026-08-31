@@ -28,6 +28,7 @@ import {
   rowToTask,
 } from "@/lib/data/tasks";
 import { listActivities, rowToActivity } from "@/lib/data/activities";
+import { getCommercialStats } from "@/lib/data/commercial-stats";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
     overdueTaskRows,
     dueThisWeekTaskRows,
     activityRows,
+    commercial,
   ] = await Promise.all([
     listCompanies(session.organizationId),
     listOpportunities(session.organizationId),
@@ -56,6 +58,7 @@ export default async function DashboardPage() {
     getOverdueTasks(session.organizationId),
     getTasksDueThisWeek(session.organizationId),
     listActivities(session.organizationId, 10),
+    getCommercialStats(session.organizationId),
   ]);
 
   // Convert database rows to UI types
@@ -111,18 +114,22 @@ export default async function DashboardPage() {
           tone="amber"
         />
         <StatCard
-          label="RFQs received"
-          value="0"
-          helper="No formal RFQ yet"
+          label="Qualified requirements"
+          value={commercial.qualifiedRequirements}
+          helper="Passed the full qualification gate"
           icon={<FileWarning className="h-5 w-5" />}
           tone="slate"
         />
         <StatCard
-          label="Offers sent"
-          value="0"
-          helper="Proposal module is ready next"
+          label="Outreach sent"
+          value={commercial.outreachSent}
+          helper={
+            commercial.awaitingReply > 0
+              ? `${commercial.awaitingReply} overdue a follow-up`
+              : "Confirmed by a human, with the sent content"
+          }
           icon={<CheckCircle2 className="h-5 w-5" />}
-          tone="slate"
+          tone={commercial.awaitingReply > 0 ? "amber" : "slate"}
         />
         <StatCard
           label="Overdue follow-ups"
