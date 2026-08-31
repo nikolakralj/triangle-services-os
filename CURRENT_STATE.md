@@ -5,6 +5,38 @@
 This file is the honest status report for the repo.
 It should tell a future agent what is real, what is partial, and what still needs cleanup.
 
+## Verified state — 31 August 2026
+
+Checked against the running app and the database, not from memory.
+
+**Schema:** migrations 001-030 applied. 031 (cross-tenant integrity, billing
+correctness) is written and committed but NOT applied.
+
+**Live counts:** 3 workers · 18 discovered projects · 166 companies · 4 buyer
+contacts, none with an email, phone or LinkedIn · 2 packages · 1 outreach draft
+waiting to send · 0 sends · 0 packets · 0 orders · 0 placements.
+
+**Working end to end:** job intake and reply drafting, Scout research through
+the MCP with approvals, contractor chain, packages, worker matching, CV import,
+CSV roster import, worker profiles and notes, assignment threads, hiring an AI
+employee, compliance documents with expiry, and — as of today — drafting a
+first approach to a named buyer from a project.
+
+**Enforced in Postgres, not in the UI:** a requirement cannot reach qualified
+without eleven facts and a confirmed buyer route; a commercial action cannot be
+completed without a recipient, the final content and a named human; a worker
+cannot hold two overlapping reservations. Verified by attempting each and being
+refused.
+
+**Known false or unfinished:**
+- migration 031 unapplied, so cross-tenant foreign-key checks are not live;
+- the in-app project research panel runs gpt-4.1-mini and returns poor results
+  (it answered a German project with builders in Dartford and California);
+  Scout on Grok does the same job well and costs a flat fee;
+- the vendor document checklist page renders a real table now, but its buttons
+  ("generate AI draft", "mark approved") are not wired;
+- Metrics has two hardcoded zero stat cards (RFQs received, Offers sent).
+
 ## Current product direction — updated 30 August 2026
 
 Triangle is a human-led, AI-assisted contract-to-crew operating system for

@@ -47,7 +47,7 @@ requires founder/customer interaction; agents may prepare assets and research.
 
 ### PZ-001 — Tenant operating profile
 
-**Status:** DONE (repository, 30 August 2026; production migration pending)  
+**Status:** DONE (repository 30 August 2026; migration 027 applied 31 August 2026)  
 **Gate:** user explicitly requires a sellable multi-tenant product.  
 **Problem:** intake and reply prompts contain Triangle/Nikola identity, making
 external use unsafe.
@@ -73,7 +73,7 @@ an authorized post-migration smoke test.
 
 ### PZ-002 — Commercial identity leakage audit
 
-**Status:** DONE (repository, 31 August 2026; production migrations pending)  
+**Status:** DONE (repository 31 August 2026; migrations 028-030 applied 31 August 2026; 031 pending)  
 **Gate:** PZ-001 `DONE`.
 
 **Problem:** research, general AI generation, imports, packets, metadata, and
@@ -95,7 +95,7 @@ and focused ESLint pass.
 
 ### PZ-003 — Tenant readiness and onboarding specification
 
-**Status:** DONE (repository, 31 August 2026; signed-in smoke test pending migrations)  
+**Status:** DONE (repository 31 August 2026; verified signed-in after migrations — /onboarding reports 8 of 9 gates)  
 **Gate:** PZ-002 `DONE`.
 
 **Scope:** produce and implement the smallest onboarding readiness check:
@@ -124,7 +124,9 @@ unsupported capacity claims.
 
 ### CORE-002 — Common qualified requirement
 
-**Status:** GATED  
+**Status:** BUILT AHEAD OF GATE (schema and UI shipped 31 August 2026; commercial_requirements). The evidence gate below was never met — it was overridden by an explicit instruction to produce a working product first. Treat the implementation as untested against real commercial use until the gate evidence exists.
+
+**Original status:** GATED  
 **Gate:** one truthful package plus at least three real buyer/recruiter
 conversations exposing qualification fields.
 
@@ -135,7 +137,9 @@ and qualification decision.
 
 ### CORE-003 — Buyer and supplier route
 
-**Status:** GATED  
+**Status:** BUILT AHEAD OF GATE (schema and UI shipped 31 August 2026; buyer_routes). The evidence gate below was never met — it was overridden by an explicit instruction to produce a working product first. Treat the implementation as untested against real commercial use until the gate evidence exists.
+
+**Original status:** GATED  
 **Gate:** one real supplier registration, framework, recruiter route, or direct
 buyer conversation.
 
@@ -145,7 +149,9 @@ evidence, next action, and deadline.
 
 ### CORE-004 — Commercial action ledger
 
-**Status:** GATED  
+**Status:** BUILT AHEAD OF GATE (schema and UI shipped 31 August 2026; commercial_actions, plus outreach drafting from a buyer contact). The evidence gate below was never met — it was overridden by an explicit instruction to produce a working product first. Treat the implementation as untested against real commercial use until the gate evidence exists.
+
+**Original status:** GATED  
 **Gate:** five real human-approved sends and one packet send are recorded.
 
 **Scope:** one history for draft, final sent content, channel, sender,
@@ -153,7 +159,9 @@ recipient, time, follow-up, response, objection, next action, and outcome.
 
 ### CORE-005 — Contract, mobilization, and margin
 
-**Status:** GATED  
+**Status:** BUILT AHEAD OF GATE (schema and UI shipped 31 August 2026; commercial_orders, worker_reservations, mobilizations, mobilization_checklist_items, timesheets, invoices, invoice_timesheets, payments, delivery_costs, order_financial_summary). The evidence gate below was never met — it was overridden by an explicit instruction to produce a working product first. Treat the implementation as untested against real commercial use until the gate evidence exists.
+
+**Original status:** GATED  
 **Gate:** concrete job order, PO, signed supplier route, or equivalent.
 
 **Scope:** agreement/order truth, reservation conflicts, document/site/country
@@ -216,9 +224,14 @@ hypothesis, data responsibilities, support, and exit/export terms.
 
 ## Product evidence board
 
+Verified against the database on 31 August 2026, not from memory.
+
 | Evidence | Current | Needed next | Owner |
 |---|---:|---:|---|
-| Truthful initial packages | unconfirmed | 1 | Triangle human |
+| Truthful initial packages | 2 recorded, neither confirmed against a real roster | 1 confirmed | Triangle human |
+| Workers in the pool | 3 | enough to staff one package | Triangle human |
+| Buyer contacts with a reachable address | 0 of 4 | 1 | Triangle human |
+| Outreach drafted and waiting to send | 1 (Peter Östlund, JSM, Nauen cable route) | — | — |
 | Recorded relevant sends | 0 | 5 | Triangle human |
 | Recorded packet sends | 0 | 1 | Triangle human |
 | Buyer/procurement conversations requested | 0 proven | 3 | Triangle human |
@@ -230,3 +243,22 @@ hypothesis, data responsibilities, support, and exit/export terms.
 
 Update only from evidence. Link the source/date in the relevant strategy or
 commercial record; do not change counts from memory.
+
+## Where Product Track B stands — 31 August 2026
+
+Track B has no `READY` item left. PZ-001 through PZ-003 are done and their
+migrations are applied; CORE-002 through CORE-005 were built ahead of their
+gates; everything remaining is `GATED` or `BLOCKED_EXTERNAL` on evidence only a
+human can produce.
+
+Per the execution rule, a software agent should now stop selecting work and
+say so rather than inventing it. The bottleneck is not code. It is:
+
+- **3 workers** in the pool, so no package can be honestly staffed (CORE-001);
+- **0 of 4 buyer contacts have an email, phone or LinkedIn**, so the drafted
+  approach to Peter Östlund cannot be sent;
+- **0 recorded sends**, so no gate downstream of Phase 0 can open.
+
+The two `READY` items are both Customer Track C (GTM-001 target list, GTM-002
+interview kit) and were explicitly deprioritised by the user on 30 August in
+favour of finishing the product.
