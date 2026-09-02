@@ -194,7 +194,7 @@ evidence for human review. No external action occurred.
 
 ### CASE-003 — Cross-entity living cases
 
-**Status:** READY
+**Status:** DONE (2026-09-02)
 **Gate:** CASE-002 is used on real company cases and confirms the common
 information/interaction pattern.
 
@@ -206,6 +206,27 @@ the default business page remains a short decision report.
 qualified requirements, and crew packages using existing canonical tables and
 conversation stores. Do not create a generic CRM entity or parallel truth
 database.
+
+**What shipped:** one parameterised loader (`getEntityCase`) covering company,
+project, worker, buyer contact, package and requirement. The work was not four
+new panels — it was teaching the loader that Triangle has **two** proposal
+systems. Findings record `promoted_entity_id`; suggestions record
+`final_record_id`. Every buyer contact and every package in the database
+arrived through the second one, so the original loader reported all of them as
+having no case at all.
+
+- Buyer contacts on the project page now carry the quoted evidence, the
+  employee who found them, confidence, and the source — Östlund shows Scout's
+  Impressum line rather than a bare name in a list.
+- Package cards carry the same, so an accepted package shows what it was
+  accepted on.
+- A requirement inherits: nobody proposes a requirement, so its case is the
+  project it came from plus that project's buyer contacts and packages.
+  `getRequirementResearchCase` returns `{snapshot, inherited}` and the page
+  says which it is showing.
+- `loadAgentFaces` (`src/lib/data/agent-identity.ts`) resolves both an
+  instance id and a credential name to the same employee, so one person cannot
+  appear under two names across screens. The approvals queue now shares it.
 
 ### CASE-004 — Agent handoffs and safe continuation policy
 

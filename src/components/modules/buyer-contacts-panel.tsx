@@ -10,6 +10,7 @@ import {
   Mail,
   Pencil,
   Phone,
+  Quote,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,20 @@ import { Button } from "@/components/ui/button";
 // single thing standing between research and a conversation.
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a contact came from. Shaped here rather than imported so this client
+ * component never pulls in a server-only module — the case loader's own type
+ * lives behind `import "server-only"`.
+ */
+export interface ContactProvenance {
+  id: string;
+  sourceUrl: string | null;
+  evidenceText: string | null;
+  confidence: number | null;
+  foundByName: string | null;
+  foundByEmoji: string | null;
+}
+
 export interface BuyerContactRow {
   id: string;
   fullName: string;
@@ -35,6 +50,12 @@ export interface BuyerContactRow {
   linkedinUrl: string | null;
   buyerRole: string | null;
   notes: string | null;
+  /**
+   * The case behind this person. Before this existed, a name could be edited
+   * or deleted with no way to see who put it there or on what evidence —
+   * exactly how Östlund's sourced note got overwritten once already.
+   */
+  provenance: ContactProvenance[];
 }
 
 export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }) {
@@ -171,6 +192,39 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
                       No way to reach them
                     </span>
                   )}
+                </div>
+              )}
+
+              {!editing && c.provenance.length > 0 && (
+                <div className="mt-2 space-y-1.5 border-l-2 border-slate-200 pl-2.5">
+                  {c.provenance.map((p) => (
+                    <div key={p.id}>
+                      {p.evidenceText && (
+                        <p className="flex gap-1 text-[11px] leading-relaxed text-slate-500">
+                          <Quote className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                          <span className="line-clamp-3">{p.evidenceText}</span>
+                        </p>
+                      )}
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400">
+                        {p.foundByName && (
+                          <span>
+                            {p.foundByEmoji ?? "AI"} Found by {p.foundByName}
+                          </span>
+                        )}
+                        {p.confidence !== null && <span>{p.confidence}% sure</span>}
+                        {p.sourceUrl && (
+                          <a
+                            href={p.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-sky-700 hover:text-sky-900"
+                          >
+                            Source
+                          </a>
+                        )}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
 

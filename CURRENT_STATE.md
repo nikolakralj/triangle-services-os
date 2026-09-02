@@ -57,6 +57,37 @@ supplier-portal URL while worker detail remains collapsed. No framework
 overlay or application console error was present. No outreach, supplier
 registration, or external action was performed.
 
+### Repository implementation — cases on every record (CASE-003)
+
+The company case proved a record is more useful when it carries its own
+history. Extending that to the other entities turned out not to be a UI job:
+Triangle records proposals in **two** places, and the loader only knew one.
+`agent_findings` stamps `promoted_entity_id` on accept; `research_suggestions`
+stamps `final_record_id`. All four buyer contacts and all three crew packages
+in the live database came through the second path, so every one of them
+reported an empty case.
+
+- `getEntityCase` now reads both, and `CASE_ENTITIES` covers company, project,
+  worker, buyer contact, package and requirement. One loader, six entities,
+  no duplicate truth tables.
+- Buyer contacts on `/hunter/[id]` show the quoted evidence, the employee who
+  found them, the confidence, and the source. Peter Östlund now displays
+  Scout's Impressum line and a 90%-sure badge instead of a bare name — which
+  is what made it possible to silently overwrite his sourced note before.
+- Package cards show the same, so an accepted package states what it was
+  accepted on.
+- A requirement inherits its case. Nobody proposes a requirement — a human
+  writes it down — so `getRequirementResearchCase` falls back to the project it
+  came from plus that project's buyer contacts and packages, and returns
+  `inherited: true` so the page can say so rather than implying the work was
+  done on the requirement itself.
+- `src/lib/data/agent-identity.ts` resolves an instance id and a credential
+  name to the same employee. Approvals and cases now share it, so Scout is
+  "Scout" on both screens and legacy `mcp_*` rows read as words.
+
+Verified signed-in against the running app on the maincubes project, its
+requirement, and the Bilfinger company page. No migration; no schema change.
+
 ### Repository implementation — CEO Decision Inbox
 
 - `/decisions` is now the default signed-in landing page and the primary AI

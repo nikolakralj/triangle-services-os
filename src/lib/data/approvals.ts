@@ -1,4 +1,5 @@
 import "server-only";
+import { loadAgentFaces } from "@/lib/data/agent-identity";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -74,17 +75,6 @@ function summarize(
   return { headline: type, detail: null };
 }
 
-/**
- * Older rows recorded which subsystem wrote them ("mcp_research_agent",
- * "research_chat_agent") rather than who filed them. Make those readable
- * rather than leaving raw identifiers in the manager's queue.
- */
-function humanizeLegacyAgent(raw: string): string {
-  if (!raw.includes("_")) return raw;
-  const words = raw.replace(/^mcp_/, "").replace(/_/g, " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 export async function listApprovals(
   orgId: string,
   opts: { status?: ApprovalStatus; limit?: number } = {},
@@ -137,30 +127,10 @@ export async function listApprovals(
     for (const p of data ?? []) projects.set(p.id as string, p.project_name as string);
   }
 
-  // Agent faces. Suggestions store a free-text `created_by_agent` (the machine
-  // credential's name); findings link to an instance directly. Resolve both to
-  // the same employee record so one person doesn't appear under two names.
-  const { data: instances } = await svc
-    .from("agent_instances")
-    .select("id, display_name, emoji")
-    .eq("org_id", orgId);
-  const byId = new Map<string, { name: string; emoji: string }>();
-  for (const i of instances ?? []) {
-    byId.set(i.id as string, {
-      name: i.display_name as string,
-      emoji: (i.emoji as string) || "🤖",
-    });
-  }
-
-  const { data: creds } = await svc
-    .from("machine_credentials")
-    .select("name, agent_instance_id")
-    .eq("org_id", orgId);
-  const byCredName = new Map<string, { name: string; emoji: string }>();
-  for (const c of creds ?? []) {
-    const inst = c.agent_instance_id ? byId.get(c.agent_instance_id as string) : undefined;
-    if (inst) byCredName.set(c.name as string, inst);
-  }
+  // Suggestions store a free-text `created_by_agent` (the machine credential's
+  // name); findings link to an instance directly. Both resolve through the same
+  // shared lookup so one person doesn't appear under two names.
+  const { byId, fromCredentialName } = await loadAgentFaces(orgId);
 
   const items: ApprovalItem[] = [];
 
@@ -169,8 +139,7 @@ export async function listApprovals(
       s.suggestion_type as string,
       (s.payload_json as Record<string, unknown>) ?? {},
     );
-    const raw = (s.created_by_agent as string | null) ?? null;
-    const who = raw ? byCredName.get(raw) : undefined;
+    const who = fromCredentialName((s.created_by_agent as string | null) ?? null);
     items.push({
       id: s.id as string,
       kind: "research_suggestion",
@@ -183,7 +152,7 @@ export async function listApprovals(
       createdAt: s.created_at as string,
       projectId: (s.project_id as string) ?? null,
       projectName: s.project_id ? projects.get(s.project_id as string) ?? null : null,
-      agentName: who?.name ?? (raw ? humanizeLegacyAgent(raw) : null),
+      agentName: who?.name ?? null,
       agentEmoji: who?.emoji ?? null,
     });
   }

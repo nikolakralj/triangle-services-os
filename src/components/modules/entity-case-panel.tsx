@@ -100,8 +100,17 @@ export function EntityCasePanel({
           <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
             {evidence.slice(0, 12).map((e) => {
               const p = e.payload;
+              // A person's name before their job title: a buyer_contact
+              // payload carries `title` as "Managing Director", which reads as
+              // the headline of a record about nobody in particular.
               const headline = String(
-                p.project_name ?? p.company_name ?? p.name ?? p.full_name ?? e.findingType,
+                p.project_name ??
+                  p.company_name ??
+                  p.full_name ??
+                  p.name ??
+                  p.package_type ??
+                  p.title ??
+                  e.findingType,
               );
               return (
                 <div key={e.id} className="px-3 py-2">
@@ -117,6 +126,11 @@ export function EntityCasePanel({
                     {e.confidence !== null && (
                       <span className="text-[10px] text-slate-400">
                         {e.confidence}% sure
+                      </span>
+                    )}
+                    {e.foundBy && (
+                      <span className="text-[10px] text-slate-400">
+                        {e.foundBy.emoji} {e.foundBy.name}
                       </span>
                     )}
                   </div>

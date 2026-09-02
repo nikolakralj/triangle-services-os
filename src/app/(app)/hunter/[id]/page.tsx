@@ -30,6 +30,7 @@ import { ResearchChatPanel } from "@/components/modules/research-chat-panel";
 import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel";
 import { OutreachComposer } from "@/components/modules/outreach-composer";
 import { BuyerContactsPanel } from "@/components/modules/buyer-contacts-panel";
+import { getEntityEvidenceBatch, type CaseEvidence } from "@/lib/data/company-case";
 import { EntityCasePanel } from "@/components/modules/entity-case-panel";
 import { getEntityCase } from "@/lib/data/company-case";
 import { WorkerMatchPanel } from "@/components/modules/worker-match-panel";
@@ -81,6 +82,22 @@ export default async function DiscoveredProjectDetailPage({
         getProjectNote(id, session.organizationId),
       ])
     : [[], [], [], [], [], null];
+
+  // Provenance for the contacts and packages on this page: which employee
+  // found each one, on what quoted evidence, from which source. One query per
+  // kind rather than one per row.
+  const [contactEvidence, packageEvidence] = await Promise.all([
+    getEntityEvidenceBatch(
+      "buyer_contact",
+      buyerContacts.map((c) => c.id),
+      session.organizationId,
+    ),
+    getEntityEvidenceBatch(
+      "package",
+      dbPackages.map((p) => p.id),
+      session.organizationId,
+    ),
+  ]);
 
   // Fetch existing worker matches for all DB packages in parallel
   const initialMatchesMap: Record<string, import("@/lib/data/worker-matching").PackageMatchRow[]> =
@@ -239,6 +256,7 @@ export default async function DiscoveredProjectDetailPage({
                 key={pkg.id}
                 opportunity={pkg}
                 contractor={pkg.contractorNodeId ? savedChainNodes.find(n => n.id === pkg.contractorNodeId) : undefined}
+                evidence={packageEvidence.get(pkg.id) ?? []}
               />
             ))}
             {packageOpportunities.length === 0 && (
@@ -294,6 +312,14 @@ export default async function DiscoveredProjectDetailPage({
               linkedinUrl: c.linkedin_url ?? null,
               buyerRole: c.buyer_role ?? null,
               notes: c.notes ?? null,
+              provenance: (contactEvidence.get(c.id) ?? []).map((e) => ({
+                id: e.id,
+                sourceUrl: e.sourceUrl,
+                evidenceText: e.evidenceText,
+                confidence: e.confidence,
+                foundByName: e.foundBy?.name ?? null,
+                foundByEmoji: e.foundBy?.emoji ?? null,
+              })),
             }))}
           />
         </PersistedCollapsible>
@@ -407,12 +433,19 @@ function ReadinessBanner({ readiness }: { readiness: CommercialReadiness }) {
   );
 }
 
-function PackageOpportunityCard({ 
-  opportunity, 
-  contractor 
-}: { 
+function PackageOpportunityCard({
+  opportunity,
+  contractor,
+  evidence = [],
+}: {
   opportunity: PackageOpportunity;
   contractor?: ContractorChainNodeRow;
+  /**
+   * The case behind an accepted package. Heuristic packages are derived from
+   * the project and have none — only ones a human accepted out of research
+   * carry a source, a quote and an employee who found it.
+   */
+  evidence?: CaseEvidence[];
 }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -441,6 +474,36 @@ function PackageOpportunityCard({
           <FactPill label="Owner" value={contractor.company_name ?? contractor.label} />
         )}
       </div>
+      {evidence.length > 0 && (
+        <div className="mt-3 space-y-1.5 border-l-2 border-slate-200 pl-2.5">
+          {evidence.map((e) => (
+            <div key={e.id}>
+              {e.evidenceText && (
+                <p className="line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                  &ldquo;{e.evidenceText}&rdquo;
+                </p>
+              )}
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400">
+                {e.foundBy && (
+                  <span>
+                    {e.foundBy.emoji} Found by {e.foundBy.name}
+                  </span>
+                )}
+                {e.sourceUrl && (
+                  <a
+                    href={e.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-sky-700 hover:text-sky-900"
+                  >
+                    Source
+                  </a>
+                )}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

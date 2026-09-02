@@ -10,7 +10,12 @@ import {
 } from "@/components/modules/commercial-record-editors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { EntityCasePanel } from "@/components/modules/entity-case-panel";
 import { getSession } from "@/lib/auth/session";
+import {
+  getEntityEvidenceBatch,
+  getRequirementResearchCase,
+} from "@/lib/data/company-case";
 import { getCommercialWorkspace } from "@/lib/data/commercial";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +40,26 @@ export default async function CommercialRequirementPage({
   const { id } = await params;
   const workspace = await getCommercialWorkspace(id, session.organizationId);
   if (!workspace) notFound();
+
+  // The research behind this requirement. A requirement is created by a human,
+  // so it has no proposal of its own — its case is whatever employee work was
+  // attached to it, plus the case of the project it came from. Showing the
+  // evidence next to the route matters because this page is where someone
+  // decides whether to pick up the phone.
+  const [researchCase, routeContactEvidence] = await Promise.all([
+    getRequirementResearchCase(
+      id,
+      workspace.requirement.discovered_project_id,
+      session.organizationId,
+    ),
+    getEntityEvidenceBatch(
+      "buyer_contact",
+      workspace.routes
+        .map((r) => r.buyer_contact_id)
+        .filter((v): v is string => Boolean(v)),
+      session.organizationId,
+    ),
+  ]);
 
   const canEdit = session.role !== "viewer";
   const canConfirm = session.role === "admin" || session.role === "partner";
@@ -121,6 +146,33 @@ export default async function CommercialRequirementPage({
                   <Badge>{route.route_type}</Badge>
                 </div>
                 <p className="mt-2 text-slate-600">{route.evidence_summary || "No evidence summary recorded."}</p>
+                {(routeContactEvidence.get(route.buyer_contact_id ?? "") ?? []).map((e) => (
+                  <div key={e.id} className="mt-2 border-l-2 border-slate-200 pl-2.5">
+                    {e.evidenceText ? (
+                      <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">
+                        &ldquo;{e.evidenceText}&rdquo;
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
+                      {e.foundBy ? (
+                        <span>
+                          {e.foundBy.emoji} Found by {e.foundBy.name}
+                        </span>
+                      ) : null}
+                      {e.confidence !== null ? <span>{e.confidence}% sure</span> : null}
+                      {e.sourceUrl ? (
+                        <a
+                          href={e.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-sky-700 hover:text-sky-900"
+                        >
+                          Source
+                        </a>
+                      ) : null}
+                    </p>
+                  </div>
+                ))}
                 <p className="mt-2 text-xs text-slate-500">
                   Next: {route.next_action || "not set"} · {route.next_action_due_at ? new Date(route.next_action_due_at).toLocaleString() : "no due date"}
                 </p>
@@ -159,6 +211,23 @@ export default async function CommercialRequirementPage({
           </div>
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <CardHeader
+          title="Research case"
+          description={
+            researchCase.inherited
+              ? "Inherited from the project this requirement came from — the evidence that says this demand is real."
+              : "Employee work attached to this requirement."
+          }
+        />
+        <CardContent>
+          <EntityCasePanel
+            snapshot={researchCase.snapshot}
+            emptyHint="No research behind this requirement yet. Put an employee on the project it came from, or record the evidence that says the demand is real."
+          />
+        </CardContent>
+      </Card>
 
       <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
         This workspace records commercial truth; it does not send messages, accept supplier terms, sign agreements, or share personal documents automatically.
