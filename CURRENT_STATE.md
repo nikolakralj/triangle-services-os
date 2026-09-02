@@ -5,15 +5,84 @@
 This file is the honest status report for the repo.
 It should tell a future agent what is real, what is partial, and what still needs cleanup.
 
-## Verified state — 31 August 2026
+## Verified state — 2 September 2026
 
 Checked against the running app and the database, not from memory.
 
-**Schema:** migrations 001-030 applied. 031 (cross-tenant integrity, billing
-correctness) is written and committed but NOT applied.
+**Schema:** repository migrations run through `031`. The remote migration
+history uses timestamped versions rather than the repository's short names;
+the 31 August state records the corresponding hardening changes as applied and
+verified. This company-case/runtime slice adds no migration. The first signed-in
+smoke used the externally operated Bilfinger E&M assignment. On 2 September,
+Triangle's own executor accepted, researched, and completed the Köster and
+GOLDBECK qualification cases against live data.
 
-**Live counts:** 3 workers · 18 discovered projects · 166 companies · 4 buyer
-contacts, none with an email, phone or LinkedIn · 2 packages · 1 outreach draft
+### Repository implementation — living company cases
+
+- accepting a company finding now preserves the source assignment and queues
+  an idempotent, research-only continuation for the same AI employee;
+- the continuation requires a named relevant project, actual buyer path,
+  sourced buyer contacts, Triangle-supported crew package, blockers, and exact
+  next commercial action; it explicitly forbids contact;
+- company records are hydrated into the agent inbox, so the employee receives
+  the case context rather than only an opaque UUID;
+- `/companies/[id]` is now a manager-report workspace: one recommendation,
+  named work, actual buyer, supported offer, next commercial action, and
+  material unknowns; worker hand-ins, conversations, evidence, and older jobs
+  remain available under `Manager audit`;
+- completed legacy sectioned Scout reports are converted into the same compact
+  manager view, so useful existing work is not discarded;
+- future company continuations carry `execution_mode: in_app`; an authenticated
+  workforce pulse safely claims one queued Scout job and runs a structured,
+  web-research-capable in-app employee without requiring provider chat;
+- old generic AI-action buttons and empty CRM side panels are no longer the
+  primary company experience;
+- the pulse is a verified early runtime bridge that operates while an
+  authenticated Triangle session is open; an always-on cloud worker remains a
+  later runtime hardening step;
+- structured hand-ins are stored atomically (never truncated mid-JSON), and
+  `agent_runs` links the assignment, employee, provider, model, timestamps,
+  token usage, status, and compact decision metadata;
+- no generic case table, vector database, second CRM, autonomous outbound,
+  deployment, or production schema write was introduced.
+
+**Verification:** `npx tsc --noEmit`, full `npm run lint`,
+`npm run check:tenant-identity`, `npm run build`, and `git diff --check` pass.
+The signed-in Bilfinger flow verifies continuity for an external Scout. The
+Köster and GOLDBECK flows additionally verify Triangle's in-app executor:
+accept finding -> durable company -> queued no-outreach assignment -> OpenAI
+web research -> valid structured manager report -> linked run audit -> pending
+project evidence. The GOLDBECK page renders a four-part strategy and a verified
+supplier-portal URL while worker detail remains collapsed. No framework
+overlay or application console error was present. No outreach, supplier
+registration, or external action was performed.
+
+### Repository implementation — CEO Decision Inbox
+
+- `/decisions` is now the default signed-in landing page and the primary AI
+  Workforce navigation destination;
+- pending research is grouped into case briefs with recommendation, business
+  impact, unknowns, evidence quality, responsible employee, next safe AI step,
+  and the exact human step;
+- recent blocked/waiting-review assignments and unsent outreach drafts appear
+  as exceptions or consequential commercial decisions;
+- queued/active internal work is counted as `AI handling now` and stays out of
+  the CEO attention queue;
+- raw evidence and the existing accept/reject controls remain behind
+  progressive disclosure; `/approvals` remains evidence history;
+- no migration, autonomous outbound action, deployment, or production write
+  was introduced.
+
+**Decision Inbox verification:** `npx tsc --noEmit`, full `npm run lint`,
+`npm run check:tenant-identity`, `npm run build`, and `git diff --check` pass.
+Signed-in browser smoke confirms `/decisions` renders grouped case decisions,
+combines related external drafts into project-level decisions, opens evidence
+controls, and shows no framework overlay or application console error. The
+write-side acceptance -> automatic continuation flow is now verified on
+Köster and GOLDBECK.
+
+**Live counts:** 3 available workers · 18 discovered projects · 172 companies ·
+4 buyer contacts, none with an email, phone or LinkedIn · 3 packages · 1 outreach draft
 waiting to send · 0 sends · 0 packets · 0 orders · 0 placements.
 
 **Working end to end:** job intake and reply drafting, Scout research through
@@ -69,11 +138,13 @@ is in `docs/strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md`.
   `C:\Users\nikol\Projects\triangle-services-os`.
 - Active branch:
   `wip-jules-2026-05-03T18-13-13-596Z`, not `main`.
-- Latest commit at this audit: `88430ac`.
+- Current committed HEAD at this audit: `81c8acd`; the 1 September company-case
+  work is an uncommitted local change on top of it.
 - The old OneDrive copy is not the project to edit.
 - Repository migrations now run through
-  `supabase/migrations/028_organization_defaults.sql`. Migrations `027` and
-  `028` have not been applied to production in this work.
+  `supabase/migrations/031_commercial_delivery_hardening.sql`. The 31 August
+  implementation records migrations `027`-`031` as applied through timestamped
+  remote migration entries.
 - The worktree contains the strategy/roadmap reconciliation plus the first
   tenant productization slice. Preserve it; do not treat untracked files as
   disposable.

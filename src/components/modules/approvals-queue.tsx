@@ -41,24 +41,42 @@ export function ApprovalsQueue({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    message: string;
+    href: string | null;
+  } | null>(null);
   const [decided, setDecided] = useState<Set<string>>(new Set());
 
   async function decide(item: ApprovalItem, action: "accept" | "reject") {
     setBusyId(item.id);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/approvals", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id, kind: item.kind, action }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        promotedTo?: string | null;
+        continuationAssignmentId?: string | null;
+        destinationHref?: string | null;
+      };
       if (!res.ok) {
         setError(data.error ?? "Could not save that decision.");
         return;
       }
       // Drop it from the list straight away; the refresh confirms.
       setDecided((prev) => new Set(prev).add(item.id));
+      if (action === "accept" && data.promotedTo === "company") {
+        setNotice({
+          message: data.continuationAssignmentId
+            ? "Accepted. The research employee is continuing automatically toward a named project, buyer path, crew package, and next action."
+            : "Accepted as a company case. No follow-up employee was available, so the case is waiting for a research assignment.",
+          href: data.destinationHref ?? null,
+        });
+      }
       router.refresh();
     } catch {
       setError("Network error — the decision was not saved. Try again.");
@@ -99,6 +117,19 @@ export function ApprovalsQueue({
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </p>
+      )}
+      {notice && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <span className="flex items-center gap-1.5">
+            <Check className="h-4 w-4 shrink-0" />
+            {notice.message}
+          </span>
+          {notice.href && (
+            <Link href={notice.href} className="font-semibold hover:underline">
+              Open the living case →
+            </Link>
+          )}
+        </div>
       )}
 
       {Array.from(groups.entries()).map(([groupName, groupItems]) => {

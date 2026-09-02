@@ -291,6 +291,56 @@ Why:
 - trust work added late is expensive and does not repair missing historical
   evidence
 
+### 2026-09-01: Approved research becomes a living case, not an empty record
+
+Decision:
+
+- an accepted company finding must preserve its source evidence, responsible
+  AI employee, assignment history, and conversation;
+- accepting a company authorizes the same employee to continue safe,
+  research-only qualification toward a named project, actual buyer path,
+  Triangle-supported crew package, and exact next commercial action;
+- the CEO view is a decision brief and exception queue, not a sequence of
+  Workforce, Approvals, Companies, and Signal Inbox pages;
+- project conversations and assignment conversations remain the initial
+  memory stores; do not introduce a generic parallel CRM or vector-memory
+  system until this vertical pattern proves insufficient.
+
+Why:
+
+- the prior workflow discarded the useful context at approval and produced a
+  sparse company record with generic AI buttons;
+- the human was acting as the integration layer between AI employees and
+  domain records;
+- read-only research continuation is reversible and low-risk, while outreach,
+  personal-data sharing, supplier registration, and commercial commitments
+  still require a human decision;
+- a case is useful only when it moves toward the product's existing success
+  object: a qualified project package opportunity and ultimately a
+  contract-qualified crew opportunity.
+
+### 2026-09-01: The CEO lands on decisions and exceptions, not dashboards
+
+Decision:
+
+- `/decisions` is the default application landing page;
+- group pending research by case and state the recommendation, impact,
+  unknowns, evidence quality, owner, next AI step, and next human step;
+- show recent failed/waiting-review assignments and unsent external drafts as
+  attention items;
+- keep queued/active safe internal work visible only as an operating count;
+- preserve raw evidence and existing accept/reject controls behind progressive
+  disclosure rather than deleting the audit trail.
+
+Why:
+
+- the CEO must manage outcomes and exceptions rather than transport data
+  between Workforce, Approvals, Companies, and Signal Inbox;
+- an unsent message is more consequential than another database row and must
+  remain a human boundary;
+- grouping reduces review volume without giving AI authority to approve its
+  own facts or external actions.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

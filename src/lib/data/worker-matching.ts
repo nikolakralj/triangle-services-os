@@ -80,12 +80,10 @@ function scoreWorker(
 
   // --- Primary role fit: 50 pts ---
   let rolePoints = 0;
-  let primaryMatchRole: string | null = null;
   for (const pkgRole of packageRoles) {
     const pkgRoleLower = pkgRole.toLowerCase();
     if (workerRole && (workerRole.includes(pkgRoleLower) || pkgRoleLower.includes(workerRole))) {
       rolePoints = 50;
-      primaryMatchRole = pkgRole;
       matchedRoles.add(pkgRole);
       reasons.push(`role: ${worker.role} fits ${pkgRole}`);
       break;
@@ -97,7 +95,6 @@ function scoreWorker(
       const pkgRoleLower = pkgRole.toLowerCase();
       if (workerSkills.some((s) => s.includes(pkgRoleLower) || pkgRoleLower.includes(s))) {
         rolePoints = 30;
-        primaryMatchRole = pkgRole;
         matchedRoles.add(pkgRole);
         reasons.push(`skills cover ${pkgRole} (no exact role match)`);
         break;

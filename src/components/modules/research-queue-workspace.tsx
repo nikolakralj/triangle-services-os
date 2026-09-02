@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { MessageSquare, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResearchRunRow, ResearchSuggestionRow } from "@/lib/data/research";

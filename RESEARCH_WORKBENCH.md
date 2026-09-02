@@ -30,6 +30,10 @@ Implemented in code:
 - agent findings can propose previously unknown projects/companies/contacts
 - accepted company findings can create a company and place it on a project
   contractor chain
+- accepted company findings preserve their originating assignment and may
+  queue an idempotent research-only continuation for the same employee
+- company pages present the linked evidence, work, outcome gaps, and assignment
+  conversation as one living case
 
 The MCP route is authenticated, org-scoped, Zod-validated, rate-limited, and logs tool calls to `ai_tool_calls`.
 
@@ -56,6 +60,25 @@ Agents must not directly write final CRM or contractor-chain records.
 They propose evidence-backed suggestions first.
 
 Final writes happen only when a user or approved review tool accepts a suggestion.
+
+## Case continuity
+
+Approval is a domain decision, not a handoff back to the CEO.
+
+When a company finding is accepted, Triangle keeps the proposal and its source
+assignment attached to the company. The same research employee receives a
+follow-on assignment to seek the next safe internal outcome: named project,
+actual buyer path, sourced contact, supported crew package, unknowns, and next
+human action. The company record is hydrated into the agent inbox and the
+assignment thread remains the case conversation.
+
+This does not allow an agent to accept its own facts or contact anyone. It
+removes unnecessary human transport between pages while preserving the
+proposal -> human review -> deterministic write boundary.
+
+Project chat and linked assignment threads are the current memory mechanisms.
+Do not add a generic vector-memory or parallel case database unless this
+pattern demonstrates a real retrieval or coordination failure.
 
 ## Available MCP Tools
 
@@ -117,7 +140,8 @@ Do not convert uncertainty into fake confidence.
 
 The workbench is functional, but commercial closure is still missing:
 
-- buyer/procurement/contract route is not a complete first-class workflow;
+- buyer/procurement/contract routes now have first-class records, but live
+  coverage and real-world validation remain weak;
 - accepted package suggestions are still thinner than a contract-ready
   package;
 - accepted research does not consistently require an owner, next action, and

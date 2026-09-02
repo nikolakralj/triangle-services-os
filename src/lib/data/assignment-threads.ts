@@ -108,7 +108,7 @@ export async function addHumanMessage(params: {
 
   const { data: assignment } = await svc
     .from("agent_assignments")
-    .select("id, status")
+    .select("id, status, constraints")
     .eq("id", params.assignmentId)
     .eq("org_id", params.orgId)
     .maybeSingle();
@@ -135,9 +135,17 @@ export async function addHumanMessage(params: {
 
   const finished = ["completed", "failed"].includes(assignment.status as string);
   if (finished) {
+    const constraints =
+      (assignment.constraints as Record<string, unknown> | null) ?? {};
     await svc
       .from("agent_assignments")
-      .update({ status: "active", completed_at: null })
+      .update({
+        // In-app workers are push-capable: the next workforce pulse claims
+        // the reopened job. External provider bots still use their existing
+        // active/polling contract.
+        status: constraints.execution_mode === "in_app" ? "queued" : "active",
+        completed_at: null,
+      })
       .eq("id", params.assignmentId)
       .eq("org_id", params.orgId);
   }

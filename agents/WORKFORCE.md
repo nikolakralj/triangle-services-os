@@ -1,6 +1,6 @@
 # Triangle workforce model
 
-**Updated:** 29 August 2026
+**Updated:** 2 September 2026
 
 This file explains how runtime business agents fit the actual product. Product
 and coding agents must also follow `SOFTWARE_AGENT_INSTRUCTIONS.md`.
@@ -24,8 +24,10 @@ authority.
 | Company policy | `agents/shared-constitution.md` |
 | Assignment | `agent_assignments` with objective, constraints, priority, deadline, and attached domain context |
 | Assignment conversation | `assignment_messages` |
+| Living domain case | canonical domain record + linked assignments/findings/conversation |
 | Quick note | `agent_tasks` |
 | Work report | agent inbox result/message and `agent_runs` |
+| Manager report | compact domain-case recommendation derived from the work report; worker detail remains auditable |
 | Proposal | `agent_findings` or `research_suggestions` |
 | Manager sign-off | human-only Approvals and domain transition |
 | Experience | accepted/rejected work plus real commercial/delivery outcomes |
@@ -96,6 +98,28 @@ research task to Bob or a mailbox-ingest task to Scout.
 An assignment result is not automatically a final business record. Results
 and findings must enter the relevant domain review/action workflow.
 
+When a human accepts a promising company finding, Triangle may automatically
+queue the same employee to continue read-only qualification. That continuation
+must be idempotent, carry the company record and expected outcome, and stop at
+the human external-action boundary. The purpose is to remove page-to-page
+human coordination, not to remove consequential approval.
+
+Company qualification can run through Triangle's in-app executor when the
+assignment declares `execution_mode: in_app`. The early implementation claims
+work while an authenticated manager session is open. External provider polling
+remains supported for older assignments, but provider chat is never the
+canonical conversation or report store.
+
+Köster and GOLDBECK are the first verified in-app cases. Their structured
+reports, project proposals, assignment conversation, and provider/model/token
+audit all remain in Triangle. No contact was performed.
+
+The CEO-facing domain page is the management layer. It shows the recommendation,
+commercial path, unknowns, and requested decision. Detailed worker conversation
+and evidence stay under audit. A CEO question entered on the case is routed to
+the current qualification assignment with its history; it must not attach to a
+random older source assignment.
+
 ## Agent work lifecycle
 
 ```text
@@ -114,6 +138,45 @@ human defines outcome and attaches Triangle context
 Agents may answer follow-up messages without closing the assignment. A
 completed/failed assignment can be reopened by a human follow-up and must
 retain its conversation.
+
+## Adding another AI employee
+
+Do not add a second generic chat window. Add a narrow employee behind the same
+company operating model:
+
+1. define the repeated business outcome and manager who owns it;
+2. write `agents/<role>.md` with inputs, outputs, evidence standard, tools,
+   forbidden actions, refusal behavior, and quality measures;
+3. create one durable `agent_instances` identity;
+4. attach a swappable `agent_provider_bindings` brain and minimum-scope badge;
+5. register one execution handler for the role: assignment eligibility,
+   context loader, agent/tools, structured result schema, proposal writer, and
+   manager-report projection;
+6. run a testing/probation period on real internal-only assignments;
+7. activate only after the manager can measure useful outcomes and safely
+   review consequential work;
+8. pause or retire the employee and revoke its badge when quality or value
+   falls below the role threshold. Preserve its history.
+
+The next runtime refactor, when a second in-app role is actually approved, is
+an `AgentRuntimeRegistry` keyed by `role_key` or an explicit execution handler.
+Scout's current executor is the first adapter, not a universal agent. The
+registry must dispatch role-specific context and structured outputs; it must
+not allow arbitrary agents to browse every table or write canonical facts.
+
+Likely future roles, added only at their evidence gate:
+
+- Buyer Route Specialist — maps procurement doors and sourced contacts;
+- Crew Packager — matches truthful available supply to one requirement;
+- Compliance Coordinator — checks document readiness and expiry, without
+  making legal judgments;
+- Outreach Drafting Employee — drafts from verified case facts; a human sends;
+- Delivery Coordinator — monitors milestones, timesheets, exceptions, and
+  margin without making commitments.
+
+The CEO continues to use Decision Inbox and short domain manager reports. Role
+queues, conversations, and technical traces belong in Workforce and Manager
+audit, not on the default CEO surface.
 
 ## Hiring gate
 
@@ -184,6 +247,8 @@ Outcome attribution becomes meaningful only after real outcomes exist.
 - Workforce roster and assignments;
 - assignment conversations and result visibility;
 - one Approvals queue;
+- company pages as living cases with evidence, responsible AI work, outcome
+  gaps, and one persistent follow-up thread;
 - Job Intake, Hunter, talent, packages, and delivery records remain domain
   workspaces.
 

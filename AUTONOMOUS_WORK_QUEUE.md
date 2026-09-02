@@ -67,13 +67,13 @@ lint, and relevant route checks pass.
 
 **Verification:** `npx tsc --noEmit`, focused ESLint, `npm run build`, and
 `git diff --check` pass. Unauthenticated GET on
-`/api/settings/organization-profile` returns `401`. Migration `027` was not
-applied to production, and the signed-in Settings/save/draft flow still needs
-an authorized post-migration smoke test.
+`/api/settings/organization-profile` returns `401`. Migration `027` was later
+applied and the signed-in organization readiness flow was verified on 31
+August.
 
 ### PZ-002 — Commercial identity leakage audit
 
-**Status:** DONE (repository 31 August 2026; migrations 028-030 applied 31 August 2026; 031 pending)  
+**Status:** DONE (repository 31 August 2026; migrations 028-031 applied 31 August 2026)
 **Gate:** PZ-001 `DONE`.
 
 **Problem:** research, general AI generation, imports, packets, metadata, and
@@ -111,7 +111,121 @@ white-label work.
 three workflow outcomes; navigation links to it; settings anchors lead to real
 configuration panels; specification is recorded in
 `docs/product/TENANT_ONBOARDING_READINESS.md`; TypeScript and focused ESLint
-pass. Production smoke testing remains pending migrations `027` and `028`.
+pass. The signed-in readiness page was verified after the migrations.
+
+### CASE-001 — Company case continuity
+
+**Status:** DONE (repository and signed-in Bilfinger smoke 1 September 2026)
+**Gate:** management explicitly identified approval-to-company page hopping as
+blocking the AI-employee operating model.
+
+**State transition:** accepted company finding -> durable company case with
+source evidence, responsible employee, continued safe research, and one CEO
+brief.
+
+**Implemented:**
+
+- accepted company findings preserve and link the source assignment;
+- the same employee receives an idempotent, research-only continuation toward
+  named project, buyer path/contact, crew package, blockers, and next action;
+- the agent inbox receives hydrated company records and expected output;
+- the company page is manager-first: recommendation, named work, actual buyer,
+  supported offer, next commercial action, and material unknowns;
+- worker hand-ins, conversation, evidence, and background jobs remain visible
+  under `Manager audit` instead of occupying the CEO view;
+- future company continuations use in-app execution and can be claimed without
+  the CEO opening Scout's provider chat;
+- generic one-shot AI buttons and empty CRM panels are no longer the primary
+  company experience.
+
+**Verification:** TypeScript, full ESLint, tenant-identity check, and diff check
+pass. Signed-in live smoke on Bilfinger verifies acceptance -> qualification ->
+completed Scout report -> concise manager page with no overlay or application
+console error. No outreach or supplier registration was performed.
+
+### CASE-002 — CEO decision inbox
+
+**Status:** DONE (repository and signed-in live smoke complete)
+**Gate:** CASE-001 repository implementation complete.
+
+**Problem:** Approvals still asks the CEO to evaluate individual raw findings.
+The CEO should see grouped case outcomes and only exceptions or consequential
+decisions.
+
+**Scope:**
+
+- group research by project/company case and show one decision brief;
+- distinguish `no_action_needed`, `agent_blocked`, `evidence_conflict`,
+  `pursue`, `hold`, `reject`, and `approve_commercial_action`;
+- show recommended decision, business impact, unknowns, evidence quality,
+  responsible employee, next safe AI step, and next human step;
+- allow batch acceptance only for safe internal facts; never batch external
+  actions or personal-data sharing;
+- measure decisions requested per qualified case and CEO review time.
+
+**Acceptance:** a manager can understand what matters and decide without
+opening Workforce, Companies, and Signal Inbox in sequence. Every decision
+links to its living case and the agent continues any pre-authorized internal
+work automatically.
+
+**Implemented:**
+
+- `/decisions` is the default application landing page and the primary AI
+  Workforce navigation item;
+- pending research is grouped by project/company case and converted into a
+  recommendation, impact, unknowns, evidence quality, responsible employee,
+  next safe AI step, and next human step;
+- recent failed/waiting-review assignments and unsent outreach drafts are
+  surfaced as exceptions or consequential commercial decisions;
+- queued/active assignments are counted as `AI handling now` and do not ask
+  the CEO for attention;
+- raw evidence and accept/reject controls remain behind progressive
+  disclosure, with `/approvals` retained as evidence history;
+- no new truth table, outbound automation, database migration, deployment, or
+  production write was introduced.
+
+**Verification:** TypeScript, full ESLint, production build, tenant-identity
+check, and diff check pass. Signed-in browser smoke confirms the Decision Inbox
+renders with case grouping and disclosure controls. Accepting Köster and
+GOLDBECK exercised the real write-side continuation flow: each created a
+durable company and no-outreach assignment, ran through Triangle's executor,
+returned valid structured strategy, logged a linked run, and filed project
+evidence for human review. No external action occurred.
+
+### CASE-003 — Cross-entity living cases
+
+**Status:** READY
+**Gate:** CASE-002 is used on real company cases and confirms the common
+information/interaction pattern.
+
+**Gate evidence:** the live Bilfinger case confirmed the common pattern and
+exposed the management-layer requirement: worker detail stays auditable while
+the default business page remains a short decision report.
+
+**Scope:** extend the proven case workspace to projects, buyer contacts,
+qualified requirements, and crew packages using existing canonical tables and
+conversation stores. Do not create a generic CRM entity or parallel truth
+database.
+
+### CASE-004 — Agent handoffs and safe continuation policy
+
+**Status:** GATED
+**Gate:** at least two runtime roles repeatedly collaborate on the same real
+case and manual assignment handoff causes measurable delay or lost context.
+
+**Scope:** explicit allowed-step policy, idempotent handoff, owner/state,
+budget/time limits, retries, blocked reason, audit, and human escalation.
+External contact remains outside automatic continuation.
+
+### CASE-005 — Outcome-backed agent learning
+
+**Status:** GATED
+**Gate:** accepted/rejected research plus real buyer response, placement, or
+delivery outcomes exist in enough volume to evaluate a playbook.
+
+**Scope:** evidence corrections, decision history, outcome attribution,
+playbook versions, evaluations, and rollback. Summaries help retrieval but
+never replace sourced facts or deterministic domain state.
 
 ### CORE-001 — Truthful availability and package coverage
 
@@ -244,21 +358,20 @@ Verified against the database on 31 August 2026, not from memory.
 Update only from evidence. Link the source/date in the relevant strategy or
 commercial record; do not change counts from memory.
 
-## Where Product Track B stands — 31 August 2026
+## Where Product Track B stands — 2 September 2026
 
-Track B has no `READY` item left. PZ-001 through PZ-003 are done and their
-migrations are applied; CORE-002 through CORE-005 were built ahead of their
-gates; everything remaining is `GATED` or `BLOCKED_EXTERNAL` on evidence only a
-human can produce.
+CASE-002 is repository- and live-smoke-complete after management clarified the
+agent-operated CEO workflow. CASE-003 is READY: Bilfinger verified the manager
+layer, while Köster and GOLDBECK verified Triangle's own no-outreach Scout
+executor and structured case hand-in. Extend this proven pattern one domain at
+a time; do not invent a generic agent platform.
 
-Per the execution rule, a software agent should now stop selecting work and
-say so rather than inventing it. The bottleneck is not code. It is:
+The commercial evidence bottlenecks remain unchanged:
 
 - **3 workers** in the pool, so no package can be honestly staffed (CORE-001);
 - **0 of 4 buyer contacts have an email, phone or LinkedIn**, so the drafted
   approach to Peter Östlund cannot be sent;
 - **0 recorded sends**, so no gate downstream of Phase 0 can open.
 
-The two `READY` items are both Customer Track C (GTM-001 target list, GTM-002
-interview kit) and were explicitly deprioritised by the user on 30 August in
-favour of finishing the product.
+Customer Track C still has GTM-001 and GTM-002 ready for research/preparation,
+but no agent has authority to contact targets.

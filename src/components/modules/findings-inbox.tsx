@@ -35,11 +35,13 @@ export function FindingsInbox({ findings }: { findings: AgentFinding[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [destinationHref, setDestinationHref] = useState<string | null>(null);
 
   async function decide(findingId: string, action: "accept" | "reject") {
     setBusyId(findingId);
     setError(null);
     setDone(null);
+    setDestinationHref(null);
     try {
       const res = await fetch("/api/findings", {
         method: "PATCH",
@@ -49,6 +51,8 @@ export function FindingsInbox({ findings }: { findings: AgentFinding[] }) {
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         promotedTo?: string | null;
+        continuationAssignmentId?: string | null;
+        destinationHref?: string | null;
       };
       if (!res.ok) {
         setError(data.error ?? "Could not save that decision.");
@@ -56,7 +60,14 @@ export function FindingsInbox({ findings }: { findings: AgentFinding[] }) {
       }
       if (action === "accept" && data.promotedTo === "discovered_project") {
         setDone("Accepted — it is now a project, and agents can research it.");
+      } else if (action === "accept" && data.promotedTo === "company") {
+        setDone(
+          data.continuationAssignmentId
+            ? "Accepted — the research employee is continuing this company case automatically."
+            : "Accepted — it is now a company case waiting for an employee.",
+        );
       }
+      setDestinationHref(data.destinationHref ?? null);
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -87,10 +98,17 @@ export function FindingsInbox({ findings }: { findings: AgentFinding[] }) {
         </p>
       )}
       {done && (
-        <p className="flex items-center gap-1.5 text-sm text-emerald-700">
-          <Check className="h-4 w-4 shrink-0" />
-          {done}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <span className="flex items-center gap-1.5">
+            <Check className="h-4 w-4 shrink-0" />
+            {done}
+          </span>
+          {destinationHref && (
+            <Link href={destinationHref} className="font-semibold hover:underline">
+              Open the living case →
+            </Link>
+          )}
+        </div>
       )}
 
       {findings.map((f) => (

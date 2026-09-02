@@ -22,13 +22,17 @@ export function AssignmentThread({
   messageCount,
   awaitingAgent,
   agentName,
+  recipientLabel,
   finished,
+  label,
 }: {
   assignmentId: string;
   messageCount: number;
   awaitingAgent: number;
   agentName: string;
+  recipientLabel?: string;
   finished: boolean;
+  label?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -38,6 +42,7 @@ export function AssignmentThread({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const recipient = recipientLabel ?? agentName;
 
   async function load() {
     setLoading(true);
@@ -90,8 +95,8 @@ export function AssignmentThread({
       setMessages(data.messages ?? []);
       setNotice(
         data.reopened
-          ? `Reopened — ${agentName} will pick this up on the next check.`
-          : `${agentName} will pick this up on the next check.`,
+          ? `Reopened — the ${recipient} will route this to the employee.`
+          : `Sent to the ${recipient}.`,
       );
       router.refresh();
     } catch {
@@ -109,9 +114,9 @@ export function AssignmentThread({
         className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
       >
         <MessageSquare className="h-3.5 w-3.5" />
-        {messageCount === 0
+        {label ?? (messageCount === 0
           ? "Ask a follow-up"
-          : `Conversation · ${messageCount}`}
+          : `Conversation · ${messageCount}`)}
         {awaitingAgent > 0 && (
           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
             {awaitingAgent} not picked up yet
@@ -165,8 +170,8 @@ export function AssignmentThread({
 
           {messages && messages.length === 0 && !loading && (
             <p className="mb-3 text-xs text-slate-500">
-              Nothing said yet. Ask {agentName} anything about this job — it
-              lands in their inbox with the whole history attached.
+              Nothing said yet. Ask the {recipient} anything about this case.
+              The manager routes it with the whole history attached.
             </p>
           )}
 
@@ -177,8 +182,8 @@ export function AssignmentThread({
               rows={2}
               placeholder={
                 finished
-                  ? `Follow-up — this reopens the job for ${agentName}`
-                  : `Ask ${agentName} something about this job`
+                  ? `Ask the ${recipient} to clarify or continue`
+                  : `Give the ${recipient} additional direction`
               }
               className="min-h-[52px] flex-1 resize-y rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
               onKeyDown={(e) => {

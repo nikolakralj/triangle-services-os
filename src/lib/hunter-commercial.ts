@@ -210,7 +210,6 @@ export function buildPackageOpportunities(project: DiscoveredProject): PackageOp
 export function mergePackageOpportunities(
   heuristicPackages: PackageOpportunity[],
   dbPackages: ProjectPackageRow[],
-  project: DiscoveredProject
 ): PackageOpportunity[] {
   const merged: PackageOpportunity[] = [];
 

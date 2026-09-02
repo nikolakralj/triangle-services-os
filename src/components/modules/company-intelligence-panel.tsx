@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ArrowRight, Users, Package, Mail, TrendingUp } from "lucide-react";
 import type {
@@ -19,14 +18,12 @@ export function CompanyIntelligencePanel({
 }: {
   intel: CompanyCrossProjectIntel;
 }) {
-  const router = useRouter();
-
   if (intel.projectInvolvements.length === 0) {
     return (
       <Card className="mb-4">
         <CardContent className="py-6 text-center">
           <p className="text-sm text-slate-500">
-            This company isn't involved in any tracked projects yet.
+            This company isn&apos;t involved in any tracked projects yet.
           </p>
         </CardContent>
       </Card>
@@ -69,7 +66,7 @@ export function CompanyIntelligencePanel({
           <CardHeader title={`Projects (${intel.projectInvolvements.length})`} />
           <CardContent className="space-y-3">
             {intel.projectInvolvements.map((project) => (
-              <ProjectRow key={project.id} project={project} router={router} />
+              <ProjectRow key={project.id} project={project} />
             ))}
           </CardContent>
         </Card>
@@ -142,10 +139,8 @@ function StatCard({
 
 function ProjectRow({
   project,
-  router,
 }: {
   project: ProjectInvolvement;
-  router: any;
 }) {
   return (
     <div
@@ -192,13 +187,13 @@ function ProjectRow({
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          onClick={() => router.push(`/hunter/${project.id}`)}
-          className="shrink-0 h-8 px-2"
+        <Link
+          href={`/hunter/${project.id}`}
+          aria-label={`Open ${project.title}`}
+          className="inline-flex h-8 shrink-0 items-center rounded-md px-2 hover:bg-slate-100"
         >
           <ArrowRight className="h-4 w-4" />
-        </Button>
+        </Link>
       </div>
     </div>
   );

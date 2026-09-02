@@ -318,6 +318,31 @@ For project/buyer research:
 
 Research is incomplete without a recommended next human action.
 
+## 12A. Living case and CEO-attention rules
+
+The CEO must not be used as the transport layer between Workforce, Approvals,
+Companies, Signal Inbox, and project pages.
+
+For project, company, buyer/contact, requirement, and package work:
+
+1. preserve the originating assignment, evidence, decisions, and conversation;
+2. attach work to the domain object it concerns;
+3. define the required commercial outcome and missing fields before assigning
+   more research;
+4. continue safe, pre-authorized read-only research without requesting a human
+   click for each intermediate fact;
+5. interrupt a human only for a consequential decision, blocked dependency,
+   evidence conflict, scope/budget exception, or meaningful commercial action;
+6. return a short decision brief with recommendation, evidence, unknowns,
+   business impact, and exact next step—not a long list of links;
+7. retain source facts separately from summaries and model memory;
+8. reuse canonical domain tables and current conversation stores before adding
+   a generic case, vector-memory, or orchestration platform.
+
+Automatic continuation never authorizes outreach, personal-data disclosure,
+supplier registration, legal acceptance, pricing commitment, or any other
+external side effect.
+
 ## 13. Architecture rules
 
 ### Preserve the current system boundary

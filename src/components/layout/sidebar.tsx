@@ -62,7 +62,7 @@ const navGroups: NavGroup[] = [
     label: "AI Workforce",
     items: [
       { href: "/agents", label: "Workforce", icon: Cpu },
-      { href: "/approvals", label: "Approvals", icon: ClipboardCheck },
+      { href: "/decisions", label: "Decision Inbox", icon: ClipboardCheck },
     ],
   },
   {
@@ -104,7 +104,7 @@ export function Sidebar({ approvalsCount = 0 }: { approvalsCount?: number }) {
                 // A live count beats a static label: work waiting on a human
                 // has to be visible from anywhere in the app, not only once
                 // you've opened the right project.
-                const pending = item.href === "/approvals" && approvalsCount > 0;
+                const pending = item.href === "/decisions" && approvalsCount > 0;
                 const badge = pending ? String(approvalsCount) : item.badge;
                 return (
                   <Link

@@ -1,29 +1,10 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
-import { CompanyDetail } from "@/components/modules/detail-sections";
+import { CompanyCaseWorkspace } from "@/components/modules/company-case-workspace";
 import { requireSession } from "@/lib/auth/session";
 import { getCompanyById, rowToCompany } from "@/lib/data/companies";
-import {
-  getContactsByCompany,
-  rowToContact,
-} from "@/lib/data/contacts";
-import {
-  getOpportunitiesByCompany,
-  rowToOpportunity,
-} from "@/lib/data/opportunities";
-import { getTasksByEntity, rowToTask } from "@/lib/data/tasks";
-import {
-  getActivitiesByCompany,
-  rowToActivity,
-} from "@/lib/data/activities";
-import {
-  enrichContactsWithOwnerNames,
-  enrichOpportunitiesWithOwnerNames,
-  enrichTasksWithOwnerNames,
-  enrichActivitiesWithCreatorNames,
-} from "@/lib/data/utils";
 import { getCompanyCrossProjectIntel } from "@/lib/data/company-intel";
-import { CompanyIntelligencePanel } from "@/components/modules/company-intelligence-panel";
+import { getCompanyCase } from "@/lib/data/company-case";
 
 export default async function CompanyDetailPage({
   params,
@@ -38,43 +19,21 @@ export default async function CompanyDetailPage({
 
   const company = rowToCompany(row);
 
-  // Fetch related data in parallel
-  const [contactRows, opportunityRows, taskRows, activityRows, crossProjectIntel] =
-    await Promise.all([
-      getContactsByCompany(id),
-      getOpportunitiesByCompany(id),
-      getTasksByEntity("company", id),
-      getActivitiesByCompany(id),
-      getCompanyCrossProjectIntel(company.name, session.organizationId),
-    ]);
-
-  const contacts = contactRows.map(rowToContact);
-  const opportunities = opportunityRows.map(rowToOpportunity);
-  const tasks = taskRows.map(rowToTask);
-  const activities = activityRows.map(rowToActivity);
-
-  // Resolve owner/assignee names
-  const enrichedContacts = await enrichContactsWithOwnerNames(contacts);
-  const enrichedOpportunities = await enrichOpportunitiesWithOwnerNames(opportunities);
-  const enrichedTasks = await enrichTasksWithOwnerNames(tasks);
-  const enrichedActivities = await enrichActivitiesWithCreatorNames(activities);
+  const [crossProjectIntel, companyCase] = await Promise.all([
+    getCompanyCrossProjectIntel(company.name, session.organizationId, company.id),
+    getCompanyCase(id, session.organizationId),
+  ]);
 
   return (
     <>
       <PageHeader
         title={company.name}
-        description="Company record with contacts, opportunities, tasks, documents, activity and cross-project intelligence."
+        description="Commercial manager report: where the work is, who buys, what Triangle can offer, and the next safe action."
       />
-      {crossProjectIntel && (
-        <CompanyIntelligencePanel intel={crossProjectIntel} />
-      )}
-      <CompanyDetail
+      <CompanyCaseWorkspace
         company={company}
-        contacts={enrichedContacts}
-        opportunities={enrichedOpportunities}
-        tasks={enrichedTasks}
-        documents={[]}
-        activities={enrichedActivities}
+        intel={crossProjectIntel}
+        companyCase={companyCase}
       />
     </>
   );

@@ -11,7 +11,7 @@ import {
   type Edge,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Building2, UserCircle2, Package, Info } from "lucide-react";
+import { Building2, UserCircle2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContractorChainNodeRow, ChainRole } from "@/lib/data/contractor-chain-shared";
 import { CHAIN_ROLE_LABELS } from "@/lib/data/contractor-chain-shared";
@@ -20,7 +20,36 @@ import type { ProjectPackageRow } from "@/lib/data/project-packages";
 
 // ─── Custom Node Components ────────────────────────────────────────────────
 
-const ChainNode = ({ data }: { data: any }) => {
+interface ChainNodeData {
+  role: ChainRole;
+  roleLabel: string;
+  companyName: string;
+  confidence: number | null;
+  isSuggestion: boolean;
+}
+
+interface PackageNodeData {
+  title: string;
+  summary: string | null;
+}
+
+const CHAIN_ROLES = new Set<ChainRole>([
+  "owner",
+  "developer",
+  "gc",
+  "epc",
+  "mep",
+  "electrical",
+  "intermediary",
+  "other",
+]);
+
+function suggestionRole(suggestion: ResearchSuggestionRow): ChainRole {
+  const value = String(suggestion.payload_json.role ?? "other") as ChainRole;
+  return CHAIN_ROLES.has(value) ? value : "other";
+}
+
+const ChainNode = ({ data }: { data: ChainNodeData }) => {
   const isSuggestion = data.isSuggestion;
   
   return (
@@ -76,7 +105,7 @@ const ChainNode = ({ data }: { data: any }) => {
   );
 };
 
-const PackageNode = ({ data }: { data: any }) => {
+const PackageNode = ({ data }: { data: PackageNodeData }) => {
   return (
     <div className="flex w-56 flex-col rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 shadow-sm">
       <Handle type="target" position={Position.Top} className="!h-2 !w-2 !bg-emerald-300" />
@@ -120,15 +149,8 @@ export function ContractorChainGraph({
       nodesByRole[n.role].push(n);
     });
 
-    // 2. Add suggestions for missing roles
+    // 2. Include pending suggestions alongside saved nodes.
     const pendingNodes = suggestions.filter(s => s.suggestion_type === "chain_node" && s.status === "pending");
-    pendingNodes.forEach(s => {
-      const payload = s.payload_json as any;
-      const role = payload.role;
-      // Simple heuristic: if we don't have a saved node for this role, or if this is a different company
-      if (!nodesByRole[role]) nodesByRole[role] = [];
-      // (Actually, show all suggestions for now to be complete)
-    });
 
     // 3. Define the vertical hierarchy
     const roles: ChainRole[] = ["owner", "developer", "epc", "gc", "mep", "electrical"];
@@ -141,7 +163,7 @@ export function ContractorChainGraph({
 
     roles.forEach((role, roleIndex) => {
       const saved = nodesByRole[role] || [];
-      const suggested = pendingNodes.filter(s => (s.payload_json as any).role === role);
+      const suggested = pendingNodes.filter((s) => suggestionRole(s) === role);
       
       const totalInRole = saved.length + suggested.length;
       if (totalInRole === 0) return;
@@ -171,7 +193,7 @@ export function ContractorChainGraph({
       // Add Suggested Nodes
       suggested.forEach((s, i) => {
         const id = `suggested-${s.id}`;
-        const payload = s.payload_json as any;
+        const payload = s.payload_json;
         nodes.push({
           id,
           type: "chain",
@@ -179,7 +201,7 @@ export function ContractorChainGraph({
           data: {
             role,
             roleLabel: CHAIN_ROLE_LABELS[role],
-            companyName: payload.company,
+            companyName: String(payload.company ?? "Unknown"),
             confidence: s.confidence,
             isSuggestion: true,
           },

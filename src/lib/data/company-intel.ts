@@ -76,19 +76,33 @@ export interface CompanyCrossProjectIntel {
 export async function getCompanyCrossProjectIntel(
   companyName: string,
   orgId: string,
+  companyId?: string,
 ): Promise<CompanyCrossProjectIntel | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
 
   try {
     // Step 1: Find all contractor_chain_nodes involving this company
-    const { data: chainNodes, error: chainError } = await svc
+    // Prefer the canonical company relation. Older chain rows may predate the
+    // relation, so fall back to an exact case-insensitive name lookup only
+    // when the canonical query returns no rows.
+    let chainQuery = svc
       .from("contractor_chain_nodes")
       .select("id,discovered_project_id,role,label,company_name,confidence")
-      .eq("organization_id", orgId)
-      .or(
-        `company_name.ilike.%${companyName}%,company_name.ilike.%${companyName.split(" ")[0]}%`,
-      );
+      .eq("organization_id", orgId);
+    if (companyId) chainQuery = chainQuery.eq("company_id", companyId);
+    else chainQuery = chainQuery.ilike("company_name", companyName);
+
+    let { data: chainNodes, error: chainError } = await chainQuery;
+    if (!chainError && companyId && (!chainNodes || chainNodes.length === 0)) {
+      const fallback = await svc
+        .from("contractor_chain_nodes")
+        .select("id,discovered_project_id,role,label,company_name,confidence")
+        .eq("organization_id", orgId)
+        .ilike("company_name", companyName);
+      chainNodes = fallback.data;
+      chainError = fallback.error;
+    }
 
     if (chainError) {
       console.error("getCompanyCrossProjectIntel - chainNodes error:", chainError);
@@ -120,7 +134,8 @@ export async function getCompanyCrossProjectIntel(
     // Step 2: Fetch all discovered_projects for these IDs
     const { data: projects, error: projError } = await svc
       .from("discovered_projects")
-      .select("id,title,description,location,status,created_at")
+      .select("id,project_name,ai_summary,country,city,status,created_at")
+      .eq("organization_id", orgId)
       .in("id", projectIds);
 
     if (projError) {
@@ -161,7 +176,7 @@ export async function getCompanyCrossProjectIntel(
     }
 
     // Step 6: Fetch buyer contact names for outreach if needed
-    let buyerNamesMap: Record<string, string> = {};
+    const buyerNamesMap: Record<string, string> = {};
     const outreachBuyerIds = outreach
       ?.filter((o) => o.buyer_contact_id)
       .map((o) => o.buyer_contact_id) as string[];
@@ -182,9 +197,10 @@ export async function getCompanyCrossProjectIntel(
       string,
       {
         id: string;
-        title: string;
-        description: string;
-        location: string;
+        project_name: string;
+        ai_summary: string | null;
+        country: string | null;
+        city: string | null;
         status: string;
         created_at: string;
       }
@@ -193,18 +209,19 @@ export async function getCompanyCrossProjectIntel(
     projects?.forEach((p) => {
       projectMap.set(p.id, {
         id: p.id,
-        title: p.title,
-        description: p.description,
-        location: p.location,
+        project_name: p.project_name,
+        ai_summary: p.ai_summary,
+        country: p.country,
+        city: p.city,
         status: p.status,
         created_at: p.created_at,
       });
     });
 
     // Step 8: Build project involvements
-    const projectInvolvements: ProjectInvolvement[] = chainNodes.map((node) => {
+    const projectInvolvements: ProjectInvolvement[] = chainNodes.flatMap((node) => {
       const project = projectMap.get(node.discovered_project_id);
-      if (!project) return null as any; // skip if project not found (shouldn't happen)
+      if (!project) return [];
 
       const buyerCount =
         buyerContacts?.filter((bc) => bc.discovered_project_id === node.discovered_project_id)
@@ -214,11 +231,11 @@ export async function getCompanyCrossProjectIntel(
       const outreachCount =
         outreach?.filter((o) => o.project_id === node.discovered_project_id).length ?? 0;
 
-      return {
+      return [{
         id: project.id,
-        title: project.title,
-        description: project.description,
-        location: project.location,
+        title: project.project_name,
+        description: project.ai_summary ?? "",
+        location: [project.city, project.country].filter(Boolean).join(", "),
         status: project.status,
         chainNodeId: node.id,
         companyRole: node.role,
@@ -228,8 +245,8 @@ export async function getCompanyCrossProjectIntel(
         packageCount: pkgCount,
         outreachCount: outreachCount,
         createdAt: project.created_at,
-      };
-    }).filter(Boolean);
+      }];
+    });
 
     // Step 9: Transform contacts
     const buyerContactsSummary: BuyerContactSummary[] =
@@ -243,7 +260,7 @@ export async function getCompanyCrossProjectIntel(
           linkedinUrl: bc.linkedin_url,
           buyerRole: bc.buyer_role,
           projectId: bc.discovered_project_id,
-          projectTitle: project?.title ?? "",
+          projectTitle: project?.project_name ?? "",
         };
       }) ?? [];
 
@@ -257,7 +274,7 @@ export async function getCompanyCrossProjectIntel(
           estimatedCrewSize: p.estimated_crew_size,
           confidence: p.confidence,
           projectId: p.discovered_project_id,
-          projectTitle: project?.title ?? "",
+          projectTitle: project?.project_name ?? "",
         };
       }) ?? [];
 
@@ -271,7 +288,7 @@ export async function getCompanyCrossProjectIntel(
           subject: o.subject,
           status: o.status,
           buyerName: o.buyer_contact_id ? buyerNamesMap[o.buyer_contact_id] ?? null : null,
-          projectTitle: project?.title ?? "",
+          projectTitle: project?.project_name ?? "",
           projectId: o.project_id,
           createdAt: o.created_at,
         };

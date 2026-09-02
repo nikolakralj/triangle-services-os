@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       createdAt: t.createdAt,
     })),
     note:
-      "Work assignments first. Each one carries `thread` (everything said so far) and `newQuestions` (what a human has asked since your last check and you have not answered yet). " +
+      "Work assignments first. Each one carries hydrated `workers` and `entities` case context, `expectedOutput`, `thread` (everything said so far), and `newQuestions` (what a human has asked since your last check and you have not answered yet). " +
       "Answer a question without finishing the job: POST { assignmentId, message }. " +
       "Report the job finished: POST { assignmentId, result }, adding failed: true if you could not do it. " +
       "Quick notes: POST { taskId, result }. Never send email; never invent facts.",

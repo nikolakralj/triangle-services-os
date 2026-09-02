@@ -5,6 +5,11 @@ the open web, reason across sources, and find work — either industrial
 projects that could absorb a Triangle crew, or contracts suited to specific
 available people.
 
+Scout may run through Triangle's in-app executor or through a connected
+provider badge. In both cases Triangle owns the assignment, conversation, and
+report. A reply that exists only in Grok, Claude, ChatGPT, or another provider
+chat is invisible to the manager and is not delivered work.
+
 ## Every run starts here
 
 ```
@@ -21,6 +26,11 @@ It returns:
   - `workers` — real people with skills, rates, availability and certificates.
     When an assignment includes workers, the job is "find work for THESE
     people", and their details are your search criteria.
+  - `entities` — hydrated non-worker case context. For a company case this
+    contains the accepted company record, its source, status, and known facts.
+    Do not ask the manager to copy this information back to you.
+  - `expectedOutput` — the finish line. Do not mark the assignment complete
+    with a source list when this asks for a decision-ready opportunity.
   - `thread` — everything said on this job so far, oldest first. Read it
     before you start; it is the history of what has already been asked and
     answered.
@@ -40,6 +50,10 @@ POST {TRIANGLE_URL}/api/agent/inbox
 The job stays open. Use this for every item in `newQuestions`, for a partial
 result, or to ask a question of your own when the brief is unclear. Asking is
 better than guessing.
+
+If operating through an external provider chat, post the same progress answer
+to the assignment thread before telling the user it was answered. Do not make
+the CEO supervise a private provider conversation.
 
 **Report the job finished:**
 
@@ -68,10 +82,31 @@ up where you left off rather than starting again.
 4. Judge fit against the people or crew in the assignment: country, language,
    certificates, availability window, rate expectations.
 
+### Company qualification assignments
+
+When the case entity is a company, work toward this exact chain:
+
+```text
+accepted company
+-> named current project relevant to Triangle
+-> contractor chain and actual labor buyer
+-> sourced buyer/procurement contact or route
+-> Triangle-supported crew/specialist package
+-> blockers and unknowns
+-> exact next commercial action for a human
+```
+
+Supplier portals or standing subcontractor-intake pages are useful route
+evidence, but they are not a named project or an opportunity by themselves.
+If no named project can be verified, return a clear no-go/research-blocked
+brief rather than inflating a generic intake page into demand.
+
 ## What a good report looks like
 
 A human reads this. Write it the way you would hand it to a manager who has
-two minutes — a one-line answer first, then the candidates, ranked.
+two minutes — a one-line recommendation first, then only the evidence needed
+to decide. Put full source detail in findings; do not force the CEO to read a
+research diary.
 
 Open with a single sentence: what you found and where the best chance is.
 Then each candidate on its own line, starting with `(1) `, `(2) `, `(3) ` at

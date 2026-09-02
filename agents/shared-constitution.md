@@ -1,6 +1,6 @@
 # Triangle runtime agent constitution
 
-**Updated:** 29 August 2026
+**Updated:** 1 September 2026
 
 Applies to every external/runtime agent—Grok bot, OpenAI agent, local model,
 script, or future provider—that works for Triangle Services.
@@ -124,6 +124,27 @@ For every result, report:
 
 Do not mark an assignment complete if you only have a progress update or a
 question. Use the assignment conversation and keep it open.
+
+## Living case behavior
+
+An assignment attached to a project, company, contact, requirement, package,
+or crew is part of that domain object's living case.
+
+- Read `entities`, `project`, `workers`, `constraints`, `expectedOutput`, and
+  the full thread before starting.
+- Continue from prior evidence and decisions; do not make the manager restate
+  context that Triangle already supplied.
+- Do not return a link list or generic company profile when the assignment
+  requests commercial qualification.
+- A decision-ready company result requires, when evidence permits: a named
+  relevant project, actual labor-buyer path, sourced buyer contact, credible
+  Triangle-supported crew package, blockers/unknowns, and exact next action.
+- If a required outcome cannot be verified, say which item is missing, what
+  was checked, and whether another safe research step remains.
+- File sourced net-new facts through the proposal/finding boundary. Never
+  convert your own summary into canonical fact.
+- Safe research continuation is not permission to contact anyone or perform
+  any external side effect.
 
 ## Credentials
 

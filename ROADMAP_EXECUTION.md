@@ -1,6 +1,6 @@
 # Roadmap Execution
 
-**Current cycle:** Commercial activation and contract truth
+**Current cycle:** Agent-operated commercial qualification and contract truth
 **Cycle started:** 29 August 2026
 **Long-term direction:** `ROADMAP.md`
 **Operating playbook:** `docs/strategy/FIRST_CONTRACT_30_DAY_PLAYBOOK.md`
@@ -42,6 +42,62 @@ The strongest demand is PCS7/automation. The stored available roster is
 electrical installation: electrician, cable puller, supervisor. The package
 for 50 electricians is not supported by the database. No metric may hide this
 supply-demand mismatch.
+
+## Operator model — clarified 1 September 2026
+
+The CEO is not the integration layer between pages or agents.
+
+The default internal loop is now:
+
+```text
+CEO sets an outcome or accepts a promising finding
+-> AI employee owns a durable domain case
+-> AI researches and files sourced proposals
+-> system continues pre-authorized, read-only qualification work
+-> CEO sees a brief only when a decision, exception, or commercial action exists
+```
+
+For a company case, qualification means a named relevant project, the actual
+labor-buyer path, sourced buyer contacts, a Triangle-supported crew package,
+unknowns/blockers, and one exact next commercial action. A company logo,
+generic summary, source list, or empty CRM record is not a finished case.
+
+Current implementation deliberately reuses agent assignments and their
+threads as case memory. Do not create a generic universal case platform until
+the company and project flows show a concrete limitation.
+
+### Ordered agent-first product slices
+
+1. **Company case continuity — repository and live Bilfinger smoke complete.**
+   Preserve approval provenance, link the originating assignment, queue the
+   same employee for safe qualification, hydrate company context in its inbox,
+   and promote the result into a compact commercial-manager report. Worker
+   hand-ins and conversations remain available under audit.
+2. **CEO decision inbox — repository and signed-in smoke complete.** Replace raw approval volume with grouped case briefs:
+   no action needed, agent blocked, evidence conflict, pursue/hold/reject,
+   approve commercial action. Do not hide evidence; put it behind progressive
+   disclosure.
+3. **In-app employee execution bridge — repository and local runtime smoke
+   complete.** Köster and GOLDBECK verified the full chain from acceptance to
+   queued no-outreach assignment, OpenAI web research, structured manager
+   report, linked run audit, and new pending project evidence. The CEO does not
+   need to wake Scout in provider chat. The remaining runtime step is replacing
+   the session pulse with a durable cloud scheduler when always-on operation is
+   commercially justified.
+4. **Cross-entity case pattern.** Apply the proven pattern to project, buyer
+   contact/person, requirement, and crew package. Each view must share case
+   outcome, memory, evidence, open questions, responsible employee, and next
+   action without creating duplicate truth tables.
+5. **Safe continuation policies and handoffs.** Make the allowed read-only
+   steps explicit, idempotent, budgeted, and observable. Agents may hand work
+   to another scoped role; consequential actions remain human-approved.
+6. **Outcome-backed learning.** Store corrections, accepted/rejected evidence,
+   buyer responses, placements, delivery, and margin as evaluation history.
+   Never let model-generated summaries silently overwrite canonical facts.
+
+These slices reduce real operator friction but do not count as Phase 0
+commercial evidence. Sends, buyer replies, orders, mobilization, payment, and
+margin remain the business gates.
 
 ## Phase 0 exit gate
 

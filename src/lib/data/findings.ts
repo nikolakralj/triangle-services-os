@@ -165,13 +165,20 @@ export async function acceptFinding(params: {
   findingId: string;
   orgId: string;
   userId: string | null;
-}): Promise<{ promotedTo: string | null; entityId: string | null } | null> {
+}): Promise<{
+  promotedTo: string | null;
+  entityId: string | null;
+  continuationAssignmentId: string | null;
+  destinationHref: string | null;
+} | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
 
   const { data: finding } = await svc
     .from("agent_findings")
-    .select("id, finding_type, payload, source_url, evidence_text, status, confidence")
+    .select(
+      "id, finding_type, payload, source_url, evidence_text, status, confidence, assignment_id, agent_instance_id",
+    )
     .eq("id", params.findingId)
     .eq("org_id", params.orgId)
     .maybeSingle();
@@ -180,6 +187,8 @@ export async function acceptFinding(params: {
   const payload = (finding.payload as Record<string, unknown>) ?? {};
   let promotedTo: string | null = null;
   let entityId: string | null = null;
+  let continuationAssignmentId: string | null = null;
+  let destinationHref: string | null = null;
 
   if (finding.finding_type === "project") {
     const name = String(payload.project_name ?? payload.name ?? "").trim();
@@ -241,6 +250,7 @@ export async function acceptFinding(params: {
     if (project) {
       promotedTo = "discovered_project";
       entityId = project.id as string;
+      destinationHref = `/hunter/${entityId}`;
     }
   }
 
@@ -286,6 +296,71 @@ export async function acceptFinding(params: {
     if (companyId) {
       promotedTo = "company";
       entityId = companyId;
+      destinationHref = `/companies/${companyId}`;
+
+      // Preserve where this company came from. The assignment is the case
+      // history; losing it at approval is what turned the company page into a
+      // dead CRM record with no evidence, memory, or responsible employee.
+      if (finding.assignment_id) {
+        const { data: existingLink } = await svc
+          .from("agent_assignment_entities")
+          .select("id")
+          .eq("org_id", params.orgId)
+          .eq("assignment_id", finding.assignment_id as string)
+          .eq("entity_type", "company")
+          .eq("entity_id", companyId)
+          .maybeSingle();
+        if (!existingLink) {
+          await svc.from("agent_assignment_entities").insert({
+            org_id: params.orgId,
+            assignment_id: finding.assignment_id as string,
+            entity_type: "company",
+            entity_id: companyId,
+            relation: "output",
+          });
+        }
+      }
+
+      // Approval means "this lead is worth pursuing", not "CEO, please open
+      // four more pages and manually reconstruct the research plan". Queue a
+      // safe research-only continuation for the same employee. External
+      // outreach still remains behind its separate human approval boundary.
+      if (finding.agent_instance_id) {
+        const { createAssignment } = await import("./workforce");
+        const continuation = await createAssignment({
+          orgId: params.orgId,
+          agentInstanceId: finding.agent_instance_id as string,
+          title: `Qualify ${companyName} into a placement opportunity`,
+          objective: [
+            `Continue the accepted company finding for ${companyName} as one durable commercial case.`,
+            "Do not contact the company or any person.",
+            "Find a current, named project relevant to Triangle's approved services; map the contractor chain far enough to identify the actual labor buyer; identify sourced buyer contacts; propose a specific Triangle-supported crew package; and state the exact next commercial action.",
+            "Separate verified facts, strong inferences, and unknowns. Every material claim needs a source URL and evidence. File net-new projects, companies, and contacts as findings for human review.",
+            "Do not call this an opportunity unless the result has a plausible project, buyer path, crew package, and next action. Return a short CEO decision brief, not a list of links.",
+          ].join("\n\n"),
+          priority: "high",
+          expectedOutput:
+            "A decision-ready qualified project package opportunity, or a clear no-go with the evidence and remaining blocker.",
+          constraints: {
+            case_type: "company_qualification",
+            execution_mode: "in_app",
+            company_id: companyId,
+            source_finding_id: params.findingId,
+            no_outreach: true,
+            required_outcome: [
+              "named_project",
+              "buyer_path",
+              "buyer_contact",
+              "crew_package",
+              "next_commercial_action",
+            ],
+          },
+          idempotencyKey: `company-qualification:${params.findingId}`,
+          entityRefs: [{ type: "company", id: companyId, relation: "target" }],
+          userId: params.userId,
+        });
+        continuationAssignmentId = continuation?.id ?? null;
+      }
 
       const projectName = String(payload.project ?? "").trim();
       if (projectName) {
@@ -429,7 +504,12 @@ export async function acceptFinding(params: {
     .eq("id", params.findingId)
     .eq("org_id", params.orgId);
 
-  return { promotedTo, entityId };
+  return {
+    promotedTo,
+    entityId,
+    continuationAssignmentId,
+    destinationHref,
+  };
 }
 
 export async function rejectFinding(params: {

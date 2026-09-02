@@ -180,12 +180,32 @@ export async function createAssignment(params: {
   priority?: Assignment["priority"];
   dueAt?: string | null;
   constraints?: Record<string, unknown>;
+  expectedOutput?: string | null;
+  idempotencyKey?: string | null;
   workerIds?: string[];
+  entityRefs?: Array<{
+    type: "worker" | "job_lead" | "project" | "project_package" | "company" | "contact" | "crew" | "other";
+    id: string;
+    relation?: "input" | "target" | "context" | "output";
+  }>;
   projectId?: string | null;
   userId: string | null;
 }): Promise<{ id: string } | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
+
+  // Approval endpoints may be retried after a network interruption. Return
+  // the already-created continuation instead of producing duplicate agent
+  // work for the same accepted finding.
+  if (params.idempotencyKey) {
+    const { data: existing } = await svc
+      .from("agent_assignments")
+      .select("id")
+      .eq("org_id", params.orgId)
+      .eq("idempotency_key", params.idempotencyKey)
+      .maybeSingle();
+    if (existing) return { id: existing.id as string };
+  }
 
   const { data, error } = await svc
     .from("agent_assignments")
@@ -197,6 +217,8 @@ export async function createAssignment(params: {
       priority: params.priority ?? "normal",
       due_at: params.dueAt ?? null,
       constraints: params.constraints ?? {},
+      expected_output: params.expectedOutput ?? null,
+      idempotency_key: params.idempotencyKey ?? null,
       project_id: params.projectId ?? null,
       created_by: params.userId,
     })
@@ -204,15 +226,22 @@ export async function createAssignment(params: {
     .maybeSingle();
   if (error || !data) return null;
 
-  const workerIds = params.workerIds ?? [];
-  if (workerIds.length > 0) {
+  const entityRefs = [
+    ...(params.workerIds ?? []).map((id) => ({
+      type: "worker" as const,
+      id,
+      relation: "input" as const,
+    })),
+    ...(params.entityRefs ?? []),
+  ];
+  if (entityRefs.length > 0) {
     await svc.from("agent_assignment_entities").insert(
-      workerIds.map((wid) => ({
+      entityRefs.map((entity) => ({
         org_id: params.orgId,
         assignment_id: data.id as string,
-        entity_type: "worker",
-        entity_id: wid,
-        relation: "input",
+        entity_type: entity.type,
+        entity_id: entity.id,
+        relation: entity.relation ?? "context",
       })),
     );
   }
@@ -239,7 +268,7 @@ export async function listAssignments(
   const ids = rows.map((r) => r.id as string);
   const { data: ents } = await svc
     .from("agent_assignment_entities")
-    .select("assignment_id, entity_type, entity_id")
+    .select("assignment_id, entity_type, entity_id, relation")
     .in("assignment_id", ids);
 
   const workerIds = Array.from(
@@ -330,7 +359,14 @@ export interface AssignmentForBot {
   priority: string;
   dueAt: string | null;
   constraints: Record<string, unknown>;
+  expectedOutput: string | null;
   workers: Array<Record<string, unknown>>;
+  /** Non-worker records attached to this case, hydrated for useful context. */
+  entities: Array<{
+    type: string;
+    relation: string;
+    record: Record<string, unknown>;
+  }>;
   /** The project this job is about, when it is about one. */
   project: { id: string; name: string } | null;
   /** Everything said on this job so far, oldest first. */
@@ -354,7 +390,9 @@ export async function listOpenAssignmentsForInstance(
   if (!svc) return [];
   const { data } = await svc
     .from("agent_assignments")
-    .select("id, title, objective, priority, due_at, constraints, status, project_id")
+    .select(
+      "id, title, objective, priority, due_at, constraints, expected_output, status, project_id",
+    )
     .eq("org_id", orgId)
     .eq("agent_instance_id", agentInstanceId)
     .in("status", ["queued", "active"])
@@ -373,7 +411,7 @@ export async function listOpenAssignmentsForInstance(
   const ids = rows.map((r) => r.id as string);
   const { data: ents } = await svc
     .from("agent_assignment_entities")
-    .select("assignment_id, entity_type, entity_id")
+    .select("assignment_id, entity_type, entity_id, relation")
     .in("assignment_id", ids);
   const workerIds = Array.from(
     new Set(
@@ -402,6 +440,51 @@ export async function listOpenAssignmentsForInstance(
     byAssignment.get(k)!.push(w);
   }
 
+  // Company case assignments must carry the company record into the agent's
+  // inbox. A bare UUID forces the human to copy context between pages, which
+  // is the exact workflow this assignment model is meant to remove.
+  const companyIds = Array.from(
+    new Set(
+      (ents ?? [])
+        .filter((e) => e.entity_type === "company")
+        .map((e) => e.entity_id as string),
+    ),
+  );
+  const companies = new Map<string, Record<string, unknown>>();
+  if (companyIds.length > 0) {
+    const { data: rows } = await svc
+      .from("companies")
+      .select(
+        "id,name,legal_name,company_type,company_status,country,region,city,website,website_domain,linkedin_url,source_url,sectors,priority,lead_score,lead_score_reason,description,pain_points,notes,research_status,do_not_contact,next_action_at",
+      )
+      .eq("organization_id", orgId)
+      .in("id", companyIds);
+    for (const company of rows ?? []) {
+      companies.set(company.id as string, company as Record<string, unknown>);
+    }
+  }
+  const entitiesByAssignment = new Map<
+    string,
+    Array<{ type: string; relation: string; record: Record<string, unknown> }>
+  >();
+  for (const entity of ents ?? []) {
+    if (entity.entity_type === "worker") continue;
+    const record =
+      entity.entity_type === "company"
+        ? companies.get(entity.entity_id as string)
+        : { id: entity.entity_id as string };
+    if (!record) continue;
+    const assignmentId = entity.assignment_id as string;
+    if (!entitiesByAssignment.has(assignmentId)) {
+      entitiesByAssignment.set(assignmentId, []);
+    }
+    entitiesByAssignment.get(assignmentId)!.push({
+      type: entity.entity_type as string,
+      relation: (entity.relation as string) ?? "context",
+      record,
+    });
+  }
+
   // Hand over the conversation and stamp the human messages delivered, so the
   // bot is told exactly once what it still owes an answer to.
   const threads = await takeThreadForBot(ids, orgId);
@@ -428,7 +511,9 @@ export async function listOpenAssignmentsForInstance(
       priority: r.priority as string,
       dueAt: (r.due_at as string) ?? null,
       constraints: (r.constraints as Record<string, unknown>) ?? {},
+      expectedOutput: (r.expected_output as string) ?? null,
       workers: byAssignment.get(r.id as string) ?? [],
+      entities: entitiesByAssignment.get(r.id as string) ?? [],
       project: pid ? { id: pid, name: projectNames.get(pid) ?? "unknown project" } : null,
       thread: t?.thread ?? [],
       newQuestions: t?.newQuestions ?? [],
@@ -450,7 +535,10 @@ export async function completeAssignment(params: {
     .from("agent_assignments")
     .update({
       status: params.failed ? "failed" : "completed",
-      result_summary: params.resultSummary.slice(0, 8000),
+      // `result_summary` is an unrestricted Postgres text column. Never cut a
+      // structured hand-in mid-JSON; presentation layers decide how much of
+      // the worker audit to show.
+      result_summary: params.resultSummary,
       completed_at: new Date().toISOString(),
     })
     .eq("id", params.assignmentId)

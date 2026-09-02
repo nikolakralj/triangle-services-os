@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  ExternalLink,
   ShieldAlert,
   Zap,
   Waypoints,
@@ -18,10 +17,7 @@ import {
 import { listCompanies, rowToCompany } from "@/lib/data/companies";
 import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
 import { getChainNodes, getBuyerContacts, type ContractorChainNodeRow } from "@/lib/data/contractor-chain";
-import {
-  listResearchRuns,
-  listResearchSuggestions,
-} from "@/lib/data/research";
+import { listResearchSuggestions } from "@/lib/data/research";
 import { listProjectPackages } from "@/lib/data/project-packages";
 import { listOutreachDrafts } from "@/lib/data/outreach";
 import { listPackageMatches } from "@/lib/data/worker-matching";
@@ -69,7 +65,6 @@ export default async function DiscoveredProjectDetailPage({
   const [
     savedChainNodes,
     allResearchSuggestions,
-    researchRuns,
     dbPackages,
     outreachDrafts,
     buyerContacts,
@@ -78,13 +73,12 @@ export default async function DiscoveredProjectDetailPage({
     ? await Promise.all([
         getChainNodes(id, session.organizationId),
         listResearchSuggestions(id, session.organizationId),
-        listResearchRuns(id, session.organizationId),
         listProjectPackages(id, session.organizationId),
         listOutreachDrafts(id, session.organizationId),
         getBuyerContacts(id, session.organizationId),
         getProjectNote(id, session.organizationId),
       ])
-    : [[], [], [], [], [], [], null];
+    : [[], [], [], [], [], null];
 
   // Fetch existing worker matches for all DB packages in parallel
   const initialMatchesMap: Record<string, import("@/lib/data/worker-matching").PackageMatchRow[]> =
@@ -106,7 +100,7 @@ export default async function DiscoveredProjectDetailPage({
   const readiness = buildCommercialReadiness(project);
   const contractorChain = buildContractorChain(project);
   const heuristicPackages = buildPackageOpportunities(project);
-  const packageOpportunities = mergePackageOpportunities(heuristicPackages, dbPackages, project);
+  const packageOpportunities = mergePackageOpportunities(heuristicPackages, dbPackages);
 
   // Build lookup maps for OutreachDraftsPanel
   const buyersById: Record<
@@ -136,9 +130,7 @@ export default async function DiscoveredProjectDetailPage({
   for (const pkg of dbPackages) {
     packagesById[pkg.id] = { id: pkg.id, title: pkg.title };
   }
-  const latestResearchRun = researchRuns[0] ?? null;
   const pendingSuggestionCount = allResearchSuggestions.filter((s) => s.status === "pending").length;
-  const activeView = query.view === "overview" || query.view === "graph" ? query.view : "queue";
   const showWeakDefault = query.showWeak === "true";
 
   return (
@@ -468,38 +460,6 @@ function Info({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 text-sm font-medium text-slate-800">{value}</p>
-    </div>
-  );
-}
-
-function ScoreRow({ label, value }: { label: string; value?: number }) {
-  if (value === undefined || value === null) {
-    return (
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>{label}</span>
-        <span>-</span>
-      </div>
-    );
-  }
-
-  const color =
-    value >= 80
-      ? "bg-emerald-500"
-      : value >= 60
-        ? "bg-sky-500"
-        : value >= 40
-          ? "bg-amber-500"
-          : "bg-slate-400";
-
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-sm">
-        <span>{label}</span>
-        <span className="font-bold">{value}/100</span>
-      </div>
-      <div className="h-2 rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
-      </div>
     </div>
   );
 }

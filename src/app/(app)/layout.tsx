@@ -1,8 +1,9 @@
 import { AuthGate } from "@/components/auth/auth-gate";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { AgentWorkPulse } from "@/components/modules/agent-work-pulse";
 import { getSession } from "@/lib/auth/session";
-import { countPendingApprovals } from "@/lib/data/approvals";
+import { countDecisionAttention } from "@/lib/data/decision-inbox";
 import {
   DEMO_ORGANIZATION_PROFILE,
   getOrganizationOperatingProfile,
@@ -20,13 +21,14 @@ export default async function AppLayout({
   // every page, not only from the one project they were filed against.
   const [approvalsCount, organizationProfile] = session?.organizationId
     ? await Promise.all([
-        countPendingApprovals(session.organizationId),
+        countDecisionAttention(session.organizationId),
         getOrganizationOperatingProfile(session.organizationId),
       ])
     : [0, DEMO_ORGANIZATION_PROFILE];
 
   return (
     <AuthGate>
+      {session?.organizationId ? <AgentWorkPulse /> : null}
       <div className="flex min-h-screen bg-slate-50">
         <Sidebar approvalsCount={approvalsCount} />
         <div className="min-w-0 flex-1">

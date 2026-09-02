@@ -255,6 +255,18 @@ export async function logAgentRun(params: {
   agentName: string;
   source: string;
   summary: Record<string, unknown>;
+  agentInstanceId?: string;
+  assignmentId?: string;
+  provider?: string;
+  model?: string;
+  status?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedCost?: number;
+  error?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<void> {
   try {
     const svc = createServiceSupabaseClient();
@@ -264,6 +276,18 @@ export async function logAgentRun(params: {
       agent_name: params.agentName,
       source: params.source,
       summary: params.summary,
+      agent_instance_id: params.agentInstanceId,
+      assignment_id: params.assignmentId,
+      provider: params.provider,
+      model: params.model,
+      status: params.status,
+      started_at: params.startedAt,
+      finished_at: params.finishedAt,
+      input_tokens: params.inputTokens,
+      output_tokens: params.outputTokens,
+      estimated_cost: params.estimatedCost,
+      error: params.error,
+      metadata: params.metadata ?? {},
     });
   } catch {
     // Logging must never break the run it is logging.

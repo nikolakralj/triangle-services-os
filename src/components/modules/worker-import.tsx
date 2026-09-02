@@ -1,6 +1,7 @@
 "use client";
 
 import Papa from "papaparse";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, Loader2, Upload } from "lucide-react";
@@ -353,12 +354,12 @@ export function WorkerImport() {
                 </ul>
               </div>
             )}
-            <a
+            <Link
               href="/workers"
               className="mt-2 inline-block text-xs font-medium text-emerald-800 underline"
             >
               Open the Talent Pool
-            </a>
+            </Link>
           </div>
         )}
       </div>
