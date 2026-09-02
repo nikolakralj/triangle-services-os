@@ -2,7 +2,7 @@ import "server-only";
 import { countMessagesByAssignment } from "@/lib/data/assignment-threads";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
-export interface CompanyCaseAssignment {
+export interface CaseAssignment {
   id: string;
   title: string;
   objective: string;
@@ -16,7 +16,7 @@ export interface CompanyCaseAssignment {
   awaitingAgent: number;
 }
 
-export interface CompanyCaseEvidence {
+export interface CaseEvidence {
   id: string;
   findingType: string;
   payload: Record<string, unknown>;
@@ -28,10 +28,56 @@ export interface CompanyCaseEvidence {
   assignmentId: string | null;
 }
 
-export interface CompanyCaseSnapshot {
-  assignments: CompanyCaseAssignment[];
-  evidence: CompanyCaseEvidence[];
+export interface CaseSnapshot {
+  assignments: CaseAssignment[];
+  evidence: CaseEvidence[];
 }
+
+/**
+ * Roadmap item 4 asks for the company-case pattern on projects, buyer
+ * contacts, requirements and packages "without creating duplicate truth
+ * tables". Four near-copies of this loader would be exactly that, so the
+ * entity is a parameter instead. Only the join keys and the relevance test
+ * differ between them.
+ */
+export type CaseEntityType = "company" | "project" | "worker";
+
+interface CaseEntityConfig {
+  /** agent_assignment_entities.entity_type */
+  linkType: string;
+  /** agent_findings.promoted_entity_type */
+  promotedType: string;
+  /** payload keys that carry this entity's name, for the relevance test */
+  nameKeys: string[];
+  /** an assignment titled this way is dedicated to one entity of this kind */
+  dedicatedTitlePrefix: string;
+}
+
+const CASE_ENTITIES: Record<CaseEntityType, CaseEntityConfig> = {
+  company: {
+    linkType: "company",
+    promotedType: "company",
+    nameKeys: ["company_name", "name", "company"],
+    dedicatedTitlePrefix: "qualify ",
+  },
+  project: {
+    linkType: "project",
+    promotedType: "discovered_project",
+    nameKeys: ["project_name", "project", "name"],
+    dedicatedTitlePrefix: "qualify ",
+  },
+  worker: {
+    linkType: "worker",
+    promotedType: "worker",
+    nameKeys: ["full_name", "name"],
+    dedicatedTitlePrefix: "worker ",
+  },
+};
+
+/** Backwards-compatible aliases — the company workspace imports these. */
+export type CompanyCaseAssignment = CaseAssignment;
+export type CompanyCaseEvidence = CaseEvidence;
+export type CompanyCaseSnapshot = CaseSnapshot;
 
 /**
  * Load the durable research case behind one company.
@@ -40,10 +86,12 @@ export interface CompanyCaseSnapshot {
  * promoted finding is also inspected so companies accepted before that link
  * existed still retain their original assignment and report.
  */
-export async function getCompanyCase(
-  companyId: string,
+export async function getEntityCase(
+  entityType: CaseEntityType,
+  entityId: string,
   orgId: string,
-): Promise<CompanyCaseSnapshot> {
+): Promise<CaseSnapshot> {
+  const config = CASE_ENTITIES[entityType];
   const svc = createServiceSupabaseClient();
   if (!svc) return { assignments: [], evidence: [] };
 
@@ -52,16 +100,16 @@ export async function getCompanyCase(
       .from("agent_assignment_entities")
       .select("assignment_id")
       .eq("org_id", orgId)
-      .eq("entity_type", "company")
-      .eq("entity_id", companyId),
+      .eq("entity_type", config.linkType)
+      .eq("entity_id", entityId),
     svc
       .from("agent_findings")
       .select(
         "id,finding_type,payload,source_url,evidence_text,confidence,status,created_at,assignment_id",
       )
       .eq("org_id", orgId)
-      .eq("promoted_entity_type", "company")
-      .eq("promoted_entity_id", companyId)
+      .eq("promoted_entity_type", config.promotedType)
+      .eq("promoted_entity_id", entityId)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -75,7 +123,7 @@ export async function getCompanyCase(
     ),
   );
 
-  const evidenceById = new Map<string, CompanyCaseEvidence>();
+  const evidenceById = new Map<string, CaseEvidence>();
   const addEvidence = (row: (typeof promotedRows)[number]) => {
     evidenceById.set(row.id as string, {
       id: row.id as string,
@@ -84,7 +132,7 @@ export async function getCompanyCase(
       sourceUrl: (row.source_url as string) ?? null,
       evidenceText: (row.evidence_text as string) ?? null,
       confidence: (row.confidence as number) ?? null,
-      status: row.status as CompanyCaseEvidence["status"],
+      status: row.status as CaseEvidence["status"],
       createdAt: row.created_at as string,
       assignmentId: (row.assignment_id as string) ?? null,
     });
@@ -119,22 +167,24 @@ export async function getCompanyCase(
   // of a dedicated company-qualification assignment. Broad source assignments
   // often discover six companies at once; showing all six on every case is
   // the same information dumping the CEO asked us to remove.
-  const companyNameTokens = promotedRows
-    .flatMap((row) => {
-      const payload = (row.payload as Record<string, unknown>) ?? {};
-      return [payload.company_name, payload.name, payload.company]
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase());
-    });
+  const entityNameTokens = promotedRows.flatMap((row) => {
+    const payload = (row.payload as Record<string, unknown>) ?? {};
+    return config.nameKeys
+      .map((key) => payload[key])
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+  });
   const dedicatedAssignmentIds = new Set(
     (assignmentsResult.data ?? [])
-      .filter((row) => row.title?.toLowerCase().startsWith("qualify "))
+      .filter((row) =>
+        row.title?.toLowerCase().startsWith(config.dedicatedTitlePrefix),
+      )
       .map((row) => row.id as string),
   );
   for (const row of relatedFindingsResult.data ?? []) {
     const payloadText = JSON.stringify(row.payload ?? {}).toLowerCase();
-    const aboutCompany = companyNameTokens.some((name) => payloadText.includes(name));
-    if (aboutCompany || dedicatedAssignmentIds.has(row.assignment_id as string)) {
+    const aboutEntity = entityNameTokens.some((name) => payloadText.includes(name));
+    if (aboutEntity || dedicatedAssignmentIds.has(row.assignment_id as string)) {
       addEvidence(row);
     }
   }
@@ -159,7 +209,7 @@ export async function getCompanyCase(
     }
   }
 
-  const assignments: CompanyCaseAssignment[] = (assignmentsResult.data ?? []).map(
+  const assignments: CaseAssignment[] = (assignmentsResult.data ?? []).map(
     (row) => {
       const agent = agents.get(row.agent_instance_id as string);
       const thread = threadCounts.get(row.id as string);
@@ -167,7 +217,7 @@ export async function getCompanyCase(
         id: row.id as string,
         title: row.title as string,
         objective: row.objective as string,
-        status: row.status as CompanyCaseAssignment["status"],
+        status: row.status as CaseAssignment["status"],
         resultSummary: (row.result_summary as string) ?? null,
         createdAt: row.created_at as string,
         completedAt: (row.completed_at as string) ?? null,
@@ -185,4 +235,12 @@ export async function getCompanyCase(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     ),
   };
+}
+
+/** The original entry point, unchanged for callers. */
+export async function getCompanyCase(
+  companyId: string,
+  orgId: string,
+): Promise<CaseSnapshot> {
+  return getEntityCase("company", companyId, orgId);
 }

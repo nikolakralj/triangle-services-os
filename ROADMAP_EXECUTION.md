@@ -84,7 +84,16 @@ the company and project flows show a concrete limitation.
    need to wake Scout in provider chat. The remaining runtime step is replacing
    the session pulse with a durable cloud scheduler when always-on operation is
    commercially justified.
-4. **Cross-entity case pattern.** Apply the proven pattern to project, buyer
+4. **Cross-entity case pattern — project done, three to go.** The loader is
+   now `getEntityCase(entityType, entityId, orgId)` rather than four
+   near-copies, which is what "without duplicate truth tables" has to mean in
+   practice; `getCompanyCase` delegates to it and the company workspace is
+   untouched. Projects carry a Case history panel showing the responsible
+   employee, their manager report and the evidence it produced — verified on
+   NTT Global Data Centers Berlin, which resolves to Scout's completed "Data
+   Centers" assignment with a 3,200-character report and four findings. Buyer
+   contact/person, requirement and crew package still need the same treatment.
+   Apply the proven pattern to project, buyer
    contact/person, requirement, and crew package. Each view must share case
    outcome, memory, evidence, open questions, responsible employee, and next
    action without creating duplicate truth tables.

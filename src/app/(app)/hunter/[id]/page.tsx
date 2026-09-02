@@ -30,6 +30,8 @@ import { ResearchChatPanel } from "@/components/modules/research-chat-panel";
 import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel";
 import { OutreachComposer } from "@/components/modules/outreach-composer";
 import { BuyerContactsPanel } from "@/components/modules/buyer-contacts-panel";
+import { EntityCasePanel } from "@/components/modules/entity-case-panel";
+import { getEntityCase } from "@/lib/data/company-case";
 import { WorkerMatchPanel } from "@/components/modules/worker-match-panel";
 import { ProjectNotesPanel } from "@/components/modules/project-notes-panel";
 import { PersistedCollapsible } from "@/components/modules/persisted-collapsible";
@@ -93,6 +95,10 @@ export default async function DiscoveredProjectDetailPage({
   }
 
   if (!row || row.organization_id !== session.organizationId) notFound();
+
+  // Roadmap item 4 — the same case snapshot the company workspace uses, so a
+  // project carries its own history rather than a second version of it.
+  const projectCase = await getEntityCase("project", id, session.organizationId);
 
   const project = rowToDiscoveredProject(row);
   const companies = companyRows.map(rowToCompany);
@@ -258,6 +264,17 @@ export default async function DiscoveredProjectDetailPage({
                 estimatedCrewSize: p.estimated_crew_size ?? null,
               }))}
             initialMatches={initialMatchesMap}
+          />
+        </PersistedCollapsible>
+
+        <PersistedCollapsible
+          storageKey={`hunter:${project.id}:case`}
+          title="Case history"
+          description="Which employee worked this, what they reported, and what it produced."
+        >
+          <EntityCasePanel
+            snapshot={projectCase}
+            emptyHint="No employee has been assigned to this project yet. Assign one from Workforce and its report will appear here."
           />
         </PersistedCollapsible>
 
