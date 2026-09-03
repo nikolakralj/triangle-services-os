@@ -1,6 +1,6 @@
 import "server-only";
 import { reachObjective } from "@/lib/data/job-suggestions";
-import { createAssignment } from "@/lib/data/workforce";
+import { createAssignment, nextAttemptKey } from "@/lib/data/workforce";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +59,15 @@ export async function queueReachabilityJob(params: {
     };
   }
 
+  const baseKey = `reachability:${contact.id}`;
+  const attempt = await nextAttemptKey(params.orgId, baseKey);
+  if ("openAssignmentId" in attempt) {
+    return {
+      ok: false,
+      error: "Someone is already looking for this one.",
+    };
+  }
+
   const name = (contact.full_name as string) ?? "this contact";
   const company = (contact.company_name as string) ?? null;
   const runtime = params.runtime ?? "bot";
@@ -80,8 +89,10 @@ export async function queueReachabilityJob(params: {
       no_outreach: true,
       required_outcome: ["published_channel_or_sourced_absence"],
     },
-    // One open job per contact. Clicking twice does not queue Scout twice.
-    idempotencyKey: `reachability:${contact.id}`,
+    // One OPEN job per contact — clicking twice does not queue Scout twice —
+    // but a finished job can be run again, which is the whole point after a
+    // report came back with nothing filed.
+    idempotencyKey: attempt.key,
     entityRefs: [{ type: "contact", id: contact.id as string, relation: "target" }],
     userId: params.userId,
   });

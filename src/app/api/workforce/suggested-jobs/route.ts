@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { suggestJobs } from "@/lib/data/job-suggestions";
-import { createAssignment } from "@/lib/data/workforce";
+import { createAssignment, nextAttemptKey } from "@/lib/data/workforce";
 import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
 
 /**
@@ -58,6 +58,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // A finished job can be handed out again; an open one cannot.
+  const attempt = await nextAttemptKey(access.organizationId, job.id);
+  if ("openAssignmentId" in attempt) {
+    return NextResponse.json(
+      { error: "Someone is already working on that one." },
+      { status: 409 },
+    );
+  }
+
   const assignment = await createAssignment({
     orgId: access.organizationId,
     agentInstanceId,
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
     priority: job.priority,
     expectedOutput: null,
     constraints: { ...job.constraints, suggestion_id: job.id },
-    idempotencyKey: job.id,
+    idempotencyKey: attempt.key,
     entityRefs: job.entityRefs.map((e) => ({
       type: e.type as "company" | "worker" | "project" | "contact" | "other",
       id: e.id,

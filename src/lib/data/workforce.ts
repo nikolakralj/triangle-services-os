@@ -594,3 +594,35 @@ export async function listWorkersLite(orgId: string): Promise<WorkerLite[]> {
     availability: (w.availability_status as string) ?? null,
   }));
 }
+
+/**
+ * An idempotency key that allows a genuine re-run.
+ *
+ * `createAssignment` treats a repeated key as a retry and hands back the
+ * existing row — which is right for a network retry and wrong for "Scout
+ * reported, filed nothing, do it again". A completed job would silently
+ * return itself and the CEO would watch nothing happen.
+ *
+ * So: refuse while the work is still open, and otherwise number the attempt.
+ */
+export async function nextAttemptKey(
+  orgId: string,
+  baseKey: string,
+): Promise<{ key: string } | { openAssignmentId: string }> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return { key: baseKey };
+
+  const { data } = await svc
+    .from("agent_assignments")
+    .select("id, status, idempotency_key")
+    .eq("org_id", orgId)
+    .or(`idempotency_key.eq.${baseKey},idempotency_key.like.${baseKey}#%`);
+
+  const rows = data ?? [];
+  const open = rows.find(
+    (r) => r.status === "queued" || r.status === "active",
+  );
+  if (open) return { openAssignmentId: open.id as string };
+  if (rows.length === 0) return { key: baseKey };
+  return { key: `${baseKey}#${rows.length + 1}` };
+}
