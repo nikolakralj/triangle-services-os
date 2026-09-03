@@ -99,6 +99,47 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### Reachability is a job, not a form field — 2 September 2026
+
+The first instinct after the pipeline audit was to store the company domain
+and give the CEO a one-click "Open Impressum" plus a box to paste what they
+found. That is a CRM. It moves the work onto the board.
+
+The correct shape is the one CASE-001 already established for companies:
+**an employee is sent, and a human accepts what comes back.**
+
+- `contact_reachability` is a second job type for the same employee. Scout
+  already searches the web with sourced evidence and is already forbidden from
+  outreach; finding the door is not a different profession from finding who
+  buys. No second bot, and CASE-004 (multi-role handoffs) stays gated.
+- `execution_mode` decides the runtime. `bot` leaves the job in
+  `/api/agent/inbox` for the Scout already running on a provider platform —
+  paid for, with a real browser. `in_app` gives it to Triangle's OpenAI
+  executor, which runs unattended but bills per run. The two never race for
+  the same job because the mode is explicit.
+- The report schema forces the honesty that matters here. Every channel states
+  whether it is the person's own, their department's, or the switchboard, and
+  a switchboard number arrives with `howToOpen` — the sentence to say when
+  someone picks up, in German for German companies. Inventing a plausible
+  `vorname.nachname@firma.de` is explicitly forbidden; a sourced absence is a
+  valid result.
+- Each channel is filed as its own `contact_channel` finding, so the CEO can
+  accept the switchboard and reject a shaky personal address separately.
+  Accepting writes it to the contact — a personal address into the field, a
+  switchboard into notes with whose desk it is — and backfills the company's
+  `website_domain`, which was null on all 172 companies.
+- Accepting a buyer contact with no email and no LinkedIn now queues the job
+  automatically. Nobody has to notice the gap.
+
+Verified signed-in: clicking "Find how to reach them" on Peter Östlund queued
+`Reach Peter Östlund` for Scout at high priority with
+`execution_mode: bot`, and the inbox query hands Scout the hydrated
+person — name, title, company, why they matter — not a UUID. Two schema
+mistakes were caught against live data before shipping: `buyer_contacts` has
+neither a `phone` nor a `source_url` column.
+
+That job is still queued. It runs when Scout next polls.
+
 ### Repository implementation — cases on every record (CASE-003)
 
 The company case proved a record is more useful when it carries its own

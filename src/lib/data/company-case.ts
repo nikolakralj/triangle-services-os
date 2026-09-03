@@ -99,7 +99,9 @@ const CASE_ENTITIES: Record<CaseEntityType, CaseEntityConfig> = {
     dedicatedTitlePrefix: "worker ",
   },
   buyer_contact: {
-    linkType: "buyer_contact",
+    // Matches agent_assignment_entities' own vocabulary, so a reachability
+    // job queued against a contact shows up on that contact's case.
+    linkType: "contact",
     promotedType: "buyer_contact",
     suggestionTypes: ["buyer_contact"],
     nameKeys: ["name", "full_name"],

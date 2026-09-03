@@ -1,8 +1,13 @@
 import "server-only";
 import {
+  createReachabilityAgent,
   createScoutQualificationAgent,
   getScoutModelId,
 } from "@/lib/ai/scout-agent";
+import {
+  describeChannel,
+  serializeReachabilityReport,
+} from "@/lib/ai/reachability-report";
 import { serializeScoutCaseReport } from "@/lib/ai/scout-case-report";
 import { addAgentMessage, takeThreadForBot } from "@/lib/data/assignment-threads";
 import { logAgentRun } from "@/lib/data/agents";
@@ -175,6 +180,13 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
   const assignment = await claimNextAssignment(orgId);
   if (!assignment) return { status: "idle" };
 
+  // Scout has more than one job now. The constraint says which one; anything
+  // unlabelled is a company qualification, which is what every existing
+  // assignment is.
+  if (assignment.constraints.case_type === "contact_reachability") {
+    return runReachabilityAssignment(assignment);
+  }
+
   const startedAt = new Date();
   const model = getScoutModelId();
   try {
@@ -292,6 +304,162 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
       status: "failed",
       startedAt: startedAt.toISOString(),
       finishedAt: new Date().toISOString(),
+      error: message,
+    });
+    return { status: "failed", assignmentId: assignment.id, error: message };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reachability: send an employee to find the door.
+// ---------------------------------------------------------------------------
+
+async function runReachabilityAssignment(
+  assignment: ClaimedAssignment,
+): Promise<ScoutWorkResult> {
+  const startedAt = new Date();
+  const model = getScoutModelId();
+  const service = createServiceSupabaseClient();
+  if (!service) {
+    return { status: "failed", assignmentId: assignment.id, error: "Database unavailable" };
+  }
+
+  try {
+    const contactId = String(assignment.constraints.buyer_contact_id ?? "");
+    const { data: contact } = await service
+      .from("buyer_contacts")
+      .select("id, full_name, job_title, company_name, buyer_role, notes")
+      .eq("organization_id", assignment.orgId)
+      .eq("id", contactId)
+      .maybeSingle();
+    if (!contact) throw new Error("Reachability job has no buyer contact attached");
+
+    const [profile, threadMap] = await Promise.all([
+      getOrganizationOperatingProfile(assignment.orgId),
+      takeThreadForBot([assignment.id], assignment.orgId),
+    ]);
+
+    const agent = createReachabilityAgent();
+    const result = await agent.generate({
+      prompt: [
+        "Find a published, legitimate way to reach this person, or the desk that owns their work.",
+        "Do not contact them. Do not submit a form. Find the door only.",
+        `Person: ${contact.full_name}`,
+        contact.job_title ? `Title: ${contact.job_title}` : null,
+        contact.company_name ? `Company: ${contact.company_name}` : null,
+        contact.buyer_role ? `Why they matter: ${contact.buyer_role}` : null,
+        profile?.companyProfile
+          ? `What Triangle would be asking them about: ${profile.companyProfile}`
+          : null,
+        (threadMap.get(assignment.id)?.thread.length ?? 0) > 0
+          ? `Notes from the manager:\n${threadMap
+              .get(assignment.id)!
+              .thread.map((m) => `- ${m.from}: ${m.text}`)
+              .join("\n")}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    });
+    if (!result.output) throw new Error("Reachability job returned no structured report");
+
+    const report = result.output;
+
+    await addAgentMessage({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      body: report.found
+        ? `Found ${report.channels.length} way(s) to reach ${contact.full_name}: ${report.channels
+            .map(describeChannel)
+            .join("; ")}`
+        : `No published channel found for ${contact.full_name}. ${report.notFoundReason ?? ""}`.trim(),
+    });
+
+    const completed = await completeAssignment({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      resultSummary: serializeReachabilityReport(report),
+    });
+    if (!completed) {
+      throw new Error("Assignment changed before the reachability report could be submitted");
+    }
+
+    // One finding per channel. They are separate decisions: a manager may
+    // accept the switchboard and reject a shaky personal address, and each
+    // carries its own source and quoted line.
+    for (const [index, channel] of report.channels.entries()) {
+      await createFinding({
+        orgId: assignment.orgId,
+        agentInstanceId: assignment.agentInstanceId,
+        assignmentId: assignment.id,
+        findingType: "contact_channel",
+        payload: {
+          buyer_contact_id: contact.id,
+          full_name: contact.full_name,
+          company: contact.company_name,
+          kind: channel.kind,
+          value: channel.value,
+          scope: channel.scope,
+          belongs_to: channel.belongsTo,
+          how_to_open: report.howToOpen,
+          impressum_url: report.impressumUrl,
+          company_website: report.companyWebsite,
+        },
+        sourceUrl: channel.sourceUrl,
+        evidenceText: channel.evidence,
+        confidence: channel.confidence,
+        idempotencyKey: `reachability:${assignment.id}:${index}`,
+      });
+    }
+
+    await logAgentRun({
+      orgId: assignment.orgId,
+      agentName: "Scout",
+      source: "in_app_executor",
+      summary: {
+        assignmentId: assignment.id,
+        status: "completed",
+        caseType: "contact_reachability",
+        found: report.found,
+        channels: report.channels.length,
+        durationMs: Date.now() - startedAt.getTime(),
+        model,
+      },
+      agentInstanceId: assignment.agentInstanceId,
+      assignmentId: assignment.id,
+      provider: "openai",
+      model,
+      status: "completed",
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+    });
+
+    return {
+      status: "completed",
+      assignmentId: assignment.id,
+      headline: report.headline,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Reachability job failed";
+    await service
+      .from("agent_assignments")
+      .update({ status: "failed", result_summary: message })
+      .eq("id", assignment.id)
+      .eq("org_id", assignment.orgId);
+    await logAgentRun({
+      orgId: assignment.orgId,
+      agentName: "Scout",
+      source: "in_app_executor",
+      summary: { assignmentId: assignment.id, status: "failed", caseType: "contact_reachability" },
+      agentInstanceId: assignment.agentInstanceId,
+      assignmentId: assignment.id,
+      provider: "openai",
+      model,
+      status: "failed",
       error: message,
     });
     return { status: "failed", assignmentId: assignment.id, error: message };

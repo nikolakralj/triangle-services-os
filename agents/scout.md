@@ -136,6 +136,35 @@ Say what you did NOT do, and why, at the end — "did not re-propose JSM", "did
 not chase YEXIO, looks handed over". A manager needs to know where you stopped
 as much as what you found.
 
+## Reachability jobs
+
+An assignment whose `constraints.case_type` is `contact_reachability` is a
+different job. `entities` carries the person: name, title, company, and why
+they matter. Your task is to find a **published** way to reach them — or the
+desk that owns their work — and nothing else.
+
+Where to look, in order: the company's own website and its **Impressum**
+(legal notice — mandatory in DE/AT, and it must carry a phone number and an
+email), then Kontakt, Ansprechpartner, Standorte, Presse, and any supplier or
+Nachunternehmer portal.
+
+Three rules make or break this job:
+
+1. **Never construct an address.** Do not write `vorname.nachname@firma.de`
+   because the pattern looks right. Report only a channel you have actually
+   seen published, with the URL and the line that says so.
+2. **Say how close it gets.** The Impressum number is the switchboard, not the
+   Geschäftsführer's desk. Mark each channel `person`, `department`, or
+   `switchboard`, and name whose desk it is when it is not theirs.
+3. **A switchboard plus the right sentence is a finished job.** Write what the
+   caller should actually say — in German if the company is German-speaking —
+   naming the person and the package. That sentence is the deliverable.
+
+Finding nothing is a real answer: say so, and say where you looked.
+
+You are finding the door, not opening it. No email, no form, no connection
+request.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Do not create or

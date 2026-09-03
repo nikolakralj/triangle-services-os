@@ -11,6 +11,7 @@ import {
   Pencil,
   Phone,
   Quote,
+  Search,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,36 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
   const [linkedin, setLinkedin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [sent, setSent] = useState<Record<string, string>>({});
+
+  // The CEO decides who is worth reaching. An employee does the looking.
+  // No form, no pasting — one click, and the result comes back as a proposal.
+  async function sendScout(id: string) {
+    setSending(id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/research/buyer-contacts/${id}/reach`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        ok?: boolean;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Could not queue that.");
+        return;
+      }
+      setSent((prev) => ({ ...prev, [id]: "queued" }));
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSending(null);
+    }
+  }
 
   if (contacts.length === 0) {
     return (
@@ -120,9 +151,9 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
       {reachableCount < contacts.length && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
           {contacts.length - reachableCount} of {contacts.length} have no way to
-          reach them. Research can name the right person but cannot find an
-          unpublished address — try the company&apos;s Impressum or legal notice,
-          or call the switchboard and ask who handles the package.
+          reach them. Put an employee on it — they go to the company&apos;s site,
+          pull the Impressum and any published number, and file what they find
+          for you to accept. You do not go looking for it yourself.
         </p>
       )}
 
@@ -147,14 +178,31 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
                   )}
                 </div>
                 {!editing && (
-                  <Button
-                    variant="ghost"
-                    className="h-7 shrink-0 px-2 text-xs"
-                    onClick={() => startEdit(c)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    {reachable ? "Edit" : "Add contact details"}
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {!reachable && (
+                      <Button
+                        variant="primary"
+                        className="h-7 px-2 text-xs"
+                        disabled={sending === c.id || Boolean(sent[c.id])}
+                        onClick={() => void sendScout(c.id)}
+                      >
+                        {sending === c.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Search className="h-3 w-3" />
+                        )}
+                        {sent[c.id] ? "Scout is on it" : "Find how to reach them"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => startEdit(c)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </Button>
+                  </div>
                 )}
               </div>
 

@@ -463,6 +463,32 @@ export async function listOpenAssignmentsForInstance(
       companies.set(company.id as string, company as Record<string, unknown>);
     }
   }
+  // Same reason as companies: a reachability job whose entity is a bare UUID
+  // tells the employee nothing about who they are supposed to find. They need
+  // the name, the title, the company, and why this person matters.
+  const contactIds = Array.from(
+    new Set(
+      (ents ?? [])
+        .filter((e) => e.entity_type === "contact")
+        .map((e) => e.entity_id as string),
+    ),
+  );
+  const contacts = new Map<string, Record<string, unknown>>();
+  if (contactIds.length > 0) {
+    const { data: rows } = await svc
+      .from("buyer_contacts")
+      .select(
+        // No phone column on this table by design — a found number is written
+        // into notes as "Phone: …", which is what the panel reads.
+        "id,full_name,job_title,company_name,buyer_role,priority,email,linkedin_url,notes",
+      )
+      .eq("organization_id", orgId)
+      .in("id", contactIds);
+    for (const contact of rows ?? []) {
+      contacts.set(contact.id as string, contact as Record<string, unknown>);
+    }
+  }
+
   const entitiesByAssignment = new Map<
     string,
     Array<{ type: string; relation: string; record: Record<string, unknown> }>
@@ -472,7 +498,9 @@ export async function listOpenAssignmentsForInstance(
     const record =
       entity.entity_type === "company"
         ? companies.get(entity.entity_id as string)
-        : { id: entity.entity_id as string };
+        : entity.entity_type === "contact"
+          ? contacts.get(entity.entity_id as string)
+          : { id: entity.entity_id as string };
     if (!record) continue;
     const assignmentId = entity.assignment_id as string;
     if (!entitiesByAssignment.has(assignmentId)) {

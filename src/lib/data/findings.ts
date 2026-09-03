@@ -400,6 +400,80 @@ export async function acceptFinding(params: {
     }
   }
 
+  // A way in, found by an employee sent to look for one.
+  //
+  // Accepting writes the channel onto the buyer contact so the CEO can act on
+  // it from the contact itself. A switchboard number is stored in the notes
+  // with whose desk it is and the sentence to say, because pretending it is
+  // the manager's direct line is how someone ends up dialling and asking for
+  // the wrong thing.
+  if (finding.finding_type === "contact_channel") {
+    const contactId = String(payload.buyer_contact_id ?? "").trim();
+    if (!contactId) return null;
+
+    const { data: contact } = await svc
+      .from("buyer_contacts")
+      .select("id, notes, email, linkedin_url")
+      .eq("organization_id", params.orgId)
+      .eq("id", contactId)
+      .maybeSingle();
+    if (!contact) return null;
+
+    const kind = String(payload.kind ?? "");
+    const value = String(payload.value ?? "").trim();
+    const scope = String(payload.scope ?? "switchboard");
+    const belongsTo = payload.belongs_to ? String(payload.belongs_to) : null;
+    if (!value) return null;
+
+    const updates: Record<string, unknown> = { updated_by: params.userId };
+
+    // Only a channel that is actually theirs goes in the person's own field.
+    if (kind === "email" && scope === "person" && !contact.email) {
+      updates.email = value;
+    } else if (kind === "linkedin" && scope === "person" && !contact.linkedin_url) {
+      updates.linkedin_url = value;
+    }
+
+    const whose =
+      scope === "person"
+        ? "their own"
+        : belongsTo
+          ? `${scope} — ${belongsTo}`
+          : scope;
+    const line = `${kind === "phone" ? "Phone" : kind === "email" ? "Email" : kind}: ${value} (${whose}) — source: ${finding.source_url ?? "unknown"}`;
+    const howTo = payload.how_to_open ? String(payload.how_to_open) : null;
+
+    const existingNotes = String(contact.notes ?? "").trim();
+    const parts = [existingNotes, line];
+    if (howTo && !existingNotes.includes(howTo)) parts.push(`How to open: ${howTo}`);
+    updates.notes = parts.filter(Boolean).join("\n").slice(0, 4000);
+
+    const { error } = await svc
+      .from("buyer_contacts")
+      .update(updates)
+      .eq("id", contactId)
+      .eq("organization_id", params.orgId);
+    if (!error) {
+      promotedTo = "buyer_contact";
+      entityId = contactId;
+
+      // The company website is a byproduct worth keeping: 172 companies were
+      // on record and not one had a domain, which is why nobody could reach
+      // an Impressum in the first place.
+      const site = payload.company_website ? String(payload.company_website) : null;
+      const company = payload.company ? String(payload.company) : null;
+      if (site && company) {
+        const domain = site.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        await svc
+          .from("companies")
+          .update({ website_domain: domain })
+          .eq("organization_id", params.orgId)
+          .ilike("name", company)
+          .is("website_domain", null);
+      }
+    }
+  }
+
   if (finding.finding_type === "worker") {
     const name = String(payload.full_name ?? payload.name ?? "").trim();
     if (!name) return null;

@@ -451,6 +451,25 @@ export async function acceptResearchSuggestion(params: {
     } else {
       finalRecordId = inserted?.id;
     }
+
+    // Accepting a buyer contact means "this is a person worth reaching". If
+    // there is no way to reach them, that is a job, not a gap for the CEO to
+    // notice and fill in later. Four accepted contacts sat unreachable for
+    // weeks precisely because nothing was queued at this moment.
+    //
+    // Best-effort: a queue failure must never undo an accepted contact.
+    if (finalRecordId && !payload.email && !payload.linkedin_url) {
+      try {
+        const { queueReachabilityJob } = await import("./reachability");
+        await queueReachabilityJob({
+          buyerContactId: finalRecordId,
+          orgId: row.org_id,
+          userId: params.userId ?? null,
+        });
+      } catch (error) {
+        console.error("queueReachabilityJob on accept:", error);
+      }
+    }
   }
 
   if (row.suggestion_type === "package_opportunity") {
