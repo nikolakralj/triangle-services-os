@@ -261,8 +261,8 @@ observability, backups, incident response, tenant controls, and cost limits.
 - a unified event/outcome ledger;
 - production observability, stronger automated tests, backup/restore drills;
 - document pages still backed by sample data;
-- an adopted role playbook for every active agent identity—Hanna is active in
-  the database but has no `agents/hanna.md` source-of-truth file.
+- an adopted role playbook for every active agent identity — done as of
+  3 September 2026: Bob, Scout and Hanna each have one.
 
 ## Phase 0 — Commercial activation and truth reset
 

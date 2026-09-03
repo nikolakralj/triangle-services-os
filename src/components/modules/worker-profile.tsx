@@ -7,6 +7,7 @@ import {
   Award,
   BadgeCheck,
   Briefcase,
+  FileDown,
   Car,
   Globe,
   Loader2,
@@ -236,6 +237,27 @@ export function WorkerProfile({
               </span>
             )}
             {rate && <span className="text-sm font-semibold text-slate-800">{rate}</span>}
+
+            {/* The document a buyer actually asks for. Anonymised first, and
+                the named version is a separate, deliberate click — releasing a
+                name and an address to a prospect who has committed to nothing
+                is a disclosure, and an invitation to go direct. Neither
+                version carries the rate: that is Triangle's cost. */}
+            <div className="mt-1 flex flex-col items-end gap-1">
+              <a
+                href={`/api/workers/${worker.id}/cv`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Triangle CV
+              </a>
+              <a
+                href={`/api/workers/${worker.id}/cv?identity=1`}
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-800"
+              >
+                Named version, with contact details
+              </a>
+            </div>
           </div>
         </div>
       </div>

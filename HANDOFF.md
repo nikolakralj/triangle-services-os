@@ -34,8 +34,9 @@ Important additions since this handoff:
 - migrations now run through `026_agent_replies.sql`;
 - assignment conversations, worker memory, CV proposal intake, packet-send
   tracking, and one Approvals queue exist;
-- Bob, Scout, and Hanna are active database identities, but Hanna has no
-  canonical role file and must not receive expanded authority;
+- Bob, Scout, and Hanna are active database identities and all three now have
+  canonical role files; Hanna's `worker.propose` scope must not be expanded
+  without a management decision;
 - the generic hybrid work OS and Collaboration Field remain deferred;
 - the adopted long-term category is a vertical contract-to-crew OS, not a
   generic agent platform.

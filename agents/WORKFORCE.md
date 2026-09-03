@@ -69,15 +69,21 @@ The database currently has three active identities:
 - reports evidence-backed findings;
 - does not contact anyone or approve its own work.
 
-### Hanna — HR
+### Hanna — resourcing
 
-- active `agent_instances` record exists;
-- no canonical `agents/hanna.md` file exists as of this update;
-- therefore the role is governance-incomplete.
+- active `agent_instances` record, badge `triangle_hr`, scope `worker.propose`;
+- canonical role file: `agents/hanna.md`, adopted 3 September 2026;
+- reads CVs from `/api/agent/cv-queue` and adds judgement to a pending worker
+  proposal. She cannot create, update, or accept a worker record, and cannot
+  mark anyone available.
 
-Do not schedule, expand scopes, or treat Hanna as production-ready until a
-management-approved role file defines inputs, outputs, evidence, forbidden
-actions, privacy rules, approval path, and quality measures.
+Her privacy rules are stricter than the other roles because she is the only
+employee holding real people's personal data: nothing from a CV leaves
+Triangle, she never contacts a candidate, she does not record protected
+characteristics, and she does not enrich from outside sources. Scout searches
+the open web about companies; Hanna does not do that about people.
+
+Scope changes remain a management decision. `worker.propose` is the whole job.
 
 ## Assignment is the work object
 

@@ -99,6 +99,42 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### Hanna is governed, and one person can now be put in front of a buyer
+
+**`agents/hanna.md` adopted (3 September 2026).** `agents/WORKFORCE.md` had
+refused to treat Hanna as production-ready until a role file defined inputs,
+outputs, evidence, forbidden actions, privacy rules, approval path and quality
+measures. It now does. Her privacy rules are stricter than the other roles
+because she is the only employee holding real people's personal data: nothing
+from a CV leaves Triangle, she never contacts a candidate, she does not record
+protected characteristics (age, photo, nationality beyond work eligibility),
+and she does not enrich from outside sources. Scout searches the open web about
+companies; Hanna does not do that about people. Scope stays `worker.propose`.
+
+She still has never run. The badge and the file exist; no CV has been through
+her.
+
+**The Triangle Services CV.** Triangle could extract a CV, build a profile,
+match a worker to a package and produce a crew packet, but had no way to put
+ONE person in front of a buyer — which is what a buyer asks for first. The
+only PDF generator was the crew-level submission packet.
+
+`GET /api/workers/[id]/cv` renders it. Two rules shape the document:
+
+- **Anonymised by default** — "A. M." and a reference like `TS-6F477424`, with
+  a notice that identity is released once an engagement is agreed. A named CV
+  with an address, sent to a prospect who has committed to nothing, is a
+  personal-data disclosure and an invitation to go direct. `?identity=1` is a
+  separate, deliberate click.
+- **The worker's rate never appears.** That is Triangle's cost, not the
+  buyer's price, and there is no flag to include it.
+
+Nothing is invented: a field Triangle does not hold prints as "Not recorded on
+file: … Triangle Services does not state what it has not verified." Verified by
+generating both versions for Anton Mueller and reading the PDF text back. The
+first named draft rendered an empty CONTACT heading — fixed, because an empty
+heading implies details exist and were withheld.
+
 ### Scout's findings could not be accepted — 3 September 2026
 
 After the reachability brief was pasted into the Grok bot, Scout filed real
@@ -377,8 +413,9 @@ is in `docs/strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md`.
   reporting;
 - Bob (Inbox Coordinator), Scout (Project Researcher), and Hanna (HR) are
   active identities in the live database;
-- only Bob and Scout currently have canonical role files. Hanna has no
-  `agents/hanna.md` file and should be treated as governance-incomplete.
+- Bob, Scout and Hanna all have canonical role files. `agents/hanna.md` was
+  adopted 3 September 2026 and carries the privacy rules that apply once
+  Triangle holds real CVs.
 
 ### Trust/platform
 
@@ -481,7 +518,8 @@ operational requirement.
 - several foundations are proven only by compile/auth checks, not sustained use;
 - automated tests and production observability are still shallow;
 - backup/restore and incident-response evidence is not documented;
-- the active Hanna identity lacks a repository role playbook;
+- Hanna has never actually run: her badge exists and her role file exists,
+  but no CV has been through her yet;
 - production deployment state should be checked before assuming the latest
   branch commit is on the public alias.
 
