@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectorSwitcher } from "@/components/modules/sector-switcher";
 import { DiscoveredProjectsTable } from "@/components/modules/discovered-projects-table";
+import { getProjectProgress } from "@/lib/data/project-progress";
 import { requireSession } from "@/lib/auth/session";
 import { listSectors, rowToSector } from "@/lib/data/sectors";
 import {
@@ -76,6 +77,13 @@ export default async function HunterPage({
   ]);
 
   const projects = projectRows.map(rowToDiscoveredProject);
+
+  // What has actually been established about each one. Replaces a model-
+  // generated "opportunity score" that read 75 on almost every row.
+  const progress = await getProjectProgress(
+    projects.map((p) => p.id),
+    session.organizationId,
+  );
   const lastRun = runRows.length > 0 ? rowToHuntRun(runRows[0]!) : null;
 
   return (
@@ -237,7 +245,7 @@ export default async function HunterPage({
       )}
 
       {/* Projects */}
-      <DiscoveredProjectsTable projects={projects} />
+      <DiscoveredProjectsTable projects={projects} progress={progress} />
     </>
   );
 }

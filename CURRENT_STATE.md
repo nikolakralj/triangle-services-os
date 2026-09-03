@@ -99,6 +99,35 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### Page audit — Signal Inbox (3 September 2026)
+
+First page of a walk through every screen. Two defects, both of the same
+family: the app stating something it does not know.
+
+**Every project scored "Opportunity 75".** Sixteen of eighteen carried exactly
+75; the other two were null. `ai_match_score`, `phase` and
+`estimated_crew_size` were null on all eighteen, so those badges never rendered
+at all. The 75 was not a hardcoded default — `clamp()` is honest — it came from
+asking a model for a 0-100 score with no rubric, and it returned the same
+middling figure every time, including for "HAL4SDV Hardware Abstraction Layer
+for Software-Defined Vehicles", a software research programme with no crew to
+supply. The list was **sorted** by that column, so the ordering carried no
+information either.
+
+Replaced with what Triangle actually knows: how far each project has been
+worked. `getProjectProgress()` derives it from real rows — chain mapped, buyer
+named, reachable, package shaped — and it cannot drift from the truth because
+it is the truth. Live result: maincubes reads "Buyer named, no way to reach
+them (3/4)", ANDRITZ "Chain mapped, no buyer named (1/4)", most others
+"Nothing known yet (0/4)". That is a real ranking of where the next hour goes.
+
+Triangle does not know enough about these projects to score them. Saying so is
+the fix; a better score would have been the same mistake.
+
+**A bare "0" next to the source link.** `{project.estimatedValueEur && (…)}`
+renders a literal `0` in JSX when the value IS `0`, and Ford's project has
+`estimated_value_eur = 0`. Same guard fixed on crew size.
+
 ### Hanna is governed, and one person can now be put in front of a buyer
 
 **`agents/hanna.md` adopted (3 September 2026).** `agents/WORKFORCE.md` had
