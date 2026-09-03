@@ -28,12 +28,36 @@ export function MagicLinkHandler() {
   const router = useRouter();
   const params = useSearchParams();
   const [state, setState] = useState<"idle" | "working" | "failed">("idle");
+  const [reason, setReason] = useState<string | null>(null);
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (!hash.includes("access_token")) return;
+    if (hash.length < 2) return;
 
     const parsed = new URLSearchParams(hash.slice(1));
+
+    // Supabase reports a dead link in the SAME fragment, not as an error page:
+    //   #error=access_denied&error_code=otp_expired&error_description=…
+    // Ignoring that branch is what made a used link look like a broken app —
+    // the person landed on a bare login form, typed their email, and got
+    // "Invalid login credentials" from the password field instead of being
+    // told the link had expired.
+    const err = parsed.get("error") ?? parsed.get("error_code");
+    if (err) {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+      queueMicrotask(() => {
+        setReason(
+          (parsed.get("error_description") ?? "").replace(/\+/g, " ") || null,
+        );
+        setState("failed");
+      });
+      return;
+    }
+
     const access_token = parsed.get("access_token");
     const refresh_token = parsed.get("refresh_token");
     if (!access_token || !refresh_token) return;
@@ -73,8 +97,12 @@ export function MagicLinkHandler() {
           Signing you in…
         </span>
       ) : (
-        <span className="text-rose-700">
-          That sign-in link has expired or was already used. Ask for a new one.
+        <span className="block text-rose-700">
+          <strong>That sign-in link no longer works.</strong>{" "}
+          {reason ?? "It has expired or was already used."} Sign-in links are
+          single use and last about an hour — and a chat or mail app that
+          previews links can spend one before you click it. Ask for a fresh
+          link, or sign in below with your password.
         </span>
       )}
     </div>

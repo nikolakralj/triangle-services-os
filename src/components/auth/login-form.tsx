@@ -28,6 +28,21 @@ export function LoginForm() {
       );
       return;
     }
+    if (!email.trim()) {
+      setMessage("Enter your email first.");
+      return;
+    }
+    // Supabase's own error for a blank password is "Invalid login
+    // credentials" — the same message it gives for a wrong password. Someone
+    // who has never set one (everyone starts on a magic link only) reads that
+    // as "my account is broken" rather than "I have no password yet". Catch
+    // it before the request so the real cause is what they see.
+    if (!password) {
+      setMessage(
+        "No password entered. If you haven't set one yet, use “Send magic link” below, then set a password from Settings once you're signed in.",
+      );
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -35,7 +50,11 @@ export function LoginForm() {
     });
     setLoading(false);
     if (error) {
-      setMessage(error.message);
+      setMessage(
+        error.message === "Invalid login credentials"
+          ? "Email or password not recognized. If you haven't set a password yet, use “Send magic link” below."
+          : error.message,
+      );
       return;
     }
     window.location.href = next;
