@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadAgentFaces } from "@/lib/data/agent-identity";
 import { listApprovals, type ApprovalItem } from "@/lib/data/approvals";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -191,6 +192,7 @@ export async function listDecisionInbox(
 
   const attentionRows = attentionResult.data ?? [];
   const draftRows = draftsResult.data ?? [];
+  const faces = await loadAgentFaces(orgId);
   const assignmentIds = attentionRows.map((row) => row.id as string);
   const { data: entityRows } = assignmentIds.length
     ? await service
@@ -400,10 +402,19 @@ export async function listDecisionInbox(
         projectDrafts.map((row) => String(row.subject || row.channel || "Outreach draft")),
       ),
     );
+    // Drafts store the raw credential name. Shown as-is it put
+    // "research_chat_agent" in front of the CEO under the heading
+    // "responsible employee" — a machine identifier where a colleague's name
+    // belongs. Resolve it the same way every other screen does.
     const owners = Array.from(
       new Set(
         projectDrafts
-          .map((row) => row.created_by_agent as string | null)
+          .map((row) => {
+            const face = faces.fromCredentialName(
+              (row.created_by_agent as string | null) ?? null,
+            );
+            return face ? `${face.emoji} ${face.name}` : null;
+          })
           .filter(Boolean) as string[],
       ),
     );

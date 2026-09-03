@@ -178,7 +178,7 @@ export function DecisionInboxWorkspace({ snapshot }: { snapshot: DecisionInboxSn
             <h2 className="mt-2 text-xl font-semibold">
               {totalAttention === 0
                 ? "The AI team does not need you right now."
-                : `${totalAttention} case decision${totalAttention === 1 ? "" : "s"} need your attention.`}
+                : `${totalAttention} decision${totalAttention === 1 ? "" : "s"} to make.`}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
               If work is not shown below, the AI team continues within its authority. You appear only for evidence decisions, blockers and external commercial actions.
@@ -186,10 +186,13 @@ export function DecisionInboxWorkspace({ snapshot }: { snapshot: DecisionInboxSn
           </div>
           <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4 xl:grid-cols-2">
             {[
-              [snapshot.pendingApprovalCount, "Evidence decisions"],
-              [snapshot.blockedCount, "Blocked agents"],
-              [snapshot.commercialActionCount, "External drafts"],
-              [snapshot.noActionNeededCount, "AI handling now"],
+              // Labelled as what they count. These are raw items grouped into
+              // the decisions above, so a tile reading 27 above a headline
+              // reading 25 is not a contradiction — but it looked like one.
+              [snapshot.pendingApprovalCount, "pieces of evidence"],
+              [snapshot.blockedCount, "employees blocked"],
+              [snapshot.commercialActionCount, "drafts unsent"],
+              [snapshot.noActionNeededCount, "cases AI is handling"],
             ].map(([value, label]) => (
               <div key={label} className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
                 <p className="text-xl font-semibold">{value}</p>
