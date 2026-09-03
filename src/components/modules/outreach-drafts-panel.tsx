@@ -96,6 +96,8 @@ function DraftCard({
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingSent, setConfirmingSent] = useState(false);
+  const [followUp, setFollowUp] = useState("");
 
   const meta = CHANNEL_META[draft.channel];
   const Icon = meta.icon;
@@ -133,6 +135,15 @@ function DraftCard({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Recording a send is a commercial fact, not a status toggle. The ledger
+  // stores what actually went out and when it should be chased, so both are
+  // asked for here rather than assumed.
+  function defaultFollowUp() {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
   }
 
   return (
@@ -280,15 +291,66 @@ function DraftCard({
                 Edit
               </button>
 
-              {draft.status === "draft" && (
+              {draft.status === "draft" && !confirmingSent && (
                 <button
-                  onClick={() => patchDraft("mark_sent")}
+                  onClick={() => setConfirmingSent(true)}
                   disabled={busy}
                   className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
                 >
-                  {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                  Mark sent
+                  <Send className="h-3 w-3" />
+                  I sent this
                 </button>
+              )}
+
+              {draft.status === "draft" && confirmingSent && (
+                <div className="w-full rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs font-semibold text-emerald-900">
+                    Record this as a real send?
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
+                    This writes it to the commercial ledger with{" "}
+                    {buyer?.name ?? "the recipient"} and the text below as what
+                    actually went out. If you reworded it in your mail client,
+                    edit the draft first so the record matches.
+                  </p>
+                  <label className="mt-2 block text-[11px] font-medium text-emerald-900">
+                    Follow up on
+                    <input
+                      type="date"
+                      value={followUp || defaultFollowUp()}
+                      onChange={(e) => setFollowUp(e.target.value)}
+                      className="ml-2 rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs text-slate-800"
+                    />
+                  </label>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <button
+                      onClick={() =>
+                        patchDraft("mark_sent", {
+                          follow_up_at: new Date(
+                            followUp || defaultFollowUp(),
+                          ).toISOString(),
+                        }).then(() => setConfirmingSent(false))
+                      }
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {busy ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3" />
+                      )}
+                      Yes, I sent it
+                    </button>
+                    <button
+                      onClick={() => setConfirmingSent(false)}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      <X className="h-3 w-3" />
+                      Not yet
+                    </button>
+                  </div>
+                </div>
               )}
 
               {draft.status === "sent" && (

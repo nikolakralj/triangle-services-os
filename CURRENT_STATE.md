@@ -57,6 +57,48 @@ supplier-portal URL while worker detail remains collapsed. No framework
 overlay or application console error was present. No outreach, supplier
 registration, or external action was performed.
 
+### Pipeline audit — 2 September 2026
+
+Counted against the live database, stage by stage:
+
+| Stage | Count |
+|---|---|
+| discovered projects | 18 |
+| contractor chain nodes | 12 |
+| buyer contacts | 4 — **0 reachable** |
+| crew packages | 3 |
+| workers | 3 (all available) |
+| commercial requirements | 1 (draft) |
+| buyer routes | **0** |
+| outreach drafts | 7 (one already replied) |
+| commercial actions — recorded sends | **0** |
+| orders | 0 |
+
+Two things stop everything, and only one of them is code.
+
+**The wall (human, not code):** Triangle knows four buyers by name and can
+reach none of them — Paul Boxer (Tata Steel), Stefan Mitterecker and Walther
+Hartl (ANDRITZ), Peter Östlund (JSM Utility Services). Research names the right
+person; it cannot produce an unpublished address. Explorium returned zero
+matches for all six lookups tried, so an enrichment API is not the answer for
+German industrial managers. The route is the Impressum or the switchboard, and
+it is Nikola/Ralph's to walk.
+
+**The gap (code, now closed):** marking an outreach draft "sent" flipped
+`outreach_drafts.status` and wrote nothing to `commercial_actions`. Seven
+drafts were marked sent, one of them replied to, and the ledger the Phase 0
+exit gate counts said zero sends had ever happened — two records of the same
+event, disagreeing. `markOutreachSent` now writes the commercial action in the
+same call, under the database's own rules: a recipient, the final content, an
+occurrence time, and a named human who confirms it. `userId` is required, so a
+machine key cannot record that a human sent something. Verified signed-in with
+a scratch draft: the action was created with recipient, content, follow-up date
+and confirmer, and a draft with no recipient on record was refused with the
+reason shown on the card and its status left as Draft.
+
+Zero buyer routes is why the one requirement cannot qualify — the database
+refuses, correctly. That unblocks itself as soon as a route is recorded.
+
 ### Repository implementation — cases on every record (CASE-003)
 
 The company case proved a record is more useful when it carries its own
@@ -370,9 +412,12 @@ The dated logs remain useful history, but this audited section is current.
    - If `pkg.roles.length === 0`, clicking "Find workers" now shows an amber notice ("This package has no roles defined…") instead of running a doomed match.
    - After a real match returning `count === 0`, shows a notice naming the roles searched and suggesting roster checks.
 
-### Known remaining bug (flagged, not yet fixed)
+### Known remaining bug — FIXED since this log
 
-- **Nested `<button>` hydration error** in `worker-match-panel.tsx`: the collapsible header `<button>` (~line 444) wraps the "Find workers" `<Button>`. Invalid HTML → React hydration error on `/hunter/[id]`. Pre-existing; spawned as a separate task. Fix: make header a div-with-onClick or move the button out as a sibling.
+- **Nested `<button>` hydration error** in `worker-match-panel.tsx`. Fixed: the
+  header is now a `<div>` with the title button, "Find workers", and the
+  chevron as siblings. Re-checked signed-in on 2 September 2026 —
+  `/hunter/[id]` loads with zero console errors.
 
 ### Approved roadmap (do these in order)
 

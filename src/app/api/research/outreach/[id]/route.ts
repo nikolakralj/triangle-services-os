@@ -2,7 +2,8 @@
  * PATCH /api/research/outreach/[id]
  *
  * Lifecycle endpoint for outreach drafts. Body:
- *   { action: "mark_sent" }
+ *   { action: "mark_sent", follow_up_at?: string|null }
+ *       Records the send in commercial_actions as well as flipping the draft.
  *   { action: "mark_replied", reply_summary?: string }
  *   { action: "archive" }
  *   { action: "edit", subject?: string|null, body?: string }
@@ -31,6 +32,7 @@ export async function PATCH(
   const body = (await request.json().catch(() => ({}))) as {
     action?: string;
     reply_summary?: string;
+    follow_up_at?: string | null;
     subject?: string | null;
     body?: string;
   };
@@ -42,8 +44,18 @@ export async function PATCH(
 
   try {
     if (action === "mark_sent") {
-      const ok = await markOutreachSent(id, access.organizationId);
-      return NextResponse.json({ ok });
+      // Recording a real send: the ledger needs the person who confirms it,
+      // and the database refuses the row without one.
+      const result = await markOutreachSent(
+        id,
+        access.organizationId,
+        access.userId ?? null,
+        { followUpAt: typeof body.follow_up_at === "string" ? body.follow_up_at : null },
+      );
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, actionId: result.actionId });
     }
     if (action === "mark_replied") {
       const ok = await markOutreachReplied(

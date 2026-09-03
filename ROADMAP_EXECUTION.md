@@ -84,19 +84,25 @@ the company and project flows show a concrete limitation.
    need to wake Scout in provider chat. The remaining runtime step is replacing
    the session pulse with a durable cloud scheduler when always-on operation is
    commercially justified.
-4. **Cross-entity case pattern — project done, three to go.** The loader is
-   now `getEntityCase(entityType, entityId, orgId)` rather than four
-   near-copies, which is what "without duplicate truth tables" has to mean in
-   practice; `getCompanyCase` delegates to it and the company workspace is
-   untouched. Projects carry a Case history panel showing the responsible
-   employee, their manager report and the evidence it produced — verified on
-   NTT Global Data Centers Berlin, which resolves to Scout's completed "Data
-   Centers" assignment with a 3,200-character report and four findings. Buyer
-   contact/person, requirement and crew package still need the same treatment.
-   Apply the proven pattern to project, buyer
-   contact/person, requirement, and crew package. Each view must share case
-   outcome, memory, evidence, open questions, responsible employee, and next
-   action without creating duplicate truth tables.
+4. **Cross-entity case pattern — complete (2 September 2026).** The loader is
+   `getEntityCase(entityType, entityId, orgId)` rather than six near-copies,
+   which is what "without duplicate truth tables" has to mean in practice;
+   `getCompanyCase` delegates to it and the company workspace is untouched.
+   Company, project, worker, buyer contact, package and requirement all
+   resolve through it.
+
+   The real obstacle was not the UI. Triangle records proposals in **two**
+   systems — `agent_findings.promoted_entity_id` and
+   `research_suggestions.final_record_id` — and the loader knew only the first.
+   Every buyer contact and every crew package in the database arrived through
+   the second, so all of them reported an empty case while their evidence sat
+   in the table. Reading both is the whole slice.
+
+   Verified signed-in: NTT Global Data Centers Berlin resolves to Scout's
+   "Data Centers" assignment; Peter Östlund now shows Scout's sourced
+   Impressum line at 90% confidence instead of a bare name; the maincubes
+   package shows what it was accepted on; the maincubes requirement inherits
+   its project's case and says that it is inherited.
 5. **Safe continuation policies and handoffs.** Make the allowed read-only
    steps explicit, idempotent, budgeted, and observable. Agents may hand work
    to another scoped role; consequential actions remain human-approved.
