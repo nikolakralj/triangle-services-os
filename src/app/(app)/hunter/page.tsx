@@ -79,6 +79,14 @@ export default async function HunterPage({
     session.organizationId,
   );
 
+  // Most-worked first, so the projects closest to an actual conversation are
+  // at the top. Previously the order came from a score that was the same
+  // number on almost every row.
+  projects.sort(
+    (a, b) =>
+      (progress.get(b.id)?.step ?? 0) - (progress.get(a.id)?.step ?? 0),
+  );
+
   return (
     <>
       <PageHeader

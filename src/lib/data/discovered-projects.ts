@@ -147,9 +147,11 @@ export async function listDiscoveredProjects(
   if (options.status) query = query.eq("status", options.status);
   if (options.countryCode) query = query.eq("country_code", options.countryCode);
 
-  query = query
-    .order("ai_opportunity_score", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+  // Newest first. The old primary sort was ai_opportunity_score, which held
+  // the same value (75) on sixteen of eighteen rows — sorting by a constant.
+  // The Signal Inbox re-sorts what it fetches by real qualification progress;
+  // this ordering only decides which rows the limit keeps.
+  query = query.order("created_at", { ascending: false });
 
   if (options.limit) query = query.limit(options.limit);
 

@@ -161,6 +161,16 @@ them (3/4)", ANDRITZ "Chain mapped, no buyer named (1/4)", most others
 Triangle does not know enough about these projects to score them. Saying so is
 the fix; a better score would have been the same mistake.
 
+The SQL sort was still keyed to that column afterwards — ordering eighteen rows
+by a constant. Signal Inbox now orders by real progress, so the projects
+closest to a conversation are at the top: two at 3/4, then 2/4, then the rest.
+`listDiscoveredProjects` falls back to newest-first, which only decides which
+rows the limit keeps.
+
+**Full-app smoke, 3 September 2026.** All twenty sidebar destinations return
+200 with no 404 and zero console errors, signed in. Every sidebar href resolves
+to a real page.
+
 **A bare "0" next to the source link.** `{project.estimatedValueEur && (…)}`
 renders a literal `0` in JSX when the value IS `0`, and Ford's project has
 `estimated_value_eur = 0`. Same guard fixed on crew size.
