@@ -99,6 +99,43 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### The Hunter run is removed (3 September 2026)
+
+Management confirmed the AI "hunt" was an idea from a few months ago and is not
+needed. Investigated before touching anything, because `/hunter` is the Signal
+Inbox and had to survive.
+
+Dead, and removed:
+
+- `src/app/api/hunter/run/route.ts` — no caller anywhere. No UI button, no cron,
+  no MCP tool, no script.
+- `src/lib/ai/hunter-prompts.ts` — imported only by that route.
+- `src/lib/data/hunt-runs.ts` — read only by the "Last hunt" card.
+- The "Last hunt" card and its "View all runs →" link, which pointed at
+  `/hunter/runs` — **a page that does not exist**. The card had been showing
+  28 April for four months.
+- `seedChainFromAI()`, `insertDiscoveredProject()`, `findByFingerprint()` —
+  all existed only to serve the hunt.
+
+Kept, because they are live: `/hunter` itself (Signal Inbox), `/hunter/[id]`
+(project cockpit), and `/api/hunter/projects/[id]/chain`,
+`/api/hunter/projects/[id]/status`, `/api/hunter/chain-nodes/[nodeId]`, which
+the contractor-chain panel and status button call.
+
+Worth recording: the removed route wrote **directly** into
+`discovered_projects` and seeded `contractor_chain_nodes`, bypassing the
+approval queue entirely. That contradicts the rule in `AGENTS.md` that AI never
+writes to final tables. It was an authenticated, callable endpoint, so this is a
+correctness fix and not only tidying.
+
+The `hunter_runs` table is left in place — dropping a table is a migration and
+a management decision, and the rows are historical. Nothing reads it now.
+
+Provenance of the existing 18 projects could not be determined: `ai_model` is
+null on all of them and the hunt would have stamped it, so they did not come
+from this route. No current code path explains the `ai_opportunity_score` of 75
+either. Recorded as unknown rather than guessed.
+
 ### Page audit — Signal Inbox (3 September 2026)
 
 First page of a walk through every screen. Two defects, both of the same

@@ -180,54 +180,6 @@ export async function getDiscoveredProjectById(
   return data as DiscoveredProjectRow | null;
 }
 
-/**
- * Insert a discovered project (used by the Hunter).
- * Uses service client because hunter runs server-side without user session.
- */
-export async function insertDiscoveredProject(
-  organizationId: string,
-  data: Partial<DiscoveredProjectRow> & { project_name: string },
-): Promise<DiscoveredProjectRow | null> {
-  const service = createServiceSupabaseClient();
-  if (!service) return null;
-
-  const { data: inserted, error } = await service
-    .from("discovered_projects")
-    .insert([{ ...data, organization_id: organizationId }])
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    console.error("insertDiscoveredProject error", error);
-    return null;
-  }
-  return inserted as DiscoveredProjectRow | null;
-}
-
-/**
- * Check if a project with this fingerprint already exists (dedup)
- */
-export async function findByFingerprint(
-  organizationId: string,
-  fingerprint: string,
-): Promise<DiscoveredProjectRow | null> {
-  const service = createServiceSupabaseClient();
-  if (!service) return null;
-
-  const { data, error } = await service
-    .from("discovered_projects")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("fingerprint", fingerprint)
-    .maybeSingle();
-
-  if (error) {
-    console.error("findByFingerprint error", error);
-    return null;
-  }
-  return data as DiscoveredProjectRow | null;
-}
-
 export async function updateDiscoveredProjectStatus(
   id: string,
   status: string,

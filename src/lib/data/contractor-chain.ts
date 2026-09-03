@@ -1,13 +1,9 @@
 import "server-only";
 import { createCookieSupabaseClient, createServiceSupabaseClient } from "@/lib/supabase/server";
 
-import { 
-  type ContractorChainNodeRow, 
-  type BuyerContactRow, 
-  type ChainRole, 
-  type ChainKnowledgeLevel,
-  CHAIN_ROLE_ORDER,
-  CHAIN_ROLE_LABELS
+import {
+  type ContractorChainNodeRow,
+  type BuyerContactRow,
 } from "./contractor-chain-shared";
 
 export * from "./contractor-chain-shared";
@@ -144,60 +140,6 @@ export async function deleteChainNode(
     return false;
   }
   return true;
-}
-
-// ─── Seed from AI inference ────────────────────────────────────────────────
-
-/**
- * Called once after a hunt run to seed inferred chain nodes from AI output.
- * Only inserts roles not already present.
- */
-export async function seedChainFromAI(
-  organizationId: string,
-  discoveredProjectId: string,
-  seeds: Array<{
-    role: ChainRole;
-    companyName?: string;
-    level: ChainKnowledgeLevel;
-    confidence?: number;
-    rationale?: string;
-  }>,
-  createdBy?: string,
-): Promise<void> {
-  const service = createServiceSupabaseClient();
-  if (!service) return;
-
-  // Get existing roles to avoid duplicates
-  const { data: existing } = await service
-    .from("contractor_chain_nodes")
-    .select("role")
-    .eq("discovered_project_id", discoveredProjectId);
-
-  const existingRoles = new Set((existing ?? []).map((r: { role: string }) => r.role));
-
-  const toInsert = seeds
-    .filter((s) => !existingRoles.has(s.role) && (s.companyName || s.level !== "unknown"))
-    .map((s) => ({
-      organization_id: organizationId,
-      discovered_project_id: discoveredProjectId,
-      role: s.role,
-      label: CHAIN_ROLE_LABELS[s.role],
-      company_name: s.companyName ?? null,
-      level: s.level,
-      confidence: s.confidence ?? null,
-      rationale: s.rationale ?? null,
-      notes: null,
-      sort_order: CHAIN_ROLE_ORDER[s.role],
-      created_by: createdBy ?? null,
-    }));
-
-  if (toInsert.length === 0) return;
-
-  const { error } = await service.from("contractor_chain_nodes").insert(toInsert);
-
-  if (error) {
-    console.error("seedChainFromAI error", error);
-  }
 }
 
 // ─── Buyer contacts CRUD ───────────────────────────────────────────────────

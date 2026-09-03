@@ -11,13 +11,11 @@ import {
   rowToDiscoveredProject,
   getDiscoveredProjectStats,
 } from "@/lib/data/discovered-projects";
-import { listHuntRuns, rowToHuntRun } from "@/lib/data/hunt-runs";
 import {
   TrendingUp,
   Target,
   Clock,
   CheckCircle2,
-  Activity,
 } from "lucide-react";
 
 export default async function HunterPage({
@@ -61,8 +59,8 @@ export default async function HunterPage({
     );
   }
 
-  // Load discovered projects + stats + recent runs in parallel
-  const [projectRows, stats, runRows] = await Promise.all([
+  // Load discovered projects + stats in parallel
+  const [projectRows, stats] = await Promise.all([
     listDiscoveredProjects(session.organizationId, {
       sectorId: activeSector?.id,
       status: statusFilter,
@@ -70,10 +68,6 @@ export default async function HunterPage({
       limit: 50,
     }),
     getDiscoveredProjectStats(session.organizationId, activeSector?.id),
-    listHuntRuns(session.organizationId, {
-      sectorId: activeSector?.id,
-      limit: 1,
-    }),
   ]);
 
   const projects = projectRows.map(rowToDiscoveredProject);
@@ -84,7 +78,6 @@ export default async function HunterPage({
     projects.map((p) => p.id),
     session.organizationId,
   );
-  const lastRun = runRows.length > 0 ? rowToHuntRun(runRows[0]!) : null;
 
   return (
     <>
@@ -126,44 +119,6 @@ export default async function HunterPage({
           color="purple"
         />
       </div>
-
-      {/* Last run info */}
-      {lastRun && (
-        <Card className="mb-4 border-slate-200">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div className="flex items-center gap-3">
-              <Activity className="h-4 w-4 text-slate-400" />
-              <div className="text-xs text-slate-600">
-                Last hunt:{" "}
-                <b className="text-slate-900">
-                  {new Date(lastRun.startedAt).toLocaleString()}
-                </b>
-                {" — "}
-                <span
-                  className={
-                    lastRun.status === "success"
-                      ? "text-emerald-700"
-                      : lastRun.status === "failed"
-                        ? "text-rose-700"
-                        : "text-slate-700"
-                  }
-                >
-                  {lastRun.status}
-                </span>
-                {" — "}
-                {lastRun.newProjectsInserted} new projects (
-                {lastRun.duplicatesFiltered} dupes filtered)
-              </div>
-            </div>
-            <Link
-              href="/hunter/runs"
-              className="text-xs font-medium text-sky-600 hover:text-sky-800"
-            >
-              View all runs →
-            </Link>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Status filter pills — every project ever discovered, findable by status */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
