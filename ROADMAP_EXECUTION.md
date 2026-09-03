@@ -25,18 +25,26 @@ Record strategic changes in `DECISIONS.md`, and implemented/live truth in
 
 ## Current truth
 
-Read-only live data on 29 August 2026:
+Read-only live data on 3 September 2026:
 
 ```text
-24 job leads              21 still new
-4 leads score 70+          3 drafts
-0 replies marked sent     18 projects, all new
-31 research suggestions   22 accepted / 8 pending / 1 rejected
-11 chain nodes             3 buyer contacts
-2 package hypotheses       3 worker matches marked placed
-0 packet sends             1 opportunity
-3 available workers        3 active agent identities
+25 job leads              22 new / 3 reviewing
+18 projects               12 chain nodes
+36 research suggestions   28 accepted / 7 pending / 1 rejected
+30 agent findings         10 accepted / 20 pending
+4 buyer contacts          0 reachable (one job running)
+3 packages                1 requirement, still draft
+0 buyer routes            0 recorded sends
+3 available workers       0 orders
 ```
+
+The 29 August block said "4 leads score 70+". `job_leads` has no `score`
+column, so that line described a field that does not exist on that table.
+Corrected rather than carried forward.
+
+27 proposals are waiting on a human, the oldest since 31 August. The sidebar
+badge reads higher (34) because the Decision Inbox also counts unsent drafts
+and failed assignments; both numbers are right for what they measure.
 
 The strongest demand is PCS7/automation. The stored available roster is
 electrical installation: electrician, cable puller, supervisor. The package

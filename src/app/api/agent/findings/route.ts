@@ -16,7 +16,18 @@ import { createFinding } from "@/lib/data/findings";
 
 export const runtime = "nodejs";
 
-const VALID_TYPES = ["project", "company", "contact", "other"];
+// `contact_channel` was missing here while agents/scout.md told Scout to use
+// it. Scout filed as "contact" instead and left `intended_finding_type` in the
+// payload — honest, and the reason three real published channels for Peter
+// Östlund could not be accepted. Keep this list and the role files in step.
+const VALID_TYPES = [
+  "project",
+  "company",
+  "contact",
+  "contact_channel",
+  "worker",
+  "other",
+];
 const REQUIRED_SCOPE = "research.suggestion.create";
 
 export async function POST(request: Request) {

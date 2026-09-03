@@ -298,6 +298,25 @@ export async function acceptFinding(params: {
       entityId = companyId;
       destinationHref = `/companies/${companyId}`;
 
+      // Keep what the employee actually found.
+      //
+      // Impressum runs come back with a domain, a switchboard, a published
+      // mailbox, a register entry, and judgement like "do not pitch the
+      // Geschäftsführer as the Nachunternehmer buyer". Creating the company
+      // and discarding all of it is the same failure as a report with no
+      // findings: the work happened and the record does not show it.
+      //
+      // Only empty fields are filled and notes are appended, never replaced —
+      // an earlier PATCH that rewrote notes from a request body destroyed a
+      // sourced line about Peter Östlund.
+      await enrichCompanyFromImpressum(svc, {
+        companyId,
+        orgId: params.orgId,
+        payload,
+        sourceUrl: (finding.source_url as string) ?? null,
+        userId: params.userId,
+      });
+
       // Preserve where this company came from. The assignment is the case
       // history; losing it at approval is what turned the company page into a
       // dead CRM record with no evidence, memory, or responsible employee.
@@ -407,7 +426,19 @@ export async function acceptFinding(params: {
   // with whose desk it is and the sentence to say, because pretending it is
   // the manager's direct line is how someone ends up dialling and asking for
   // the wrong thing.
-  if (finding.finding_type === "contact_channel") {
+  //
+  // Matched on shape, not only on the type name. An agent that could not send
+  // `contact_channel` past the endpoint's whitelist filed the same payload as
+  // `contact`; refusing those on a technicality would strand real published
+  // numbers in the pending queue.
+  const looksLikeChannel =
+    Boolean(payload.buyer_contact_id) &&
+    Boolean(payload.kind) &&
+    Boolean(payload.value);
+  if (
+    finding.finding_type === "contact_channel" ||
+    (finding.finding_type === "contact" && looksLikeChannel)
+  ) {
     const contactId = String(payload.buyer_contact_id ?? "").trim();
     if (!contactId) return null;
 
@@ -425,7 +456,11 @@ export async function acceptFinding(params: {
     const belongsTo = payload.belongs_to ? String(payload.belongs_to) : null;
     if (!value) return null;
 
-    const updates: Record<string, unknown> = { updated_by: params.userId };
+    // No `updated_by` column on buyer_contacts. Including one made every
+    // write fail, and because the failure was swallowed the finding was
+    // still marked accepted — a published phone number silently discarded
+    // while the queue reported the decision as done.
+    const updates: Record<string, unknown> = {};
 
     // Only a channel that is actually theirs goes in the person's own field.
     if (kind === "email" && scope === "person" && !contact.email) {
@@ -453,7 +488,13 @@ export async function acceptFinding(params: {
       .update(updates)
       .eq("id", contactId)
       .eq("organization_id", params.orgId);
-    if (!error) {
+    if (error) {
+      // Refuse the whole acceptance. Marking it accepted while the record
+      // did not change is the failure this product exists to prevent.
+      console.error("acceptFinding contact_channel:", error);
+      throw new Error(`Could not write that channel to the contact: ${error.message}`);
+    }
+    {
       promotedTo = "buyer_contact";
       entityId = contactId;
 
@@ -605,4 +646,82 @@ export async function rejectFinding(params: {
     .eq("status", "pending")
     .select("id");
   return !error && (data?.length ?? 0) > 0;
+}
+
+
+/**
+ * Write published company reachability onto the company record.
+ *
+ * `companies` has no email or phone column — those live in notes, the same
+ * convention buyer contacts use for a found number — while domain, website,
+ * address and legal name have real homes.
+ */
+async function enrichCompanyFromImpressum(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  params: {
+    companyId: string;
+    orgId: string;
+    payload: Record<string, unknown>;
+    sourceUrl: string | null;
+    userId: string | null;
+  },
+): Promise<void> {
+  const p = params.payload;
+  const str = (v: unknown) => (v ? String(v).trim() : "");
+
+  const domain = str(p.domain).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const impressum = str(p.impressum_url);
+  const website = str(p.company_website) || str(p.website);
+  const address = str(p.address_register) || str(p.address);
+  const legalName = str(p.legal_name);
+  const email = str(p.email);
+  const phone = str(p.phone);
+  const register = str(p.register);
+  const note = str(p.note);
+  const leadership = Array.isArray(p.geschaeftsfuehrung)
+    ? (p.geschaeftsfuehrung as unknown[]).map(String).filter(Boolean)
+    : [];
+
+  if (!domain && !impressum && !email && !phone && !note) return;
+
+  const { data: row } = await svc
+    .from("companies")
+    .select("website_domain, website, address, legal_name, notes")
+    .eq("id", params.companyId)
+    .eq("organization_id", params.orgId)
+    .maybeSingle();
+  if (!row) return;
+
+  const updates: Record<string, unknown> = { updated_by: params.userId };
+  if (domain && !row.website_domain) updates.website_domain = domain;
+  if (website && !row.website) updates.website = website;
+  if (address && !row.address) updates.address = address;
+  if (legalName && !row.legal_name) updates.legal_name = legalName;
+
+  const lines = [
+    email ? `Published email: ${email}` : null,
+    phone ? `Switchboard: ${phone}` : null,
+    impressum ? `Impressum: ${impressum}` : null,
+    register ? `Register: ${register}` : null,
+    leadership.length > 0 ? `Geschäftsführung: ${leadership.join(", ")}` : null,
+    note ? `Note: ${note}` : null,
+    params.sourceUrl ? `Source: ${params.sourceUrl}` : null,
+  ].filter(Boolean) as string[];
+
+  const existingNotes = String(row.notes ?? "").trim();
+  const fresh = lines.filter((l) => !existingNotes.includes(l));
+  if (fresh.length > 0) {
+    updates.notes = [existingNotes, ...fresh]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 8000);
+  }
+
+  if (Object.keys(updates).length > 1) {
+    await svc
+      .from("companies")
+      .update(updates)
+      .eq("id", params.companyId)
+      .eq("organization_id", params.orgId);
+  }
 }

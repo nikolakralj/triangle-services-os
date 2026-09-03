@@ -99,6 +99,44 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### Scout's findings could not be accepted — 3 September 2026
+
+After the reachability brief was pasted into the Grok bot, Scout filed real
+work: three published channels for Peter Östlund (the Waltenhofen office
+number, the UK group switchboard, and the group mailbox — each correctly
+marked `switchboard`, with `belongs_to` and a German opening sentence), and
+Impressum data for five companies including "Switchboard 998-0; Baupartner/
+Einkauf form still uses 998-1400. Do not pitch GF as NU buyer."
+
+Four defects stood between that work and the record. All found by driving the
+real screens, not by reading code.
+
+1. **The findings endpoint rejected `contact_channel`.** `VALID_TYPES` never
+   included it while `agents/scout.md` instructed Scout to use it. Scout filed
+   as `contact` and left `"intended_finding_type": "contact_channel"` in the
+   payload — honest, and invisible. The whitelist and the role files must stay
+   in step.
+2. **Accept matched on the type name only**, so those three channels could
+   never promote. It now matches on payload shape as well.
+3. **The write included `updated_by`, which `buyer_contacts` does not have.**
+   Every write failed.
+4. **The failure was swallowed.** `if (!error)` skipped the promotion and the
+   finding was still marked `accepted` — a published phone number discarded
+   while the queue reported the decision as done. A failed promotion now
+   throws, and the finding stays pending.
+
+Accepting a company finding also discarded the Impressum entirely: the branch
+created or matched the company and wrote none of the domain, address, legal
+name, switchboard, mailbox, register or note. It now fills empty fields and
+appends to notes, never replacing them.
+
+Verified end to end on a scratch contact and finding: the accepted channel
+landed as "Phone: … (switchboard — … office) — source: …" plus the German
+opening line, with `promoted_entity_id` set. Scratch rows deleted.
+
+Approvals also showed three cards all titled "Peter Östlund", separable only
+by reading their quotes. A channel card now names the channel and its scope.
+
 ### Work that needs doing — 3 September 2026
 
 "New assignment" was a blank form: pick an employee, invent a title, write a

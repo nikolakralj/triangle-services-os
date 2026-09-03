@@ -164,13 +164,29 @@ export async function listApprovals(
       id: f.id as string,
       kind: "finding",
       itemType: f.finding_type as string,
-      headline: String(
-        p.full_name ?? p.project_name ?? p.company_name ?? p.name ?? p.company ?? f.finding_type,
-      ),
+      // A channel proposal is about the channel, not the person. Three
+      // findings for Peter Östlund all rendered as "Peter Östlund" and could
+      // only be told apart by reading their quotes — the CEO was being asked
+      // to accept three identical-looking cards.
+      headline: p.kind && p.value
+        ? `${String(p.full_name ?? "Contact")} — ${String(p.value)}`
+        : String(
+            p.full_name ??
+              p.project_name ??
+              p.company_name ??
+              p.name ??
+              p.company ??
+              f.finding_type,
+          ),
       // Never the CV text itself — that is tens of thousands of characters and
       // belongs behind the decision, not in the queue.
       detail:
         [
+          // Whose desk this actually is. "switchboard" next to a number is
+          // the difference between calling and expecting the right voice.
+          p.scope
+            ? `${String(p.scope)}${p.belongs_to ? ` — ${String(p.belongs_to)}` : ""}`
+            : null,
           p.role,
           p.parent ? `Part of ${String(p.parent)}` : null,
           p.project ? `On ${String(p.project)}` : null,
