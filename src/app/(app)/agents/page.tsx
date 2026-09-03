@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/common/page-header";
 import { getSession } from "@/lib/auth/session";
 import { AgentConsole } from "@/components/modules/agent-console";
+import { countUnmappedProjects, suggestJobs } from "@/lib/data/job-suggestions";
 import { listAgentTasks, listAgentRuns } from "@/lib/data/agents";
 import {
   listWorkforce,
@@ -41,6 +42,13 @@ export default async function WorkforcePage() {
   // agent only knowing which project because you typed its name.
   const projects = projectRows.map((p) => ({ id: p.id, name: p.project_name }));
 
+  // What the company should be working on, derived from what is actually
+  // missing. The board picks; it does not have to compose the brief.
+  const [suggestedJobs, moreUnmapped] = await Promise.all([
+    suggestJobs(session.organizationId),
+    countUnmappedProjects(session.organizationId),
+  ]);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -56,6 +64,14 @@ export default async function WorkforcePage() {
         canHire={session.role === "admin"}
         tasks={tasks}
         runs={runs}
+        suggestedJobs={suggestedJobs.map((j) => ({
+          id: j.id,
+          title: j.title,
+          reason: j.reason,
+          priority: j.priority,
+          kind: j.kind,
+        }))}
+        moreUnmapped={moreUnmapped}
       />
     </div>
   );

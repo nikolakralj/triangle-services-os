@@ -99,6 +99,44 @@ reason shown on the card and its status left as Draft.
 Zero buyer routes is why the one requirement cannot qualify — the database
 refuses, correctly. That unblocks itself as soon as a route is recorded.
 
+### Work that needs doing — 3 September 2026
+
+"New assignment" was a blank form: pick an employee, invent a title, write a
+brief. That asks the board to already know what the company should be working
+on and how to phrase it. Triangle already knows.
+
+`suggestJobs()` derives the list from live state — buyers with no way to reach
+them, projects with no contractor chain, confirmed-available people with no
+package — and writes the brief. The CEO picks; the objective is already
+written. The blank form survives as "Something else", behind a link.
+
+The chain jobs are capped at four, newest first, with the remainder stated
+("8 more projects have no contractor chain") rather than hidden. Newest-first
+is not a relevance ranking and is not claimed to be one; Triangle cannot
+compute relevance yet.
+
+### First real reachability result, and the gap it exposed
+
+The Grok Scout picked up `Reach Peter Östlund` and completed it at 04:51 on
+3 September. It found the published German office number for JSM Utility
+Services (EU) GmbH at Papiermühlenweg 4, Waltenhofen, the group switchboard
+and enquiries address attributed correctly to the UK head office, and a
+Northdata register cross-check naming Klaus Peter Östlund as Geschäftsführer,
+HRB 133482. It explicitly declined to call the number his: "Confidence 90 that
+the number is published for that GmbH; Confidence n/a that it rings his
+pocket." That is the person/department/switchboard distinction the report
+schema requires, reached independently.
+
+**It filed zero findings.** The whole result sat in `result_summary` as prose.
+Nothing reached Approvals, nothing reached the contact, and the panel still
+said "no way to reach them" — work done, and the system not reflecting it.
+
+Two fixes. `agents/scout.md` now carries the exact filing contract: one
+`contact_channel` finding per channel, with the payload shape, before
+reporting complete. And a completed reachability job that filed nothing now
+reads differently on the jobs list — "Reported on already, but nothing was
+filed" rather than being offered again as though nobody had looked.
+
 ### Reachability is a job, not a form field — 2 September 2026
 
 The first instinct after the pipeline audit was to store the company domain

@@ -1,4 +1,5 @@
 import "server-only";
+import { reachObjective } from "@/lib/data/job-suggestions";
 import { createAssignment } from "@/lib/data/workforce";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -66,17 +67,7 @@ export async function queueReachabilityJob(params: {
     orgId: params.orgId,
     agentInstanceId: scout,
     title: `Reach ${name}`,
-    objective: [
-      `Find a published, legitimate way to reach ${name}${company ? ` at ${company}` : ""}.`,
-      "Do not contact them. Do not submit a contact form, send an email, or send a connection request. You are finding the door, not opening it.",
-      company
-        ? `Start with ${company}'s own website. In Germany and Austria the Impressum (legal notice) must publish a phone number and an email — find it. Then check Kontakt, Ansprechpartner, Standorte, and any supplier or Nachunternehmer portal.`
-        : "Start with the company's own website and its legal notice.",
-      "Never invent or pattern-derive an address. Do not construct firstname.lastname@company.de because it looks plausible. Report only a channel you have actually seen published, with the source URL and the line that says so.",
-      "Be honest about precision: say whether each channel is the person's own, their department's, or the company switchboard.",
-      "A switchboard number plus the right opening sentence is a complete result. Write what the caller should actually say — in German if the company is German-speaking — naming the person and the package.",
-      "If nothing is published, say so and say where you looked. A sourced absence beats a fabricated address.",
-    ].join("\n\n"),
+    objective: reachObjective(name, company),
     priority: "high",
     expectedOutput:
       "Published contact channels with source URL, quoted evidence, and how close each one gets to the person — or a sourced statement that none is published.",
@@ -84,6 +75,8 @@ export async function queueReachabilityJob(params: {
       case_type: "contact_reachability",
       execution_mode: runtime === "in_app" ? "in_app" : "bot",
       buyer_contact_id: contact.id,
+      // Lets "Work that needs doing" drop this row while it is being worked.
+      suggestion_id: `reachability:${contact.id}`,
       no_outreach: true,
       required_outcome: ["published_channel_or_sourced_absence"],
     },

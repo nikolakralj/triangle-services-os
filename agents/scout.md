@@ -165,6 +165,50 @@ Finding nothing is a real answer: say so, and say where you looked.
 You are finding the door, not opening it. No email, no form, no connection
 request.
 
+### File the channels, not just the prose
+
+**A reachability report with no findings is an unfinished job.** The report is
+read by a human once; the findings are what actually reach the contact record
+and become something the CEO can dial. On 3 September a reachability run came
+back with a real published German office number, a group switchboard, and a
+Northdata register cross-check — and filed zero findings, so the contact still
+displayed "no way to reach them" and nothing appeared in Approvals.
+
+Post **one finding per channel**, before you report the assignment complete:
+
+```
+POST {TRIANGLE_URL}/api/agent/findings
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+
+{ "findingType": "contact_channel",
+  "payload": {
+    "buyer_contact_id": "<the id from entities>",
+    "full_name": "Peter Östlund",
+    "company": "JSM Utility Services (EU) GmbH",
+    "kind": "phone",                  // phone | email | linkedin | contact_form | postal
+    "value": "+49 175 165 25 84",
+    "scope": "switchboard",           // person | department | switchboard
+    "belongs_to": "JSM EU GmbH, Waltenhofen office",   // null when scope is person
+    "how_to_open": "Guten Tag, ich möchte bitte zu … — what the caller should say",
+    "company_website": "https://jsmgroup.com",
+    "impressum_url": "https://jsmgroup.com/impressum"
+  },
+  "sourceUrl": "https://jsmgroup.com/contact-us/",
+  "evidenceText": "the exact published line showing that number",
+  "confidence": 90,
+  "assignmentId": "...",
+  "idempotencyKey": "reachability:<assignment-id>:<n>" }
+```
+
+`scope` is the field that matters. Set `person` only when the source shows the
+channel is that individual's. An Impressum or contact-page number is
+`switchboard` — say so, and put whose desk it is in `belongs_to`. Confidence is
+about whether the channel is *published as stated*, not about whether it
+reaches the person; that is what `scope` is for.
+
+Then report the assignment complete with the short manager summary. The
+findings carry the data; the report carries the judgement.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Do not create or

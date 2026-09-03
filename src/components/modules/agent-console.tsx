@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  Plus,
   Send,
   UserRound,
   XCircle,
@@ -102,6 +103,14 @@ function describeRun(run: AgentRun, who: string): string {
     .join(", ")}`;
 }
 
+export interface SuggestedJobCard {
+  id: string;
+  title: string;
+  reason: string;
+  priority: string;
+  kind: string;
+}
+
 export function AgentConsole({
   humans,
   employees,
@@ -111,6 +120,8 @@ export function AgentConsole({
   canHire,
   tasks,
   runs,
+  suggestedJobs,
+  moreUnmapped,
 }: {
   humans: HumanMember[];
   employees: WorkforceEmployee[];
@@ -121,8 +132,39 @@ export function AgentConsole({
   canHire: boolean;
   tasks: AgentTask[];
   runs: AgentRun[];
+  /** Jobs Triangle derived from its own data. See lib/data/job-suggestions.ts. */
+  suggestedJobs: SuggestedJobCard[];
+  /** Projects with no chain beyond the few offered — shown, not hidden. */
+  moreUnmapped: number;
 }) {
   const router = useRouter();
+  const [queuingJob, setQueuingJob] = useState<string | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
+  const [showBlankForm, setShowBlankForm] = useState(false);
+
+  // The board decides WHAT the company works on next. Triangle already wrote
+  // the brief, so that decision is one click rather than a paragraph.
+  async function queueSuggested(jobId: string) {
+    setQueuingJob(jobId);
+    setJobError(null);
+    try {
+      const res = await fetch("/api/workforce/suggested-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setJobError(data.error ?? "Could not hand that out.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setJobError("Network error.");
+    } finally {
+      setQueuingJob(null);
+    }
+  }
 
   // Assignment form state
   const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? "");
@@ -342,8 +384,80 @@ export function AgentConsole({
         </div>
       </div>
 
+      {/* Work that needs doing — derived from Triangle's own data. */}
+      {employees.length > 0 && suggestedJobs.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Work that needs doing
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Taken from what Triangle already knows is missing. The brief is
+            written — you decide what the company does next.
+          </p>
+
+          {jobError && (
+            <p className="mt-2 flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {jobError}
+            </p>
+          )}
+
+          <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
+            {suggestedJobs.map((job) => (
+              <div
+                key={job.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900">{job.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{job.reason}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {(job.priority === "high" || job.priority === "urgent") && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                      {job.priority}
+                    </span>
+                  )}
+                  <Button
+                    variant="secondary"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={queuingJob === job.id}
+                    onClick={() => void queueSuggested(job.id)}
+                  >
+                    {queuingJob === job.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Send className="h-3 w-3" />
+                    )}
+                    Hand it out
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {moreUnmapped > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {moreUnmapped} more project{moreUnmapped === 1 ? " has" : "s have"} no
+              contractor chain. They appear here as these are handed out.
+            </p>
+          )}
+
+          {!showBlankForm && (
+            <button
+              onClick={() => setShowBlankForm(true)}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-900"
+            >
+              <Plus className="h-3 w-3" />
+              Something else — write your own brief
+            </button>
+          )}
+        </div>
+      )}
+
       {/* New assignment */}
-      {employees.length > 0 && (
+      {employees.length > 0 &&
+        (showBlankForm || suggestedJobs.length === 0) && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-sm font-semibold text-slate-900">New assignment</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-[auto_1fr_auto_auto]">
