@@ -8,6 +8,8 @@ import {
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { NextMoveBanner } from "@/components/modules/next-move-banner";
+import { getNextMove } from "@/lib/data/next-move";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -60,6 +62,7 @@ export default async function DashboardPage() {
 
   const [
     refusals,
+    nextMove,
     commercial,
     decisions,
     projectRows,
@@ -70,6 +73,7 @@ export default async function DashboardPage() {
     orders,
   ] = await Promise.all([
     summarizeRefusals(orgId),
+    getNextMove(orgId),
     getCommercialStats(orgId),
     countDecisionAttention(orgId),
     listDiscoveredProjects(orgId, { limit: 200 }),
@@ -113,6 +117,7 @@ export default async function DashboardPage() {
         description="Where the company actually is, from signal to paid work — and what the system refused to record."
       />
 
+      <NextMoveBanner move={nextMove} />
       <div className="mb-4">
         <RefusalLedger summary={refusals} />
       </div>

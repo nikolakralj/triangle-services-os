@@ -60,6 +60,28 @@ export async function createFinding(params: {
     if (existing) return { id: existing.id as string, duplicate: true };
   }
 
+  // Second guard, on content rather than on the key.
+  //
+  // Two reachability runs for Peter Östlund produced six pending rows for the
+  // three same published channels, because each run generated its own
+  // idempotency key. A queue that asks a human to decide the same fact twice
+  // is wasting the only resource this product is trying to protect.
+  const dedupeValue =
+    typeof params.payload.value === "string" ? params.payload.value : null;
+  if (dedupeValue) {
+    const { data: sameFact } = await svc
+      .from("agent_findings")
+      .select("id")
+      .eq("org_id", params.orgId)
+      .eq("finding_type", params.findingType)
+      .eq("status", "pending")
+      .contains("payload", { value: dedupeValue })
+      .limit(1);
+    if (sameFact && sameFact.length > 0) {
+      return { id: sameFact[0].id as string, duplicate: true };
+    }
+  }
+
   const { data, error } = await svc
     .from("agent_findings")
     .insert({

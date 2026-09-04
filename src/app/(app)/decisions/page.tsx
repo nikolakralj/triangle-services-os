@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/common/page-header";
+import { NextMoveBanner } from "@/components/modules/next-move-banner";
+import { getNextMove } from "@/lib/data/next-move";
 import { DecisionInboxWorkspace } from "@/components/modules/decision-inbox-workspace";
 import { PlaysPanel } from "@/components/modules/plays-panel";
 import { getSession } from "@/lib/auth/session";
@@ -18,9 +20,10 @@ export default async function DecisionsPage() {
     );
   }
 
-  const [snapshot, plays] = await Promise.all([
+  const [snapshot, plays, nextMove] = await Promise.all([
     listDecisionInbox(session.organizationId),
     listPlays(session.organizationId),
+    getNextMove(session.organizationId),
   ]);
 
   return (
@@ -32,6 +35,7 @@ export default async function DecisionsPage() {
       {/* Above the queue on purpose. Everything below is a decision about
           something that already happened; this is a decision about what to do
           next, which is the more valuable of the two and had nowhere to live. */}
+      <NextMoveBanner move={nextMove} />
       <PlaysPanel plays={plays} />
       <DecisionInboxWorkspace snapshot={snapshot} />
     </>
