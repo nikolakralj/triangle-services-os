@@ -11,7 +11,7 @@ import { requireApiAccess } from "@/lib/supabase/server";
  * GET /api/workers/[id]/cv          — anonymised candidate profile
  * GET /api/workers/[id]/cv?identity=1 — named, with contact details
  *
- * The document Triangle actually sends a buyer. Anonymised is the default:
+ * The document the active organization may send a buyer. Anonymised is the default:
  * releasing a name and an email to a prospect who has committed to nothing is
  * a personal-data disclosure and an invitation to go direct. Asking for the
  * named version is a deliberate act, and it is recorded in the URL.

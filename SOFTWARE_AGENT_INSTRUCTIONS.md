@@ -80,7 +80,9 @@ Before proposing or changing product behavior:
    accepting a document's claim that something is missing.
 8. Identify the active roadmap phase and its exit gate.
 9. If asked to continue independently, select the first eligible `READY` item
-   from `AUTONOMOUS_WORK_QUEUE.md`; do not invent a new backlog.
+   from Product Track B in `AUTONOMOUS_WORK_QUEUE.md`; do not invent a new
+   backlog. Customer/client research requires a separate explicit instruction
+   and is never implied by “continue.”
 
 If the branch or directory does not contain the current Job Intake, Hunter,
 Workforce, Approvals, packages, and migrations through `027`, stop and report

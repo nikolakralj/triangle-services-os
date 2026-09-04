@@ -1,4 +1,4 @@
-// The Triangle Services CV — one person, on Triangle's paper.
+// One person's CV, branded for the active organization.
 // Rendered server-side via renderToBuffer. Do NOT add "server-only".
 
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";

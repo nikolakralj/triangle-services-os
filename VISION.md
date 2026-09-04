@@ -165,15 +165,19 @@ activity do not create defensibility.
 
 1. Run Triangle Services as tenant zero and use the system in current contract
    work.
-2. Interview comparable technical staffing and crew-supply businesses now,
-   before internal assumptions harden into product architecture.
-3. Remove tenant identity, permission, and onboarding risks needed for a safe
-   paid design-partner pilot.
-4. Win and deliver Triangle work with known economics while one external
-   design partner tests the same core workflow.
-5. Productize only patterns proven across Triangle and at least three paying
-   vertical customers.
-6. Consider a broader platform or network only when real customers prove it.
+2. Focus the active goals on developing, testing, and operating the app's
+   contract-to-crew workflows for Triangle.
+3. Remove tenant identity, permission, reliability, and onboarding risks as
+   product work exposes them.
+4. Treat external customer discovery and design-partner search as paused work
+   that requires a separate explicit management instruction.
+5. If reactivated later, productize only patterns proven in real operation.
+6. Consider a broader platform or network only when management deliberately
+   reopens that path and evidence supports it.
+
+**Current management focus — 4 September 2026:** app development, not client
+search. A generic request to continue means continue eligible product work; it
+does not authorize target research, interview preparation, or outreach.
 
 The primary external buyer is a 2–25 person European technical contract
 staffing, crew-supply, or labor-subcontracting business. Solo recruiters are a

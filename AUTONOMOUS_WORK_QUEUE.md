@@ -16,7 +16,9 @@ independently:
 
 1. complete the mandatory start protocol in `SOFTWARE_AGENT_INSTRUCTIONS.md`;
 2. inspect the current branch, diff, live/local evidence, and this queue;
-3. select the first `READY` item whose entry gate is already proven;
+3. select the first `READY` item in **Product Track B** whose entry gate is
+   already proven; never select Customer Track C unless the user explicitly
+   requests customer discovery or client research;
 4. mark only that item `IN_PROGRESS` before editing;
 5. implement the smallest coherent slice and run its verification;
 6. update the item, `CURRENT_STATE.md`, and any affected source-of-truth doc;
@@ -40,8 +42,9 @@ generated artifacts, or statuses without real-world proof.
 ## Active tracks
 
 Commercial Track A is operated by Triangle's humans with AI assistance.
-Product Track B is executable by software/product agents. Customer Track C
-requires founder/customer interaction; agents may prepare assets and research.
+Product Track B is the active software/product-agent queue. Customer Track C
+is paused by management and requires a separate explicit request; a generic
+instruction to continue does not activate it.
 
 ## Product Track B — ordered queue
 
@@ -330,29 +333,40 @@ configuration no longer depends on developer judgment.
 **Gate:** recurring narrow-market demand and supply liquidity, repeat
 transactions, legal review, and a proven portal job-to-be-done.
 
-## Customer Track C — agents prepare, humans execute
+## Customer Track C — paused; explicit management instruction required
 
 ### GTM-001 — Design-partner target list
 
-**Status:** READY  
+**Status:** DONE (dormant; client research paused 4 September 2026)
 **Agent work:** define search criteria and prepare a research table for 30
 European technical crew suppliers/contract staffing agencies with public
 evidence and likely buyer role.  
 **Human gate:** approve targets and any contact method.  
 **No authority:** do not scrape prohibited data or send outreach.
 
+**Verification:** `docs/strategy/DESIGN_PARTNER_TARGETS_2026-09-04.md`
+contains 30 unique, official company sources, a size-evidence field, an
+explicit buyer-role hypothesis, and a ranked first interview wave. Source
+claims remain labelled as company-controlled and no person was contacted.
+
 ### GTM-002 — Problem interview kit
 
-**Status:** READY  
+**Status:** DONE (dormant; client research paused 4 September 2026)
 **Agent work:** prepare the interview guide, current-workflow map, pain/cost
 worksheet, pilot qualification score, and evidence log.  
 **Human work:** invite and conduct interviews.
 
+**Verification:** `docs/strategy/PROBLEM_INTERVIEW_KIT_2026-09-04.md` contains
+the interview guide, current-workflow map, pain/cost worksheet, pilot score,
+mandatory safety gates, evidence definitions, summary template, and the
+cross-interview decision rule. The companion
+`docs/strategy/problem-interview-evidence-log.csv` parses as CSV.
+
 ### GTM-003 — Paid pilot offer
 
-**Status:** GATED  
-**Gate:** at least five interviews repeat the core pain and one target requests
-a concrete next step.  
+**Status:** GATED (customer/client work paused by management 4 September 2026)
+**Gate:** management explicitly reactivates customer discovery, at least five
+interviews repeat the core pain, and one target requests a concrete next step.
 **Agent work:** draft scope, success metrics, implementation boundary, pricing
 hypothesis, data responsibilities, support, and exit/export terms.  
 **Human/legal work:** approve, negotiate, and sign.
@@ -379,13 +393,12 @@ Verified against the database on 31 August 2026, not from memory.
 Update only from evidence. Link the source/date in the relevant strategy or
 commercial record; do not change counts from memory.
 
-## Where Product Track B stands — 2 September 2026
+## Where the queue stands — 4 September 2026
 
-CASE-002 is repository- and live-smoke-complete after management clarified the
-agent-operated CEO workflow. CASE-003 is READY: Bilfinger verified the manager
-layer, while Köster and GOLDBECK verified Triangle's own no-outreach Scout
-executor and structured case hand-in. Extend this proven pattern one domain at
-a time; do not invent a generic agent platform.
+CASE-001 through CASE-003 are complete. CASE-004 remains gated until two
+runtime roles repeatedly collaborate on the same real case and a manual
+handoff creates measured delay or lost context. Do not build handoff
+infrastructure ahead of that evidence.
 
 The commercial evidence bottlenecks remain unchanged:
 
@@ -394,5 +407,7 @@ The commercial evidence bottlenecks remain unchanged:
   approach to Peter Östlund cannot be sent;
 - **0 recorded sends**, so no gate downstream of Phase 0 can open.
 
-Customer Track C still has GTM-001 and GTM-002 ready for research/preparation,
-but no agent has authority to contact targets.
+GTM-001 and GTM-002 exist as dormant research/preparation artifacts; they are
+not active goals and create no next action. GTM-003 remains gated. A future
+agent must not research or search for clients unless management explicitly
+asks for that work.

@@ -1,6 +1,6 @@
 # Triangle Services OS — Long-Term Product and Software Roadmap
 
-**Adopted:** 29 August 2026; productization track updated 30 August 2026
+**Adopted:** 29 August 2026; active focus updated 4 September 2026
 **Horizon:** 24–36 months, controlled by evidence gates rather than calendar promises
 **Owner:** Triangle Services management
 **Execution companion:** `ROADMAP_EXECUTION.md`
@@ -12,9 +12,10 @@ Triangle is building a **contract-to-crew operating system for cross-border
 technical staffing and subcontracting**.
 
 It is intended to become a sellable vertical product. Triangle Services is
-tenant zero and the first proof environment. External customer discovery and
-paid-design-partner work begin during commercial activation; speculative SaaS
-features do not.
+tenant zero and the first proof environment. The active management focus is
+app development and operation for Triangle. External customer discovery and
+paid-design-partner work are paused unless management explicitly reactivates
+them; speculative SaaS features remain gated.
 
 It is human-led and AI-assisted. Its purpose is to turn truthful worker
 capacity and verified demand into buyer conversations, supplier approval,
@@ -272,9 +273,9 @@ observability, backups, incident response, tenant controls, and cost limits.
 
 ### Goal
 
-Use the existing system to start real commercial conversations and expose the
-first genuine workflow friction, while verifying that similar technical
-staffing and crew-supply businesses will pay to solve the same problem.
+Develop and operate the existing system through real Triangle workflows so the
+app exposes genuine workflow friction and becomes reliable enough to support
+contract-to-crew work end to end.
 
 ### Required work
 
@@ -287,18 +288,14 @@ staffing and crew-supply businesses will pay to solve the same problem.
 - record final sent content, recipient, send date, follow-up date, and outcome;
 - start supplier/prequalification routes relevant to the chosen package;
 - record every next action and due date;
-- interview at least 12 qualified owners/operators from technical crew
-  suppliers and boutique contract staffing agencies;
-- obtain three concrete design-partner commitments: a real-data workshop,
-  pilot LOI, or paid pilot—not compliments or wait-list signups.
 
 ### Software allowed
 
-Fix verified blockers to those actions. A narrow productization safety slice
-is also allowed when it prevents tenant identity leakage, permission failure,
-or unsafe onboarding for a real design-partner conversation. Do not build
-speculative workflow, analytics, billing, or design work during the revenue
-block.
+Develop the app where work completes or protects a real contract-to-crew state
+transition, fixes a verified bug, reduces tenant/privacy/data risk, strengthens
+tests or observability, or closes a documented workflow gap. Do not substitute
+client searching, speculative SaaS work, generic architecture, or cosmetic
+activity for product progress.
 
 ### Exit gate
 
@@ -308,9 +305,6 @@ block.
 - all high-priority leads triaged;
 - follow-ups scheduled;
 - at least three buyer/procurement conversations requested;
-- 12 qualified external problem interviews completed;
-- five interviewees independently confirm the same costly workflow problem;
-- three concrete pilot commitments requested or received;
 - no duplicate or unauthorized external action.
 
 ### Do not build
@@ -385,14 +379,13 @@ Keep existing Next.js route handlers, Supabase state, and current agent/API
 contracts unless real usage proves request-bound execution is unreliable. Do
 not introduce a general orchestration platform in anticipation.
 
-### Parallel design-partner rule
+### Design-partner work is paused
 
-Customer discovery does not wait for Phase 4 or Phase 5. When five qualified
-interviews repeat the same problem and one target agrees to a paid, scoped
-pilot, build only the tenant onboarding, import/export, trust, and integration
-work required for that pilot. Triangle revenue work remains the product truth
-test; external feedback prevents the internal workflow becoming dependent on
-Nikola's tacit knowledge.
+External target research, customer interviews, and pilot preparation are not
+active goals. They require a separate explicit management instruction before
+an agent may select or continue them. If reactivated later, build only the
+tenant onboarding, import/export, trust, and integration work justified by a
+scoped pilot.
 
 ## Phase 2 — Delivery, mobilization, and margin OS
 

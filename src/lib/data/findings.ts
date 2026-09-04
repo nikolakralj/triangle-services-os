@@ -209,20 +209,12 @@ export async function acceptFinding(params: {
       .join(" ")
       .toLowerCase();
 
-    const { data: sectors } = await svc
-      .from("sectors")
-      .select("id, name, is_active")
-      .eq("organization_id", params.orgId);
-
-    const words = (n: string) =>
-      n.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
-    const matched = (sectors ?? []).find((s) =>
-      words(s.name as string).some((w) => haystack.includes(w)),
+    const { classifySector, toCountryCode } = await import("./project-facts");
+    const sectorId = await classifySector(
+      params.orgId,
+      haystack,
+      payload.sector ? String(payload.sector) : null,
     );
-    const sectorId =
-      (matched?.id as string | undefined) ??
-      ((sectors ?? []).find((s) => s.is_active)?.id as string | undefined) ??
-      null;
 
     const { data: project } = await svc
       .from("discovered_projects")
@@ -231,6 +223,11 @@ export async function acceptFinding(params: {
         sector_id: sectorId,
         project_name: name.slice(0, 300),
         country: payload.country ? String(payload.country) : null,
+        // Derived, because the country filter matches ISO codes and nothing
+        // ever wrote one — eighteen projects had country_code = null.
+        country_code: toCountryCode(
+          payload.country ? String(payload.country) : null,
+        ),
         city: payload.city ? String(payload.city) : null,
         project_type: payload.project_type ? String(payload.project_type) : null,
         client_company: payload.client_company
@@ -252,6 +249,29 @@ export async function acceptFinding(params: {
       entityId = project.id as string;
       destinationHref = `/hunter/${entityId}`;
     }
+  }
+
+  // Missing facts filled in on a project that already exists.
+  //
+  // Distinct from a "project" finding, which creates one. This corrects blanks
+  // on a record Triangle already has — the eighteen projects that carried no
+  // sector, no country code, no phase and no crew size, which is why every
+  // sector tab and country pill on Signal Inbox filtered to nothing.
+  if (finding.finding_type === "project_facts") {
+    const projectId = String(payload.project_id ?? "").trim();
+    if (!projectId) return null;
+
+    const { applyProjectFacts } = await import("./project-facts");
+    const result = await applyProjectFacts({
+      projectId,
+      orgId: params.orgId,
+      payload,
+    });
+    if (!result) return null;
+
+    promotedTo = "discovered_project";
+    entityId = projectId;
+    destinationHref = `/hunter/${projectId}`;
   }
 
   if (finding.finding_type === "company") {

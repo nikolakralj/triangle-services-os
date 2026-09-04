@@ -17,6 +17,7 @@ operating profile.
 | Research run/chat | Triangle seller instructions and Zagreb search location | Unsafe commercial instruction | Tenant name/profile injected; search is not pinned to tenant-zero location |
 | Import evaluation | Triangle target-market prompt | Unsafe commercial scoring | Fit is scored against the active tenant's approved profile |
 | Submission packet/PDF | Triangle author, header, next step, footer | Unsafe buyer-facing artifact | Organization name is required and passed into both formats |
+| Individual worker CV/PDF | Later feature added a Triangle fallback and `TS-` reference | Unsafe buyer-facing artifact | Active organization name is required; the reference prefix is derived from it |
 | Document center | Static Triangle sample records and fake signed link | Unsafe operational record | Static sample module removed; tenant database and private storage are authoritative |
 | MCP description | Triangle-specific server description | Product metadata leakage | Generic project-to-placement workbench description |
 | Tenant-zero defaults | Triangle company facts and sign-off | Legitimate tenant data | Restricted to the demo/tenant-zero organization profile and migration seed |
@@ -32,6 +33,8 @@ operating profile.
   opt-out status.
 - Research suggestions remain pending until human acceptance.
 - Submission packets require the active organization profile.
+- Individual worker CVs require the active organization name and derive their
+  brand/reference from it; anonymised output remains the default.
 - Documents are filtered by tenant role and opened through short-lived signed
   URLs.
 

@@ -21,6 +21,24 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 /** How many "map the chain" jobs to surface at once. */
 const CHAIN_JOB_LIMIT = 4;
 
+/** Same reasoning as the chain cap — a wall of rows is not a decision. */
+const FACTS_JOB_LIMIT = 3;
+
+/**
+ * Every research brief asks for the structured facts too.
+ *
+ * A researcher who has already read the source knows the country and roughly
+ * what phase the job is in. Leaving those blank cost nothing visible until you
+ * notice that every sector tab and country filter on Signal Inbox matched
+ * nothing, on all eighteen projects.
+ */
+const FACTS_INSTRUCTION = [
+  "While you are in the source, fill in the structured facts Triangle is missing about this project and file them as a separate finding of type `project_facts` with `project_id` set:",
+  "country (and country_code as ISO-2 if you know it), city, phase, project_type, estimated_crew_size, estimated_value_eur, estimated_start_date, peak_workforce_month.",
+  "phase must be one of: announced, permits_filed, permits_approved, groundbreaking, foundation, shell, fit_out, mep_install, commissioning, operational, unknown. Everyday words are mapped where they map cleanly, but the exact value is safer.",
+  "Only fields the source actually supports. Leave the rest out — a guessed crew size becomes a package Triangle cannot staff.",
+].join(" ");
+
 export interface SuggestedJob {
   /** Stable across refreshes; also the idempotency key. */
   id: string;
@@ -31,7 +49,7 @@ export interface SuggestedJob {
   /** Which kind of employee should get it. */
   roleKey: string;
   priority: "urgent" | "high" | "normal" | "low";
-  kind: "reach" | "chain" | "supply";
+  kind: "reach" | "chain" | "supply" | "facts";
   entityRefs: Array<{ type: string; id: string; relation?: string }>;
   constraints: Record<string, unknown>;
 }
@@ -48,7 +66,9 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
       .eq("organization_id", orgId),
     svc
       .from("discovered_projects")
-      .select("id, project_name, client_company, country, created_at")
+      .select(
+        "id, project_name, client_company, country, country_code, sector_id, phase, estimated_crew_size, created_at",
+      )
       .eq("organization_id", orgId)
       // Newest first. Not a relevance ranking — Triangle cannot compute one
       // yet — but the most recently discovered project is the most likely to
@@ -173,6 +193,40 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
       kind: "chain",
       entityRefs: [{ type: "project", id: p.id as string, relation: "target" }],
       constraints: { execution_mode: "bot", no_outreach: true },
+    });
+  }
+
+  // Projects Triangle cannot even file correctly.
+  //
+  // Separate from the chain job on purpose: a project can have a full
+  // contractor chain and still be invisible to every filter because nobody
+  // recorded which sector or country it is in.
+  const missingFacts = (projects.data ?? []).filter(
+    (p) => !p.sector_id || !p.country_code || !p.phase,
+  );
+  for (const p of missingFacts.slice(0, FACTS_JOB_LIMIT)) {
+    const name = (p.project_name as string) ?? "this project";
+    const gaps = [
+      !p.sector_id ? "sector" : null,
+      !p.country_code ? "country" : null,
+      !p.phase ? "phase" : null,
+      !p.estimated_crew_size ? "crew size" : null,
+    ].filter(Boolean) as string[];
+    push({
+      id: `facts:${p.id}`,
+      title: `Complete the record for ${name}`,
+      objective: [
+        `Triangle holds ${name} but cannot file it: ${gaps.join(", ")} ${gaps.length === 1 ? "is" : "are"} missing.`,
+        "Go back to the source and read what is actually stated.",
+        FACTS_INSTRUCTION,
+        "Do not contact anyone. If the source does not support a field, say so rather than filling it in.",
+      ].join("\n\n"),
+      reason: `Missing ${gaps.join(", ")} — invisible to sector and country filters.`,
+      roleKey: "project_researcher",
+      priority: "normal",
+      kind: "facts",
+      entityRefs: [{ type: "project", id: p.id as string, relation: "target" }],
+      constraints: { execution_mode: "bot", no_outreach: true, project_id: p.id },
     });
   }
 

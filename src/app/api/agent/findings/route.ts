@@ -25,6 +25,7 @@ const VALID_TYPES = [
   "company",
   "contact",
   "contact_channel",
+  "project_facts",
   "worker",
   "other",
 ];

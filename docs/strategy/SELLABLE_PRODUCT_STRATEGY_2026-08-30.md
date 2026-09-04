@@ -5,6 +5,12 @@
 **Status:** adopted product hypothesis; customer and price claims remain evidence-gated  
 **Tenant zero:** Triangle Services
 
+> **Execution update — 4 September 2026:** management paused external client
+> search, target research, interviews, and pilot preparation. The product
+> hypothesis below remains long-term context, but it is not an active goal and
+> does not follow from a generic request to continue. Current goals focus on
+> app development.
+
 ## Executive decision
 
 Build a sellable **contract-to-crew operating system for technical staffing,

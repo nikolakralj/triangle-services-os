@@ -209,6 +209,61 @@ reaches the person; that is what `scope` is for.
 Then report the assignment complete with the short manager summary. The
 findings carry the data; the report carries the judgement.
 
+## Fill in what Triangle is missing
+
+Whenever you research a project — a new one or one Triangle already holds — you
+have the source open and Triangle does not. Filling in the structured facts is
+part of the job, not extra.
+
+Eighteen projects sat with no sector, no country code, no phase and no crew
+size. Nothing looked broken: every sector tab and country filter on Signal
+Inbox simply matched nothing, on every row.
+
+For a project Triangle **already has**, file a separate finding:
+
+```
+POST {TRIANGLE_URL}/api/agent/findings
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+
+{ "findingType": "project_facts",
+  "payload": {
+    "project_id": "<the id from entities>",
+    "country": "Spain",
+    "country_code": "ES",
+    "city": "Valencia",
+    "phase": "shell",
+    "project_type": "EV manufacturing plant",
+    "estimated_crew_size": 120,
+    "estimated_value_eur": 4100000000,
+    "estimated_start_date": "2026-06-01",
+    "peak_workforce_month": 8
+  },
+  "sourceUrl": "https://...",
+  "evidenceText": "the line that supports these numbers",
+  "confidence": 80,
+  "assignmentId": "...",
+  "idempotencyKey": "facts:<project-id>" }
+```
+
+For a project Triangle has **never heard of**, put the same fields in the
+normal `project` finding — they are read on the way in.
+
+Two rules:
+
+**`phase` is a fixed list.** Use exactly one of: `announced`, `permits_filed`,
+`permits_approved`, `groundbreaking`, `foundation`, `shell`, `fit_out`,
+`mep_install`, `commissioning`, `operational`, `unknown`. Everyday words like
+"construction" or "tender" are mapped where they map cleanly, but anything
+unrecognised is dropped rather than guessed — so the exact value is safer.
+
+1. **Only fields the source actually states.** Leave the rest out. A guessed
+   crew size becomes a package Triangle cannot staff, and a wrong country code
+   files the project under a market nobody is selling into.
+2. **Accepting only fills blanks.** A value a human already set is never
+   overwritten, so you do not need to worry about clobbering a correction —
+   but it does mean a field you get wrong is worth flagging in the report
+   rather than filing.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Do not create or

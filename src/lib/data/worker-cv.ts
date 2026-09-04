@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
-// The Triangle Services CV.
+// The active organization's worker CV.
 //
 // The document you actually send a buyer. Triangle could extract a CV, build a
 // profile, match a worker to a package and generate a crew packet — but there
@@ -71,6 +71,9 @@ export async function buildWorkerCv(params: {
     .eq("id", params.orgId)
     .maybeSingle();
 
+  const orgName = String(org?.name ?? "").trim();
+  if (!orgName) return null;
+
   const list = (v: unknown) =>
     Array.isArray(v) ? (v as unknown[]).map(String).filter(Boolean) : [];
 
@@ -98,7 +101,7 @@ export async function buildWorkerCv(params: {
 
   return {
     displayName: anonymised ? anonymiseName(fullName, role) : fullName || "Unnamed",
-    reference: `TS-${String(w.id).slice(0, 8).toUpperCase()}`,
+    reference: `${organizationReferencePrefix(orgName)}-${String(w.id).slice(0, 8).toUpperCase()}`,
     anonymised,
     role: role || "Role not recorded",
     workerType: w.worker_type ? String(w.worker_type) : null,
@@ -127,8 +130,22 @@ export async function buildWorkerCv(params: {
         },
     notRecorded,
     generatedAt: new Date().toISOString(),
-    orgName: (org?.name as string) ?? "Triangle Services",
+    orgName,
   };
+}
+
+function organizationReferencePrefix(name: string): string {
+  const words =
+    name
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .match(/[a-zA-Z0-9]+/g) ?? [];
+
+  if (words.length >= 2) {
+    return `${words[0]?.charAt(0) ?? ""}${words[1]?.charAt(0) ?? ""}`.toUpperCase();
+  }
+
+  return (words[0]?.slice(0, 2).toUpperCase() || "CV").padEnd(2, "X");
 }
 
 /**

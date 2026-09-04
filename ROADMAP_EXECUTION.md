@@ -1,9 +1,14 @@
 # Roadmap Execution
 
-**Current cycle:** Agent-operated commercial qualification and contract truth
+**Current cycle:** App development and operational hardening
 **Cycle started:** 29 August 2026
 **Long-term direction:** `ROADMAP.md`
 **Operating playbook:** `docs/strategy/FIRST_CONTRACT_30_DAY_PLAYBOOK.md`
+
+**Management focus — 4 September 2026:** goals are app development, not client
+search. External target research, customer interviews, and pilot preparation
+are paused unless management explicitly requests them. A generic instruction
+to continue authorizes only eligible product/app work.
 
 ## How to use this file
 
@@ -283,9 +288,10 @@ Only after a concrete requirement or vendor process exists:
 **90-day success:** paid work and known economics. A signed agreement without
 mobilization is progress, not final proof.
 
-## Workstream E — Parallel sellability proof
+## Workstream E — External sellability proof (paused)
 
-This work begins now but cannot displace Workstreams A–D.
+This work is retained as future context but is not active. It requires a new,
+explicit management instruction before research or execution.
 
 1. Build a qualified list of 30 European targets: technical crew suppliers,
    labor subcontractors, and boutique contract staffing agencies.
@@ -301,7 +307,8 @@ This work begins now but cannot displace Workstreams A–D.
    interview questions, pricing hypothesis, and evidence gates.
 7. Use `AUTONOMOUS_WORK_QUEUE.md` as the ordered software/product queue.
 
-Agents may research targets and prepare interview/pilot material. Only a human
+Agents may not select target research or interview/pilot preparation from a
+generic request to continue. If management reactivates this work, only a human
 contacts prospects, agrees price/terms, supplies customer data, or authorizes
 external account creation.
 
@@ -384,9 +391,9 @@ Until Phase 0 exits, do not build:
 
 Keep existing workforce architecture; do not delete useful foundations.
 
-The freeze does not prohibit customer interviews, target research, pilot
-definition, or the narrow tenant-identity safety boundary. Those are evidence
-and trust work, not a generic SaaS build.
+The freeze does not prohibit tenant-identity and trust work inside the app.
+Customer interviews, target research, and pilot definition are separately
+paused by the 4 September management decision.
 
 ## Weekly management review
 
@@ -445,3 +452,12 @@ tenant-aware Job Intake classification/reply drafting. TypeScript, focused
 lint, production build, unauthenticated route gate, and diff checks pass.
 Migration `027` is not applied to production; no external communication,
 deployment, live data, or commercial record was changed.
+
+### 4 September 2026
+
+Management clarified that active goals must focus on app development, not
+searching for clients. External target research, interviews, and pilot
+preparation are paused and no longer follow from a generic request to
+continue. The long-term possibility of a sellable vertical product remains;
+the current execution priority is product functionality, reliability,
+testing, and completion of Triangle's contract-to-crew workflows.

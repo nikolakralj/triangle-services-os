@@ -5,6 +5,41 @@
 This file is the honest status report for the repo.
 It should tell a future agent what is real, what is partial, and what still needs cleanup.
 
+## App-development focus — 4 September 2026
+
+Management clarified that current goals focus on app development, not client
+search. A generic instruction to continue now selects only eligible Product
+Track B work. External target research, customer interviews, and pilot
+preparation require a separate explicit instruction.
+
+Earlier on 4 September, before that clarification, customer-discovery
+preparation artifacts were completed. They are retained as dormant reference;
+they are not active goals and create no follow-up action.
+
+- `docs/strategy/DESIGN_PARTNER_TARGETS_2026-09-04.md` records 30 European
+  technical staffing, crew-supply, and labour-subcontracting targets using 30
+  unique official company sources. It separates a 12-company first wave from
+  larger or less-certain comparators, shows what size evidence is actually
+  public, and keeps the buyer role as a hypothesis.
+- `docs/strategy/PROBLEM_INTERVIEW_KIT_2026-09-04.md` provides the neutral
+  interview guide, last-real-case workflow map, pain/cost worksheet, 20-point
+  pilot qualification score, mandatory human/data gates, evidence taxonomy,
+  and cross-interview decision rule.
+- `docs/strategy/problem-interview-evidence-log.csv` is the reusable claim-
+  level evidence ledger.
+- The tenant-identity regression check exposed a later worker-CV feature whose
+  generated buyer document still had a `Triangle Services` fallback and a
+  hardcoded `TS-` reference. The CV now requires the active organization's
+  stored name and derives its stable two-character prefix from that name.
+  Triangle still renders `TS-`; another tenant cannot inherit it.
+
+No company or person was contacted, no form was submitted, and no target was
+promoted into Triangle's canonical business records. No client-search action
+should follow from these files unless management reactivates that work.
+
+Verification on 4 September: `npx tsc --noEmit`, full `npm run lint`,
+`npm run check:tenant-identity`, `npm run build`, and `git diff --check` pass.
+
 ## Verified state — 2 September 2026
 
 Checked against the running app and the database, not from memory.
@@ -135,6 +170,51 @@ Provenance of the existing 18 projects could not be determined: `ai_model` is
 null on all of them and the hunt would have stamped it, so they did not come
 from this route. No current code path explains the `ai_opportunity_score` of 75
 either. Recorded as unknown rather than guessed.
+
+### Sector and country filters were dead, and one fallback was misfiling projects
+
+Codex flagged "sector data corruption" before running out of budget. It is not
+corruption — it is worse in a quieter way. All eighteen projects carried
+`sector_id = NULL`, `country_code = NULL`, `phase = NULL` and
+`estimated_crew_size = NULL`. Three of the four sector tabs are `is_active =
+false` and render disabled; the one that is clickable filters to **zero rows**,
+and the country pills filter on a column that is null everywhere. Tabs that
+render, accept a click, and can never match anything.
+
+Management's direction was the right one: the researcher who already has the
+source open should fill these in, not the CEO.
+
+- `project_facts` is a new finding type. It corrects blanks on a project
+  Triangle already holds, as opposed to `project`, which creates one.
+  `PROJECT_FACT_FIELDS` is the whole surface an agent may touch.
+- **Only blanks are filled.** A value a human already set is never overwritten,
+  and the skipped fields are reported.
+- `country_code` is derived from whatever the record holds — "Valencia, Spain"
+  yields `ES` — so a researcher never has to know ISO codes. The `project`
+  insert path never set it at all, which is why even new projects arrived
+  unfilterable.
+- Every research brief now asks for the facts as well as the narrative, and
+  a "Complete the record for X" job appears for projects missing them.
+
+Two defects surfaced only by running the real accept against real data:
+
+1. **`phase` has a CHECK constraint** and my own first brief told Scout to use
+   "planning, tender, construction" — none of which are valid. The accept
+   failed with a Postgres constraint error, taking every other good field on
+   the finding down with it. `normalizePhase()` now maps everyday words onto
+   the real values and drops anything unrecognised, so one wrong word costs
+   that field and not the whole acceptance. This is exactly the enum pitfall
+   `AGENTS.md` already warns about.
+2. **The sector classifier fell back to "whichever sector is active."** An EV
+   plant in Valencia was filed under **Data Centers** — present in a filter it
+   does not belong to and absent from the one it does. The fallback is gone;
+   unmatched now means null, which is visible under "All" and honest. A
+   researcher may name the sector outright and that is matched first.
+
+Verified end to end against the live database: a scratch finding filled
+country, country_code `ES`, phase `shell` and crew size 120; the same finding
+naming "Automotive & EV" resolved to that sector rather than Data Centers; and
+scratch rows were removed and the project returned to its original blank state.
 
 ### Page audit — Signal Inbox (3 September 2026)
 
@@ -601,12 +681,13 @@ operational requirement.
 
 ## Current priority
 
-1. human-confirm supply and choose one truthful package;
-2. work and triage the current high-priority demand;
-3. record five real human sends and follow-ups;
-4. send and record one appropriate capability/crew packet;
-5. start real buyer/procurement/supplier conversations;
-6. build only a verified blocker exposed by those actions.
+1. develop and complete the app's contract-to-crew workflows;
+2. fix verified product, authorization, privacy, and data-truth defects;
+3. strengthen automated coverage for critical authentication, tenant, and
+   commercial state transitions;
+4. verify built workflows end to end with real or clearly isolated test data;
+5. improve reliability and observability where current evidence is shallow;
+6. do not spend autonomous work on searching for clients.
 
 The generic hybrid work OS, Collaboration Field, agent analytics/catalog,
 additional agents, autonomous outbound, broad Hunter expansion, marketplace,

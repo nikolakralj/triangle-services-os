@@ -341,6 +341,30 @@ Why:
 - grouping reduces review volume without giving AI authority to approve its
   own facts or external actions.
 
+### 2026-09-04: Active goals focus on app development, not client search
+
+Decision:
+
+- make product/app development the active agent goal;
+- pause external target research, client searching, problem-interview work,
+  and design-partner preparation unless management requests them explicitly;
+- interpret a generic request to “continue” as eligible Product Track B work
+  only;
+- retain already prepared target/interview artifacts as dormant reference,
+  not an active pipeline or required next action.
+
+Why:
+
+- management wants engineering attention spent on the application;
+- research activity must not displace app functionality, reliability,
+  testing, or completion of contract-to-crew workflows;
+- the long-term sellable-product direction can remain without making client
+  search a current operating goal.
+
+This supersedes the execution timing of the 30 August decision that external
+customer discovery begins during Phase 0. It does not authorize speculative
+generic software or autonomous external action.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement
