@@ -63,6 +63,9 @@ export interface NextMove {
 /** Long enough that calling back is not pestering, short enough to stay warm. */
 const RETRY_AFTER_DAYS = 4;
 
+/** A conversation that has gone quiet for this long has been dropped. */
+const FOLLOW_UP_AFTER_DAYS = 5;
+
 interface ContactRow {
   id: string;
   full_name: string | null;
@@ -121,10 +124,49 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     reachable.map((c) => c.id),
   );
 
-  // ── 1. Someone is reachable and has never been tried ──────────────────────
+  // ── 1. A conversation that started and then went quiet ────────────────────
   //
-  // Above everything else, including accepting more channels. Research that
-  // is never acted on is the exact failure this product exists to prevent.
+  // Above a cold call, because someone who already picked up is worth more
+  // than someone who never has. Without this, getting through was the one
+  // outcome that made a person vanish from every screen — the app forgot the
+  // live conversations and kept pointing at strangers.
+  const quiet = reachable
+    .filter((c) => {
+      const log = history.get(c.id) ?? [];
+      if (log.length === 0 || log[0].outcome !== "reached") return false;
+      return (
+        new Date(log[0].at).getTime() < Date.now() - FOLLOW_UP_AFTER_DAYS * 86_400_000
+      );
+    })
+    .sort(
+      (a, b) =>
+        new Date((history.get(a.id) ?? [])[0].at).getTime() -
+        new Date((history.get(b.id) ?? [])[0].at).getTime(),
+    );
+
+  if (quiet.length > 0) {
+    const person = quiet[0];
+    const log = history.get(person.id) ?? [];
+    const channel = bestChannel(person);
+    if (channel) {
+      const said = log[0].note && log[0].note !== "Got through" ? log[0].note : null;
+      return {
+        headline: `Follow up with ${person.full_name ?? "them"}`,
+        because: said
+          ? `You got through ${daysAgo(log[0].at)} and wrote down: “${said}”. Nothing since.`
+          : `You got through ${daysAgo(log[0].at)} and nothing has happened since. A conversation nobody returns to is a conversation lost.`,
+        href: "/decisions",
+        cta: "Open Decision Inbox",
+        clear: false,
+        action: buildAction(person, channel, draftRows, history),
+      };
+    }
+  }
+
+  // ── 2. Someone is reachable and has never been tried ──────────────────────
+  //
+  // Above accepting more channels. Research that is never acted on is the
+  // exact failure this product exists to prevent.
   const untried = reachable
     .filter((c) => (history.get(c.id) ?? []).length === 0)
     .sort(byActionability);
@@ -140,7 +182,7 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     }
   }
 
-  // ── 2. Nobody reachable yet, but a route to one is waiting on you ─────────
+  // ── 3. Nobody reachable yet, but a route to one is waiting on you ─────────
   if (channelFindings.length > 0) {
     const names = Array.from(
       new Set(
@@ -165,7 +207,7 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     };
   }
 
-  // ── 3. Tried, nobody picked up, and enough time has passed to try again ───
+  // ── 4. Tried, nobody picked up, and enough time has passed to try again ───
   const cutoff = Date.now() - RETRY_AFTER_DAYS * 86_400_000;
   const stale = reachable
     .filter((c) => {
@@ -203,7 +245,7 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     }
   }
 
-  // ── 4. A draft that can actually be sent ──────────────────────────────────
+  // ── 5. A draft that can actually be sent ──────────────────────────────────
   //
   // Sendable means there is a person attached AND a channel that reaches
   // them. Five of the six drafts on record fail the first test and the sixth
@@ -234,7 +276,7 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     };
   }
 
-  // ── 5. Decisions, but none of them a route to a person ────────────────────
+  // ── 6. Decisions, but none of them a route to a person ────────────────────
   if (pending.length > 0) {
     return {
       headline: `${pending.length} decisions waiting`,

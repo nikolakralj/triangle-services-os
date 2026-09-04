@@ -91,6 +91,8 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [logging, setLogging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState<"reached" | "dead_end" | null>(null);
+  const [note, setNote] = useState("");
 
   const isPhone = action.channelKind === "phone";
   const isEmail = action.channelKind === "email";
@@ -105,7 +107,7 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
     }
   }
 
-  async function log(outcome: "reached" | "no_answer" | "dead_end") {
+  async function log(outcome: "reached" | "no_answer" | "dead_end", note?: string) {
     setLogging(outcome);
     setError(null);
     try {
@@ -117,6 +119,7 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
           channelKind: action.channelKind,
           value: action.value,
           outcome,
+          note: note?.trim() || undefined,
           content: action.script ?? undefined,
         }),
       });
@@ -125,6 +128,8 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
         setError(data.error ?? "Could not record that.");
         return;
       }
+      setAsking(null);
+      setNote("");
       router.refresh();
     } catch {
       setError("Network error.");
@@ -223,28 +228,79 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
         </div>
       ) : null}
 
-      {/* What happened. Three buttons, because those are the three outcomes. */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-slate-400">Then tell me what happened:</span>
-        {(
-          [
-            ["reached", "Got through"],
-            ["no_answer", "No answer"],
-            ["dead_end", "Dead end"],
-          ] as const
-        ).map(([outcome, label]) => (
+      {/* What happened. Three buttons, because those are the three outcomes.
+          "No answer" needs no explanation and files instantly. The other two
+          carry the only information worth keeping — what they actually said —
+          so they ask for one line before filing. That asymmetry is the whole
+          difference between a record you write and a form you avoid. */}
+      {asking ? (
+        <form
+          className="mt-4 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void log(asking, note);
+          }}
+        >
+          <span className="text-xs font-medium text-slate-400">
+            {asking === "reached" ? "What did they say?" : "Why is it a dead end?"}
+          </span>
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              asking === "reached"
+                ? "Asked for our capability statement — call back Tuesday"
+                : "Wrong person; procurement is handled in Ijmuiden"
+            }
+            className="h-8 min-w-0 flex-1 rounded-lg border border-white/20 bg-slate-900 px-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-400"
+          />
           <button
-            key={outcome}
-            type="button"
+            type="submit"
             disabled={logging !== null}
-            onClick={() => void log(outcome)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-slate-100 disabled:opacity-50"
           >
-            {logging === outcome ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {label}
+            {logging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Save
           </button>
-        ))}
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setAsking(null);
+              setNote("");
+            }}
+            className="text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+          >
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-400">
+            Then tell me what happened:
+          </span>
+          {(
+            [
+              ["reached", "Got through"],
+              ["no_answer", "No answer"],
+              ["dead_end", "Dead end"],
+            ] as const
+          ).map(([outcome, label]) => (
+            <button
+              key={outcome}
+              type="button"
+              disabled={logging !== null}
+              onClick={() =>
+                outcome === "no_answer" ? void log(outcome) : setAsking(outcome)
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
+            >
+              {logging === outcome ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
 

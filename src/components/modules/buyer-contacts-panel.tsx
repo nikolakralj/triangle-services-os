@@ -426,9 +426,11 @@ function AttemptTrail({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [asking, setAsking] = useState<"reached" | "dead_end" | null>(null);
+  const [note, setNote] = useState("");
   const primary = channels[0];
 
-  async function log(outcome: "reached" | "no_answer" | "dead_end") {
+  async function log(outcome: "reached" | "no_answer" | "dead_end", why?: string) {
     if (!primary) return;
     setBusy(outcome);
     setFailed(null);
@@ -441,6 +443,7 @@ function AttemptTrail({
           channelKind: primary.kind,
           value: primary.value,
           outcome,
+          note: why?.trim() || undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -448,6 +451,8 @@ function AttemptTrail({
         setFailed(data.error ?? "Could not record that.");
         return;
       }
+      setAsking(null);
+      setNote("");
       router.refresh();
     } catch {
       setFailed("Network error.");
@@ -473,27 +478,64 @@ function AttemptTrail({
           ))}
         </ul>
       )}
-      <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <span className="text-[11px] text-slate-400">Log a contact:</span>
-        {(
-          [
-            ["reached", "Got through"],
-            ["no_answer", "No answer"],
-            ["dead_end", "Dead end"],
-          ] as const
-        ).map(([outcome, label]) => (
-          <button
-            key={outcome}
+      {asking ? (
+        <form
+          className="mt-1.5 flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void log(asking, note);
+          }}
+        >
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              asking === "reached" ? "What did they say?" : "Why is it a dead end?"
+            }
+            className="h-7 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[11px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+          />
+          <Button variant="primary" className="h-7 px-2 text-[11px]" disabled={busy !== null}>
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            Save
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-7 px-1.5 text-[11px]"
             type="button"
-            disabled={busy !== null}
-            onClick={() => void log(outcome)}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            onClick={() => {
+              setAsking(null);
+              setNote("");
+            }}
           >
-            {busy === outcome ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            {label}
-          </button>
-        ))}
-      </div>
+            <X className="h-3 w-3" />
+          </Button>
+        </form>
+      ) : (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          <span className="text-[11px] text-slate-400">Log a contact:</span>
+          {(
+            [
+              ["reached", "Got through"],
+              ["no_answer", "No answer"],
+              ["dead_end", "Dead end"],
+            ] as const
+          ).map(([outcome, label]) => (
+            <button
+              key={outcome}
+              type="button"
+              disabled={busy !== null}
+              onClick={() =>
+                outcome === "no_answer" ? void log(outcome) : setAsking(outcome)
+              }
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              {busy === outcome ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {failed && <p className="mt-1 text-[11px] text-rose-600">{failed}</p>}
     </div>
   );
