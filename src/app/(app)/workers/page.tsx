@@ -2,7 +2,6 @@ import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { WorkerCards } from "@/components/modules/worker-cards";
 import { WorkersFilterForm } from "@/components/modules/workers-filter";
-import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import { countNotesByWorker } from "@/lib/data/worker-notes";
 import {
@@ -73,7 +72,6 @@ export default async function WorkersPage({
             >
               Import from CSV
             </Link>
-            <Button variant="primary">Add worker</Button>
           </div>
         }
       />

@@ -12,7 +12,6 @@ import { PageHeader } from "@/components/common/page-header";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { summarizeRefusals } from "@/lib/data/refusals";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { getSession } from "@/lib/auth/session";
@@ -86,7 +85,6 @@ export default async function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Daily operating view for the 300-company lead database, pipeline, follow-ups and vendor document readiness."
-        actions={<Button variant="primary">Generate weekly report</Button>}
       />
 
       {/* Above the counters on purpose. Every other panel reports what

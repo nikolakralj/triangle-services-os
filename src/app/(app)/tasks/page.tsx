@@ -1,7 +1,6 @@
 import { PageHeader } from "@/components/common/page-header";
 import { TasksTable } from "@/components/modules/simple-table";
 import { TasksFilterForm } from "@/components/modules/tasks-filter";
-import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import {
   searchAndFilterTasks,
@@ -50,7 +49,6 @@ export default async function TasksPage({
       <PageHeader
         title="Tasks"
         description={`${enrichedTasks.length} task${enrichedTasks.length !== 1 ? "s" : ""} - follow-ups, reminders and ownership tracking.`}
-        actions={<Button variant="primary">Create task</Button>}
       />
       <TasksFilterForm
         workers={workers}

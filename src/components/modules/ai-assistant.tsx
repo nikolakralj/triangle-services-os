@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Save, Sparkles } from "lucide-react";
+import { Copy, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, Textarea } from "@/components/ui/field";
@@ -217,9 +217,6 @@ export function AIAssistant({
                 onClick={() => output && navigator.clipboard.writeText(output)}
               >
                 <Copy className="h-4 w-4" /> Copy
-              </Button>
-              <Button>
-                <Save className="h-4 w-4" /> Save as activity
               </Button>
             </div>
           }

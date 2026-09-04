@@ -1,7 +1,6 @@
 import { PageHeader } from "@/components/common/page-header";
 import { ContactsTable } from "@/components/modules/simple-table";
 import { ContactsFilterForm } from "@/components/modules/contacts-filter";
-import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/auth/session";
 import {
   searchAndFilterContacts,
@@ -57,7 +56,6 @@ export default async function ContactsPage({
       <PageHeader
         title="Contacts"
         description={`${contacts.length} contact${contacts.length !== 1 ? "s" : ""} - filter, search, and manage your contacts.`}
-        actions={<Button variant="primary">Add contact</Button>}
       />
       <ContactsFilterForm
         roleCategories={roleCategories}
