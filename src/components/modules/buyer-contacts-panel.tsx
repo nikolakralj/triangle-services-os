@@ -15,6 +15,11 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  contactChannels,
+  telHref,
+  type ContactChannel,
+} from "@/lib/data/contact-channels";
 
 // ---------------------------------------------------------------------------
 // The people who can actually buy.
@@ -59,7 +64,28 @@ export interface BuyerContactRow {
   provenance: ContactProvenance[];
 }
 
-export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }) {
+/**
+ * One thing that was tried on this person, and what came of it.
+ *
+ * Shaped here rather than imported for the same reason as ContactProvenance —
+ * the loader it comes from is server-only.
+ */
+export interface ContactAttemptRow {
+  id: string;
+  verb: string;
+  at: string;
+  note: string | null;
+  outcome: "reached" | "no_answer" | "dead_end" | null;
+}
+
+export function BuyerContactsPanel({
+  contacts,
+  history = {},
+}: {
+  contacts: BuyerContactRow[];
+  /** contactId -> attempts, newest first. */
+  history?: Record<string, ContactAttemptRow[]>;
+}) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -142,9 +168,7 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
     }
   }
 
-  const reachableCount = contacts.filter(
-    (c) => c.email || c.linkedinUrl || /Phone:/.test(c.notes ?? ""),
-  ).length;
+  const reachableCount = contacts.filter((c) => contactChannels(c).length > 0).length;
 
   return (
     <div className="space-y-2">
@@ -159,8 +183,9 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
 
       <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
         {contacts.map((c) => {
-          const phoneNote = (c.notes ?? "").match(/Phone:\s*(.+)/)?.[1];
-          const reachable = Boolean(c.email || c.linkedinUrl || phoneNote);
+          const channels = contactChannels(c);
+          const reachable = channels.length > 0;
+          const attempts = history[c.id] ?? [];
           const editing = editingId === c.id;
 
           return (
@@ -207,33 +232,10 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
               </div>
 
               {!editing && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {c.email ? (
-                    <a
-                      href={`mailto:${c.email}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-900"
-                    >
-                      <Mail className="h-3 w-3" />
-                      {c.email}
-                    </a>
-                  ) : null}
-                  {phoneNote && (
-                    <span className="inline-flex items-center gap-1 text-xs text-slate-600">
-                      <Phone className="h-3 w-3" />
-                      {phoneNote}
-                    </span>
-                  )}
-                  {c.linkedinUrl && (
-                    <a
-                      href={c.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-900"
-                    >
-                      <Link2 className="h-3 w-3" />
-                      LinkedIn
-                    </a>
-                  )}
+                <div className="mt-2 space-y-1">
+                  {channels.map((ch, i) => (
+                    <ChannelRow key={`${ch.kind}-${i}`} channel={ch} />
+                  ))}
                   {!reachable && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
                       <AlertCircle className="h-3 w-3" />
@@ -241,6 +243,10 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
                     </span>
                   )}
                 </div>
+              )}
+
+              {!editing && reachable && (
+                <AttemptTrail contactId={c.id} channels={channels} attempts={attempts} />
               )}
 
               {!editing && c.provenance.length > 0 && (
@@ -332,6 +338,163 @@ export function BuyerContactsPanel({ contacts }: { contacts: BuyerContactRow[] }
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One published way in, rendered so it can be used rather than read.
+ *
+ * A number that is not a `tel:` link and a source that is raw text in the
+ * middle of a sentence are both a copy-paste job for whoever is holding the
+ * phone. The opening sentence Scout writes is the most useful text on the
+ * record and had no place on screen at all.
+ */
+function ChannelRow({ channel }: { channel: ContactChannel }) {
+  const [open, setOpen] = useState(false);
+  const Icon =
+    channel.kind === "phone" ? Phone : channel.kind === "email" ? Mail : Link2;
+
+  const href =
+    channel.kind === "phone"
+      ? telHref(channel.value)
+      : channel.kind === "email"
+        ? `mailto:${channel.value}`
+        : channel.value;
+  const external = channel.kind !== "phone" && channel.kind !== "email";
+
+  return (
+    <div className="text-xs">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <a
+          href={href}
+          target={external ? "_blank" : undefined}
+          rel={external ? "noopener noreferrer" : undefined}
+          className="inline-flex items-center gap-1 font-medium text-sky-700 hover:text-sky-900"
+        >
+          <Icon className="h-3 w-3" />
+          {channel.kind === "linkedin" ? "LinkedIn" : channel.value}
+        </a>
+        {channel.whose && channel.whose !== "their own" && (
+          <span className="text-slate-500">{channel.whose}</span>
+        )}
+        {channel.sourceUrl && (
+          <a
+            href={channel.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline"
+          >
+            source
+          </a>
+        )}
+        {channel.howToOpen && (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline"
+          >
+            {open ? "hide the words" : "what to say"}
+          </button>
+        )}
+      </div>
+      {open && channel.howToOpen && (
+        <p className="mt-1 whitespace-pre-wrap rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-700">
+          {channel.howToOpen}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What has been tried, and one click to add to it.
+ *
+ * The whole tracking system: "we called that person, it didn't work". No
+ * stage, no score, no form. Three buttons and a list, so that after a few
+ * weeks it is obvious whether there is a chance here or not.
+ */
+function AttemptTrail({
+  contactId,
+  channels,
+  attempts,
+}: {
+  contactId: string;
+  channels: ContactChannel[];
+  attempts: ContactAttemptRow[];
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const primary = channels[0];
+
+  async function log(outcome: "reached" | "no_answer" | "dead_end") {
+    if (!primary) return;
+    setBusy(outcome);
+    setFailed(null);
+    try {
+      const res = await fetch("/api/outreach/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contactId,
+          channelKind: primary.kind,
+          value: primary.value,
+          outcome,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setFailed(data.error ?? "Could not record that.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setFailed("Network error.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-2 border-t border-slate-100 pt-2">
+      {attempts.length === 0 ? (
+        <p className="text-[11px] text-slate-400">Never contacted.</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {attempts.slice(0, 4).map((a) => (
+            <li key={a.id} className="text-[11px] text-slate-500">
+              {a.verb} {new Date(a.at).toLocaleDateString(undefined, {
+                day: "numeric",
+                month: "short",
+              })}{" "}
+              — {a.note ?? "no outcome recorded"}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <span className="text-[11px] text-slate-400">Log a contact:</span>
+        {(
+          [
+            ["reached", "Got through"],
+            ["no_answer", "No answer"],
+            ["dead_end", "Dead end"],
+          ] as const
+        ).map(([outcome, label]) => (
+          <button
+            key={outcome}
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void log(outcome)}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            {busy === outcome ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            {label}
+          </button>
+        ))}
+      </div>
+      {failed && <p className="mt-1 text-[11px] text-rose-600">{failed}</p>}
     </div>
   );
 }

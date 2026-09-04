@@ -29,6 +29,7 @@ import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel"
 import { OutreachComposer } from "@/components/modules/outreach-composer";
 import { BuyerContactsPanel } from "@/components/modules/buyer-contacts-panel";
 import { getEntityEvidenceBatch, type CaseEvidence } from "@/lib/data/company-case";
+import { getContactLog } from "@/lib/data/contact-log";
 import { EntityCasePanel } from "@/components/modules/entity-case-panel";
 import { getEntityCase } from "@/lib/data/company-case";
 import { WorkerMatchPanel } from "@/components/modules/worker-match-panel";
@@ -80,11 +81,15 @@ export default async function DiscoveredProjectDetailPage({
   // Provenance for the contacts and packages on this page: which employee
   // found each one, on what quoted evidence, from which source. One query per
   // kind rather than one per row.
-  const [contactEvidence, packageEvidence] = await Promise.all([
+  const [contactEvidence, contactHistory, packageEvidence] = await Promise.all([
     getEntityEvidenceBatch(
       "buyer_contact",
       buyerContacts.map((c) => c.id),
       session.organizationId,
+    ),
+    getContactLog(
+      session.organizationId,
+      buyerContacts.map((c) => c.id),
     ),
     getEntityEvidenceBatch(
       "package",
@@ -313,6 +318,18 @@ export default async function DiscoveredProjectDetailPage({
                 foundByEmoji: e.foundBy?.emoji ?? null,
               })),
             }))}
+            history={Object.fromEntries(
+              buyerContacts.map((c) => [
+                c.id,
+                (contactHistory.get(c.id) ?? []).map((a) => ({
+                  id: a.id,
+                  verb: a.verb,
+                  at: a.at,
+                  note: a.note,
+                  outcome: a.outcome,
+                })),
+              ]),
+            )}
           />
         </PersistedCollapsible>
 
