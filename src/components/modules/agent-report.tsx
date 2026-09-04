@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { parseScoutCaseReport } from "@/lib/ai/scout-case-report";
 
 // ---------------------------------------------------------------------------
 // An employee's report, readable.
@@ -123,8 +124,26 @@ export function AgentReport({
   authorName?: string;
   authorEmoji?: string;
 }) {
-  const blocks = parseReport(text);
+  // Hooks first, unconditionally — the structured branch below is an early
+  // return and React requires the same hook order on every render.
   const [showRaw, setShowRaw] = useState(false);
+
+  // A company qualification is stored as JSON. Rendered as text it became a
+  // three-hundred-word wall of braces and escaped quotes on the Workforce page
+  // — the CEO's own words were that anyone who handed him that would be fired,
+  // and he was right. The parser already existed; nothing here was calling it.
+  const structured = parseScoutCaseReport(text);
+  if (structured) {
+    return (
+      <StructuredReport
+        report={structured}
+        authorName={authorName}
+        authorEmoji={authorEmoji}
+      />
+    );
+  }
+
+  const blocks = parseReport(text);
 
   const candidates = blocks.filter((b) => b.index);
   const prose = blocks.filter((b) => !b.index);
@@ -210,6 +229,164 @@ function Sources({ urls }: { urls: string[] }) {
           {prettyUrl(u)}
         </a>
       ))}
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// The manager view of a qualification.
+//
+// One recommendation, the named project, who actually buys, what to offer, and
+// the next human action. Sources stay clickable — the point of a source is
+// that someone can go and look at it.
+// ---------------------------------------------------------------------------
+
+type Structured = NonNullable<ReturnType<typeof parseScoutCaseReport>>;
+
+const VERDICT: Record<string, { label: string; cls: string }> = {
+  pursue: { label: "Pursue", cls: "bg-emerald-100 text-emerald-800" },
+  hold: { label: "Hold", cls: "bg-amber-100 text-amber-800" },
+  no_go: { label: "No go", cls: "bg-rose-100 text-rose-800" },
+};
+
+function StructuredReport({
+  report,
+  authorName,
+  authorEmoji,
+}: {
+  report: Structured;
+  authorName?: string;
+  authorEmoji?: string;
+}) {
+  const [showDetail, setShowDetail] = useState(false);
+  const verdict = VERDICT[report.verdict] ?? VERDICT.hold;
+
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${verdict.cls}`}>
+          {verdict.label}
+        </span>
+        {typeof report.confidence === "number" && (
+          <span className="text-xs text-slate-500">{report.confidence}% sure</span>
+        )}
+        {authorName && (
+          <span className="text-xs text-slate-500">
+            {authorEmoji ?? "🤖"} {authorName}
+          </span>
+        )}
+      </div>
+
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-950">
+        {report.headline}
+      </p>
+      {report.executiveSummary && (
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          {report.executiveSummary}
+        </p>
+      )}
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {report.namedProject && (
+          <Fact label="The work">
+            {report.namedProject.name}
+            {report.namedProject.location ? ` · ${report.namedProject.location}` : ""}
+            {report.namedProject.timing ? ` · ${report.namedProject.timing}` : ""}
+          </Fact>
+        )}
+        {report.buyerPath && (
+          <Fact label="Who buys">
+            {report.buyerPath.laborBuyer}
+            {report.buyerPath.decisionMaker
+              ? ` · ${report.buyerPath.decisionMaker}`
+              : ""}
+          </Fact>
+        )}
+        {report.crewPackage && (
+          <Fact label="What we offer">{report.crewPackage.title}</Fact>
+        )}
+        {report.nextCommercialAction && (
+          <Fact label="Next action">
+            {report.nextCommercialAction.action}
+          </Fact>
+        )}
+      </div>
+
+      {/* The door, as a link — a URL a person cannot click is a URL they will
+          not open. */}
+      {report.buyerPath?.publicDoor &&
+        /^https?:\/\//.test(report.buyerPath.publicDoor) && (
+          <a
+            href={report.buyerPath.publicDoor}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+          >
+            Open the supplier door
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+
+      {(report.unknowns.length > 0 || report.risks.length > 0) && (
+        <div className="mt-3 space-y-1">
+          {[...report.unknowns, ...report.risks].slice(0, 4).map((item) => (
+            <p key={item} className="text-xs leading-5 text-amber-800">
+              • {item}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {report.sources.length > 0 && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowDetail(!showDetail)}
+            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+          >
+            {showDetail ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {report.sources.length} source
+            {report.sources.length === 1 ? "" : "s"}
+          </button>
+          {showDetail && (
+            <div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-3">
+              {report.sources.map((src) => (
+                <div key={src.url}>
+                  {src.quote && (
+                    <p className="text-xs leading-relaxed text-slate-500">
+                      &ldquo;{src.quote}&rdquo;
+                    </p>
+                  )}
+                  <a
+                    href={src.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 break-all text-xs font-medium text-sky-700 hover:text-sky-900"
+                  >
+                    {src.url.replace(/^https?:\/\//, "").slice(0, 70)}
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm leading-6 text-slate-800">{children}</p>
     </div>
   );
 }
