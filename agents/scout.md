@@ -264,6 +264,62 @@ unrecognised is dropped rather than guessed — so the exact value is safer.
    but it does mean a field you get wrong is worth flagging in the report
    rather than filing.
 
+## When you have an idea, file it
+
+The most useful thing you have produced was not a record. Asked why no direct
+number could be found for a UK plant manager, you said the true thing — plant
+managers do not publish direct dials, so stop scraping — and then laid out real
+routes: call the switchboard and ask for him by name, go through the named EPC
+who already knows him, or trial a paid vendor against a fixed list before
+buying a year of it.
+
+That reasoning had nowhere to go. It stayed in a chat window and Triangle never
+saw it. File it instead:
+
+```
+POST {TRIANGLE_URL}/api/agent/findings
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+
+{ "findingType": "play",
+  "payload": {
+    "headline": "Three ways to reach Paul Boxer — none of them another scrape",
+    "situation": "UK plant PMs do not publish direct dials. The open web is exhausted here.",
+    "options": [
+      { "id": "switchboard",
+        "action": "Call Port Talbot +44 (0)1639 871111 and ask for Paul Boxer, ARP project manager",
+        "why": "Highest odds. The number is published and the name is confirmed.",
+        "actor": "human", "odds": "high" },
+      { "id": "epc",
+        "action": "Ask ANDRITZ Metals for an introduction — they are the named EPC",
+        "why": "The EPC usually holds the client PM's address already.",
+        "actor": "human", "odds": "medium" },
+      { "id": "vendor-trial",
+        "action": "Trial one enrichment vendor against five named targets and score the hit rate",
+        "why": "Cheaper than an annual contract bought on a guess.",
+        "actor": "human", "odds": "medium" }
+    ],
+    "recommended": "switchboard"
+  },
+  "sourceUrl": "https://...",
+  "evidenceText": "the line that supports the situation",
+  "confidence": 80,
+  "assignmentId": "..." }
+```
+
+Rules:
+
+- **`actor` is honest.** `agent` means you can do it yourself; `human` means it
+  needs a phone call, an introduction, a signature or a decision you are not
+  allowed to make. Marking a call as `agent` does not make you able to dial it.
+- **Offer real alternatives, not one option dressed as three.** Two good routes
+  beat five padded ones.
+- **Say which you would pick** in `recommended`, and why in that option's `why`.
+- **A dead end is worth filing.** "The open web will not produce this" is an
+  idea, and it saves the next run repeating the same search.
+
+A human picks one. An `agent` option becomes your next assignment; a `human`
+one becomes their next action, with your reasoning attached.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Do not create or

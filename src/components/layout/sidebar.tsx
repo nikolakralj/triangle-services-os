@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BriefcaseBusiness,
-  Banknote,
   Building2,
   ClipboardCheck,
   FileText,
@@ -34,38 +32,43 @@ type NavGroup = {
   items: NavItem[];
 };
 
+// Ordered by how often a person should need it, not by how the data is
+// modelled. The stated goal is to spend LESS time here — every extra
+// destination is a place to get lost on the way to finding a client, so the
+// two screens that answer "what needs me" and "where does the company stop"
+// come first and everything else is filed under what it is: reference.
+//
+// Tasks was removed rather than demoted. Workforce assignments are the work
+// object; a second task list beside them is two answers to one question.
 const navGroups: NavGroup[] = [
   {
-    label: "Demand & Projects",
+    label: "Every day",
     items: [
-      { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "LEADS" },
-      { href: "/hunter", label: "Signal Inbox", icon: Radar },
-      { href: "/companies", label: "Companies", icon: Building2 },
+      { href: "/decisions", label: "Decision Inbox", icon: ClipboardCheck },
+      { href: "/dashboard", label: "Overview", icon: Gauge },
+      { href: "/agents", label: "Workforce", icon: Cpu },
     ],
   },
   {
-    label: "Contract & Crew",
+    label: "What we found",
     items: [
-      { href: "/commercial", label: "Requirements", icon: BriefcaseBusiness },
-      { href: "/delivery", label: "Delivery & Margin", icon: Banknote },
+      { href: "/hunter", label: "Signal Inbox", icon: Radar },
+      { href: "/companies", label: "Companies", icon: Building2 },
+      { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "LEADS" },
+    ],
+  },
+  {
+    label: "Our people",
+    items: [
       { href: "/workers", label: "Talent Pool", icon: UserRound },
       { href: "/workers/cert-checklist", label: "Cert Alerts", icon: ShieldAlert },
       { href: "/documents", label: "Compliance", icon: FileText },
     ],
   },
   {
-    label: "AI Workforce",
-    items: [
-      { href: "/agents", label: "Workforce", icon: Cpu },
-      { href: "/decisions", label: "Decision Inbox", icon: ClipboardCheck },
-    ],
-  },
-  {
-    label: "System",
+    label: "Setup",
     items: [
       { href: "/onboarding", label: "Setup Readiness", icon: ListChecks },
-      { href: "/dashboard", label: "Metrics", icon: Gauge },
-      { href: "/tasks", label: "Tasks", icon: ClipboardCheck },
       { href: "/imports", label: "Data Imports", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
