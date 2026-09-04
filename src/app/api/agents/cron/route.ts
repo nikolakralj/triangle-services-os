@@ -11,10 +11,15 @@ import { safeEqual } from "@/lib/job-intake/credentials";
 // stopped. That is the opposite of an AI workforce; it is a human driving a
 // machine that pretends to drive itself.
 //
-// Called by Vercel Cron with `Authorization: Bearer $CRON_SECRET`. It claims
-// and runs queued assignments the same way the in-app pulse does, so there is
-// one execution path and one set of database claims rather than two that can
-// disagree.
+// Called with `Authorization: Bearer $CRON_SECRET`. It claims and runs queued
+// assignments the same way the in-app pulse does, so there is one execution
+// path and one set of database claims rather than two that can disagree.
+//
+// Vercel Hobby allows a cron only once a day, so the schedule in vercel.json is
+// a floor, not the heartbeat. The frequent caller is the provider bot's own
+// recurring routine hitting /api/agent/inbox, which costs nothing extra and
+// polls as often as it likes. This endpoint is the safety net underneath it:
+// once a day, anything the bot never collected gets done anyway.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
