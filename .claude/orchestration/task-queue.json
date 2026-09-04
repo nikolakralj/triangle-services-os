@@ -1,7 +1,7 @@
 {
   "last_trigger": "pre-commit",
-  "triggered_at": "2026-09-03T13:40:37Z",
+  "triggered_at": "2026-09-04T07:23:20Z",
   "action": "codex-format",
-  "files": [],
+  "files": ,
   "status": "pending"
 }
