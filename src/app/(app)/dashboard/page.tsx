@@ -1,272 +1,197 @@
+import Link from "next/link";
 import {
   AlertTriangle,
   BriefcaseBusiness,
-  Building2,
   CheckCircle2,
-  Clock3,
-  FileWarning,
-  Target,
+  Radar,
+  Send,
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
-import { summarizeRefusals } from "@/lib/data/refusals";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { getSession } from "@/lib/auth/session";
-import {
-  listOpportunities,
-  listPipelineStages,
-  rowToOpportunity,
-  rowToPipelineStage,
-} from "@/lib/data/opportunities";
-import { listCompanies, rowToCompany } from "@/lib/data/companies";
-import { listContacts } from "@/lib/data/contacts";
-import {
-  getOverdueTasks,
-  getTasksDueThisWeek,
-  rowToTask,
-} from "@/lib/data/tasks";
-import { listActivities, rowToActivity } from "@/lib/data/activities";
+import { summarizeRefusals } from "@/lib/data/refusals";
 import { getCommercialStats } from "@/lib/data/commercial-stats";
+import { countDecisionAttention } from "@/lib/data/decision-inbox";
+import { listDiscoveredProjects, rowToDiscoveredProject } from "@/lib/data/discovered-projects";
+import { getProjectProgress } from "@/lib/data/project-progress";
+import { listWorkers, rowToWorker } from "@/lib/data/workers";
+import { createServiceSupabaseClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+// ---------------------------------------------------------------------------
+// The operating view of the governed model.
+//
+// This page used to count companies against a target of 300, report "progress
+// toward 300 — 57%", and chart a sales pipeline by stage. Those measure
+// activity, not outcome: adding 128 more companies would have moved the number
+// without moving the business an inch, which is the exact thing this product
+// refuses to let anyone do everywhere else.
+//
+// What replaces them is the chain AGENTS.md actually names —
+//   signal -> qualified requirement -> buyer route -> crew package
+//          -> human action -> order
+// — plus, above it all, what the system would not let anyone record.
+// ---------------------------------------------------------------------------
 
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session?.organizationId) {
     return (
       <PageHeader
-        title="Dashboard"
-        description="Dashboard not available - organization context required"
+        title="Overview"
+        description="Overview not available — organization context required."
       />
     );
   }
+  const orgId = session.organizationId;
+
+  const svc = createServiceSupabaseClient();
+  const count = async (table: string, orgCol = "org_id", extra?: [string, string]) => {
+    if (!svc) return 0;
+    let q = svc.from(table).select("id", { count: "exact", head: true }).eq(orgCol, orgId);
+    if (extra) q = q.eq(extra[0], extra[1]);
+    const { count: n } = await q;
+    return n ?? 0;
+  };
 
   const [
-    companyRows,
-    opportunityRows,
-    stageRows,
-    contactRows,
-    overdueTaskRows,
-    dueThisWeekTaskRows,
-    activityRows,
-    commercial,
     refusals,
+    commercial,
+    decisions,
+    projectRows,
+    workerRows,
+    requirements,
+    routes,
+    packages,
+    orders,
   ] = await Promise.all([
-    listCompanies(session.organizationId),
-    listOpportunities(session.organizationId),
-    listPipelineStages(session.organizationId),
-    listContacts(session.organizationId),
-    getOverdueTasks(session.organizationId),
-    getTasksDueThisWeek(session.organizationId),
-    listActivities(session.organizationId, 10),
-    getCommercialStats(session.organizationId),
-    summarizeRefusals(session.organizationId),
+    summarizeRefusals(orgId),
+    getCommercialStats(orgId),
+    countDecisionAttention(orgId),
+    listDiscoveredProjects(orgId, { limit: 200 }),
+    listWorkers(orgId),
+    count("commercial_requirements"),
+    count("buyer_routes"),
+    count("project_packages"),
+    count("commercial_orders"),
   ]);
 
-  // Convert database rows to UI types
-  const companies = companyRows.map(rowToCompany);
-  const opportunities = opportunityRows.map(rowToOpportunity);
-  const pipelineStages = stageRows.map(rowToPipelineStage);
-  const overdueTasks = overdueTaskRows.map(rowToTask);
-  const dueThisWeek = dueThisWeekTaskRows.map(rowToTask);
-  const activities = activityRows.map(rowToActivity);
+  const projects = projectRows.map(rowToDiscoveredProject);
+  const workers = workerRows.map(rowToWorker);
+  const progress = await getProjectProgress(projects.map((p) => p.id), orgId);
 
-  const openOpportunities = opportunities.filter(
-    (item) => item.status === "open",
-  );
-  const companiesWithoutNextAction = companies.filter(
-    (company) => !company.nextActionAt,
-  );
-  const contactCount = contactRows.length;
+  const reachable = projects.filter(
+    (p) => progress.get(p.id)?.hasReachableContact,
+  ).length;
+  const withBuyer = projects.filter(
+    (p) => progress.get(p.id)?.hasBuyerContact,
+  ).length;
+  const available = workers.filter((w) => w.availabilityStatus === "available").length;
+
+  // Each step names the one before it, so a gap reads as a gap rather than as
+  // a small number sitting on its own.
+  const chain = [
+    { label: "Signals discovered", value: projects.length, href: "/hunter" },
+    { label: "Buyer named", value: withBuyer, href: "/hunter" },
+    { label: "Someone you can call", value: reachable, href: "/hunter" },
+    { label: "Crew packages", value: packages, href: "/hunter" },
+    { label: "Requirements", value: requirements, href: "/commercial" },
+    { label: "Confirmed buyer routes", value: routes, href: "/commercial" },
+    { label: "Sends recorded", value: commercial.outreachSent, href: "/commercial" },
+    { label: "Orders", value: orders, href: "/delivery" },
+  ];
+  const firstGap = chain.find((s) => s.value === 0);
 
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Daily operating view for the 300-company lead database, pipeline, follow-ups and vendor document readiness."
+        title="Overview"
+        description="Where the company actually is, from signal to paid work — and what the system refused to record."
       />
 
-      {/* Above the counters on purpose. Every other panel reports what
-          happened; this reports what the system would not let anyone record. */}
       <div className="mb-4">
         <RefusalLedger summary={refusals} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Total companies"
-          value={companies.length}
-          helper="Target: 300"
-          icon={<Building2 className="h-5 w-5" />}
-          tone="sky"
-        />
-        <StatCard
-          label="Progress toward 300"
-          value={`${Math.round((companies.length / 300) * 100)}%`}
-          helper={`${300 - companies.length} companies remaining`}
-          icon={<Target className="h-5 w-5" />}
-          tone="emerald"
-        />
-        <StatCard
-          label="Contacts added"
-          value={contactCount}
-          helper="Decision makers and coordinators"
-          icon={<Users className="h-5 w-5" />}
-          tone="violet"
-        />
-        <StatCard
-          label="Open opportunities"
-          value={openOpportunities.length}
-          helper="Active commercial discussions"
-          icon={<BriefcaseBusiness className="h-5 w-5" />}
+          label="Waiting on you"
+          value={decisions}
+          helper="Evidence, blocked employees and unsent drafts"
+          icon={<AlertTriangle className="h-5 w-5" />}
           tone="amber"
+        />
+        <StatCard
+          label="People available"
+          value={available}
+          helper={`of ${workers.length} on the books, human-confirmed`}
+          icon={<Users className="h-5 w-5" />}
+          tone="sky"
         />
         <StatCard
           label="Qualified requirements"
           value={commercial.qualifiedRequirements}
-          helper="Passed the full qualification gate"
-          icon={<FileWarning className="h-5 w-5" />}
-          tone="slate"
+          helper="Passed the full evidence gate"
+          icon={<BriefcaseBusiness className="h-5 w-5" />}
+          tone="violet"
         />
         <StatCard
-          label="Outreach sent"
-          value={commercial.outreachSent}
-          helper={
-            commercial.awaitingReply > 0
-              ? `${commercial.awaitingReply} overdue a follow-up`
-              : "Confirmed by a human, with the sent content"
-          }
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          tone={commercial.awaitingReply > 0 ? "amber" : "slate"}
-        />
-        <StatCard
-          label="Overdue follow-ups"
-          value={overdueTasks.length}
-          helper="Needs action today"
-          icon={<AlertTriangle className="h-5 w-5" />}
+          label="Awaiting a reply"
+          value={commercial.awaitingReply}
+          helper="Sent, follow-up date passed, nothing logged"
+          icon={<Send className="h-5 w-5" />}
           tone="rose"
         />
-        <StatCard
-          label="Tasks due this week"
-          value={dueThisWeek.length}
-          helper="All team members"
-          icon={<Clock3 className="h-5 w-5" />}
-          tone="sky"
+      </div>
+
+      <Card>
+        <CardHeader
+          title="Signal to paid work"
+          description="Every step counts real rows. A step at zero is where the company currently stops."
         />
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader
-            title="Pipeline by stage"
-            description="Visual count before opening the Kanban board."
-          />
-          <CardContent className="space-y-3">
-            {pipelineStages.slice(0, 11).map((stage) => {
-              const count = opportunities.filter(
-                (opportunity) => opportunity.stageId === stage.id,
-              ).length;
-              return (
-                <div key={stage.id}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-700">
-                      {stage.name}
+        <CardContent className="space-y-2">
+          {chain.map((step) => {
+            const isGap = step.value === 0;
+            const isFirstGap = firstGap?.label === step.label;
+            return (
+              <Link
+                key={step.label}
+                href={step.href}
+                className={`flex items-center justify-between rounded-lg border px-3 py-2 transition ${
+                  isFirstGap
+                    ? "border-amber-300 bg-amber-50 hover:bg-amber-100"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex items-center gap-2 text-sm text-slate-800">
+                  {isGap ? (
+                    <Radar className="h-4 w-4 text-amber-600" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  )}
+                  {step.label}
+                  {isFirstGap && (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                      stops here
                     </span>
-                    <span className="text-slate-500">{count}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-100">
-                    <div
-                      className="h-2 rounded-full bg-sky-500"
-                      style={{ width: `${Math.max(6, count * 18)}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Top priority companies"
-            description="Highest-scored targets for outreach."
-          />
-          <CardContent className="space-y-3">
-            {[...companies]
-              .sort((a, b) => b.leadScore - a.leadScore)
-              .slice(0, 5)
-              .map((company) => (
-                <div
-                  key={company.id}
-                  className="rounded-md border border-slate-100 p-3"
+                  )}
+                </span>
+                <span
+                  className={`text-sm font-semibold ${
+                    isGap ? "text-amber-700" : "text-slate-900"
+                  }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-slate-950">{company.name}</p>
-                    <Badge intent="info">{company.leadScore}/25</Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {company.country} · {company.companyType}
-                  </p>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <Card>
-          <CardHeader title="Overdue follow-ups" />
-          <CardContent className="space-y-3">
-            {overdueTasks.map((task) => (
-              <div
-                key={task.id}
-                className="rounded-md bg-rose-50 p-3 text-sm text-rose-900"
-              >
-                <p className="font-medium">{task.title}</p>
-                <p className="text-xs">
-                  Due {task.dueDate} · {task.assignedToName ?? "—"}
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader title="Companies without next action" />
-          <CardContent className="space-y-3">
-            {companiesWithoutNextAction.length ? (
-              companiesWithoutNextAction.map((company) => (
-                <div
-                  key={company.id}
-                  className="rounded-md bg-amber-50 p-3 text-sm text-amber-900"
-                >
-                  {company.name}
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">
-                All sample companies have a next action.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader title="Recent activities" />
-          <CardContent className="space-y-3">
-            {activities.map((activity) => (
-              <div
-                key={activity.id}
-                className="rounded-md border border-slate-100 p-3"
-              >
-                <p className="font-medium text-slate-950">{activity.title}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {activity.summary}
-                </p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+                  {step.value}
+                </span>
+              </Link>
+            );
+          })}
+        </CardContent>
+      </Card>
     </>
   );
 }

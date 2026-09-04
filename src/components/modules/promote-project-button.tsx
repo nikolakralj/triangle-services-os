@@ -1,71 +1,68 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TrendingUp, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/field";
-import type { Company, PipelineStage } from "@/lib/types";
+import { Input } from "@/components/ui/field";
+
+// ---------------------------------------------------------------------------
+// Turn a discovered project into the thing the company actually sells.
+//
+// This used to create an `opportunity` — a row in a generic sales pipeline with
+// no rules attached, sitting beside the governed commercial model rather than
+// inside it. AGENTS.md names the workflow as
+//
+//   signal -> qualified requirement -> contractor chain -> buyer route
+//          -> crew package -> human action -> order -> mobilization -> payment
+//
+// and "opportunity" appears nowhere in it. The commercial success object is a
+// qualified requirement with a real buyer route, and that object is the one the
+// database refuses to let anyone fake.
+//
+// So the button now creates a commercial requirement, carrying the project as
+// its source. The requirement starts as a draft and the database will not let
+// it reach "qualified" until the evidence exists.
+// ---------------------------------------------------------------------------
 
 export function PromoteProjectButton({
+  projectId,
   projectName,
-  country,
-  estimatedValueEur,
-  companies,
-  stages,
 }: {
+  projectId: string;
   projectName: string;
-  country?: string;
-  estimatedValueEur?: number;
-  companies: Company[];
-  stages: PipelineStage[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState(projectName);
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
-  const [stageId, setStageId] = useState(stages[0]?.id ?? "");
-  const [countryVal, setCountryVal] = useState(country ?? "");
-  const [estimatedValue, setEstimatedValue] = useState(
-    estimatedValueEur ? String(estimatedValueEur) : "",
-  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleOpen = () => {
-    setTitle(projectName);
-    setCountryVal(country ?? "");
-    setEstimatedValue(estimatedValueEur ? String(estimatedValueEur) : "");
-    setError(null);
-    setIsOpen(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !companyId) {
-      setError("Title and company are required.");
+    if (!title.trim()) {
+      setError("Give the requirement a title.");
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/opportunities", {
+      const response = await fetch("/api/commercial/requirements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title,
-          companyId,
-          stageId: stageId || stages[0]?.id,
-          country: countryVal || "Unknown",
-          estimatedValue: estimatedValue ? parseInt(estimatedValue) : null,
+          title: title.trim(),
+          // Recorded so the requirement can always name the signal it came from.
+          source: `discovered_project:${projectId}`,
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Failed to create opportunity");
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not create the requirement.");
+      }
       setIsOpen(false);
-      router.push(`/pipeline`);
+      router.push(`/commercial/${data.requirementId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -76,118 +73,69 @@ export function PromoteProjectButton({
   return (
     <>
       <button
-        onClick={handleOpen}
+        onClick={() => {
+          setTitle(projectName);
+          setError(null);
+          setIsOpen(true);
+        }}
         className="w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
       >
-        Promote to Opportunity
+        <span className="inline-flex items-center gap-1.5">
+          <TrendingUp className="h-4 w-4" />
+          Make this a requirement
+        </span>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <Card className="w-full max-w-md">
             <CardHeader
-              title="Promote to Opportunity"
-              description={`Based on: ${projectName}`}
+              title="Make this a requirement"
+              description="The commercial object the database enforces. It starts as a draft — scope, route and economics are added as they become real."
+              action={
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="rounded p-1 text-slate-400 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              }
             />
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Title *
-                  </label>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  Title
                   <Input
+                    className="mt-1"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    required
+                    placeholder="e.g. 15 electricians, Nauen cable route"
                   />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Company *
-                  </label>
-                  <Select
-                    value={companyId}
-                    onChange={(e) => setCompanyId(e.target.value)}
-                    required
-                  >
-                    <option value="">— select a company —</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Select>
-                  {companies.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      No companies yet.{" "}
-                      <Link href="/companies" className="underline">
-                        Add one first.
-                      </Link>
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Pipeline stage
-                  </label>
-                  <Select
-                    value={stageId}
-                    onChange={(e) => setStageId(e.target.value)}
-                  >
-                    {stages.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Country
-                    </label>
-                    <Input
-                      value={countryVal}
-                      onChange={(e) => setCountryVal(e.target.value)}
-                      placeholder="e.g. Germany"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Est. value (€)
-                    </label>
-                    <Input
-                      type="number"
-                      value={estimatedValue}
-                      onChange={(e) => setEstimatedValue(e.target.value)}
-                      placeholder="e.g. 500000"
-                    />
-                  </div>
-                </div>
-                {error && (
-                  <p className="text-sm text-rose-600">{error}</p>
-                )}
-                <div className="flex gap-2 pt-2">
-                  <Button type="submit" disabled={isLoading} className="flex-1">
+                </label>
+
+                <p className="rounded-md bg-slate-50 px-2.5 py-2 text-xs leading-relaxed text-slate-600">
+                  Filed against <strong>{projectName}</strong>, so the
+                  requirement always names the signal it came from.
+                </p>
+
+                {error && <p className="text-xs text-rose-600">{error}</p>}
+
+                <div className="flex items-center gap-2">
+                  <Button variant="primary" disabled={isLoading}>
                     {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating…
-                      </>
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <>
-                        <TrendingUp className="mr-2 h-4 w-4" />
-                        Create opportunity
-                      </>
+                      <TrendingUp className="h-4 w-4" />
                     )}
+                    Create requirement
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
                     onClick={() => setIsOpen(false)}
                     disabled={isLoading}
                   >
-                    <X className="h-4 w-4" />
+                    Cancel
                   </Button>
                 </div>
               </form>

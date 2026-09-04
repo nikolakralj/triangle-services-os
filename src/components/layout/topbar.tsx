@@ -7,7 +7,6 @@ import {
   FileUp,
   Plus,
   Search,
-  UserPlus,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +33,7 @@ export function Topbar({
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               className="h-10 pl-9"
-              placeholder="Search companies, contacts, opportunities, workers, documents..."
+              placeholder="Search projects, companies, workers, documents…"
             />
           </div>
         </div>
@@ -56,15 +55,8 @@ export function Topbar({
             <div className="invisible absolute right-0 top-10 w-56 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
               {[
                 { href: "/companies", label: "Add company", icon: Building2 },
-                { href: "/contacts", label: "Add contact", icon: UserPlus },
-                {
-                  href: "/opportunities",
-                  label: "Add opportunity",
-                  icon: Plus,
-                },
-                { href: "/tasks", label: "Add task", icon: Plus },
                 { href: "/documents", label: "Upload document", icon: FileUp },
-                { href: "/workers", label: "Add worker", icon: Users },
+                { href: "/workers", label: "Talent pool", icon: Users },
               ].map((item) => {
                 const Icon = item.icon;
                 return (

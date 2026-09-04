@@ -14,8 +14,6 @@ import {
   getDiscoveredProjectById,
   rowToDiscoveredProject,
 } from "@/lib/data/discovered-projects";
-import { listCompanies, rowToCompany } from "@/lib/data/companies";
-import { listPipelineStages, rowToPipelineStage } from "@/lib/data/opportunities";
 import { getChainNodes, getBuyerContacts, type ContractorChainNodeRow } from "@/lib/data/contractor-chain";
 import { listResearchSuggestions } from "@/lib/data/research";
 import { listProjectPackages } from "@/lib/data/project-packages";
@@ -59,11 +57,7 @@ export default async function DiscoveredProjectDetailPage({
   const query = await searchParams;
   const session = await requireSession();
 
-  const [row, companyRows, stageRows] = await Promise.all([
-    getDiscoveredProjectById(id),
-    listCompanies(session.organizationId),
-    listPipelineStages(session.organizationId),
-  ]);
+  const row = await getDiscoveredProjectById(id);
 
   const [
     savedChainNodes,
@@ -118,8 +112,6 @@ export default async function DiscoveredProjectDetailPage({
   const projectCase = await getEntityCase("project", id, session.organizationId);
 
   const project = rowToDiscoveredProject(row);
-  const companies = companyRows.map(rowToCompany);
-  const stages = stageRows.map(rowToPipelineStage);
   const readiness = buildCommercialReadiness(project);
   const contractorChain = buildContractorChain(project);
   const heuristicPackages = buildPackageOpportunities(project);
@@ -376,11 +368,8 @@ export default async function DiscoveredProjectDetailPage({
           <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
             <UpdateProjectStatusButton projectId={project.id} currentStatus={project.status} />
             <PromoteProjectButton
+              projectId={project.id}
               projectName={project.projectName}
-              country={project.country}
-              estimatedValueEur={project.estimatedValueEur}
-              companies={companies}
-              stages={stages}
             />
           </div>
         </PersistedCollapsible>

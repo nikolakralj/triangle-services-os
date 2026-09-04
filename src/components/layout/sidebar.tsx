@@ -11,12 +11,10 @@ import {
   Cpu,
   Gauge,
   Inbox,
-  KanbanSquare,
   Radar,
   Settings,
   ShieldAlert,
   Upload,
-  Users,
   UserRound,
   ListChecks,
 } from "lucide-react";
@@ -42,10 +40,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "LEADS" },
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
-      { href: "/pipeline", label: "Active Pipeline", icon: KanbanSquare },
       { href: "/companies", label: "Companies", icon: Building2 },
-      { href: "/contacts", label: "Contacts", icon: Users },
-      { href: "/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
     ],
   },
   {
