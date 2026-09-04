@@ -108,6 +108,9 @@ export function CommercialRequirementEditor({
     }
   }
 
+  // Open while there are gaps to close, shut once there are not.
+  const detailsOpen = missingForQualification.length > 0;
+
   return (
     <form className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4" onSubmit={save}>
       {missingForQualification.length > 0 ? (
@@ -144,6 +147,25 @@ export function CommercialRequirementEditor({
         />
         Human-confirmed buyer demand
       </label>
+
+      {/* Everything below is research, not a decision.
+          Faced with thirty flat fields the honest reaction was "for what? I
+          have to handle a shitload of data" — and it was right. Scope, roles,
+          country, duration and the rest are readable from a source by whoever
+          already has it open, so they are collapsed by default and a
+          researcher can propose them. What stays visible is what only a human
+          can settle: whether the buyer has confirmed demand, what happens
+          next, and the decision itself. */}
+      <details className="rounded-lg border border-slate-200 bg-slate-50 p-3 xl:col-span-4" open={detailsOpen}>
+        <summary className="cursor-pointer text-sm font-medium text-slate-700">
+          Requirement detail — {missingForQualification.length > 0
+            ? `${missingForQualification.length} still missing`
+            : "complete"}
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            research can fill most of this
+          </span>
+        </summary>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
       <label className="text-sm font-medium text-slate-700 xl:col-span-4">
         Scope
         <Textarea className="mt-1" name="scopeSummary" defaultValue={requirement.scope_summary ?? ""} />
@@ -292,6 +314,9 @@ export function CommercialRequirementEditor({
         Demand evidence summary
         <Textarea className="mt-1" name="demandEvidenceSummary" defaultValue={requirement.demand_evidence_summary ?? ""} />
       </label>
+        </div>
+      </details>
+
       <label className="text-sm font-medium text-slate-700 xl:col-span-2">
         Next action
         <Input className="mt-1" name="nextAction" defaultValue={requirement.next_action ?? ""} />

@@ -49,7 +49,7 @@ export interface SuggestedJob {
   /** Which kind of employee should get it. */
   roleKey: string;
   priority: "urgent" | "high" | "normal" | "low";
-  kind: "reach" | "chain" | "supply" | "facts";
+  kind: "reach" | "chain" | "supply" | "facts" | "requirement";
   entityRefs: Array<{ type: string; id: string; relation?: string }>;
   constraints: Record<string, unknown>;
 }
@@ -227,6 +227,52 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
       kind: "facts",
       entityRefs: [{ type: "project", id: p.id as string, relation: "target" }],
       constraints: { execution_mode: "bot", no_outreach: true, project_id: p.id },
+    });
+  }
+
+  // Requirements a human opened and then faced thirty empty fields.
+  //
+  // Most of those fields are research, not decisions. Scope, roles, country,
+  // duration and shift pattern are readable from the source; whether the buyer
+  // has confirmed demand is not, and no agent proposes that.
+  const { data: reqs } = await svc
+    .from("commercial_requirements")
+    .select("id, title, status, scope_summary, roles, country, duration_weeks, discovered_project_id")
+    .eq("org_id", orgId)
+    .in("status", ["draft", "needs_information"]);
+
+  for (const r of (reqs ?? []).slice(0, 3)) {
+    const gaps = [
+      !r.scope_summary ? "scope" : null,
+      !Array.isArray(r.roles) || r.roles.length === 0 ? "roles" : null,
+      !r.country ? "country" : null,
+      !r.duration_weeks ? "duration" : null,
+    ].filter(Boolean) as string[];
+    if (gaps.length === 0) continue;
+
+    const title = (r.title as string) ?? "this requirement";
+    push({
+      id: `requirement:${r.id}`,
+      title: `Research the requirement: ${title.slice(0, 60)}`,
+      objective: [
+        `Fill in what Triangle does not know about the requirement "${title}". Missing: ${gaps.join(", ")}.`,
+        "Read the source behind it and report only what the source states.",
+        "File a finding of type `requirement_facts` with `requirement_id` set, using these fields where the source supports them: scope_summary, exclusions, roles, headcount_min, headcount_max, seniority, country, city, site_location, start_date_from, start_window_text, duration_weeks, duration_text, shift_pattern, required_skills, required_documents, engagement_model, currency, rate_unit, commercial_notes, unknowns, demand_evidence_url, demand_evidence_date, demand_evidence_summary.",
+        "Do NOT propose status, buyer confirmation or a decision. Whether a buyer has confirmed demand is a human's call, and the database will not let you make it.",
+        "List what remains unknown in `unknowns` rather than guessing it. Do not contact anyone.",
+      ].join("\n\n"),
+      reason: `Draft requirement missing ${gaps.join(", ")}.`,
+      roleKey: "project_researcher",
+      priority: "high",
+      kind: "requirement",
+      entityRefs: r.discovered_project_id
+        ? [{ type: "project", id: r.discovered_project_id as string, relation: "context" }]
+        : [],
+      constraints: {
+        execution_mode: "bot",
+        no_outreach: true,
+        requirement_id: r.id,
+      },
     });
   }
 

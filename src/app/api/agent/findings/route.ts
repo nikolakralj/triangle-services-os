@@ -26,6 +26,7 @@ const VALID_TYPES = [
   "contact",
   "contact_channel",
   "project_facts",
+  "requirement_facts",
   "worker",
   "other",
 ];
@@ -70,7 +71,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = body.payload ?? {};
+  // Two shapes, on purpose.
+  //
+  // Scout filed three contact_channel findings on 3 September whose payload
+  // arrived as {} — the report described three published routes for Paul Boxer
+  // and the rows stored nothing. The same agent had filed full payloads under
+  // `contact` an hour earlier, so the difference was the request shape, not the
+  // agent. Rather than lose real research to a key name, the recognised finding
+  // fields are also accepted at the top level.
+  const RESERVED = new Set([
+    "findingType",
+    "payload",
+    "sourceUrl",
+    "sourceDate",
+    "evidenceText",
+    "confidence",
+    "idempotencyKey",
+    "assignmentId",
+  ]);
+  const raw = body as unknown as Record<string, unknown>;
+  const nested = body.payload ?? {};
+  const flat = Object.fromEntries(
+    Object.entries(raw).filter(([k, v]) => !RESERVED.has(k) && v !== undefined),
+  );
+  const payload = Object.keys(nested).length > 0 ? nested : flat;
+
+  // A finding with nothing in it is not a discovery, and storing one puts a row
+  // in the approvals queue that a human cannot act on and cannot understand.
+  if (Object.keys(payload).length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "payload is empty. Send the finding's fields under `payload` (or at the top level) — a finding with no content cannot be reviewed or accepted.",
+      },
+      { status: 400 },
+    );
+  }
+
   if (findingType === "project" && !payload.project_name && !payload.name) {
     return NextResponse.json(
       { error: "A project finding needs payload.project_name." },

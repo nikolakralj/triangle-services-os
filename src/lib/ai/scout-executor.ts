@@ -26,6 +26,13 @@ type ClaimedAssignment = {
   constraints: Record<string, unknown>;
 };
 
+/**
+ * How long a `bot` job waits for its provider runtime before this executor
+ * takes it. Long enough that a bot polling a few times a day still gets first
+ * refusal; short enough that nothing sits over a weekend.
+ */
+const STALL_HOURS = Number(process.env.AGENT_STALL_HOURS ?? 6);
+
 export type ScoutWorkResult =
   | { status: "idle" }
   | { status: "completed"; assignmentId: string; headline: string }
@@ -44,19 +51,51 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
   const scoutIds = (scouts ?? []).map((row) => row.id as string);
   if (scoutIds.length === 0) return null;
 
-  const { data: candidates } = await service
-    .from("agent_assignments")
-    .select(
-      "id,org_id,agent_instance_id,title,objective,expected_output,constraints,status",
-    )
-    .eq("org_id", orgId)
-    .in("agent_instance_id", scoutIds)
-    .eq("status", "queued")
-    .contains("constraints", { execution_mode: "in_app" })
-    .order("created_at")
-    .limit(5);
+  // Two kinds of queued work are claimable here.
+  //
+  // `execution_mode: in_app` is ours outright. `bot` belongs to the Scout
+  // running on a provider platform — but that Scout only ever POLLS, because
+  // Triangle cannot push to it. If nobody opens the bot, a job sits queued
+  // forever and the company simply stops, which is what "the AI should work,
+  // not the human" fails to mean in practice.
+  //
+  // So the bot gets first refusal for STALL_HOURS, and after that this
+  // executor picks the job up rather than letting it rot.
+  const stalledBefore = new Date(
+    Date.now() - STALL_HOURS * 60 * 60 * 1000,
+  ).toISOString();
 
-  for (const row of candidates ?? []) {
+  const [ours, stalled] = await Promise.all([
+    service
+      .from("agent_assignments")
+      .select(
+        "id,org_id,agent_instance_id,title,objective,expected_output,constraints,status,created_at",
+      )
+      .eq("org_id", orgId)
+      .in("agent_instance_id", scoutIds)
+      .eq("status", "queued")
+      .contains("constraints", { execution_mode: "in_app" })
+      .order("created_at")
+      .limit(5),
+    service
+      .from("agent_assignments")
+      .select(
+        "id,org_id,agent_instance_id,title,objective,expected_output,constraints,status,created_at",
+      )
+      .eq("org_id", orgId)
+      .in("agent_instance_id", scoutIds)
+      .eq("status", "queued")
+      .contains("constraints", { execution_mode: "bot" })
+      .lt("created_at", stalledBefore)
+      .order("created_at")
+      .limit(5),
+  ]);
+
+  // Ours first: work explicitly addressed to this runtime should never wait
+  // behind a job the bot may still be about to collect.
+  const candidates = [...(ours.data ?? []), ...(stalled.data ?? [])];
+
+  for (const row of candidates) {
     const { data: claimed } = await service
       .from("agent_assignments")
       .update({ status: "active", started_at: new Date().toISOString() })

@@ -274,6 +274,28 @@ export async function acceptFinding(params: {
     destinationHref = `/hunter/${projectId}`;
   }
 
+  // Research filling in a requirement's blanks.
+  //
+  // Never touches status, buyer confirmation or the decision reason: moving a
+  // requirement toward "qualified" is a commercial decision, and the database
+  // guards it. This only fills the fields a researcher can read from a source.
+  if (finding.finding_type === "requirement_facts") {
+    const requirementId = String(payload.requirement_id ?? "").trim();
+    if (!requirementId) return null;
+
+    const { applyRequirementFacts } = await import("./requirement-facts");
+    const result = await applyRequirementFacts({
+      requirementId,
+      orgId: params.orgId,
+      payload,
+    });
+    if (!result) return null;
+
+    promotedTo = "commercial_requirement";
+    entityId = requirementId;
+    destinationHref = `/commercial/${requirementId}`;
+  }
+
   if (finding.finding_type === "company") {
     const companyName = String(
       payload.company_name ?? payload.name ?? payload.company ?? "",
