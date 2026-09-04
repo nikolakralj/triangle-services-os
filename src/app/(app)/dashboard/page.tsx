@@ -9,6 +9,8 @@ import {
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
+import { RefusalLedger } from "@/components/modules/refusal-ledger";
+import { summarizeRefusals } from "@/lib/data/refusals";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
     dueThisWeekTaskRows,
     activityRows,
     commercial,
+    refusals,
   ] = await Promise.all([
     listCompanies(session.organizationId),
     listOpportunities(session.organizationId),
@@ -59,6 +62,7 @@ export default async function DashboardPage() {
     getTasksDueThisWeek(session.organizationId),
     listActivities(session.organizationId, 10),
     getCommercialStats(session.organizationId),
+    summarizeRefusals(session.organizationId),
   ]);
 
   // Convert database rows to UI types
@@ -84,6 +88,13 @@ export default async function DashboardPage() {
         description="Daily operating view for the 300-company lead database, pipeline, follow-ups and vendor document readiness."
         actions={<Button variant="primary">Generate weekly report</Button>}
       />
+
+      {/* Above the counters on purpose. Every other panel reports what
+          happened; this reports what the system would not let anyone record. */}
+      <div className="mb-4">
+        <RefusalLedger summary={refusals} />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total companies"

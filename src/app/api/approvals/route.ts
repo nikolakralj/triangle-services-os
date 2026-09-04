@@ -5,6 +5,7 @@ import {
   rejectResearchSuggestion,
 } from "@/lib/data/research";
 import { acceptFinding, rejectFinding } from "@/lib/data/findings";
+import { recordRefusal } from "@/lib/data/refusals";
 
 // ---------------------------------------------------------------------------
 // PATCH /api/approvals — decide on one item from the unified queue.
@@ -107,6 +108,17 @@ export async function PATCH(request: Request) {
       : NextResponse.json({ error: "Could not reject." }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not save that decision.";
+    // An acceptance the database refused is the same class of event as a
+    // refused commercial action: someone tried to turn a claim into a record
+    // and the evidence did not support it.
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Accept a proposal",
+      reason: message,
+      userId: access.userId ?? null,
+      entityType: kind,
+      entityId: id,
+    });
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordRefusal } from "@/lib/data/refusals";
 import { requirementPatchSchema } from "@/lib/commercial/validation";
 import {
   createServiceSupabaseClient,
@@ -128,6 +129,13 @@ export async function PATCH(
     .eq("org_id", access.organizationId);
   if (error) {
     const qualificationError = error.message.includes("Requirement cannot be");
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Qualify a commercial requirement",
+      reason: error.message,
+      userId: access.userId ?? null,
+      entityType: "commercial_requirement",
+    });
     return NextResponse.json(
       { error: error.message },
       { status: qualificationError ? 409 : 500 },

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordRefusal } from "@/lib/data/refusals";
 import { commercialActionPatchSchema } from "@/lib/commercial/validation";
 import {
   createServiceSupabaseClient,
@@ -78,6 +79,13 @@ export async function PATCH(
   const { error } = await service.from("commercial_actions").update(updates).eq("id", id).eq("org_id", access.organizationId);
   if (error) {
     const truthError = error.message.includes("commercial action requires");
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Record a commercial action",
+      reason: error.message,
+      userId: access.userId ?? null,
+      entityType: "commercial_action",
+    });
     return NextResponse.json({ error: error.message }, { status: truthError ? 409 : 500 });
   }
   return NextResponse.json({ ok: true });

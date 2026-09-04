@@ -10,6 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { recordRefusal } from "@/lib/data/refusals";
 import { requireApiAccess } from "@/lib/supabase/server";
 import {
   archiveOutreachDraft,
@@ -53,6 +54,14 @@ export async function PATCH(
         { followUpAt: typeof body.follow_up_at === "string" ? body.follow_up_at : null },
       );
       if (!result.ok) {
+        await recordRefusal({
+          orgId: access.organizationId,
+          surface: "Record a send",
+          reason: result.error ?? "",
+          userId: access.userId ?? null,
+          entityType: "outreach_draft",
+          entityId: id,
+        });
         return NextResponse.json({ error: result.error }, { status: 400 });
       }
       return NextResponse.json({ ok: true, actionId: result.actionId });

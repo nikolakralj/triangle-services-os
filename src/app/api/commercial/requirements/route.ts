@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordRefusal } from "@/lib/data/refusals";
 import { requirementInputSchema } from "@/lib/commercial/validation";
 import {
   createServiceSupabaseClient,
@@ -159,6 +160,13 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Qualify a commercial requirement",
+      reason: error.message,
+      userId: access.userId ?? null,
+      entityType: "commercial_requirement",
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ requirementId: data.id }, { status: 201 });

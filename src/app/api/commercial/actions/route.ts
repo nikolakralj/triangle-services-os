@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordRefusal } from "@/lib/data/refusals";
 import { commercialActionInputSchema } from "@/lib/commercial/validation";
 import {
   createServiceSupabaseClient,
@@ -104,6 +105,15 @@ export async function POST(request: Request) {
 
   if (error) {
     const truthError = error.message.includes("commercial action requires");
+    // The refusal is the informative part. Recorded before the response so the
+    // attempt survives even though its transaction did not.
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Record a commercial action",
+      reason: error.message,
+      userId: access.userId ?? null,
+      entityType: "commercial_action",
+    });
     return NextResponse.json(
       { error: error.message },
       { status: truthError ? 409 : 500 },
