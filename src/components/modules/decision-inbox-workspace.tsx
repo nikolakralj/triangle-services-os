@@ -7,7 +7,7 @@ import {
   CirclePause,
   ExternalLink,
   FileCheck2,
-  MessagesSquare,
+  ChevronDown,
   ShieldCheck,
   Sparkles,
   Target,
@@ -43,124 +43,122 @@ const QUALITY_META: Record<EvidenceQuality, { label: string; intent: "success" |
   low: { label: "Weak evidence", intent: "danger" },
 };
 
+// ---------------------------------------------------------------------------
+// One decision, one line.
+//
+// This used to render six labelled panels per decision — recommended decision,
+// business impact, responsible employee, unknowns, next safe AI step, your
+// step — roughly a screenful each, twenty-five times over. All of it true, and
+// all of it in the way: the point of this page is to get through the queue and
+// close the tab, not to read a report about every case.
+//
+// So the row states the only two things needed to decide: what it is, and what
+// YOU do. Everything else is one click away for the cases where the answer is
+// not obvious. A coloured edge carries the kind, so the eye sorts the list
+// before the words are read.
+// ---------------------------------------------------------------------------
+
+const EDGE: Record<string, string> = {
+  approve_commercial_action: "bg-violet-500",
+  agent_blocked: "bg-rose-500",
+  evidence_conflict: "bg-amber-500",
+  pursue_hold_reject: "bg-sky-500",
+  no_action_needed: "bg-slate-300",
+};
+
 function DecisionCard({ decision }: { decision: DecisionCase }) {
   const meta = KIND_META[decision.kind];
   const quality = QUALITY_META[decision.evidenceQuality];
   const Icon = meta.icon;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge intent={meta.intent}>
-                <Icon className="mr-1 h-3.5 w-3.5" />
-                {meta.label}
-              </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                {decision.caseLabel}
-              </span>
-            </div>
-            <h2 className="mt-2 text-base font-semibold text-slate-950">{decision.title}</h2>
-            {decision.detail && (
-              <p className="mt-1 max-w-5xl whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                {decision.detail.length > 700 ? `${decision.detail.slice(0, 700)}…` : decision.detail}
-              </p>
-            )}
-          </div>
+    <details className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
+      <summary className="flex cursor-pointer list-none items-center gap-3 p-0">
+        <span
+          className={`h-full min-h-[3.5rem] w-1 shrink-0 ${EDGE[decision.kind] ?? "bg-slate-300"}`}
+          aria-hidden
+        />
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 py-3 pr-3">
+          <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-slate-950">
+              {decision.title}
+            </span>
+            {/* The actionable half, on the line, so the queue can be worked
+                without opening anything. */}
+            <span className="mt-0.5 block truncate text-xs text-slate-600">
+              {decision.nextHumanStep}
+            </span>
+          </span>
+          <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            {meta.label}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
+        </span>
+      </summary>
+
+      <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-4">
+        <div className="rounded-lg border border-sky-100 bg-sky-50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+            Recommended
+          </p>
+          <p className="mt-0.5 text-sm font-medium leading-6 text-slate-950">
+            {decision.recommendation}
+          </p>
+        </div>
+
+        {decision.detail && (
+          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">
+            {decision.detail.length > 500
+              ? `${decision.detail.slice(0, 500)}…`
+              : decision.detail}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+          <Badge intent={quality.intent}>{quality.label}</Badge>
+          {decision.averageConfidence !== null && (
+            <Badge>{decision.averageConfidence}% confidence</Badge>
+          )}
+          <span className="text-slate-500">{decision.ownerLabel}</span>
+          <span className="text-slate-400">·</span>
+          <span className="text-slate-500">{decision.businessImpact}</span>
+        </div>
+
+        {decision.unknowns.length > 0 && (
+          <ul className="space-y-1">
+            {decision.unknowns.map((unknown) => (
+              <li key={unknown} className="flex gap-2 text-xs leading-5 text-amber-800">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                {unknown}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="flex items-start gap-1.5 text-xs leading-5 text-slate-500">
+          <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {decision.nextSafeAiStep}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
           {decision.caseHref && (
             <Link
               href={decision.caseHref}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
             >
-              Open living case <ArrowRight className="h-3.5 w-3.5" />
+              Open the case <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           )}
         </div>
-      </div>
 
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
-        <div className="space-y-4 p-5">
-          <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-              Recommended decision
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-6 text-slate-950">
-              {decision.recommendation}
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Business impact
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">{decision.businessImpact}</p>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Responsible employee
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">{decision.ownerLabel}</p>
-            </div>
-          </div>
-
-          {decision.unknowns.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Unknowns and risks
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {decision.unknowns.map((unknown) => (
-                  <li key={unknown} className="flex gap-2 text-sm leading-5 text-slate-600">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                    {unknown}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        <aside className="border-t border-slate-100 bg-slate-50/70 p-5 lg:border-l lg:border-t-0">
-          <div className="flex flex-wrap gap-2">
-            <Badge intent={quality.intent}>{quality.label}</Badge>
-            {decision.averageConfidence !== null && (
-              <Badge>{decision.averageConfidence}% confidence</Badge>
-            )}
-            {decision.evidenceCount > 0 && (
-              <Badge>{decision.evidenceCount} evidence item{decision.evidenceCount === 1 ? "" : "s"}</Badge>
-            )}
-          </div>
-          <div className="mt-4 space-y-4">
-            <div>
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                <Bot className="h-3.5 w-3.5" /> Next safe AI step
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">{decision.nextSafeAiStep}</p>
-            </div>
-            <div>
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                <MessagesSquare className="h-3.5 w-3.5" /> Your step
-              </p>
-              <p className="mt-1 text-sm font-medium leading-6 text-slate-900">{decision.nextHumanStep}</p>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      {decision.approvalItems.length > 0 && (
-        <details className="border-t border-slate-100 bg-white">
-          <summary className="cursor-pointer px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Review and decide on the supporting evidence
-          </summary>
-          <div className="border-t border-slate-100 p-5">
+        {decision.approvalItems.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
             <ApprovalsQueue items={decision.approvalItems} />
           </div>
-        </details>
-      )}
-    </article>
+        )}
+      </div>
+    </details>
   );
 }
 
