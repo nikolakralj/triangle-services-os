@@ -78,11 +78,21 @@ export async function listWorkers(
   const supabase = await createCookieSupabaseClient();
   if (!supabase) return [];
 
+  // Candidates belong on this screen.
+  //
+  // Every query in this file filtered status='active', and a CV import creates
+  // a candidate. So a CV was uploaded, a profile was written to the database,
+  // and there was no screen anywhere on which it existed — "than profile was
+  // not created" was a correct reading of what the app showed.
+  //
+  // The list is the pool of people we know. The narrower queries below — the
+  // ones that put somebody in front of a buyer or onto a site — still require
+  // 'active', because that is where vouching matters.
   const { data, error } = await supabase
     .from("workers")
     .select("*")
     .eq("organization_id", organizationId)
-    .eq("status", "active")
+    .in("status", ["active", "candidate"])
     .order("full_name", { ascending: true });
 
   if (error) {
@@ -203,11 +213,13 @@ export async function searchAndFilterWorkers(
   const supabase = await createCookieSupabaseClient();
   if (!supabase) return [];
 
+  // Same reasoning as listWorkers: the pool screen shows everyone we know of,
+  // and the badge on the card says who has been vouched for.
   let query = supabase
     .from("workers")
     .select("*")
     .eq("organization_id", organizationId)
-    .eq("status", "active");
+    .in("status", ["active", "candidate"]);
 
   if (options.role && options.role !== "all") {
     query = query.eq("role", options.role);

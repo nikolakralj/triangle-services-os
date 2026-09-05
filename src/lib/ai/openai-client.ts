@@ -39,7 +39,7 @@ export type OpenAIHunterResponse = {
   };
 };
 
-function getOpenAIClient() {
+export function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(

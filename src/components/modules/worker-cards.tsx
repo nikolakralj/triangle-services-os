@@ -77,11 +77,22 @@ export function WorkerCards({
                   {w.country ? ` · ${w.country}` : ""}
                 </p>
               </div>
-              <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${avail.cls}`}
-              >
-                {avail.label}
-              </span>
+              {/* A candidate is someone a CV told us about and nobody has
+                  vouched for yet. They cannot be matched to a package or put
+                  in front of a buyer until somebody does, so the card says
+                  which of the two this is rather than showing an availability
+                  that has never been confirmed by a person. */}
+              {w.status === "candidate" ? (
+                <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800">
+                  From a CV
+                </span>
+              ) : (
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${avail.cls}`}
+                >
+                  {avail.label}
+                </span>
+              )}
             </div>
 
             {(w.skills.length > 0 || w.certificates.length > 0) && (

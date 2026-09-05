@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
 import { extractCv } from "@/lib/data/cv-extract";
+import { readCv } from "@/lib/ai/cv-reader";
 
 // ---------------------------------------------------------------------------
-// POST /api/workers/cv — a CV goes in, a proposal comes out.
+// POST /api/workers/cv — a CV goes in, a read profile comes out.
 //
-// It does NOT create a worker. A CV is a claim about a person: "10 years
-// experience", "fluent German", "A1 certified". Those become a pending
-// proposal in Approvals, and a human turns them into a record. Same rule that
-// governs everything Scout files.
+// A CV is a claim about a person: "10 years experience", "fluent German",
+// "A1 certified". The claim is recorded, read by a model, and attached to a
+// candidate — somebody on the books who cannot yet be put on a site, because
+// every matching and submission query in this codebase requires status
+// 'active'.
 //
-// The file is stored either way, so accepting the proposal later attaches the
-// original document to the person rather than leaving only a summary of it.
+// So the human approval that matters still exists; it has moved to where it
+// carries weight. Vouching for a person is a decision. Confirming that a
+// parser found an email address is not, and asking for it fifty times over is
+// how a CEO ends up doing data entry for his own software.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -121,48 +125,167 @@ export async function POST(request: Request) {
     .select("id")
     .maybeSingle();
 
-  // The proposal. `cv_text` rides along so the HR agent can read the CV
-  // through the API and enrich this before a human decides — the free pass
-  // did the plumbing, the agent does the judgement.
-  const { data: finding, error: findingError } = await svc
+  // Read it properly, here, now.
+  //
+  // This used to file a proposal carrying an email address and a couple of
+  // language lines, and ask a human to approve it. The card said "Nikola Kralj
+  // · Croatia" — no role, no skills, no seniority, no link to the CV. That is
+  // not a decision, it is data entry with a confirmation step, and the half
+  // that would have made it worth reading was parked behind an HR agent that
+  // had never once authenticated.
+  //
+  // A model is better, cheaper and faster at reading a CV than either of the
+  // two people who run this company, so neither of them does it.
+  const reading = await readCv(extracted.text, {
+    fullName: extracted.guess.fullName,
+    country: extracted.guess.country,
+  });
+
+  const payload = {
+    full_name: extracted.guess.fullName,
+    email: extracted.guess.email,
+    phone: extracted.guess.phone,
+    // The regex pass and the reading can disagree about country; the reading
+    // has seen the whole document, the regex has seen a keyword.
+    country: reading?.country ?? extracted.guess.country,
+    city: reading?.city ?? null,
+    role: reading?.role ?? null,
+    seniority: reading?.seniority ?? null,
+    years_experience: reading?.years_experience ?? null,
+    summary: reading?.summary ?? null,
+    // Union, not replacement: a ticket either pass found is a ticket found.
+    certificates: mergeLists(extracted.guess.certificates, reading?.certificates),
+    languages: mergeLists(extracted.guess.languages, reading?.languages, languageName),
+    skills: reading?.skills ?? [],
+    industries: reading?.industries ?? [],
+    concerns: reading?.concerns ?? [],
+    read_by: reading ? "gpt-4.1-mini" : null,
+    cv_document_id: doc?.id ?? null,
+    cv_file_name: file.name,
+    cv_pages: extracted.pages,
+    cv_text: extracted.text.slice(0, 60000),
+  };
+
+  // The person goes on the books immediately, as a candidate.
+  //
+  // `candidate` is not a placeable worker: every matching, availability and
+  // submission query in this codebase requires status 'active'. So nothing an
+  // agent read can put somebody on a live site — a human still vouches, at the
+  // point where vouching means something, rather than rubber-stamping a parse.
+  const { data: worker, error: workerError } = await svc
+    .from("workers")
+    .insert({
+      organization_id: access.organizationId,
+      full_name: extracted.guess.fullName ?? file.name.replace(/\.pdf$/i, ""),
+      role: payload.role,
+      email: payload.email,
+      phone: payload.phone,
+      country: payload.country,
+      city: payload.city,
+      skills: payload.skills,
+      certificates: payload.certificates,
+      languages: payload.languages,
+      industries: payload.industries,
+      notes: payload.summary,
+      status: "candidate",
+      availability_status: "unknown",
+      created_by: access.userId,
+      updated_by: access.userId,
+    })
+    .select("id")
+    .single();
+
+  if (workerError) {
+    return NextResponse.json(
+      { error: `Could not create the profile: ${workerError.message}` },
+      { status: 500 },
+    );
+  }
+
+  // The finding is the evidence trail, not a queue item. Filed already
+  // resolved so fifty CVs do not become fifty approvals — the provenance
+  // (which CV, read by what, how sure) stays attached to the person.
+  const { data: finding } = await svc
     .from("agent_findings")
     .insert({
       org_id: access.organizationId,
       finding_type: "worker",
-      payload: {
-        full_name: extracted.guess.fullName,
-        email: extracted.guess.email,
-        phone: extracted.guess.phone,
-        country: extracted.guess.country,
-        certificates: extracted.guess.certificates,
-        languages: extracted.guess.languages,
-        cv_document_id: doc?.id ?? null,
-        cv_file_name: file.name,
-        cv_pages: extracted.pages,
-        cv_text: extracted.text.slice(0, 60000),
-      },
+      payload,
       evidence_text: `Read from ${file.name} (${extracted.pages} pages).`,
-      // Low on purpose: a first pass off a PDF is a starting point, not a
-      // judgement. The agent raises it once it has actually read the text.
-      confidence: 40,
-      status: "pending",
+      confidence: reading?.confidence ?? 40,
+      status: "accepted",
+      promoted_entity_type: "worker",
+      promoted_entity_id: worker.id,
+      reviewed_by: access.userId,
+      reviewed_at: new Date().toISOString(),
       idempotency_key: `cv:${storagePath}`,
     })
     .select("id")
     .maybeSingle();
 
-  if (findingError) {
-    return NextResponse.json(
-      { error: `Could not file the proposal: ${findingError.message}` },
-      { status: 500 },
-    );
+  // Attach the original PDF to the person it describes.
+  if (doc?.id) {
+    await svc
+      .from("documents")
+      .update({ linked_entity_type: "worker", linked_entity_id: worker.id })
+      .eq("id", doc.id);
   }
 
   return NextResponse.json({
     ok: true,
+    workerId: worker.id,
     findingId: finding?.id ?? null,
     pages: extracted.pages,
     characters: extracted.text.length,
-    guess: extracted.guess,
+    read: Boolean(reading),
+    name: payload.full_name,
+    role: payload.role,
+    concerns: payload.concerns,
   });
 }
+
+/**
+ * Both passes contribute; neither overwrites the other.
+ *
+ * The regex knows a vocabulary of ticket names and the reading knows what the
+ * document said, so they arrive at the same fact by different routes: "SCC"
+ * and "SCC Dokument 018 (valid until 2028)", "A1" and "A1 certificate",
+ * "German native" and "German Muttersprache". Listing both makes a person look
+ * as though they hold two tickets where they hold one. Where one entry
+ * contains another, the longer one wins — it is the same fact with more of the
+ * detail kept.
+ */
+function mergeLists(
+  a: string[] = [],
+  b: string[] = [],
+  /**
+   * What counts as "the same entry". Languages need it: "German native" and
+   * "German Muttersprache" are one language described twice, and neither
+   * string contains the other, so the language name itself is the identity.
+   */
+  identity?: (value: string) => string,
+): string[] {
+  const cleaned = [...a, ...b].map((v) => v.trim()).filter(Boolean);
+  // Longest first, so a specific entry is seated before its own abbreviation
+  // arrives to be swallowed.
+  cleaned.sort((x, y) => y.length - x.length);
+
+  const kept: string[] = [];
+  const keys = new Set<string>();
+  for (const value of cleaned) {
+    if (identity) {
+      const key = identity(value);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      kept.push(value);
+      continue;
+    }
+    const lower = value.toLowerCase();
+    if (!kept.some((k) => k.toLowerCase().includes(lower))) kept.push(value);
+  }
+  return kept;
+}
+
+/** "German native" and "German Muttersprache" are both German. */
+const languageName = (value: string) =>
+  value.trim().split(/[\s(,\-–—:]/)[0].toLowerCase();
