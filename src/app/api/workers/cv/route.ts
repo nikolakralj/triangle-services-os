@@ -210,25 +210,43 @@ export async function POST(request: Request) {
 
   let worker: { id: string };
   let updatedExisting = false;
+  let disagreements: string[] = [];
 
   if (existing) {
     updatedExisting = true;
-    // A newer CV is newer information about the same person, so it wins on the
-    // single-value fields — that is the point of sending it. Lists are a union:
-    // a ticket earned three years ago is not revoked by a CV that forgot to
-    // mention it. Status is untouched, so somebody already vouched for stays
-    // vouched for.
+    // Lists are always a union: a ticket earned three years ago is not revoked
+    // by a CV that forgot to mention it.
+    //
+    // Single values depend on whether anyone has vouched for this person yet.
+    // A candidate has only ever been described by a machine, so a newer CV
+    // replaces what an older one said. An active worker has been through a
+    // human — somebody set that role, corrected that city, and did it knowing
+    // what the CV claimed — and a parser silently overwriting them is how a
+    // person stops trusting the record. There, a CV fills blanks only.
+    const vouchedFor = existing.status === "active";
     const update: Record<string, unknown> = { updated_by: access.userId };
+    const kept: string[] = [];
+
     for (const [key, value] of Object.entries(fields)) {
       if (value == null || (Array.isArray(value) && value.length === 0)) continue;
-      update[key] = Array.isArray(value)
-        ? mergeLists(
-            (existing[key as keyof typeof existing] as string[]) ?? [],
-            value,
-            key === "languages" ? languageName : undefined,
-          )
-        : value;
+      if (Array.isArray(value)) {
+        update[key] = mergeLists(
+          (existing[key as keyof typeof existing] as string[]) ?? [],
+          value,
+          key === "languages" ? languageName : undefined,
+        );
+        continue;
+      }
+      const current = existing[key as keyof typeof existing];
+      if (vouchedFor && current != null && current !== "") {
+        // Not silent: the CV disagreeing with a vouched record is worth
+        // knowing about, even though it does not get to win.
+        if (String(current) !== String(value)) kept.push(`${key} stayed "${current}"`);
+        continue;
+      }
+      update[key] = value;
     }
+    disagreements = kept;
     const { error: updateError } = await svc
       .from("workers")
       .update(update)
@@ -315,6 +333,7 @@ export async function POST(request: Request) {
     // fifty CVs will contain people already on the books, and "updated" and
     // "added" are different outcomes.
     updatedExisting,
+    disagreements,
   });
 }
 
@@ -398,6 +417,13 @@ const normalizeName = (value: string) =>
     .trim();
 
 type WorkerLike = {
+  status: string;
+  role: string | null;
+  city: string | null;
+  country: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
   id: string;
   skills: string[];
   certificates: string[];
@@ -420,7 +446,8 @@ async function findSamePerson(
   orgId: string,
   cv: { email: string | null; fullName: string; country: string | null },
 ): Promise<WorkerLike | null> {
-  const columns = "id, full_name, email, country, skills, certificates, languages, industries";
+  const columns =
+    "id, full_name, email, role, city, country, status, skills, certificates, languages, industries, notes";
 
   if (cv.email) {
     const { data } = await svc

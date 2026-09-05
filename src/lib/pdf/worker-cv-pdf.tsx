@@ -1,104 +1,155 @@
-// One person's CV, branded for the active organization.
+// One person's CV, in Triangle's own house style.
 // Rendered server-side via renderToBuffer. Do NOT add "server-only".
+//
+// Modelled on the CV Triangle already sends — the one for Nikola Kralj, nine
+// pages of it. That document is serif, black on white, with the company name
+// as a plain letterhead over the Sofia address, a centred "Curriculum Vitae",
+// and label/value rows down the left margin. Its only colours are a dark red
+// and a blue used sparingly on headings.
+//
+// The previous version of this file was a navy banner in Helvetica with teal
+// section bars and grey chips. It was invented here and looked like software
+// output. A candidate CV that does not match the company's own paper tells a
+// buyer that it was produced by a different outfit.
+//
+// Two versions, and the difference is not only the name:
+//
+//   Client version — initials, no contact details, and short. A buyer deciding
+//   whether to take a call does not read nine pages, and every extra fact is
+//   another way to identify the person and go direct.
+//
+//   Named version  — full name and contact, released deliberately.
+//
+// Neither carries a rate. That is Triangle's cost, not the buyer's business.
 
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
 import type { WorkerCvDocument } from "@/lib/data/worker-cv";
 
 export type { WorkerCvDocument };
 
-const NAVY = "#1e3a5f";
-const TEAL = "#0e7490";
-const SLATE = "#64748b";
-const LIGHT = "#f1f5f9";
-const TEXT = "#1e293b";
-const MUTED = "#94a3b8";
+// Read off the company's own CV: black body, a dark red and a blue used on
+// headings, and a grey for secondary lines.
+const INK = "#000000";
+const RED = "#c00000";
+const BLUE = "#0070c0";
+const GREY = "#757171";
+const RULE = "#d9d9d9";
+
+// The letterhead as it appears on the paper Triangle already sends.
+//
+// The legal name is spelled out rather than taken from the organisation
+// record: the registration number and VAT id below it belong to Triangle
+// Services OOD specifically, and a header that says one entity over a footer
+// that identifies another is the kind of detail a procurement desk notices.
+const LETTERHEAD = {
+  legalName: "Triangle Services OOD",
+  addressLine1: "53A, Nikola Vaptzarov Blvd.",
+  addressLine2: "1407 Sofia, Bulgaria",
+  registration: "Commercial Register : 2071 39321",
+  vat: "VAT # : BG 2071 39321",
+};
 
 const s = StyleSheet.create({
   page: {
-    fontFamily: "Helvetica",
-    fontSize: 9.5,
-    color: TEXT,
-    paddingBottom: 48,
-  },
-  header: {
-    backgroundColor: NAVY,
-    paddingHorizontal: 36,
-    paddingVertical: 22,
-  },
-  brand: { color: "#93c5fd", fontSize: 8, letterSpacing: 1.4 },
-  name: { color: "#ffffff", fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 6 },
-  role: { color: "#bfdbfe", fontSize: 11, marginTop: 3 },
-  headMeta: { color: "#93c5fd", fontSize: 8, marginTop: 8 },
-  body: { paddingHorizontal: 36, paddingTop: 18 },
-  notice: {
-    backgroundColor: LIGHT,
-    borderLeftWidth: 3,
-    borderLeftColor: TEAL,
-    padding: 8,
-    marginBottom: 14,
-    fontSize: 8,
-    color: SLATE,
-  },
-  section: { marginBottom: 13 },
-  h2: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: TEAL,
-    letterSpacing: 1,
-    marginBottom: 5,
-  },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  chip: {
-    backgroundColor: LIGHT,
-    color: TEXT,
-    fontSize: 8.5,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 3,
-    marginRight: 4,
-    marginBottom: 4,
-  },
-  line: { fontSize: 9.5, marginBottom: 2 },
-  twoCol: { flexDirection: "row", gap: 24 },
-  col: { flex: 1 },
-  availability: {
+    fontFamily: "Times-Roman",
     fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: NAVY,
+    color: INK,
+    paddingTop: 40,
+    paddingHorizontal: 56,
+    paddingBottom: 64,
   },
-  missing: { fontSize: 8, color: MUTED, fontStyle: "italic" },
+
+  // Letterhead: company name left, address right, a rule under both.
+  head: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    borderBottomWidth: 0.75,
+    borderBottomColor: RULE,
+    paddingBottom: 8,
+    marginBottom: 22,
+  },
+  orgName: { fontFamily: "Times-Bold", fontSize: 20 },
+  address: { fontSize: 8, color: GREY, textAlign: "right", lineHeight: 1.4 },
+
+  title: { fontFamily: "Times-Bold", fontSize: 16, textAlign: "center" },
+  subject: { fontSize: 10, textAlign: "center", marginTop: 4, marginBottom: 18 },
+
+  // Label on the left, value beside it — the shape of the original.
+  row: { flexDirection: "row", marginBottom: 7 },
+  label: { fontFamily: "Times-Bold", fontSize: 10, width: 132 },
+  value: { fontSize: 10, flex: 1, lineHeight: 1.35 },
+
+  h2: {
+    fontFamily: "Times-Bold",
+    fontSize: 11,
+    color: RED,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  bullet: { fontSize: 10, marginBottom: 2.5, lineHeight: 1.35 },
+  note: {
+    fontSize: 9,
+    color: GREY,
+    lineHeight: 1.4,
+    borderLeftWidth: 2,
+    borderLeftColor: BLUE,
+    paddingLeft: 8,
+    marginBottom: 16,
+  },
+  missing: { fontSize: 8.5, color: GREY, fontStyle: "italic", marginTop: 14 },
+
   footer: {
     position: "absolute",
-    bottom: 20,
-    left: 36,
-    right: 36,
-    fontSize: 7.5,
-    color: MUTED,
-    borderTopWidth: 0.5,
-    borderTopColor: "#e2e8f0",
+    bottom: 26,
+    left: 56,
+    right: 56,
+    borderTopWidth: 0.75,
+    borderTopColor: RULE,
     paddingTop: 6,
     flexDirection: "row",
     justifyContent: "space-between",
+    fontSize: 8,
+    color: GREY,
   },
 });
 
-function Chips({ title, items }: { title: string; items: string[] }) {
+/** A label/value row, skipped entirely when there is no value. */
+function Row({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <View style={s.row} wrap={false}>
+      <Text style={s.label}>{label}</Text>
+      <Text style={s.value}>{value}</Text>
+    </View>
+  );
+}
+
+function Bullets({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <View style={s.section}>
-      <Text style={s.h2}>{title.toUpperCase()}</Text>
-      <View style={s.row}>
-        {items.map((item) => (
-          <Text key={item} style={s.chip}>
-            {item}
-          </Text>
-        ))}
-      </View>
+    <View wrap={false}>
+      <Text style={s.h2}>{title}</Text>
+      {items.map((item) => (
+        <Text key={item} style={s.bullet}>
+          {"•  "}
+          {item}
+        </Text>
+      ))}
     </View>
   );
 }
 
 export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
+  // The client version stays short on purpose: a buyer deciding whether to
+  // take a call reads a page, and each further detail narrows the field of
+  // people it could be until the anonymity is decorative.
+  const shortlist = <T,>(items: T[], keep: number) =>
+    cv.anonymised ? items.slice(0, keep) : items;
+
+  const skills = shortlist(cv.skills, 10);
+  const certificates = shortlist(cv.certificates, 8);
+
   return (
     <Document
       title={`${cv.orgName} — ${cv.displayName}`}
@@ -106,91 +157,85 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
       subject={cv.role}
     >
       <Page size="A4" style={s.page}>
-        <View style={s.header}>
-          <Text style={s.brand}>{cv.orgName.toUpperCase()}</Text>
-          <Text style={s.name}>{cv.displayName}</Text>
-          <Text style={s.role}>
-            {cv.role}
-            {cv.workerType ? ` · ${cv.workerType}` : ""}
-          </Text>
-          <Text style={s.headMeta}>
-            Ref {cv.reference}
-            {cv.basedIn ? ` · Based in ${cv.basedIn}` : ""}
+        <View style={s.head} fixed>
+          <Text style={s.orgName}>{LETTERHEAD.legalName}</Text>
+          <Text style={s.address}>
+            {LETTERHEAD.addressLine1}
+            {"\n"}
+            {LETTERHEAD.addressLine2}
           </Text>
         </View>
 
-        <View style={s.body}>
-          {cv.anonymised && (
-            <Text style={s.notice}>
-              Candidate profile. Identity and contact details are released by{" "}
-              {cv.orgName} once an engagement is agreed. Please refer to this
-              person as {cv.reference}.
-            </Text>
-          )}
+        <Text style={s.title}>Curriculum Vitae</Text>
+        <Text style={s.subject}>{cv.displayName}</Text>
 
-          <View style={s.section}>
-            <Text style={s.h2}>AVAILABILITY</Text>
-            <Text style={s.availability}>{cv.availability}</Text>
-            {cv.mobility.length > 0 && (
-              <Text style={[s.line, { color: SLATE, marginTop: 3 }]}>
-                Will work in: {cv.mobility.join(", ")}
-              </Text>
-            )}
-          </View>
+        {cv.anonymised && (
+          <Text style={s.note}>
+            Candidate profile. {cv.orgName} releases the name and contact
+            details once an engagement is agreed. Please refer to this person as{" "}
+            {cv.reference}.
+          </Text>
+        )}
 
-          <Chips title="Skills" items={cv.skills} />
-          <Chips title="Certificates" items={cv.certificates} />
+        <Row label="Reference" value={cv.reference} />
+        <Row label="Position" value={cv.role} />
+        <Row label="Engagement" value={cv.workerType} />
+        <Row label="Based in" value={cv.basedIn} />
+        <Row label="Experience" value={cv.yearsNote} />
+        <Row label="Availability" value={cv.availability} />
+        <Row
+          label="Will work in"
+          value={cv.mobility.length > 0 ? cv.mobility.join(", ") : null}
+        />
+        <Row
+          label="Languages"
+          value={cv.languages.length > 0 ? cv.languages.join(", ") : null}
+        />
+        <Row
+          label="Sectors"
+          value={cv.industries.length > 0 ? cv.industries.join(", ") : null}
+        />
 
-          <View style={s.twoCol}>
-            <View style={s.col}>
-              <Chips title="Languages" items={cv.languages} />
-            </View>
-            <View style={s.col}>
-              <Chips title="Sectors" items={cv.industries} />
-            </View>
-          </View>
+        {/* Named version only, and only when something is actually held. An
+            empty "Contact" heading implies details exist and were withheld. */}
+        {cv.contact && (cv.contact.email || cv.contact.phone) && (
+          <Row
+            label="Contact"
+            value={[cv.contact.email, cv.contact.phone].filter(Boolean).join(" · ")}
+          />
+        )}
 
-          {cv.practical.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.h2}>PRACTICAL</Text>
-              {cv.practical.map((item) => (
-                <Text key={item} style={s.line}>
-                  • {item}
-                </Text>
-              ))}
-            </View>
-          )}
+        <Bullets title="Technical Skills" items={skills} />
+        {cv.anonymised && cv.skills.length > skills.length && (
+          <Text style={[s.bullet, { color: GREY }]}>
+            {"•  "}
+            and {cv.skills.length - skills.length} more, on request
+          </Text>
+        )}
 
-          {/* Only when there is something under it. An empty CONTACT heading
-              on a released, named CV implies details exist and were withheld,
-              when in fact Triangle holds none. */}
-          {cv.contact && (cv.contact.email || cv.contact.phone) && (
-            <View style={s.section}>
-              <Text style={s.h2}>CONTACT</Text>
-              {cv.contact.email && <Text style={s.line}>{cv.contact.email}</Text>}
-              {cv.contact.phone && <Text style={s.line}>{cv.contact.phone}</Text>}
-            </View>
-          )}
+        <Bullets title="Certificates" items={certificates} />
 
-          {/* Stated, not omitted. A CV missing "Certificates" silently reads
-              as a person with none, which is a different claim entirely. */}
-          {cv.notRecorded.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.missing}>
-                Not recorded on file: {cv.notRecorded.join(", ")}. {cv.orgName}{" "}
-                does not state what it has not verified.
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* The practical facts a site manager asks about before anything else:
+            passport, A1, own tools, own transport. */}
+        {!cv.anonymised && <Bullets title="Practical" items={cv.practical} />}
+
+        {/* Stated, not omitted. A CV missing "Certificates" silently reads as a
+            person with none, which is a different claim entirely. */}
+        {cv.notRecorded.length > 0 && (
+          <Text style={s.missing}>
+            Not recorded on file: {cv.notRecorded.join(", ")}. {cv.orgName} does
+            not state what it has not verified.
+          </Text>
+        )}
 
         <View style={s.footer} fixed>
-          <Text>
-            {cv.orgName} · {cv.reference}
-          </Text>
-          <Text>
-            Generated {new Date(cv.generatedAt).toLocaleDateString("en-GB")}
-          </Text>
+          <Text>{LETTERHEAD.registration}</Text>
+          <Text
+            render={({ pageNumber, totalPages }) =>
+              `${cv.reference} · ${pageNumber} / ${totalPages}`
+            }
+          />
+          <Text>{LETTERHEAD.vat}</Text>
         </View>
       </Page>
     </Document>

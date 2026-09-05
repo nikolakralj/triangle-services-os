@@ -73,6 +73,11 @@ Return ONLY what the CV supports. This is the whole job:
 - seniority: helper / skilled / lead / supervisor / manager. Null if unclear.
 - years_experience: whole years of relevant hands-on experience. Work it out
   from the dates rather than repeating a claim in the profile blurb.
+- city / country: where THIS PERSON lives. A CV is usually written on a
+  company's letterhead, and the address in the header or footer is that
+  company's, not theirs. Reading one off the top of the page put a candidate in
+  Sofia because his agency is registered there. Use the person's own stated
+  address, place of residence or home town; null if the CV does not say.
 - skills: concrete, checkable capabilities. "Siemens S7 commissioning", "cable
   pulling", "HV termination". Not soft skills, not "team player".
 - certificates: ONLY tickets actually named in the CV — SCC, VCA, ECS, CSCS,

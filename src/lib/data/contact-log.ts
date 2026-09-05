@@ -188,16 +188,46 @@ export async function getContactLog(
     .neq("status", "draft")
     .order("sent_at", { ascending: false });
 
-  for (const row of data ?? []) {
+  const rows = data ?? [];
+
+  // The outcome is read back from the ledger, where it was written verbatim.
+  //
+  // It used to be inferred from the draft: status 'replied' plus a
+  // reply_summary of exactly "Dead end" meant a dead end, anything else meant
+  // a conversation. But a dead end and a conversation both store 'replied',
+  // and the note the CEO is asked for replaces that summary — so "wrong
+  // person, procurement is in Ijmuiden" came back as somebody who had picked
+  // up and talked. That put a closed door into the follow-up queue, where it
+  // would have been chased for as long as it sat there.
+  const outcomeByDraft = new Map<string, AttemptOutcome>();
+  if (rows.length > 0) {
+    const { data: actions } = await svc
+      .from("commercial_actions")
+      .select("outreach_draft_id, outcome")
+      .eq("org_id", orgId)
+      .in(
+        "outreach_draft_id",
+        rows.map((r) => r.id as string),
+      );
+    for (const a of actions ?? []) {
+      const value = String(a.outcome ?? "");
+      if (value === "reached" || value === "no_answer" || value === "dead_end") {
+        outcomeByDraft.set(a.outreach_draft_id as string, value);
+      }
+    }
+  }
+
+  for (const row of rows) {
     const contactId = row.buyer_contact_id as string;
+    // Falls back to the draft status only for rows written before the ledger
+    // carried an outcome — an email marked sent by the older outreach flow.
     const outcome: AttemptOutcome | null =
-      row.status === "no_reply"
+      outcomeByDraft.get(row.id as string) ??
+      (row.status === "no_reply"
         ? "no_answer"
         : row.status === "replied"
-          ? String(row.reply_summary ?? "") === ATTEMPT_LABEL.dead_end
-            ? "dead_end"
-            : "reached"
-          : null;
+          ? "reached"
+          : null);
     const list = out.get(contactId) ?? [];
     list.push({
       id: row.id as string,
