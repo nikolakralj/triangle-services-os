@@ -273,3 +273,32 @@ export async function getKnownProjectNames(
     country: r.country,
   }));
 }
+
+/**
+ * How many projects sit in each sector, plus how many are in none.
+ *
+ * Exists because the sector tabs used to say nothing at all, and every one of
+ * them led to an empty list: all eighteen projects had a null sector, so the
+ * filter was correct and the data was not. A count on the tab makes that
+ * visible before it is clicked rather than after.
+ */
+export async function countProjectsBySector(
+  organizationId: string,
+): Promise<{ bySector: Record<string, number>; unclassified: number; total: number }> {
+  const svc = createServiceSupabaseClient();
+  const bySector: Record<string, number> = {};
+  if (!svc) return { bySector, unclassified: 0, total: 0 };
+
+  const { data } = await svc
+    .from("discovered_projects")
+    .select("sector_id")
+    .eq("organization_id", organizationId);
+
+  let unclassified = 0;
+  for (const row of data ?? []) {
+    const id = row.sector_id as string | null;
+    if (!id) unclassified += 1;
+    else bySector[id] = (bySector[id] ?? 0) + 1;
+  }
+  return { bySector, unclassified, total: (data ?? []).length };
+}

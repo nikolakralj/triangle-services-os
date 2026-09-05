@@ -10,6 +10,7 @@ import {
   listDiscoveredProjects,
   rowToDiscoveredProject,
   getDiscoveredProjectStats,
+  countProjectsBySector,
 } from "@/lib/data/discovered-projects";
 import {
   TrendingUp,
@@ -70,6 +71,8 @@ export default async function HunterPage({
     getDiscoveredProjectStats(session.organizationId, activeSector?.id),
   ]);
 
+  const sectorCounts = await countProjectsBySector(session.organizationId);
+
   const projects = projectRows.map(rowToDiscoveredProject);
 
   // What has actually been established about each one. Replaces a model-
@@ -98,7 +101,12 @@ export default async function HunterPage({
         }
       />
 
-      <SectorSwitcher sectors={sectors} activeSectorId={activeSector?.id} />
+      <SectorSwitcher
+        sectors={sectors}
+        activeSectorId={activeSector?.id}
+        counts={sectorCounts.bySector}
+        total={sectorCounts.total}
+      />
 
       {/* Stats row */}
       <div className="mb-4 grid gap-3 md:grid-cols-4">

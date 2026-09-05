@@ -146,12 +146,45 @@ export function toCountryCode(value: string | null | undefined): string | null {
 }
 
 /**
+ * The words a sector is actually described by, keyed by slug.
+ *
+ * Matching a sector's own name against the text is too literal to be useful.
+ * "CATL and Stellantis Electric Vehicle Battery Factory in Zaragoza" is
+ * obviously Automotive & EV to any human and contains none of those words, so
+ * it stayed unclassified — and so did six more like it. Every one of the
+ * eighteen projects on record ended up with a null sector, which is why every
+ * sector tab showed an empty list: the filter was working perfectly on data
+ * that had never been filed.
+ *
+ * Kept as plain keywords rather than a model call. Filing a project is not a
+ * judgement worth paying per token for, and a list you can read is a list you
+ * can correct.
+ */
+const SECTOR_KEYWORDS: Record<string, string[]> = {
+  "data-centers": [
+    "data cent", "datacent", "rechenzentrum", "colocation", "hyperscale",
+    "server farm", "gpu cluster", "ai cluster", "megawatt it", "mw it",
+  ],
+  automotive: [
+    "automotive", "electric vehicle", "vehicle", "battery", "gigafactory",
+    "car plant", "ev plant", "fahrzeug", "cell factory", "powertrain",
+  ],
+  "steel-heavy-industry": [
+    "steel", "stahl", "smelter", "blast furnace", "pickling", "rolling mill",
+    "foundry", "hydrogen plant", "direct reduction", "refinery", "petrochemical",
+    "pulp", "paper mill", "cement",
+  ],
+  hvac: [
+    "hvac", "commissioning", "ventilation", "heating", "cooling", "chiller",
+    "lüftung", "klima", "mechanical and electrical", "mep",
+  ],
+};
+
+/**
  * Which sector this project belongs to.
  *
  * Extracted from the accept-a-project branch so a project created by an
- * approval and one corrected later cannot disagree about the answer. Matches
- * the words in a sector's own name against the text — no model call, no
- * invented taxonomy.
+ * approval and one corrected later cannot disagree about the answer.
  *
  * Returns null when nothing matches, and that is deliberate. This previously
  * fell back to "whichever sector is active", which filed an EV plant in
@@ -168,7 +201,7 @@ export async function classifySector(
   if (!svc) return null;
   const { data: sectors } = await svc
     .from("sectors")
-    .select("id, name")
+    .select("id, name, slug")
     .eq("organization_id", orgId);
   const all = sectors ?? [];
 
@@ -183,9 +216,25 @@ export async function classifySector(
   }
 
   const haystack = text.toLowerCase();
+
+  // Keywords first — they are what the sector is actually described by.
+  // Most specific wins: a steel mill's own hydrogen plant should file under
+  // Steel rather than being pulled into a sector that matched one loose word,
+  // so the sector with the longest matching phrase takes it.
+  let best: { id: string; length: number } | null = null;
+  for (const s of all) {
+    const keys = SECTOR_KEYWORDS[String(s.slug ?? "")] ?? [];
+    for (const k of keys) {
+      if (haystack.includes(k) && (!best || k.length > best.length)) {
+        best = { id: s.id as string, length: k.length };
+      }
+    }
+  }
+  if (best) return best.id;
+
+  // Then the sector's own name, for a sector nobody has written keywords for.
   const words = (n: string) =>
     n.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
-
   const matched = all.find((s) =>
     words(s.name as string).some((w) => haystack.includes(w)),
   );
