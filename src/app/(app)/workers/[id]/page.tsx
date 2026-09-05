@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { getWorkerById } from "@/lib/data/workers";
+import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { listWorkerNotes } from "@/lib/data/worker-notes";
 import { WorkerProfile } from "@/components/modules/worker-profile";
 
@@ -23,6 +24,22 @@ export default async function WorkerDetailPage({
   if (!row || row.organization_id !== session.organizationId) notFound();
 
   const notes = await listWorkerNotes(id, session.organizationId);
+
+  // The CV this profile was read from. Stored and attached to the person from
+  // the first upload, and shown on no screen until now — so there was no way
+  // to check what the app had read against what the document actually said.
+  const svc = createServiceSupabaseClient();
+  const { data: cvDoc } = svc
+    ? await svc
+        .from("documents")
+        .select("id, file_name")
+        .eq("organization_id", session.organizationId)
+        .eq("linked_entity_id", id)
+        .eq("document_category", "cv")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="space-y-4">
@@ -65,6 +82,8 @@ export default async function WorkerDetailPage({
           status: row.status ?? "active",
         }}
         initialNotes={notes}
+        cvDocumentId={(cvDoc?.id as string | undefined) ?? null}
+        cvFileName={(cvDoc?.file_name as string | undefined) ?? null}
       />
     </div>
   );

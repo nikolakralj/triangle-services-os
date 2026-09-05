@@ -79,6 +79,11 @@ Return ONLY what the CV supports. This is the whole job:
   IPAF, PASMA, EX, A1, BOSIET, first aid, driving licence categories. Never
   infer one from a job title. An invented certificate puts an uncertified
   person on a live site.
+  Name each one EXACTLY as the CV writes it, in the CV's own language, and do
+  not translate it. "Schaltberechtigung bis 30 kV" stays German. A person's CV
+  gets read more than once — when a newer one arrives, or when the reading is
+  re-run — and a ticket translated differently each time becomes two tickets on
+  the same profile.
 - languages: as stated, keeping the level — "German fluent", "English basic".
 - industries: the sectors worked in — data centres, steel, pharma, automotive,
   oil and gas, pulp and paper.

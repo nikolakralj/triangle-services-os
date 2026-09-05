@@ -8,6 +8,8 @@ import {
   BadgeCheck,
   Briefcase,
   FileDown,
+  FileText,
+  RefreshCw,
   Car,
   Globe,
   Loader2,
@@ -125,11 +127,48 @@ function Panel({
 export function WorkerProfile({
   worker,
   initialNotes,
+  cvDocumentId = null,
+  cvFileName = null,
 }: {
   worker: ProfileWorker;
   initialNotes: WorkerNote[];
+  /** The CV this profile was built from, if one is on file. */
+  cvDocumentId?: string | null;
+  cvFileName?: string | null;
 }) {
   const router = useRouter();
+  const [rereading, setRereading] = useState(false);
+  const [rereadNote, setRereadNote] = useState<string | null>(null);
+
+  // Every profile made before the upload started reading CVs is a husk. The
+  // document is still on file, so the fix is to read it again rather than ask
+  // for the same PDF twice.
+  async function reread() {
+    setRereading(true);
+    setRereadNote(null);
+    try {
+      const res = await fetch(`/api/workers/${worker.id}/reread-cv`, { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        filled?: string[];
+        note?: string;
+      };
+      if (!res.ok) {
+        setRereadNote(data.error ?? "Could not read it.");
+        return;
+      }
+      setRereadNote(
+        data.filled?.length
+          ? `Filled in ${data.filled.join(", ")}.`
+          : (data.note ?? "Nothing new in it."),
+      );
+      router.refresh();
+    } catch {
+      setRereadNote("Network error.");
+    } finally {
+      setRereading(false);
+    }
+  }
   const [notes, setNotes] = useState<WorkerNote[]>(initialNotes);
   const [open, setOpen] = useState(initialNotes.length === 0);
   const [kind, setKind] = useState<WorkerNoteKind>("note");
@@ -257,6 +296,41 @@ export function WorkerProfile({
               >
                 Named version, with contact details
               </a>
+              {/* The document this profile was built from. It was stored and
+                  attached to the person all along and shown on no screen, so
+                  there was no way to check what the app had read against what
+                  the CV actually said. */}
+              {cvDocumentId && (
+                <a
+                  href={`/api/documents/${cvDocumentId}/signed-url?redirect=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900"
+                >
+                  <FileText className="h-3 w-3" />
+                  {cvFileName ?? "Original CV"}
+                </a>
+              )}
+              {cvDocumentId && (
+                <button
+                  type="button"
+                  onClick={() => void reread()}
+                  disabled={rereading}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                >
+                  {rereading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  Read it again
+                </button>
+              )}
+              {rereadNote && (
+                <span className="max-w-[220px] text-right text-[11px] text-slate-500">
+                  {rereadNote}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -423,7 +497,12 @@ export function WorkerProfile({
             )}
           </Panel>
 
-          {(worker.reliabilityScore || worker.qualityScore || worker.safetyScore) && (
+          {/* Explicitly boolean. `(0 || 0 || 0) && <Panel/>` is `0`, and React
+              renders that as a literal "0" — a bare zero floating under the
+              panels on every profile whose scores are all unset. */}
+          {[worker.reliabilityScore, worker.qualityScore, worker.safetyScore].some(
+            (s) => typeof s === "number" && s > 0,
+          ) && (
             <Panel title="Track record" icon={BadgeCheck}>
               <ul className="space-y-1 text-xs">
                 {[

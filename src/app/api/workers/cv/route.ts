@@ -166,40 +166,99 @@ export async function POST(request: Request) {
     cv_text: extracted.text.slice(0, 60000),
   };
 
-  // The person goes on the books immediately, as a candidate.
+  // Is this somebody we already know?
   //
-  // `candidate` is not a placeable worker: every matching, availability and
-  // submission query in this codebase requires status 'active'. So nothing an
-  // agent read can put somebody on a live site — a human still vouches, at the
-  // point where vouching means something, rather than rubber-stamping a parse.
-  const { data: worker, error: workerError } = await svc
-    .from("workers")
-    .insert({
-      organization_id: access.organizationId,
-      full_name: extracted.guess.fullName ?? file.name.replace(/\.pdf$/i, ""),
-      role: payload.role,
-      email: payload.email,
-      phone: payload.phone,
-      country: payload.country,
-      city: payload.city,
-      skills: payload.skills,
-      certificates: payload.certificates,
-      languages: payload.languages,
-      industries: payload.industries,
-      notes: payload.summary,
-      status: "candidate",
-      availability_status: "unknown",
-      created_by: access.userId,
-      updated_by: access.userId,
-    })
-    .select("id")
-    .single();
+  // A second CV for the same person is the normal case, not the exception —
+  // an updated one arrives, or the same file gets dragged in twice out of a
+  // folder of fifty. Creating a second profile splits one person's tickets and
+  // history across two records, and the first anyone notices is when a buyer
+  // is sent the wrong half.
+  //
+  // Decided here rather than in a review queue. Which of two records is the
+  // same human is not a decision worth interrupting anybody for, and a
+  // duplicate-review screen is the beginning of the CRM nobody wants.
+  const fullName = extracted.guess.fullName ?? file.name.replace(/\.pdf$/i, "");
+  const existing = await findSamePerson(svc, access.organizationId, {
+    email: payload.email,
+    fullName,
+    country: payload.country,
+  });
 
-  if (workerError) {
-    return NextResponse.json(
-      { error: `Could not create the profile: ${workerError.message}` },
-      { status: 500 },
-    );
+  const fields = {
+    role: payload.role,
+    email: payload.email,
+    phone: payload.phone,
+    country: payload.country,
+    city: payload.city,
+    skills: payload.skills,
+    certificates: payload.certificates,
+    languages: payload.languages,
+    industries: payload.industries,
+    notes: payload.summary,
+  };
+
+  let worker: { id: string };
+  let updatedExisting = false;
+
+  if (existing) {
+    updatedExisting = true;
+    // A newer CV is newer information about the same person, so it wins on the
+    // single-value fields — that is the point of sending it. Lists are a union:
+    // a ticket earned three years ago is not revoked by a CV that forgot to
+    // mention it. Status is untouched, so somebody already vouched for stays
+    // vouched for.
+    const update: Record<string, unknown> = { updated_by: access.userId };
+    for (const [key, value] of Object.entries(fields)) {
+      if (value == null || (Array.isArray(value) && value.length === 0)) continue;
+      update[key] = Array.isArray(value)
+        ? mergeLists(
+            (existing[key as keyof typeof existing] as string[]) ?? [],
+            value,
+            key === "languages" ? languageName : undefined,
+          )
+        : value;
+    }
+    const { error: updateError } = await svc
+      .from("workers")
+      .update(update)
+      .eq("id", existing.id)
+      .eq("organization_id", access.organizationId);
+    if (updateError) {
+      return NextResponse.json(
+        { error: `Could not update the profile: ${updateError.message}` },
+        { status: 500 },
+      );
+    }
+    worker = { id: existing.id };
+  } else {
+    // The person goes on the books immediately, as a candidate.
+    //
+    // `candidate` is not a placeable worker: every matching, availability and
+    // submission query in this codebase requires status 'active'. So nothing a
+    // model read can put somebody on a live site — a human still vouches, at
+    // the point where vouching means something, rather than rubber-stamping a
+    // parse.
+    const { data: created, error: workerError } = await svc
+      .from("workers")
+      .insert({
+        organization_id: access.organizationId,
+        full_name: fullName,
+        ...fields,
+        status: "candidate",
+        availability_status: "unknown",
+        created_by: access.userId,
+        updated_by: access.userId,
+      })
+      .select("id")
+      .single();
+
+    if (workerError) {
+      return NextResponse.json(
+        { error: `Could not create the profile: ${workerError.message}` },
+        { status: 500 },
+      );
+    }
+    worker = created;
   }
 
   // The finding is the evidence trail, not a queue item. Filed already
@@ -241,6 +300,10 @@ export async function POST(request: Request) {
     name: payload.full_name,
     role: payload.role,
     concerns: payload.concerns,
+    // Said out loud rather than left for someone to discover: a folder of
+    // fifty CVs will contain people already on the books, and "updated" and
+    // "added" are different outcomes.
+    updatedExisting,
   });
 }
 
@@ -280,12 +343,103 @@ function mergeLists(
       kept.push(value);
       continue;
     }
-    const lower = value.toLowerCase();
-    if (!kept.some((k) => k.toLowerCase().includes(lower))) kept.push(value);
+    // Containment on the words, not the characters. Read twice, the same
+    // ticket comes back punctuated differently — "SCC Dokument 018 (valid
+    // until 2028)" and "SCC 018 valid until 2028" are one certificate, and a
+    // plain substring test keeps both.
+    const words = tokens(value);
+    if (!kept.some((k) => isSubset(words, tokens(k)))) kept.push(value);
   }
   return kept;
+}
+
+const STOPWORDS = new Set(["the", "a", "an", "of", "to", "up", "and", "bis", "und", "der", "die", "das"]);
+
+/** Comparable words: lowercase, unpunctuated, no filler. */
+function tokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .split(" ")
+      .filter((w) => w && !STOPWORDS.has(w)),
+  );
+}
+
+function isSubset(small: Set<string>, large: Set<string>): boolean {
+  if (small.size === 0) return true;
+  for (const w of small) if (!large.has(w)) return false;
+  return true;
 }
 
 /** "German native" and "German Muttersprache" are both German. */
 const languageName = (value: string) =>
   value.trim().split(/[\s(,\-–—:]/)[0].toLowerCase();
+
+/** Ignore case, punctuation and doubled spaces when comparing two names. */
+const normalizeName = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+type WorkerLike = {
+  id: string;
+  skills: string[];
+  certificates: string[];
+  languages: string[];
+  industries: string[];
+};
+
+/**
+ * The person this CV is about, if they are already on the books.
+ *
+ * Two signals, both deliberately strict. An email address is as good as an
+ * identifier gets — nobody shares one. Failing that, the same name in the same
+ * country: common enough to be reliable inside one company's roster, and
+ * narrow enough that two different Michael Schmidts in Germany and Austria
+ * stay two people. Anything weaker would silently merge two humans into one
+ * record, which is far worse than holding two records for one human.
+ */
+async function findSamePerson(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  orgId: string,
+  cv: { email: string | null; fullName: string; country: string | null },
+): Promise<WorkerLike | null> {
+  const columns = "id, full_name, email, country, skills, certificates, languages, industries";
+
+  if (cv.email) {
+    const { data } = await svc
+      .from("workers")
+      .select(columns)
+      .eq("organization_id", orgId)
+      .ilike("email", cv.email)
+      .limit(1)
+      .maybeSingle();
+    if (data) return data as unknown as WorkerLike;
+  }
+
+  const target = normalizeName(cv.fullName);
+  if (!target) return null;
+
+  // Compared in JS rather than SQL: the normalisation strips accents and
+  // punctuation, and "Müller" has to match "Mueller" written by a parser that
+  // lost the umlaut.
+  const { data: candidates } = await svc
+    .from("workers")
+    .select(columns)
+    .eq("organization_id", orgId);
+
+  for (const row of candidates ?? []) {
+    if (normalizeName(String(row.full_name ?? "")) !== target) continue;
+    const sameCountry =
+      !cv.country ||
+      !row.country ||
+      String(row.country).toLowerCase() === cv.country.toLowerCase();
+    if (sameCountry) return row as unknown as WorkerLike;
+  }
+  return null;
+}
