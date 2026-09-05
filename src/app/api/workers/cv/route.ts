@@ -90,6 +90,17 @@ export async function POST(request: Request) {
   // worker does not exist yet; accepting the proposal re-links it.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const storagePath = `${access.organizationId}/cv-inbox/${Date.now()}-${safeName}`;
+
+  // Belt as well as braces. extractCv no longer detaches what it is given, but
+  // an empty object in storage is silent — nobody finds out until they click
+  // the link months later — so refuse to write one rather than discover it.
+  if (bytes.byteLength === 0) {
+    return NextResponse.json(
+      { error: "The uploaded file arrived empty. Nothing was saved." },
+      { status: 400 },
+    );
+  }
+
   const { error: storageError } = await svc.storage
     .from(BUCKET)
     .upload(storagePath, bytes, {

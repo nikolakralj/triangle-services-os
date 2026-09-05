@@ -214,7 +214,18 @@ function guessCountry(text: string): string | null {
 
 /** Read a PDF and take the parts a regex reads better than a model. */
 export async function extractCv(buffer: ArrayBuffer): Promise<CvExtraction> {
-  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  // `new Uint8Array(buffer)` is a view over the caller's memory, not a copy,
+  // and pdf.js takes ownership of what it is handed — it transfers the
+  // underlying ArrayBuffer, which leaves the caller holding a detached buffer
+  // of length zero.
+  //
+  // The caller here is the CV upload, which extracts first and then stores the
+  // file. Every CV it had ever taken was written to storage as a nought-byte
+  // object: the text was read, the profile was built, the link to the original
+  // opened nothing, and no error was raised anywhere along the way.
+  //
+  // `.slice()` copies. Reading a document must not destroy it.
+  const pdf = await getDocumentProxy(new Uint8Array(buffer.slice(0)));
   const { totalPages, text } = await extractText(pdf, { mergePages: true });
   const merged = Array.isArray(text) ? text.join("\n") : text;
 
