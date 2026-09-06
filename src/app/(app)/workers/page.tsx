@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { WorkerCards } from "@/components/modules/worker-cards";
 import { WorkersFilterForm } from "@/components/modules/workers-filter";
+import { AskHanna } from "@/components/modules/ask-hanna";
 import { getSession } from "@/lib/auth/session";
 import { countNotesByWorker } from "@/lib/data/worker-notes";
 import {
@@ -75,6 +76,7 @@ export default async function WorkersPage({
           </div>
         }
       />
+      <AskHanna poolSize={allRows.length} />
       <WorkersFilterForm
         roles={roles}
         skills={skills}
