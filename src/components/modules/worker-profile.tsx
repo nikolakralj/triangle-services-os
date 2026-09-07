@@ -20,6 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { describeRights } from "@/lib/data/work-authorisation";
 import {
   NOTE_KIND_LABEL,
   NOTE_KINDS,
@@ -63,6 +64,9 @@ export interface ProfileWorker {
   hasCar: boolean | null;
   legacyNotes: string | null;
   status: string;
+  nationality: string | null;
+  workAuthorisation: string[];
+  visaNotes: string | null;
 }
 
 const AVAILABILITY: Record<string, { label: string; cls: string }> = {
@@ -465,6 +469,24 @@ export function WorkerProfile({
 
           <Panel title="Languages" icon={Globe}>
             <Chips items={worker.languages} tone="bg-sky-50 text-sky-700" />
+          </Panel>
+
+          {/* Right to work sits above the practical facts on purpose: a
+              passport in a drawer is no use if the person cannot legally
+              stand on the site. */}
+          <Panel title="Right to work" icon={Globe}>
+            <p className="text-xs text-slate-700">{describeRights(worker)}</p>
+            {worker.visaNotes && (
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                {worker.visaNotes}
+              </p>
+            )}
+            {!worker.nationality && worker.workAuthorisation.length === 0 && (
+              <p className="mt-1 text-[11px] text-amber-800">
+                Nobody has checked. That is not the same as no — it just cannot
+                be answered yet.
+              </p>
+            )}
           </Panel>
 
           <Panel title="Can travel" icon={Car}>

@@ -44,6 +44,9 @@ const cvReadingSchema = z.object({
   ),
   city: nullableText(120),
   country: nullableText(120),
+  nationality: nullableText(120),
+  work_authorisation: listOfStrings,
+  visa_notes: nullableText(400),
   skills: listOfStrings,
   certificates: listOfStrings,
   languages: listOfStrings,
@@ -84,11 +87,33 @@ Return ONLY what the CV supports. This is the whole job:
   IPAF, PASMA, EX, A1, BOSIET, first aid, driving licence categories. Never
   infer one from a job title. An invented certificate puts an uncertified
   person on a live site.
+  A visa or a residence permit is not a certificate — it belongs in
+  work_authorisation and visa_notes, not here.
   Name each one EXACTLY as the CV writes it, in the CV's own language, and do
   not translate it. "Schaltberechtigung bis 30 kV" stays German. A person's CV
   gets read more than once — when a newer one arrives, or when the reading is
   re-run — and a ticket translated differently each time becomes two tickets on
   the same profile.
+- nationality: the passport the CV states — "Croatian", "German", "Filipino".
+  Take it only from an explicit nationality or citizenship line. It is not the
+  country they live in and not where they last worked. Null if not stated.
+- work_authorisation: countries OUTSIDE their own nationality where the CV
+  shows a right to PERFORM WORK. Use the country: ["UK"], ["US"].
+  A visitor visa is not a work permit and must never be listed here. B-1, B-2,
+  ESTA, a Schengen tourist or business visa, and "visa on arrival" all permit
+  meetings and site visits and forbid productive labour. Listing a B-1 as
+  authorisation to work is how a supervisor ends up on an American site
+  illegally.
+  What does count: a work permit, a Blue Card, a Skilled Worker or Tier 2
+  visa, an H-1B, H-2B or L-1, a green card or permanent residence, a residence
+  permit that explicitly allows employment, or citizenship of that country.
+  Do NOT list EU states for an EU national; that is understood from
+  nationality. Do NOT infer a right to work from having worked somewhere years
+  ago. Empty unless the CV actually shows it.
+- visa_notes: the qualifying sentence if there is one — which permit, expiring
+  when, sponsorship needed. If the CV names a visitor visa, say so here
+  ("holds a US B-1 business visa — visits only, not work"), because it is
+  worth knowing and it is not authorisation. Null otherwise.
 - languages: as stated, keeping the level — "German fluent", "English basic".
 - industries: the sectors worked in — data centres, steel, pharma, automotive,
   oil and gas, pulp and paper.
@@ -150,6 +175,9 @@ export async function readCv(
               years_experience: { type: ["integer", "null"] },
               city: { type: ["string", "null"] },
               country: { type: ["string", "null"] },
+              nationality: { type: ["string", "null"] },
+              work_authorisation: { type: "array", items: { type: "string" } },
+              visa_notes: { type: ["string", "null"] },
               skills: { type: "array", items: { type: "string" } },
               certificates: { type: "array", items: { type: "string" } },
               languages: { type: "array", items: { type: "string" } },

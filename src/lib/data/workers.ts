@@ -31,6 +31,11 @@ export type WorkerRow = {
   has_car: boolean;
   notes: string | null;
   status: "active" | "inactive" | "blacklisted" | "candidate";
+  /** Passport nationality — an EU/EEA/CH one carries EU-wide right to work. */
+  nationality: string | null;
+  /** Countries beyond that where the right to work has been established. */
+  work_authorisation: string[];
+  visa_notes: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { describeRights } from "@/lib/data/work-authorisation";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -74,10 +75,19 @@ Rules:
 5. If the pool cannot answer the question, say that first and plainly. "Nobody
    in the pool is a supervisor" is a useful answer. A weak match dressed up as
    a good one is not.
-6. Anything the roster does not record, put in "missing" — do not guess it.
-   Work authorisation, visas, and which country a certificate is valid in are
-   NOT in this data. If the question depends on them, that is the real answer:
-   the blocker is that nobody recorded it.
+6. Anything the roster does not record, put in "missing" — do not guess it. If
+   the question depends on something nobody has recorded, that IS the answer.
+7. Right to work. Each person carries "works_in": what has actually been
+   established, worked out from their nationality and anything recorded beyond
+   it. An EU, EEA or Swiss passport carries the right to work across the whole
+   EU/EEA, and that needs no visa. Anywhere else needs a recorded
+   authorisation.
+   An empty authorisation means NOBODY HAS CHECKED — it does not mean the
+   person cannot work there. Say "no work authorisation recorded for the USA",
+   never "he cannot work in the USA". Quietly dropping somebody because a field
+   is blank is worse than no shortlist, because it looks like an answer.
+   Which country a certificate is valid in is genuinely not in this data; if it
+   matters, put it in "missing".
 
 Return JSON: answer, worker_ids (ids you referred to, best first), blockers,
 missing.`;
@@ -95,7 +105,7 @@ export async function answerAboutTalent(
   const { data: rows } = await svc
     .from("workers")
     .select(
-      "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes",
+      "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes, nationality, work_authorisation, visa_notes",
     )
     .eq("organization_id", orgId)
     .neq("status", "blacklisted")
@@ -127,6 +137,16 @@ export async function answerAboutTalent(
     certificates: w.certificates ?? [],
     languages: w.languages ?? [],
     sectors: w.industries ?? [],
+    nationality: w.nationality,
+    // Spelled out rather than left to be inferred: an EU passport is a right
+    // to work across the EU, and a model should not have to know the member
+    // list to answer a question about Germany.
+    works_in: describeRights({
+      nationality: w.nationality as string | null,
+      work_authorisation: (w.work_authorisation as string[]) ?? [],
+      visa_notes: w.visa_notes as string | null,
+    }),
+    visa_notes: w.visa_notes,
     passport: w.has_passport,
     a1_possible: w.has_a1_possible,
     summary: typeof w.notes === "string" ? w.notes.slice(0, 400) : null,

@@ -160,6 +160,9 @@ export async function POST(request: Request) {
     // has seen the whole document, the regex has seen a keyword.
     country: reading?.country ?? extracted.guess.country,
     city: reading?.city ?? null,
+    nationality: reading?.nationality ?? null,
+    work_authorisation: reading?.work_authorisation ?? [],
+    visa_notes: reading?.visa_notes ?? null,
     role: reading?.role ?? null,
     seniority: reading?.seniority ?? null,
     years_experience: reading?.years_experience ?? null,
@@ -197,6 +200,9 @@ export async function POST(request: Request) {
 
   const fields = {
     role: payload.role,
+    nationality: payload.nationality,
+    work_authorisation: payload.work_authorisation,
+    visa_notes: payload.visa_notes,
     email: payload.email,
     phone: payload.phone,
     country: payload.country,
