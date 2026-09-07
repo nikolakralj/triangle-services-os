@@ -96,15 +96,27 @@ export async function recordRefusal(params: {
   entityType?: string | null;
   entityId?: string | null;
   details?: Record<string, unknown>;
+  /**
+   * State the kind when the code itself decided to refuse, rather than passing
+   * a database error along and hoping it is recognised.
+   *
+   * The pattern list below reads the phrasing of Postgres exceptions, which is
+   * right for a caller handing over `error.message` — it keeps ordinary
+   * defects out of a ledger that is supposed to show deliberate refusals. It is
+   * wrong for a refusal written in English by this codebase: the unattended
+   * runner declining a job it has no handler for is a refusal by construction,
+   * and it was being dropped on the floor for not sounding like Postgres.
+   */
+  kind?: RefusalKind;
 }): Promise<void> {
   try {
-    if (!isRefusal(params.reason)) return;
+    if (!params.kind && !isRefusal(params.reason)) return;
     const svc = createServiceSupabaseClient();
     if (!svc) return;
     await svc.from("refusal_log").insert({
       org_id: params.orgId,
       surface: params.surface,
-      kind: classifyRefusal(params.reason),
+      kind: params.kind ?? classifyRefusal(params.reason),
       reason: cleanReason(params.reason),
       attempted_by: params.userId ?? null,
       attempted_by_agent: params.agentName ?? null,

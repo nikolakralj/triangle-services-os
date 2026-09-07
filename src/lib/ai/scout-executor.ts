@@ -14,6 +14,7 @@ import { logAgentRun } from "@/lib/data/agents";
 import { createFinding } from "@/lib/data/findings";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { completeAssignment } from "@/lib/data/workforce";
+import { recordRefusal } from "@/lib/data/refusals";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 type ClaimedAssignment = {
@@ -33,10 +34,15 @@ type ClaimedAssignment = {
  */
 const STALL_HOURS = Number(process.env.AGENT_STALL_HOURS ?? 6);
 
+/** A job this runner has already handed back is not offered to it again. */
+const REFUSED_MARKER = JSON.stringify({ runner_refused: true });
+
 export type ScoutWorkResult =
   | { status: "idle" }
   | { status: "completed"; assignmentId: string; headline: string }
-  | { status: "failed"; assignmentId: string; error: string };
+  | { status: "failed"; assignmentId: string; error: string }
+  /** Claimed, understood to be out of scope, and handed back untouched. */
+  | { status: "refused"; assignmentId: string; reason: string };
 
 async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | null> {
   const service = createServiceSupabaseClient();
@@ -75,6 +81,7 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
       .in("agent_instance_id", scoutIds)
       .eq("status", "queued")
       .contains("constraints", { execution_mode: "in_app" })
+      .not("constraints", "cs", REFUSED_MARKER)
       .order("created_at")
       .limit(5),
     service
@@ -86,6 +93,7 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
       .in("agent_instance_id", scoutIds)
       .eq("status", "queued")
       .contains("constraints", { execution_mode: "bot" })
+      .not("constraints", "cs", REFUSED_MARKER)
       .lt("created_at", stalledBefore)
       .order("created_at")
       .limit(5),
@@ -219,11 +227,37 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
   const assignment = await claimNextAssignment(orgId);
   if (!assignment) return { status: "idle" };
 
-  // Scout has more than one job now. The constraint says which one; anything
-  // unlabelled is a company qualification, which is what every existing
-  // assignment is.
-  if (assignment.constraints.case_type === "contact_reachability") {
+  // Scout has more than one job now, and the constraint says which one.
+  //
+  // This used to read "anything unlabelled is a company qualification", which
+  // was true on the day it was written and stopped being true the moment a
+  // play could be turned into an assignment. Choosing an agent option on a
+  // play files work with constraints of {execution_mode, no_outreach,
+  // from_play} and no case_type at all — so an assignment whose objective was
+  // "ask ANDRITZ Metals for an introduction" was handed to the qualifier and
+  // prompted to "qualify this company into a project-to-placement commercial
+  // case". It would answer a question nobody asked, file the report, and the
+  // assignment would be marked completed.
+  //
+  // A job done wrong and recorded as done is the failure this whole product
+  // exists to refuse. So the fallback is no longer a guess: an assignment
+  // whose kind is not handled here is put back for a human, with the reason
+  // written down, and nothing is claimed to have been done.
+  const caseType =
+    typeof assignment.constraints.case_type === "string"
+      ? assignment.constraints.case_type
+      : null;
+
+  if (caseType === "contact_reachability") {
     return runReachabilityAssignment(assignment);
+  }
+  if (caseType !== null && caseType !== "company_qualification") {
+    return refuseUnknownAssignment(assignment, caseType);
+  }
+  // An assignment with no case_type is only a company qualification when it
+  // actually names a company. A play-derived job does not.
+  if (caseType === null && assignment.constraints.from_play) {
+    return refuseUnknownAssignment(assignment, "a play with no case type");
   }
 
   const startedAt = new Date();
@@ -503,4 +537,90 @@ async function runReachabilityAssignment(
     });
     return { status: "failed", assignmentId: assignment.id, error: message };
   }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand back a job this executor does not know how to do.
+ *
+ * Deliberately not a failure and not a completion. The assignment goes back to
+ * queued so a capable agent — or the bot on its provider platform — can still
+ * take it, and the reason is written to the refusal ledger and onto the thread
+ * so a human can see why nothing happened rather than watching it sit there.
+ *
+ * The alternative, which is what this code used to do, is to run the only
+ * prompt it has and mark the work complete. That is worse than doing nothing:
+ * nothing is visible, and a wrong answer filed under a completed assignment
+ * is not.
+ */
+async function refuseUnknownAssignment(
+  assignment: ClaimedAssignment,
+  caseType: string,
+): Promise<ScoutWorkResult> {
+  const reason =
+    `The unattended runner has no handler for "${caseType}". ` +
+    `It can qualify a company and it can find a way to reach a contact. ` +
+    `This job — "${assignment.title}" — is neither, and running it as a ` +
+    `company qualification would answer a question nobody asked.`;
+
+  const service = createServiceSupabaseClient();
+  if (service) {
+    // Back to queued, not failed: nobody has established that this cannot be
+    // done, only that this executor cannot do it. The bot on its provider
+    // platform may well be able to.
+    //
+    // Marked as it goes back, because a job returned to the queue is a job
+    // this loop would claim again on its very next turn — it would spend every
+    // iteration refusing the same assignment, and no other work would move.
+    await service
+      .from("agent_assignments")
+      .update({
+        status: "queued",
+        constraints: {
+          ...assignment.constraints,
+          runner_refused: true,
+          runner_refused_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", assignment.id)
+      .eq("org_id", assignment.orgId);
+  }
+
+  await addAgentMessage({
+    assignmentId: assignment.id,
+    orgId: assignment.orgId,
+    agentInstanceId: assignment.agentInstanceId,
+    body: reason,
+  });
+
+  await recordRefusal({
+    orgId: assignment.orgId,
+    surface: "Unattended agent run",
+    reason,
+    agentName: "Scout",
+    entityType: "agent_assignment",
+    entityId: assignment.id,
+    // Stated outright: this is a refusal by construction, not a database
+    // error that happens to read like one.
+    kind: "boundary",
+    details: { caseType, title: assignment.title },
+  });
+
+  await logAgentRun({
+    orgId: assignment.orgId,
+    agentName: "Scout",
+    source: "in_app_executor",
+    summary: { assignmentId: assignment.id, status: "refused", caseType },
+    agentInstanceId: assignment.agentInstanceId,
+    assignmentId: assignment.id,
+    provider: "openai",
+    model: getScoutModelId(),
+    status: "failed",
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    error: reason,
+  });
+
+  return { status: "refused", assignmentId: assignment.id, reason };
 }
