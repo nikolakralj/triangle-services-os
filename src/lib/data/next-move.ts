@@ -7,6 +7,7 @@ import {
   type ContactChannel,
 } from "@/lib/data/contact-channels";
 import { getContactLog, type ContactAttempt } from "@/lib/data/contact-log";
+import { matchOpenLeads, draftLeadReply } from "@/lib/data/lead-match";
 
 // ---------------------------------------------------------------------------
 // The single most valuable thing available right now — and the means to do it
@@ -32,6 +33,16 @@ import { getContactLog, type ContactAttempt } from "@/lib/data/contact-log";
 
 export interface NextMoveAction {
   contactId: string;
+  /** Set when this answers an inbound requisition rather than a contact. */
+  leadId?: string;
+  /** Who we would put forward, when the move is a reply about somebody. */
+  offering?: {
+    workerId: string;
+    name: string;
+    role: string | null;
+    why: string;
+    caveats: string[];
+  };
   personName: string;
   personRole: string | null;
   company: string | null;
@@ -77,7 +88,11 @@ interface ContactRow {
   discovered_project_id: string | null;
 }
 
-export async function getNextMove(orgId: string): Promise<NextMove> {
+export async function getNextMove(
+  orgId: string,
+  /** Signs the drafted reply. A letter from nobody does not get answered. */
+  senderName = "Nikola",
+): Promise<NextMove> {
   const svc = createServiceSupabaseClient();
   if (!svc) {
     return {
@@ -123,6 +138,68 @@ export async function getNextMove(orgId: string): Promise<NextMove> {
     orgId,
     reachable.map((c) => c.id),
   );
+
+  // ── 0. A live requisition from somebody who wrote to us first ─────────────
+  //
+  // Above everything, including a conversation already started, because this
+  // is the warmest thing in the building: a named recruiter with a working
+  // email address, a client already signed, a role already open, and somebody
+  // on our books who does that job.
+  //
+  // Thirty-four of these arrived in sixty days and thirty-one were never
+  // opened, because nothing on any screen looked at job_leads. This banner
+  // read findings, contacts and unsent drafts, and sent the CEO to cold-call a
+  // steel plant switchboard while g2 Recruitment sat in the inbox asking for
+  // the exact engineer we have.
+  const leadMatches = await matchOpenLeads(orgId, 5);
+  if (leadMatches.length > 0) {
+    const best = leadMatches[0];
+    const who = best.candidates[0];
+    const others = leadMatches.length - 1;
+    return {
+      headline: `Reply to ${best.contactName ?? best.agency ?? "the agency"} about the ${
+        best.roleTitle ?? "open role"
+      }`,
+      because: [
+        `${best.agency ?? "An agency"} asked${
+          best.country ? ` for ${best.country}` : ""
+        }${best.startText ? `, starting ${best.startText}` : ""}.`,
+        `${who.name} fits it: ${who.why}.`,
+        others > 0
+          ? `${others} more open ${others === 1 ? "requisition" : "requisitions"} behind this one.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      href: "/job-intake",
+      cta: "Open Job Intake",
+      clear: false,
+      action: {
+        contactId: "",
+        leadId: best.leadId,
+        personName: best.contactName ?? best.agency ?? "The agency",
+        personRole: best.roleTitle,
+        company: best.agency,
+        project: best.clientCompany,
+        channelKind: "email",
+        value: best.contactEmail ?? "",
+        whose: "their own",
+        sourceUrl: null,
+        script: draftLeadReply(best, senderName),
+        subject: `Re: ${best.roleTitle ?? "your requirement"}${
+          best.country ? ` — ${best.country}` : ""
+        }`,
+        history: [],
+        offering: {
+          name: who.name,
+          role: who.role,
+          why: who.why,
+          caveats: who.caveats,
+          workerId: who.id,
+        },
+      },
+    };
+  }
 
   // ── 1. A conversation that started and then went quiet ────────────────────
   //

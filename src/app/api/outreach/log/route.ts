@@ -17,12 +17,17 @@ import { requireApiAccess } from "@/lib/supabase/server";
 // ---------------------------------------------------------------------------
 
 const bodySchema = z.object({
-  contactId: z.string().uuid(),
+  // One or the other: a buyer contact, or the inbound requisition being
+  // answered. An agency conversation has no contact record and never will.
+  contactId: z.string().uuid().optional(),
+  leadId: z.string().uuid().optional(),
   channelKind: z.enum(["phone", "email", "linkedin", "contact_form", "other"]),
   value: z.string().trim().min(1).max(400),
   outcome: z.enum(["reached", "no_answer", "dead_end"]),
   content: z.string().trim().max(8_000).optional(),
   note: z.string().trim().max(1_000).optional(),
+}).refine((v) => Boolean(v.contactId || v.leadId), {
+  message: "Give either a contactId or a leadId.",
 });
 
 export async function POST(request: Request) {
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
       reason: result.error,
       userId: access.userId,
       entityType: "buyer_contact",
-      entityId: parsed.data.contactId,
+      entityId: parsed.data.contactId ?? parsed.data.leadId ?? null,
     });
     return NextResponse.json({ error: result.error }, { status: 409 });
   }

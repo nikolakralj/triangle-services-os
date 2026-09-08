@@ -81,7 +81,10 @@ const ACTION_STATUS: Record<AttemptOutcome, string> = {
 export async function logContactAttempt(params: {
   orgId: string;
   userId: string;
-  contactId: string;
+  /** A buyer contact, when the conversation is with one. */
+  contactId?: string;
+  /** An inbound requisition, when the conversation answers one. */
+  leadId?: string;
   /** ChannelKind from contact-channels. */
   channelKind: string;
   /** The number dialled or address written to — the record of what was used. */
@@ -94,37 +97,59 @@ export async function logContactAttempt(params: {
   const svc = createServiceSupabaseClient();
   if (!svc) return { ok: false, error: "Database unavailable." };
 
-  const { data: contact } = await svc
-    .from("buyer_contacts")
-    .select("id, full_name, email, company_name, discovered_project_id")
-    .eq("id", params.contactId)
-    .eq("organization_id", params.orgId)
-    .maybeSingle();
-  if (!contact) return { ok: false, error: "Contact not found." };
+  // Either a buyer contact or an inbound requisition. A conversation with a
+  // recruiter at g2 about a live role is not attached to a discovered project
+  // and never will be, and neither is a first call to Hays.
+  let contactId: string | null = null;
+  let leadId: string | null = null;
+  let projectId: string | null = null;
+  let recipientName: string | null = null;
+  let recipientEmail: string | null = null;
+  let recipientCompany: string | null = null;
 
-  // outreach_drafts.project_id is NOT NULL. A contact with no project behind
-  // it cannot carry an attempt record, and saying so beats writing the
-  // attempt somewhere it will never be read from.
-  const projectId = contact.discovered_project_id as string | null;
-  if (!projectId) {
-    return {
-      ok: false,
-      error: "This contact is not attached to a project, so the attempt has nowhere to be recorded.",
-    };
+  if (params.contactId) {
+    const { data: contact } = await svc
+      .from("buyer_contacts")
+      .select("id, full_name, email, company_name, discovered_project_id")
+      .eq("id", params.contactId)
+      .eq("organization_id", params.orgId)
+      .maybeSingle();
+    if (!contact) return { ok: false, error: "Contact not found." };
+    contactId = contact.id as string;
+    projectId = (contact.discovered_project_id as string | null) ?? null;
+    recipientName = (contact.full_name as string | null) ?? null;
+    recipientEmail = (contact.email as string | null) ?? null;
+    recipientCompany = (contact.company_name as string | null) ?? null;
+  } else if (params.leadId) {
+    const { data: lead } = await svc
+      .from("job_leads")
+      .select("id, contact_name, contact_email, agency_name, discovered_project_id")
+      .eq("id", params.leadId)
+      .eq("org_id", params.orgId)
+      .maybeSingle();
+    if (!lead) return { ok: false, error: "Lead not found." };
+    leadId = lead.id as string;
+    projectId = (lead.discovered_project_id as string | null) ?? null;
+    recipientName = (lead.contact_name as string | null) ?? null;
+    recipientEmail = (lead.contact_email as string | null) ?? null;
+    recipientCompany = (lead.agency_name as string | null) ?? null;
+  } else {
+    return { ok: false, error: "Nothing to log this against." };
   }
 
   const channel = DRAFT_CHANNEL[params.channelKind] ?? "email_cold";
   const now = new Date().toISOString();
   const record =
     params.content?.trim() ||
-    `${VERB[channel] ?? "Contacted"} ${contact.full_name ?? "contact"} on ${params.value}.`;
+    `${VERB[channel] ?? "Contacted"} ${recipientName ?? "contact"} on ${params.value}.`;
 
   const { data: draft, error: draftError } = await svc
     .from("outreach_drafts")
     .insert({
       org_id: params.orgId,
       project_id: projectId,
-      buyer_contact_id: contact.id,
+      buyer_contact_id: contactId,
+      job_lead_id: leadId,
       channel,
       subject: null,
       body: record,
@@ -148,9 +173,9 @@ export async function logContactAttempt(params: {
     status: ACTION_STATUS[params.outcome],
     channel,
     sender_user_id: params.userId,
-    recipient_name: contact.full_name,
-    recipient_email: (contact.email as string | null) ?? null,
-    recipient_company: (contact.company_name as string | null) ?? null,
+    recipient_name: recipientName,
+    recipient_email: recipientEmail,
+    recipient_company: recipientCompany,
     final_content: record,
     response_summary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
     outcome: params.outcome,

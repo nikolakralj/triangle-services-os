@@ -115,7 +115,8 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contactId: action.contactId,
+          contactId: action.contactId || undefined,
+          leadId: action.leadId,
           channelKind: action.channelKind,
           value: action.value,
           outcome,
@@ -195,6 +196,36 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
           ) : null}
         </span>
       </div>
+
+      {/* Who we would put forward. A reply about nobody in particular is a
+          brochure; naming the person and what stands in their way is the
+          difference between a pitch and an offer. */}
+      {action.offering && (
+        <div className="mt-3 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Offering
+          </p>
+          <p className="mt-0.5 text-sm text-white">
+            <Link
+              href={`/workers/${action.offering.workerId}`}
+              className="font-semibold underline-offset-2 hover:underline"
+            >
+              {action.offering.name}
+            </Link>
+            {action.offering.role ? ` · ${action.offering.role}` : ""}
+          </p>
+          <p className="text-xs text-slate-400">{action.offering.why}</p>
+          {action.offering.caveats.length > 0 && (
+            <p className="mt-1 text-xs text-amber-300">
+              Before you promise anything:{" "}
+              {action.offering.caveats
+                .map((c) => c.replace(/[.;]+$/, ""))
+                .join("; ")}
+              .
+            </p>
+          )}
+        </div>
+      )}
 
       {/* The words. Written by an employee, so nobody has to compose them. */}
       {action.script ? (
