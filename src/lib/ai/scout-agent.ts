@@ -65,6 +65,13 @@ export const HOUSE_RULES = [
   "The project owner is usually not the labour buyer. Ignore the hyperscaler, the hospital trust and the school authority. Find the contractor holding the installation package, and the human there who buys subcontract labour.",
   "A company with no named person and no published channel is UNREACHABLE. Say so and file it as such. Never present it as an opportunity — a finding with no name and no number produces no meetings and makes the pipeline look fuller than it is.",
   "Do not hand over homework. Three links and a note saying hold until proof is found is not a result; it is the research job passed back to the CEO. Either carry it to a named reachable person, or state plainly that it cannot be carried and why.",
+  [
+    "Your report must land in exactly one of three states, and the database refuses anything else. There is no fourth option and no way to hedge.",
+    "REACHABLE — you have a named person at the labour buyer, a published way to reach them (phone, address, or the page it appears on), AND the words to say. Fill buyerPath.decisionMaker, buyerPath.publicDoor, and nextCommercialAction.action. Missing any one of the three is not reachable.",
+    "ONE THING MISSING — you carried the research to the point where EXACTLY ONE fact is unknown, you name that fact as the single entry in unknowns, and you name who goes and gets it in missingOwner. Two unknowns is not this state: it is research you have not finished. Finish it or refuse it.",
+    "DEAD — not worth chasing, and you write deadReason saying why: wrong trade for Triangle's supply, no buyer that can be named, wrong country. A refusal with its reason recorded is a complete and valuable result, and it stops the same lead coming back next week.",
+    "Choosing DEAD honestly is always better than dressing a weak case up. Choosing ONE THING MISSING with eight unknowns is not available to you.",
+  ].join("\n"),
 ].join("\n");
 
 export function createScoutQualificationAgent() {
@@ -130,7 +137,8 @@ export function createReachabilityAgent() {
       "A switchboard number plus the right sentence is a SUCCESSFUL result, not a failure. Write howToOpen as what the caller should actually say — in German if the company is German-speaking, with an English gloss. Name the person and the package being asked about.",
       "Do not contact anyone. Do not fill in a contact form, send an email, or send a connection request. You are finding the door, not opening it.",
       "Do not scrape behind a login. Do not report data from a source that required an account to view.",
-      "If you cannot find a published channel, set found to false and write notFoundReason plainly. A sourced absence is worth more than a fabricated address.",
+      "If you cannot find a published channel, set found to false and write notFoundReason plainly. A sourced absence is worth more than a fabricated address, and the database will refuse a not-found report that does not say what you checked and what was not there.",
+      "This job lands in one of two states and cannot hedge. Found a channel: report it with howToOpen — the sentence to say — filled in. Found nothing: found=false with notFoundReason. There is no 'hold and look again later'.",
     ].join("\n"),
     tools: {
       web_search: openai.tools.webSearch({

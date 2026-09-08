@@ -148,12 +148,22 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, assignmentId, replied: true });
       }
     }
+    // Research work has to land in one of the three states. Passed straight
+    // through: Postgres decides whether the report actually earns the state
+    // claimed, and its sentence comes back to the bot as a 409 it can act on.
+    const claimedState = String(
+      (body as { findingState?: unknown }).findingState ?? "",
+    ).trim();
+
     const done = await completeAssignment({
       assignmentId,
       orgId: machine.orgId,
       agentInstanceId: machine.agentInstanceId,
       resultSummary: result,
       failed: body.failed === true,
+      findingState: ["reachable", "one_thing_missing", "dead"].includes(claimedState)
+        ? (claimedState as "reachable" | "one_thing_missing" | "dead")
+        : null,
     });
     // A refusal is not a 404. The assignment exists and belongs to them —
     // they simply have not answered the question on it yet, and saying so

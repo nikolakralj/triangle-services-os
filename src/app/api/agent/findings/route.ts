@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     confidence?: number;
     idempotencyKey?: string;
     assignmentId?: string;
+    findingState?: string;
   };
   try {
     body = await request.json();
@@ -89,6 +90,9 @@ export async function POST(request: Request) {
     "confidence",
     "idempotencyKey",
     "assignmentId",
+    // Not payload content — it is the row's own column. Left out of this set
+    // it would arrive as a payload field on every flat-shaped submission.
+    "findingState",
   ]);
   const raw = body as unknown as Record<string, unknown>;
   const nested = body.payload ?? {};
@@ -130,6 +134,28 @@ export async function POST(request: Request) {
     );
   }
 
+  // The finding contract, stated to the bot in words rather than left to a
+  // Postgres exception. The provider Scout writes through this route, and a
+  // rule the in-app executor obeys and the bot does not is how there came to
+  // be two Scouts in the first place.
+  const COMMERCIAL = ["project", "company", "contact", "contact_channel"];
+  const STATES = ["reachable", "one_thing_missing", "dead"];
+  const findingState = String(body.findingState ?? "").trim();
+
+  if (COMMERCIAL.includes(findingType) && !STATES.includes(findingState)) {
+    return NextResponse.json(
+      {
+        error:
+          `A ${findingType} finding must say what it is: findingState of "reachable", "one_thing_missing" or "dead". ` +
+          "reachable needs a named person and a published channel in the payload. " +
+          'one_thing_missing needs payload.missing (ONE named fact) and payload.missing_owner (who fetches it). ' +
+          "dead needs payload.dead_reason, so the lead is never presented again. " +
+          "There is no fourth option: a finding that hedges is not filed.",
+      },
+      { status: 400 },
+    );
+  }
+
   const created = await createFinding({
     orgId: machine.orgId,
     agentInstanceId: machine.agentInstanceId,
@@ -144,10 +170,20 @@ export async function POST(request: Request) {
         ? Math.max(0, Math.min(100, Math.round(body.confidence)))
         : null,
     idempotencyKey: body.idempotencyKey ?? null,
+    findingState: STATES.includes(findingState)
+      ? (findingState as "reachable" | "one_thing_missing" | "dead")
+      : null,
   });
 
   if (!created) {
-    return NextResponse.json({ error: "Could not save the finding." }, { status: 500 });
+    return NextResponse.json(
+      {
+        error:
+          "The finding was refused. A reachable finding needs a named person and a published channel; " +
+          "one_thing_missing needs payload.missing and payload.missing_owner; dead needs payload.dead_reason.",
+      },
+      { status: 422 },
+    );
   }
 
   return NextResponse.json({

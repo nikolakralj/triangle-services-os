@@ -594,6 +594,13 @@ export async function completeAssignment(params: {
   agentInstanceId: string;
   resultSummary: string;
   failed?: boolean;
+  /**
+   * What the research actually produced. Required by migration 041 for
+   * research work; ignored for a CV read or a mail run, which have no buyer to
+   * be reachable about. Postgres refuses a completion without it, so a missing
+   * value comes back as a readable refusal rather than a 500.
+   */
+  findingState?: "reachable" | "one_thing_missing" | "dead" | null;
 }): Promise<boolean | { refused: string }> {
   const svc = createServiceSupabaseClient();
   if (!svc) return false;
@@ -630,6 +637,7 @@ export async function completeAssignment(params: {
       // structured hand-in mid-JSON; presentation layers decide how much of
       // the worker audit to show.
       result_summary: params.resultSummary,
+      finding_state: params.findingState ?? null,
       completed_at: new Date().toISOString(),
     })
     .eq("id", params.assignmentId)
@@ -637,7 +645,42 @@ export async function completeAssignment(params: {
     .eq("agent_instance_id", params.agentInstanceId)
     .in("status", ["queued", "active"])
     .select("id");
+
+  // The finding contract refuses the row rather than storing a hedge. Hand the
+  // database's own sentence back verbatim — paraphrasing it here is the same
+  // failure the guard exists to catch — and record it, so how often an
+  // employee tries to file nothing is measurable instead of invisible.
+  if (error && isFindingContractRefusal(error.message)) {
+    await recordRefusal({
+      orgId: params.orgId,
+      surface: "Complete an assignment",
+      reason: error.message,
+      agentName: null,
+      entityType: "agent_assignment",
+      entityId: params.assignmentId,
+      kind: "truth",
+    });
+    return { refused: error.message };
+  }
+
   return !error && (data?.length ?? 0) > 0;
+}
+
+/**
+ * Is this Postgres message the finding contract talking?
+ *
+ * Matched on the state names the trigger raises, which are this codebase's own
+ * words and appear in no other guard. Matching on phrasing has burned this
+ * project before — `isRefusal` once matched only Postgres's own wording and
+ * silently dropped refusals written in English by this repo — so the caller is
+ * told the kind outright rather than guessing.
+ */
+function isFindingContractRefusal(message: string): boolean {
+  return (
+    message.includes("reachable") ||
+    message.includes("one_thing_missing") ||
+    message.includes("dead needs")
+  );
 }
 
 /** Minimal worker list for the assignment form's context picker. */

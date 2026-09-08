@@ -45,6 +45,18 @@ export async function createFinding(params: {
   evidenceText?: string | null;
   confidence?: number | null;
   idempotencyKey?: string | null;
+  /**
+   * What this proposal is: reachable, one_thing_missing, or dead.
+   *
+   * A finding inherits the state of the research that produced it — that is
+   * the honest answer, because a project discovered inside a case that could
+   * not name a buyer is exactly as unactionable as the case was.
+   *
+   * Required by migration 041 for project, company, contact and
+   * contact_channel. Not required for a CV reading or a play card, which have
+   * no buyer to be reachable about.
+   */
+  findingState?: "reachable" | "one_thing_missing" | "dead" | null;
 }): Promise<{ id: string; duplicate: boolean } | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -95,11 +107,23 @@ export async function createFinding(params: {
       evidence_text: params.evidenceText ?? null,
       confidence: params.confidence ?? null,
       idempotency_key: params.idempotencyKey ?? null,
+      finding_state: params.findingState ?? null,
     })
     .select("id")
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    // The finding contract refuses rather than storing something nobody can
+    // act on. Log the database's own sentence — a silent null here is how a
+    // caller ends up reporting success for a row that was never written.
+    if (error) {
+      console.error(
+        `createFinding refused (${params.findingType}):`,
+        error.message,
+      );
+    }
+    return null;
+  }
   return { id: data.id as string, duplicate: false };
 }
 

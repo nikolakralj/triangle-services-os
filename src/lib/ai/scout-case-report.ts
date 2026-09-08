@@ -38,6 +38,18 @@ export const scoutCaseReportSchema = z.object({
     })
     .nullable(),
   unknowns: z.array(z.string().max(320)).max(8),
+  /**
+   * Who goes and gets the one missing fact. Required by the database whenever
+   * this report resolves to `one_thing_missing`, because "we do not know who
+   * buys the labour" with nobody assigned to find out is the research job
+   * handed back to the CEO.
+   */
+  missingOwner: z.string().max(240).nullable().default(null),
+  /**
+   * Why this is not worth chasing. Required by the database whenever this
+   * report resolves to `dead`, so the same weak lead is never presented again.
+   */
+  deadReason: z.string().max(600).nullable().default(null),
   risks: z.array(z.string().max(320)).max(8),
   questionsAnswered: z.array(z.string().max(500)).max(8),
   sources: z.array(
@@ -53,6 +65,96 @@ export const scoutCaseReportSchema = z.object({
 });
 
 export type ScoutCaseReport = z.infer<typeof scoutCaseReportSchema>;
+
+/** The only three things a finished piece of research may be. */
+export type FindingState = "reachable" | "one_thing_missing" | "dead";
+
+/**
+ * What this report actually is — decided here and nowhere else.
+ *
+ * `verdict` was ("pursue" | "hold" | "no_go") and "hold" required no evidence
+ * of any kind, so a model that was unsure always picked it. That is how the
+ * CEO opened a result reading "Hold until the missing commercial proof is
+ * found · 60% sure · 3 sources" and correctly said he could have used Chrome.
+ *
+ * The state is derived from what the report CONTAINS rather than from what the
+ * model called it, because the model's own label is the thing that drifted. A
+ * report claiming "pursue" with no named person is not reachable, whatever it
+ * says about itself.
+ *
+ * Migration 041 checks the same conditions in Postgres and refuses the row.
+ * This function exists so the app agrees with the database instead of finding
+ * out at INSERT time — but the database is the one that decides. There is
+ * deliberately no fourth return value: an "unknown" state would be the hedge
+ * coming back under a new name.
+ */
+export function findingStateOf(report: ScoutCaseReport): FindingState {
+  const person = report.buyerPath?.decisionMaker?.trim();
+  const door =
+    report.buyerPath?.publicDoor?.trim() || report.nextCommercialAction?.channel?.trim();
+  const words = report.nextCommercialAction?.action?.trim();
+
+  if (person && door && words) return "reachable";
+  if (report.deadReason?.trim()) return "dead";
+  if (report.unknowns.length === 1 && report.missingOwner?.trim()) {
+    return "one_thing_missing";
+  }
+
+  // Nothing carried. A no_go with no reason written is still a refusal, so
+  // give it one rather than losing the judgement — the reason is what stops it
+  // coming back next week.
+  if (report.verdict === "no_go") return "dead";
+
+  // Everything else is research that did not finish. It resolves to
+  // one_thing_missing, and the caller must name the one fact and its owner
+  // before Postgres will accept it — which is the point.
+  return "one_thing_missing";
+}
+
+/**
+ * Why the database will refuse this report, in the words an agent can act on.
+ *
+ * Deliberately a mirror of the trigger in migration 041 rather than a
+ * replacement for it. The database is the authority — there are two Scouts, a
+ * provider bot and whoever is hired next, and a rule enforced only here is a
+ * rule the other paths do not have. This function exists so an agent gets a
+ * usable sentence and a retry instead of a Postgres exception, and so the
+ * refusal is recorded against the employee that earned it.
+ *
+ * Returns null when the report will be accepted.
+ */
+export function contractViolation(
+  report: ScoutCaseReport,
+  state: FindingState,
+): string | null {
+  if (state === "reachable") {
+    if (!report.buyerPath?.decisionMaker?.trim()) {
+      return "A reachable finding needs a named person at the labour buyer. Name them, or file this as one_thing_missing with the name as the one missing fact.";
+    }
+    if (!report.buyerPath?.publicDoor?.trim() && !report.nextCommercialAction?.channel?.trim()) {
+      return `A reachable finding needs a published way to reach ${report.buyerPath.decisionMaker} — a phone number, an address, or the page it is published on. Without one this is UNREACHABLE and must be filed as one_thing_missing or dead.`;
+    }
+    if (!report.nextCommercialAction?.action?.trim()) {
+      return "A reachable finding needs the words to say. Write the approach — the sentence a human reads out or copies into an email. Leaving it blank hands the job back.";
+    }
+    return null;
+  }
+
+  if (state === "one_thing_missing") {
+    if (report.unknowns.length !== 1) {
+      return `one_thing_missing means exactly ONE named fact, and this report lists ${report.unknowns.length}. Either carry the research far enough that only one thing is unknown, or file it as dead with the reason. Research still in progress is not a finding.`;
+    }
+    if (!report.missingOwner?.trim()) {
+      return `Name who goes and gets it. "${report.unknowns[0]}" with nobody assigned is homework handed to the CEO.`;
+    }
+    return null;
+  }
+
+  if (!report.deadReason?.trim()) {
+    return "A dead finding needs its reason recorded, so this lead is never presented again. Say what makes it not worth chasing — wrong trade, no buyer to name, wrong country.";
+  }
+  return null;
+}
 
 const SECTION_ALIASES: Record<string, string> = {
   "NAMED PROJECT": "project",
@@ -159,12 +261,22 @@ function parseLegacyReport(value: string): ScoutCaseReport | null {
   return {
     version: 1,
     verdict,
+    // This is where the CEO's sentence came from. "Hold until the missing
+    // commercial proof is found" was never written by any model — it is a
+    // hardcoded headline this parser stamped on every prose report it could
+    // not classify, complete with an invented 60% confidence below. It read
+    // like a judgement and was a parse failure.
     headline:
       verdict === "pursue"
         ? "Pursue through the verified buyer route."
         : verdict === "no_go"
           ? "Do not pursue this case."
-          : "Hold until the missing commercial proof is found.",
+          : "Older report, filed before the three-state contract — read it below.",
+    // The legacy path reads history; it does not write new rows, and it cannot
+    // know who was going to fetch a missing fact. Null is the honest answer,
+    // and the contract does not apply retroactively.
+    missingOwner: null,
+    deadReason: verdict === "no_go" ? compact(intro, 500) || null : null,
     executiveSummary: compact(
       intro
         .split("\n")

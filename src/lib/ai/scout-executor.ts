@@ -8,7 +8,11 @@ import {
   describeChannel,
   serializeReachabilityReport,
 } from "@/lib/ai/reachability-report";
-import { serializeScoutCaseReport } from "@/lib/ai/scout-case-report";
+import {
+  serializeScoutCaseReport,
+  findingStateOf,
+  contractViolation,
+} from "@/lib/ai/scout-case-report";
 import { addAgentMessage, takeThreadForBot } from "@/lib/data/assignment-threads";
 import { logAgentRun } from "@/lib/data/agents";
 import { createFinding } from "@/lib/data/findings";
@@ -38,6 +42,29 @@ const STALL_HOURS = Number(process.env.AGENT_STALL_HOURS ?? 6);
 
 /** A job this runner has already handed back is not offered to it again. */
 const REFUSED_MARKER = JSON.stringify({ runner_refused: true });
+
+/**
+ * The contract's evidence, copied onto a finding's payload.
+ *
+ * A finding is read on its own in the queue, not alongside the report that
+ * produced it, so "why is this dead" has to travel with the row. Migration 041
+ * checks these exact keys.
+ */
+function stateFields(
+  report: { deadReason: string | null; unknowns: string[]; missingOwner: string | null },
+  state: "reachable" | "one_thing_missing" | "dead",
+): Record<string, unknown> {
+  if (state === "dead") {
+    return { dead_reason: report.deadReason ?? "Refused during qualification." };
+  }
+  if (state === "one_thing_missing") {
+    return {
+      missing: report.unknowns[0] ?? "",
+      missing_owner: report.missingOwner ?? "",
+    };
+  }
+  return {};
+}
 
 export type ScoutWorkResult =
   | { status: "idle" }
@@ -328,11 +355,23 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
         .join("\n\n"),
     });
 
+    // What this research actually produced, decided from what the report
+    // carries rather than from the label the model chose for itself.
+    const state = findingStateOf(report);
+    const violation = contractViolation(report, state);
+    if (violation) {
+      // Refuse rather than file a hedge. The assignment stays queued and the
+      // reason reaches the thread, which is the same shape as every other
+      // refusal in this system: "I could not do this" is an answer.
+      throw new Error(violation);
+    }
+
     const completed = await completeAssignment({
       assignmentId: assignment.id,
       orgId: assignment.orgId,
       agentInstanceId: assignment.agentInstanceId,
       resultSummary: serializeScoutCaseReport(report),
+      findingState: state,
     });
     if (typeof completed === "object" && "refused" in completed) {
       throw new Error(completed.refused);
@@ -351,11 +390,18 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
           client_company: report.namedProject.owner,
           summary: report.namedProject.evidence,
           source: "in_app_scout_qualification",
+          // The contract wants the reason on the row, not only in the parent
+          // report — a finding is read on its own in the queue.
+          ...stateFields(report, state),
         },
         sourceUrl: report.sources[0].url,
         evidenceText: report.namedProject.evidence,
         confidence: report.confidence,
         idempotencyKey: `in-app-scout:${assignment.id}:project`,
+        // A project discovered inside a case that could not name a buyer is
+        // exactly as unactionable as that case was, so it inherits the state
+        // rather than being filed as if it stood on its own.
+        findingState: state,
       });
     }
 
@@ -489,11 +535,29 @@ async function runReachabilityAssignment(
         : `No published channel found for ${contact.full_name}. ${report.notFoundReason ?? ""}`.trim(),
     });
 
+    // A reachability job lands in only two of the three states. It cannot be
+    // one_thing_missing, because finding the door WAS the one missing thing —
+    // either it was found, or there is no published door and that is a sourced
+    // absence worth recording. Per the house rule: a company with no named
+    // person and no published channel is UNREACHABLE, and is filed as such
+    // rather than presented as an opportunity.
+    const reachState =
+      report.found && report.channels.length > 0 && report.howToOpen.trim()
+        ? "reachable"
+        : "dead";
+
+    if (reachState === "dead" && !report.notFoundReason?.trim()) {
+      throw new Error(
+        "No published channel was found, which is a legitimate result — but it has to say why, or the same company comes back next week. Write notFoundReason: what was checked and what was not there.",
+      );
+    }
+
     const completed = await completeAssignment({
       assignmentId: assignment.id,
       orgId: assignment.orgId,
       agentInstanceId: assignment.agentInstanceId,
       resultSummary: serializeReachabilityReport(report),
+      findingState: reachState,
     });
     if (typeof completed === "object" && "refused" in completed) {
       throw new Error(completed.refused);
@@ -527,6 +591,9 @@ async function runReachabilityAssignment(
         evidenceText: channel.evidence,
         confidence: channel.confidence,
         idempotencyKey: `reachability:${assignment.id}:${index}`,
+        // A published channel with the person's name and the words to say IS
+        // reachable — this loop only runs when the door was found.
+        findingState: "reachable",
       });
     }
 
@@ -744,11 +811,18 @@ async function runOpenResearchAssignment(
       body: `Answered: ${report.headline}`,
     });
 
+    // This is the path that produced "Hold until the missing commercial proof
+    // is found · 60% sure · 3 sources". It now has to land somewhere.
+    const state = findingStateOf(report);
+    const violation = contractViolation(report, state);
+    if (violation) throw new Error(violation);
+
     const completed = await completeAssignment({
       assignmentId: assignment.id,
       orgId: assignment.orgId,
       agentInstanceId: assignment.agentInstanceId,
       resultSummary: serializeScoutCaseReport(report),
+      findingState: state,
     });
     if (typeof completed === "object" && "refused" in completed) {
       throw new Error(completed.refused);
