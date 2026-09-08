@@ -29,6 +29,7 @@ interface Done {
   role: string | null;
   pages: number;
   read: boolean;
+  readFailures: string[];
   updatedExisting: boolean;
   concerns: string[];
 }
@@ -61,6 +62,7 @@ export function CvUpload() {
             role: data.role ?? null,
             pages: data.pages,
             read: Boolean(data.read),
+            readFailures: (data.readFailures as string[]) ?? [],
             updatedExisting: Boolean(data.updatedExisting),
             concerns: (data.concerns as string[]) ?? [],
           },
@@ -143,11 +145,16 @@ export function CvUpload() {
                         `${d.pages} ${d.pages === 1 ? "page" : "pages"}`,
                         // Worth knowing that a profile is thin because the
                         // reading failed, not because the CV was thin.
-                        d.read ? null : "read failed — only the basics saved",
+                        d.read ? null : "nothing could be read — only the name and email were saved",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    {d.readFailures.length > 0 && (
+                      <p className="text-[11px] text-amber-800">
+                        {d.readFailures.join("; ")} — the rest was saved.
+                      </p>
+                    )}
                     {d.concerns.length > 0 && (
                       <p className="text-[11px] text-amber-800">
                         Check: {d.concerns.join("; ")}

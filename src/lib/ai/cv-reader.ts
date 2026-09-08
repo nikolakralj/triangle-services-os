@@ -24,24 +24,47 @@ import { getOpenAIClient } from "@/lib/ai/openai-client";
 // stays owned. The machine reads; the human vouches.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Every cap below TRUNCATES. None of them reject.
+//
+// This schema used to validate lengths — `z.array(z.string().max(120)).max(40)`
+// — and a single over-long string failed the array, which failed the object,
+// which threw the entire reading away. Igor Pejkovic's seven-page CV came back
+// with a role, twenty-one skills, six languages and twenty-four projects on it,
+// and all of it was discarded because one skill ran past a hundred and twenty
+// characters. What reached the screen was "read failed".
+//
+// AGENTS.md says this in as many words — coerce and safeParse each item so one
+// bad row does not kill the whole response — and this file did the opposite.
+// A length limit exists to stop a runaway string reaching the database. Cutting
+// it short does that. Throwing away the other ninety fields does not.
+// ---------------------------------------------------------------------------
+
 const listOfStrings = z.preprocess(
-  (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []),
-  z.array(z.string().trim().min(1).max(120)).max(40),
+  (v) =>
+    Array.isArray(v)
+      ? v
+          .filter((x) => typeof x === "string" && x.trim())
+          .map((x) => (x as string).trim().slice(0, 120))
+          .slice(0, 40)
+      : [],
+  z.array(z.string()),
 );
 
 const nullableText = (max: number) =>
-  z.preprocess(
-    (v) => (v === "" || v == null || v === "unknown" ? null : v),
-    z.string().trim().max(max).nullable(),
-  );
+  z.preprocess((v) => {
+    if (v === "" || v == null || v === "unknown") return null;
+    return typeof v === "string" ? v.trim().slice(0, max) : String(v).slice(0, max);
+  }, z.string().nullable());
 
 const cvReadingSchema = z.object({
   role: nullableText(120),
   seniority: nullableText(60),
-  years_experience: z.preprocess(
-    (v) => (v === "" || v == null ? null : Number(v)),
-    z.number().int().min(0).max(60).nullable(),
-  ),
+  years_experience: z.preprocess((v) => {
+    if (v === "" || v == null) return null;
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(60, Math.max(0, n)) : null;
+  }, z.number().nullable()),
   city: nullableText(120),
   country: nullableText(120),
   nationality: nullableText(120),
@@ -74,7 +97,8 @@ const cvReadingSchema = z.object({
         .filter((row) => {
           const e = row as Record<string, unknown>;
           return Boolean(e.project || e.customer);
-        });
+        })
+        .slice(0, 40);
     },
     z.array(
       z.object({
@@ -84,14 +108,14 @@ const cvReadingSchema = z.object({
         period: z.string().nullable(),
         scope: z.string().nullable(),
       }),
-    ).max(40),
+    ),
   ),
   summary: nullableText(600),
   /** How much of this the CV actually supports. */
-  confidence: z.preprocess(
-    (v) => (v == null ? 50 : Number(v)),
-    z.number().int().min(0).max(100),
-  ),
+  confidence: z.preprocess((v) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50;
+  }, z.number()),
   /** Anything a human should look at before vouching for this person. */
   concerns: listOfStrings,
 });
@@ -179,15 +203,81 @@ If the text is not a CV at all, set role null, confidence 0, and say so in
 concerns.`;
 
 /**
+ * The JSON shape for the profile half — everything except the projects.
+ */
+const PROFILE_SCHEMA = {
+  type: "object",
+  properties: {
+    role: { type: ["string", "null"] },
+    seniority: { type: ["string", "null"] },
+    years_experience: { type: ["integer", "null"] },
+    city: { type: ["string", "null"] },
+    country: { type: ["string", "null"] },
+    nationality: { type: ["string", "null"] },
+    work_authorisation: { type: "array", items: { type: "string" } },
+    visa_notes: { type: ["string", "null"] },
+    skills: { type: "array", items: { type: "string" } },
+    certificates: { type: "array", items: { type: "string" } },
+    languages: { type: "array", items: { type: "string" } },
+    industries: { type: "array", items: { type: "string" } },
+    summary: { type: ["string", "null"] },
+    confidence: { type: "integer" },
+    concerns: { type: "array", items: { type: "string" } },
+  },
+  required: ["role", "skills", "certificates", "confidence"],
+} as const;
+
+const HISTORY_SCHEMA = {
+  type: "object",
+  properties: {
+    work_history: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          customer: { type: ["string", "null"] },
+          project: { type: ["string", "null"] },
+          position: { type: ["string", "null"] },
+          period: { type: ["string", "null"] },
+          scope: { type: ["string", "null"] },
+        },
+      },
+    },
+  },
+  required: ["work_history"],
+} as const;
+
+export interface CvReadResult extends CvReading {
+  /** Which halves failed, in plain words, for the person who uploaded it. */
+  failures: string[];
+}
+
+/**
  * Read a CV and return what a staffing manager would want to know.
  *
- * Never throws. A reading that fails leaves the record as the regex pass left
- * it — thin but honest — rather than blocking the upload.
+ * Two calls, run at the same time, rather than one that does everything.
+ *
+ * Igor Pejkovic's CV is seven pages with twenty-four projects on it, and one
+ * call reading the whole thing took NINETY SECONDS. This route is capped at
+ * sixty, so on Vercel that CV could not have succeeded once — it would be
+ * killed mid-read every time, and all the reader could say afterwards was
+ * "read failed", with no reason and nothing saved beyond an email address.
+ *
+ * Almost all of that time is the model writing output, and the projects are
+ * most of the output. Splitting them means each call writes about half as
+ * much and they overlap, so the wall clock is roughly the slower half rather
+ * than the sum.
+ *
+ * It also makes failure partial instead of total. A CV whose project list is
+ * too long or too strange still yields a role, skills and tickets, and the
+ * upload says which half did not read rather than shrugging.
+ *
+ * Never throws.
  */
 export async function readCv(
   cvText: string,
   alreadyRead: { fullName?: string | null; country?: string | null } = {},
-): Promise<CvReading | null> {
+): Promise<CvReadResult | null> {
   const text = cvText.trim();
   if (text.length < 100) return null;
 
@@ -198,74 +288,75 @@ export async function readCv(
     return null;
   }
 
-  try {
+  // A very long CV costs tokens for pages of references and page furniture;
+  // the first 24k characters carry the working history.
+  const body = [
+    alreadyRead.fullName ? `Name on file: ${alreadyRead.fullName}` : null,
+    alreadyRead.country ? `Country on file: ${alreadyRead.country}` : null,
+    "",
+    "CV TEXT:",
+    text.slice(0, 24_000),
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  async function ask(
+    name: string,
+    schema: unknown,
+    extra: string,
+  ): Promise<Record<string, unknown> | null> {
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      instructions: SYSTEM,
-      // Turn 0 of a Responses call takes a plain string.
-      input: [
-        alreadyRead.fullName ? `Name on file: ${alreadyRead.fullName}` : null,
-        alreadyRead.country ? `Country on file: ${alreadyRead.country}` : null,
-        "",
-        "CV TEXT:",
-        // A very long CV costs tokens for pages of references and page
-        // furniture; the first 24k characters carry the working history.
-        text.slice(0, 24_000),
-      ]
-        .filter((l) => l !== null)
-        .join("\n"),
+      instructions: `${SYSTEM}\n\n${extra}`,
+      input: body,
       text: {
-        format: {
-          type: "json_schema",
-          name: "cv_reading",
-          strict: false,
-          schema: {
-            type: "object",
-            properties: {
-              role: { type: ["string", "null"] },
-              seniority: { type: ["string", "null"] },
-              years_experience: { type: ["integer", "null"] },
-              city: { type: ["string", "null"] },
-              country: { type: ["string", "null"] },
-              nationality: { type: ["string", "null"] },
-              work_authorisation: { type: "array", items: { type: "string" } },
-              visa_notes: { type: ["string", "null"] },
-              skills: { type: "array", items: { type: "string" } },
-              certificates: { type: "array", items: { type: "string" } },
-              languages: { type: "array", items: { type: "string" } },
-              industries: { type: "array", items: { type: "string" } },
-              work_history: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    customer: { type: ["string", "null"] },
-                    project: { type: ["string", "null"] },
-                    position: { type: ["string", "null"] },
-                    period: { type: ["string", "null"] },
-                    scope: { type: ["string", "null"] },
-                  },
-                },
-              },
-              summary: { type: ["string", "null"] },
-              confidence: { type: "integer" },
-              concerns: { type: "array", items: { type: "string" } },
-            },
-            required: ["role", "skills", "certificates", "confidence"],
-          },
-        },
+        format: { type: "json_schema", name, strict: false, schema: schema as never },
       },
     });
-
     const raw = response.output_text?.trim();
-    if (!raw) return null;
+    if (!raw) throw new Error("the model returned nothing");
+    return JSON.parse(raw) as Record<string, unknown>;
+  }
 
-    // safeParse rather than parse: a model that returns a float where an int
-    // belongs should cost one field, not the whole reading.
-    const parsed = cvReadingSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch (err) {
-    console.error("readCv:", err instanceof Error ? err.message : err);
+  const [profile, history] = await Promise.allSettled([
+    ask(
+      "cv_profile",
+      PROFILE_SCHEMA,
+      "For THIS call, return the profile fields only. Do not return work_history.",
+    ),
+    ask(
+      "cv_history",
+      HISTORY_SCHEMA,
+      "For THIS call, return work_history ONLY — nothing else. Every project the CV lists, newest first.",
+    ),
+  ]);
+
+  const failures: string[] = [];
+  if (profile.status === "rejected") {
+    failures.push("the profile (role, skills, tickets) could not be read");
+    console.error("readCv profile:", reasonOf(profile.reason));
+  }
+  if (history.status === "rejected") {
+    failures.push("the project history could not be read");
+    console.error("readCv history:", reasonOf(history.reason));
+  }
+
+  // Both halves gone means there is nothing to save beyond the regex pass.
+  if (profile.status === "rejected" && history.status === "rejected") return null;
+
+  const merged = {
+    ...(profile.status === "fulfilled" ? (profile.value ?? {}) : {}),
+    ...(history.status === "fulfilled" ? (history.value ?? {}) : {}),
+  };
+
+  const parsed = cvReadingSchema.safeParse(merged);
+  if (!parsed.success) {
+    console.error("readCv shape:", parsed.error.issues[0]?.message);
     return null;
   }
+  return { ...parsed.data, failures };
+}
+
+function reasonOf(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
 }

@@ -351,6 +351,9 @@ export async function POST(request: Request) {
     pages: extracted.pages,
     characters: extracted.text.length,
     read: Boolean(reading),
+    // Which half failed, if either did. "Read failed" on its own tells the
+    // person who uploaded it nothing they can act on.
+    readFailures: reading?.failures ?? [],
     name: payload.full_name,
     role: payload.role,
     concerns: payload.concerns,
