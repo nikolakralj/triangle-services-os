@@ -46,6 +46,17 @@ export interface SuggestedJob {
   objective: string;
   /** Why this is on the list, in the CEO's language, with the real number. */
   reason: string;
+  /**
+   * Who or what this is about, for somebody who does not remember.
+   *
+   * "Reach Walther Hartl" means nothing across eighteen projects and a
+   * hundred and seventy-four companies. "Project Manager Electrolysis at
+   * ANDRITZ, on the Salzgitter hydrogen plant" is the same job with the
+   * question answered.
+   */
+  context: string | null;
+  /** What lands when it is done. A button with an unknown result is not pressed. */
+  delivers: string;
   /** Which kind of employee should get it. */
   roleKey: string;
   priority: "urgent" | "high" | "normal" | "low";
@@ -62,7 +73,7 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
     await Promise.all([
     svc
       .from("buyer_contacts")
-      .select("id, full_name, company_name, email, linkedin_url, notes")
+      .select("id, full_name, job_title, company_name, email, linkedin_url, notes, discovered_project_id")
       .eq("organization_id", orgId),
     svc
       .from("discovered_projects")
@@ -134,6 +145,11 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
     for (const f of filed ?? []) filedFor.add(f.assignment_id as string);
   }
 
+  const projectName = new Map<string, string>();
+  for (const p of projects.data ?? []) {
+    projectName.set(p.id as string, (p.project_name as string) ?? "a project");
+  }
+
   const jobs: SuggestedJob[] = [];
   const push = (job: SuggestedJob) => {
     if (!taken.has(job.id)) jobs.push(job);
@@ -151,6 +167,17 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
       title: `Reach ${name}`,
       objective: reachObjective(name, company),
       reason: reachReason(reportedOn, filedFor, c.id as string),
+      context: [
+        c.job_title as string | null,
+        company,
+        c.discovered_project_id
+          ? `on ${projectName.get(c.discovered_project_id as string) ?? "a project"}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || null,
+      delivers:
+        "A phone number, an email or a LinkedIn profile — published, with the page it came from — waiting in Approvals for you to accept. Usually within a day.",
       roleKey: "project_researcher",
       priority: "high",
       kind: "reach",
@@ -188,6 +215,11 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
         "Every link needs a source URL and the line that supports it. File what you find as findings for human review. Do not contact anyone.",
       ].join("\n\n"),
       reason: "No contractor chain — nobody knows who buys here.",
+      context: [p.client_company as string | null, p.country as string | null]
+        .filter(Boolean)
+        .join(" · ") || null,
+      delivers:
+        "The chain from owner to the contractor who actually buys the labour, and a named person there. Filed for you to accept.",
       roleKey: "project_researcher",
       priority: "normal",
       kind: "chain",
@@ -222,6 +254,10 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
         "Do not contact anyone. If the source does not support a field, say so rather than filling it in.",
       ].join("\n\n"),
       reason: `Missing ${gaps.join(", ")} — invisible to sector and country filters.`,
+      context: [p.client_company as string | null, p.country as string | null]
+        .filter(Boolean)
+        .join(" · ") || null,
+      delivers: `The missing ${gaps.join(", ")}, sourced, so this project stops being invisible to every filter.`,
       roleKey: "project_researcher",
       priority: "normal",
       kind: "facts",
@@ -262,6 +298,8 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
         "List what remains unknown in `unknowns` rather than guessing it. Do not contact anyone.",
       ].join("\n\n"),
       reason: `Draft requirement missing ${gaps.join(", ")}.`,
+      context: null,
+      delivers: `Scope, roles, country and duration for this package, so it can be priced and sold rather than guessed at.`,
       roleKey: "project_researcher",
       priority: "high",
       kind: "requirement",
@@ -301,6 +339,12 @@ export async function suggestJobs(orgId: string): Promise<SuggestedJob[]> {
         .filter(Boolean)
         .join("\n\n"),
       reason: `${available.length} confirmed available, none sold into a package.`,
+      context: available
+        .slice(0, 3)
+        .map((w) => `${w.full_name}${w.role ? ` (${w.role})` : ""}`)
+        .join(", "),
+      delivers:
+        "Contractors and agencies currently short of exactly these trades, with a named person at each. Filed for you to accept.",
       roleKey: "project_researcher",
       priority: "high",
       kind: "supply",

@@ -70,6 +70,8 @@ export default async function WorkforcePage() {
           reason: j.reason,
           priority: j.priority,
           kind: j.kind,
+          context: j.context,
+          delivers: j.delivers,
         }))}
         moreUnmapped={moreUnmapped}
       />

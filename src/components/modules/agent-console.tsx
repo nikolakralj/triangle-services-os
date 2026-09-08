@@ -109,6 +109,10 @@ export interface SuggestedJobCard {
   reason: string;
   priority: string;
   kind: string;
+  /** Who this is about, for somebody who does not remember the name. */
+  context: string | null;
+  /** What lands when it is done, and roughly when. */
+  delivers: string;
 }
 
 export function AgentConsole({
@@ -138,7 +142,18 @@ export function AgentConsole({
   moreUnmapped: number;
 }) {
   const router = useRouter();
+  // Anything still with an employee comes first; a finished job is history.
+  const outCount = assignments.filter(
+    (a) => a.status === "queued" || a.status === "active",
+  ).length;
+  const ordered = [...assignments].sort((a, b) => {
+    const out = (x: Assignment) => (x.status === "queued" || x.status === "active" ? 0 : 1);
+    const byState = out(a) - out(b);
+    if (byState !== 0) return byState;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
   const [queuingJob, setQueuingJob] = useState<string | null>(null);
+  const [handedOff, setHandedOff] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
   const [showBlankForm, setShowBlankForm] = useState(false);
 
@@ -158,6 +173,7 @@ export function AgentConsole({
         setJobError(data.error ?? "Could not hand that out.");
         return;
       }
+      setHandedOff(jobId);
       router.refresh();
     } catch {
       setJobError("Network error.");
@@ -395,6 +411,14 @@ export function AgentConsole({
             written — you decide what the company does next.
           </p>
 
+          {handedOff && !jobError && (
+            <p className="mt-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900">
+              Handed out. It is in <strong>What you handed out</strong> below —
+              you will see the answer there when it lands, and nothing is sent
+              to anyone in the meantime.
+            </p>
+          )}
+
           {jobError && (
             <p className="mt-2 flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -408,9 +432,19 @@ export function AgentConsole({
                 key={job.id}
                 className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
               >
+                {/* "Reach Walther Hartl" means nothing across eighteen
+                    projects. Who he is, why it matters, and what actually
+                    lands when the job is done — otherwise this is a button
+                    with an unknown result, and it does not get pressed. */}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-slate-900">{job.title}</p>
+                  {job.context && (
+                    <p className="mt-0.5 text-xs text-slate-700">{job.context}</p>
+                  )}
                   <p className="mt-0.5 text-xs text-slate-500">{job.reason}</p>
+                  <p className="mt-1 text-xs text-sky-800">
+                    <span className="font-medium">You get back:</span> {job.delivers}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {(job.priority === "high" || job.priority === "urgent") && (
@@ -585,16 +619,27 @@ export function AgentConsole({
         </div>
       )}
 
-      {/* Assignments */}
+      {/* What you handed out.
+          //
+          // "Where can I find this result as CEO?" — it was here all along,
+          // in a list called Assignments, below fifteen finished ones, in
+          // creation order. Nothing connected the button to the answer. It is
+          // now named after the act that produces it and sorted so anything
+          // still out is at the top. */}
       <div className="rounded-xl border border-slate-200 bg-white">
-        <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
-          Assignments
-        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">What you handed out</p>
+          <p className="text-xs text-slate-500">
+            {outCount > 0
+              ? `${outCount} still out · ${assignments.length - outCount} came back`
+              : `${assignments.length} came back — nothing is out right now`}
+          </p>
+        </div>
         {assignments.length === 0 ? (
           <p className="p-4 text-sm text-slate-500">No assignments yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {assignments.map((a) => {
+            {ordered.map((a) => {
               const badge = ASSIGNMENT_BADGE[a.status];
               return (
                 <li key={a.id} className="px-4 py-3">
