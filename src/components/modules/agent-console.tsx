@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -628,7 +629,16 @@ export function AgentConsole({
           // still out is at the top. */}
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          <p className="text-sm font-semibold text-slate-900">What you handed out</p>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">What you handed out</p>
+            <p className="text-xs text-slate-500">
+              The full record. New answers arrive on the{" "}
+              <Link href="/decisions" className="font-medium text-sky-700 hover:text-sky-900">
+                Decision Inbox
+              </Link>
+              .
+            </p>
+          </div>
           <p className="text-xs text-slate-500">
             {outCount > 0
               ? `${outCount} still out · ${assignments.length - outCount} came back`
@@ -684,12 +694,25 @@ export function AgentConsole({
                       )}
                     </div>
                   </div>
+                  {/* Folded, because the same report is now open on the
+                      Decision Inbox — the page a CEO actually opens. Rendering
+                      it in full here as well made one answer look like two
+                      places to check, which is the thing that made this a
+                      mess in the first place.
+                      //
+                      This page is the archive: who did what, when, and how it
+                      ended. Open one when you want to reread it. */}
                   {a.resultSummary && (
-                    <AgentReport
-                      text={a.resultSummary}
-                      authorName={called(a.agentInstanceId)}
-                      authorEmoji={face(a.agentInstanceId)}
-                    />
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-medium text-sky-700 hover:text-sky-900">
+                        Read the report
+                      </summary>
+                      <AgentReport
+                        text={a.resultSummary}
+                        authorName={called(a.agentInstanceId)}
+                        authorEmoji={face(a.agentInstanceId)}
+                      />
+                    </details>
                   )}
                   {a.status !== "cancelled" && (
                     <AssignmentThread

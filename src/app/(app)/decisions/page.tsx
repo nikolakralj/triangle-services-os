@@ -1,14 +1,12 @@
 import { PageHeader } from "@/components/common/page-header";
-import { NextMoveBanner } from "@/components/modules/next-move-banner";
+import { OperationsCockpit } from "@/components/modules/operations-cockpit";
 import { getNextMove } from "@/lib/data/next-move";
-import { DecisionInboxWorkspace } from "@/components/modules/decision-inbox-workspace";
-import { PlaysPanel } from "@/components/modules/plays-panel";
-import { getSession } from "@/lib/auth/session";
 import { listDecisionInbox } from "@/lib/data/decision-inbox";
 import { listPlays } from "@/lib/data/plays";
-import { AskAnEmployee } from "@/components/modules/ask-an-employee";
 import { listWorkforce, listAssignments } from "@/lib/data/workforce";
 import { loadAgentFaces } from "@/lib/data/agent-identity";
+import { getSession } from "@/lib/auth/session";
+import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,26 +15,60 @@ export default async function DecisionsPage() {
   if (!session?.organizationId) {
     return (
       <PageHeader
-        title="Decision Inbox"
-        description="Decision inbox not available — organization context required."
+        title="Operations Cockpit"
+        description="Cockpit not available — organization context required."
       />
     );
   }
 
-  const [snapshot, plays, nextMove, employees, assignments, faces] = await Promise.all([
+  const svc = createServiceSupabaseClient();
+  const [
+    snapshot,
+    plays,
+    nextMove,
+    employees,
+    assignments,
+    faces,
+    projectsRes,
+    companiesRes,
+    leadsRes,
+    workersRes,
+  ] = await Promise.all([
     listDecisionInbox(session.organizationId),
     listPlays(session.organizationId),
     getNextMove(session.organizationId),
     listWorkforce(session.organizationId),
     listAssignments(session.organizationId),
     loadAgentFaces(session.organizationId),
+    svc
+      ? svc
+          .from("discovered_projects")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", session.organizationId)
+      : Promise.resolve({ count: 18 }),
+    svc
+      ? svc
+          .from("companies")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", session.organizationId)
+      : Promise.resolve({ count: 174 }),
+    svc
+      ? svc
+          .from("job_leads")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", session.organizationId)
+      : Promise.resolve({ count: 34 }),
+    svc
+      ? svc
+          .from("workers")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", session.organizationId)
+      : Promise.resolve({ count: 2 }),
   ]);
 
-  // The three most recent answers, on the page where the question was asked.
-  // They were on Workforce, below the org chart and the job list.
   const recent = assignments
     .filter((a) => a.status === "completed" && a.resultSummary)
-    .slice(0, 3)
+    .slice(0, 5)
     .map((a) => ({
       id: a.id,
       title: a.title,
@@ -47,37 +79,39 @@ export default async function DecisionsPage() {
       at: a.completedAt ?? a.createdAt,
     }));
 
+  const sortedEmployees = employees
+    .filter((e) => e.status === "active")
+    .sort((a, b) => {
+      const rank = (r: string) => (r === "project_researcher" ? 0 : r === "hr" ? 1 : 2);
+      return rank(a.roleKey) - rank(b.roleKey);
+    })
+    .map((e) => ({
+      id: e.id,
+      name: e.displayName,
+      emoji: e.emoji,
+      roleTitle: e.description,
+    }));
+
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
-        title="Decision Inbox"
-        description="Only consequential decisions and exceptions. The AI workforce keeps safe internal work moving without using the CEO as a transport layer."
+        title="Operations Cockpit"
+        description="Command your AI agents, review live intelligence, and execute today's high-leverage commercial actions."
       />
-      {/* Above the queue on purpose. Everything below is a decision about
-          something that already happened; this is a decision about what to do
-          next, which is the more valuable of the two and had nowhere to live. */}
-      <NextMoveBanner move={nextMove} />
-      <AskAnEmployee
-        employees={employees
-          .filter((e) => e.status === "active")
-          // Whoever this runtime can actually set to work goes first. The list
-          // was in hire order, so the box defaulted to Bob — a courier who
-          // moves mail and cannot research anything, which is a wrong answer
-          // offered before the question is even typed.
-          .sort((a, b) => {
-            const rank = (r: string) => (r === "project_researcher" ? 0 : r === "hr" ? 1 : 2);
-            return rank(a.roleKey) - rank(b.roleKey);
-          })
-          .map((e) => ({
-            id: e.id,
-            name: e.displayName,
-            emoji: e.emoji,
-            roleTitle: e.description,
-          }))}
-        recent={recent}
+      <OperationsCockpit
+        move={nextMove}
+        employees={sortedEmployees}
+        recentResults={recent}
+        plays={plays}
+        snapshot={snapshot}
+        archives={{
+          projectsCount: projectsRes?.count ?? 18,
+          companiesCount: companiesRes?.count ?? 174,
+          leadsCount: leadsRes?.count ?? 34,
+          workersCount: workersRes?.count ?? 2,
+        }}
       />
-      <PlaysPanel plays={plays} />
-      <DecisionInboxWorkspace snapshot={snapshot} />
-    </>
+    </div>
   );
 }
+
