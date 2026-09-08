@@ -283,6 +283,19 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
     return refuseUnknownAssignment(assignment, "a play with no case type");
   }
 
+  // Neither does a question somebody typed into the cockpit. "Find HVAC
+  // subcontractors in Frankfurt" has no company attached and never will, and
+  // the qualifier throws on it — which is what happened the first time the new
+  // command bar was used: the job ran, failed in nine seconds, and the whole
+  // promise of asking an employee in plain language died on it.
+  //
+  // A brief with no case entity is an open research question. That is a
+  // legitimate kind of work, not an error, and it needs its own handler rather
+  // than a refusal.
+  if (caseType === null && !(await hasCompanyAttached(assignment))) {
+    return runOpenResearchAssignment(assignment);
+  }
+
   const startedAt = new Date();
   const model = getScoutModelId();
   try {
@@ -652,4 +665,124 @@ async function refuseUnknownAssignment(
   });
 
   return { status: "refused", assignmentId: assignment.id, reason };
+}
+
+// ---------------------------------------------------------------------------
+
+/** Is there a company on this assignment's case, or is it an open question? */
+async function hasCompanyAttached(assignment: ClaimedAssignment): Promise<boolean> {
+  const service = createServiceSupabaseClient();
+  if (!service) return false;
+  const { data } = await service
+    .from("agent_assignment_entities")
+    .select("entity_id")
+    .eq("org_id", assignment.orgId)
+    .eq("assignment_id", assignment.id)
+    .eq("entity_type", "company")
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * A question typed in plain language, answered in the same shape as everything
+ * else so it renders as a manager report rather than a wall of prose.
+ *
+ * The brief is the whole input. Triangle's own operating profile goes with it,
+ * because "find contractors who need what we sell" is unanswerable without
+ * knowing what Triangle sells, and the supply-first rule in the constitution
+ * is not optional here — an answer naming forty electricians Triangle does not
+ * have is worse than no answer.
+ */
+async function runOpenResearchAssignment(
+  assignment: ClaimedAssignment,
+): Promise<ScoutWorkResult> {
+  const startedAt = new Date();
+  const model = getScoutModelId();
+  try {
+    const [profile, workers] = await Promise.all([
+      getOrganizationOperatingProfile(assignment.orgId),
+      listAvailableSupply(assignment.orgId),
+    ]);
+
+    const agent = createScoutQualificationAgent();
+    const result = await agent.generate({
+      prompt: [
+        "Answer this question for the commercial manager. It is an open research brief, not a company case.",
+        "Do not invent a company case around it, and do not return a list of links.",
+        "Name real organisations and, wherever the evidence allows, a real person who buys subcontract labour there — a company with no named person and no published channel is UNREACHABLE and must be reported as such rather than presented as an opportunity.",
+        "Ground every recommendation in who Triangle can actually supply. If the answer requires people Triangle does not have, say so plainly; that is the useful answer.",
+        "",
+        `THE BRIEF:\n${assignment.objective}`,
+        "",
+        `WHO TRIANGLE IS:\n${JSON.stringify(profile, null, 2)}`,
+        "",
+        `WHO TRIANGLE CAN SUPPLY RIGHT NOW:\n${JSON.stringify(workers, null, 2)}`,
+      ].join("\n"),
+    });
+    if (!result.output) throw new Error("Scout returned no structured report");
+
+    const report = result.output;
+    await addAgentMessage({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      body: `Answered: ${report.headline}`,
+    });
+
+    const completed = await completeAssignment({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      resultSummary: serializeScoutCaseReport(report),
+    });
+    if (typeof completed === "object" && "refused" in completed) {
+      throw new Error(completed.refused);
+    }
+    if (!completed) throw new Error("Assignment changed before Scout could submit it");
+
+    await logAgentRun({
+      orgId: assignment.orgId,
+      agentName: "Scout",
+      source: "in_app_executor",
+      summary: {
+        assignmentId: assignment.id,
+        status: "completed",
+        kind: "open_research",
+        durationMs: Date.now() - startedAt.getTime(),
+        model,
+      },
+      agentInstanceId: assignment.agentInstanceId,
+      assignmentId: assignment.id,
+      provider: "openai",
+      model,
+      status: "completed",
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+    });
+
+    return { status: "completed", assignmentId: assignment.id, headline: report.headline };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Research failed";
+    await completeAssignment({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      resultSummary: `Scout could not answer this: ${message}`,
+      failed: true,
+    });
+    return { status: "failed", assignmentId: assignment.id, error: message };
+  }
+}
+
+/** The bench, as the constitution's supply-first rule requires it to be read. */
+async function listAvailableSupply(orgId: string) {
+  const service = createServiceSupabaseClient();
+  if (!service) return [];
+  const { data } = await service
+    .from("workers")
+    .select("full_name, role, status, country, nationality, work_authorisation, skills, industries, availability_status")
+    .eq("organization_id", orgId)
+    .neq("status", "blacklisted")
+    .limit(50);
+  return data ?? [];
 }

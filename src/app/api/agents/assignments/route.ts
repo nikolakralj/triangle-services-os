@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     dueAt?: string;
     workerIds?: string[];
     projectId?: string;
+    constraints?: Record<string, unknown>;
   };
   try {
     body = await request.json();
@@ -68,6 +69,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // Constraints were never read here, so every assignment written from a
+  // screen was stored with `constraints: {}` — and the unattended runner only
+  // claims rows whose constraints contain execution_mode in_app or bot. An
+  // empty object matches neither, so anything a human typed into the app sat
+  // queued for ever, unclaimable, while work created by accepting a finding
+  // (which sets its own constraints) ran normally. That is why the cockpit's
+  // Run Now created the job and nothing happened.
+  //
+  // A person typing into a screen and waiting is the definition of in_app, so
+  // that is the default. An explicit value still wins, for work meant for the
+  // provider bot.
+  const constraints = {
+    execution_mode: "in_app",
+    ...(body.constraints && typeof body.constraints === "object"
+      ? body.constraints
+      : {}),
+  };
+
   const dueAt = body.dueAt ? new Date(body.dueAt) : null;
   const created = await createAssignment({
     orgId: access.organizationId,
@@ -75,6 +94,7 @@ export async function POST(request: Request) {
     title,
     objective,
     priority,
+    constraints,
     dueAt: dueAt && !isNaN(dueAt.getTime()) ? dueAt.toISOString() : null,
     projectId: body.projectId ? String(body.projectId) : null,
     workerIds: Array.isArray(body.workerIds)
