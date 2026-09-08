@@ -87,14 +87,41 @@ function firstNonEmptyLine(value: string): string {
     .find(Boolean) ?? "";
 }
 
+/**
+ * Pull the cited links out of a report written as prose.
+ *
+ * `new URL()` used to be called here bare, and it THROWS on anything the regex
+ * matched that is not a real URL — a bare "https://", a link the model cut off
+ * mid-word, a trailing unicode ellipsis from its own truncation. This function
+ * runs inside a React render (AgentReport), so that throw took down the whole
+ * Cockpit with "Failed to construct 'URL': Invalid URL" and the CEO lost the
+ * page, not just the one card.
+ *
+ * Model output is untrusted input. Nothing derived from it may be allowed to
+ * throw on a render path: a malformed link is dropped, and the rest of the
+ * report still renders.
+ */
 function extractUrls(value: string): ScoutCaseReport["sources"] {
   const urls = Array.from(new Set(value.match(/https?:\/\/[^\s)]+/g) ?? []));
-  return urls.map((url) => ({
-    url: url.replace(/[.,;]+$/, ""),
-    title: new URL(url.replace(/[.,;]+$/, "")).hostname.replace(/^www\./, ""),
-    claim: "Source cited in the worker report.",
-    quote: null,
-  }));
+  const sources: ScoutCaseReport["sources"] = [];
+  for (const raw of urls) {
+    // Trailing punctuation and the ellipsis the truncator leaves behind.
+    const cleaned = raw.replace(/[.,;…]+$/, "");
+    let hostname: string;
+    try {
+      hostname = new URL(cleaned).hostname;
+    } catch {
+      continue;
+    }
+    if (!hostname) continue;
+    sources.push({
+      url: cleaned,
+      title: hostname.replace(/^www\./, ""),
+      claim: "Source cited in the worker report.",
+      quote: null,
+    });
+  }
+  return sources;
 }
 
 function parseLegacyReport(value: string): ScoutCaseReport | null {
@@ -203,7 +230,15 @@ export function parseScoutCaseReport(value: string | null): ScoutCaseReport | nu
   } catch {
     // Older agents returned a readable sectioned brief. Keep those useful.
   }
-  return parseLegacyReport(value);
+  try {
+    return parseLegacyReport(value);
+  } catch {
+    // The legacy path was outside the catch above, so anything it threw while
+    // parsing a model's prose escaped into a React render and blanked the
+    // page. A report this function cannot read is worth losing; the screen
+    // around it is not.
+    return null;
+  }
 }
 
 export function serializeScoutCaseReport(report: ScoutCaseReport): string {
