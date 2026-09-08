@@ -74,7 +74,12 @@ export async function POST(request: Request) {
     objective: job.objective,
     priority: job.priority,
     expectedOutput: null,
-    constraints: { ...job.constraints, suggestion_id: job.id },
+    // Handed out by a human, in the app, on purpose — so this runtime owns it
+    // immediately. It used to inherit execution_mode "bot", which gives the
+    // Grok bot first refusal for six hours before the in-app executor may
+    // touch it. That is right for work Triangle generates on a schedule and
+    // wrong for a person clicking a button and waiting for an answer.
+    constraints: { ...job.constraints, suggestion_id: job.id, execution_mode: "in_app" },
     idempotencyKey: attempt.key,
     entityRefs: job.entityRefs.map((e) => ({
       type: e.type as "company" | "worker" | "project" | "contact" | "other",
