@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
+  ArrowUpRight,
   Check,
   Copy,
+  CornerDownLeft,
   Loader2,
   Mail,
   Phone,
-  Send,
-  Trash2,
 } from "lucide-react";
 import type { NextMove, NextMoveAction } from "@/lib/data/next-move";
 import type { CameBackItem } from "@/lib/data/came-back";
@@ -18,20 +17,25 @@ import { telHref } from "@/lib/data/contact-channels";
 import { AgentReport } from "@/components/modules/agent-report";
 
 // ---------------------------------------------------------------------------
-// One screen. Three zones. Numbered because it is a real order, not decoration.
+// One screen. Three zones. Numbered because it is a real order on the page.
 //
-//   01  NOW              exactly one card — the single highest-leverage action
-//   02  ASK              type it, it runs, the answer appears underneath
-//   03  BACK FROM THE TEAM   every item is a decision, not a report
+//   01  NOW     the hero — one action, the only thing in colour
+//   02  ASK     a console line: type, it answers underneath
+//   03  BACK    a tight list with a state rail, not a stack of cards
 //
-// Replaces the Operations Cockpit, the Workforce hand-out list, "What you
-// handed out", the Agent Desk and its four tabs. All of those showed the same
-// event in four vocabularies and offered, at the end, a "Done" button wired to
-// `setDrawerItem(null)`.
+// The first version of this worked and looked like every admin panel: one
+// border radius, one shadow, one text size, white cards on a white page. Same
+// weight for the one thing that matters today and for a row of history.
 //
-// "So I am handing out in Workforce and then I see details in Cockpit and also
-// Workforce ... it is so confusing." Chasing one lead took eight steps across
-// three pages and recorded nothing. Here it takes one.
+// Hierarchy is the whole job here. The NOW card is the only saturated surface
+// on the page; ASK is a single deep input; BACK is rows on the page ground
+// with a coloured rail carrying the state. Everything else is quiet so those
+// three read in order at a glance.
+//
+// Type is Geist and Geist Mono, already the app's faces. Mono is used only
+// where the content is data a human will copy or dial — addresses, numbers,
+// the prepared words — which is also what makes the script look like a
+// document rather than a paragraph.
 // ---------------------------------------------------------------------------
 
 interface Employee {
@@ -43,7 +47,6 @@ interface Employee {
 
 export function TodayScreen({
   move,
-  employees,
   cameBack,
   counts,
 }: {
@@ -52,38 +55,41 @@ export function TodayScreen({
   cameBack: CameBackItem[];
   counts: { projects: number; companies: number; leads: number; people: number };
 }) {
+  const decisions = cameBack.filter((i) => i.state !== null);
+  const older = cameBack.filter((i) => i.state === null);
+
   return (
-    <div className="space-y-5">
-      <Zone n="01" name="Now" note="one card — the rest can wait">
+    <div className="space-y-7">
+      <Zone n="01" name="Now" note="one action — the rest can wait">
         <NowCard move={move} />
       </Zone>
 
-      <Zone n="02" name="Ask" note="runs immediately, answers here">
-        <AskBox employees={employees} />
+      <Zone n="02" name="Ask" note="answers here, in about a minute">
+        <AskConsole />
       </Zone>
 
       <Zone
         n="03"
         name="Back from the team"
-        note={noteFor(cameBack)}
+        note={
+          decisions.length === 0
+            ? "nothing to decide"
+            : `${decisions.length} to decide`
+        }
       >
-        <CameBackList items={cameBack} />
+        <CameBackList decisions={decisions} older={older} />
       </Zone>
 
-      <p className="px-1 text-xs text-slate-400">
-        On file: {counts.people} people · {counts.projects} projects ·{" "}
-        {counts.companies} companies · {counts.leads} inbound requisitions.
+      {/* What is on file but not on the path to an order. Requisitions are
+          deliberately not repeated here — the strip above already draws them,
+          and printing the same number twice in two idioms is how the old
+          screen ended up saying everything four times. */}
+      <p className="border-t border-slate-200/80 pt-3 font-mono text-[11px] tracking-wide text-slate-400">
+        on file · {counts.people} people · {counts.projects} projects ·{" "}
+        {counts.companies} companies
       </p>
     </div>
   );
-}
-
-/** How many of these actually need an answer, as opposed to sitting in history. */
-function noteFor(items: CameBackItem[]): string {
-  const decisions = items.filter((i) => i.state !== null).length;
-  if (items.length === 0) return "nothing waiting";
-  if (decisions === 0) return "nothing to decide";
-  return `${decisions} to decide`;
 }
 
 function Zone({
@@ -99,14 +105,15 @@ function Zone({
 }) {
   return (
     <section>
-      <div className="mb-1.5 flex items-baseline gap-2 px-1">
-        <span className="font-mono text-[11px] font-semibold tracking-widest text-sky-700">
+      <div className="mb-2 flex items-baseline gap-2.5">
+        <span className="font-mono text-[11px] font-medium tabular-nums text-sky-600">
           {n}
         </span>
-        <h2 className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
           {name}
         </h2>
-        <span className="text-xs text-slate-400">— {note}</span>
+        <span className="h-px grow bg-slate-200" />
+        <span className="text-[11px] text-slate-400">{note}</span>
       </div>
       {children}
     </section>
@@ -118,21 +125,26 @@ function Zone({
 function NowCard({ move }: { move: NextMove }) {
   if (move.clear || !move.action) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <p className="text-sm font-semibold text-slate-900">{move.headline}</p>
-        <p className="mt-1 text-sm text-slate-600">{move.because}</p>
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center">
+        <p className="text-base font-semibold text-slate-900">{move.headline}</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{move.because}</p>
       </div>
     );
   }
   return (
-    <div className="rounded-xl bg-slate-950 p-5 text-slate-100">
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-emerald-400">
-        Highest commercial leverage
-      </p>
-      <h3 className="mt-2 text-lg font-semibold leading-snug text-white">
-        {move.headline}
-      </h3>
-      <p className="mt-1 text-sm text-slate-400">{move.because}</p>
+    <div className="overflow-hidden rounded-2xl bg-slate-950 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5">
+      <div className="px-6 pt-6">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
+          Highest commercial leverage
+        </p>
+        {/* The one piece of large type on the page. */}
+        <h3 className="mt-2.5 max-w-2xl text-[22px] font-semibold leading-[1.2] tracking-[-0.02em] text-white">
+          {move.headline}
+        </h3>
+        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-slate-400">
+          {move.because}
+        </p>
+      </div>
       <ActionPanel action={move.action} />
     </div>
   );
@@ -141,10 +153,10 @@ function NowCard({ move }: { move: NextMove }) {
 /**
  * Dial, copy, then log what happened.
  *
- * Carried over unchanged from the cockpit: the one part of that screen that
+ * Behaviour carried over from the cockpit: the one part of that screen that
  * did the right thing. The CEO's maximum effort is a copied email or picking
- * up the phone, and the three outcome buttons are the whole of the contact
- * history — no stages, no scores, no forms.
+ * up the phone, and the three outcomes are the whole of the contact history —
+ * no stages, no scores, no forms.
  */
 function ActionPanel({ action }: { action: NextMoveAction }) {
   const router = useRouter();
@@ -187,17 +199,23 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
   }
 
   return (
-    <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs text-slate-300">{action.value}</span>
+    <div className="mt-5">
+      {/* The channel bar — the thing you act on, lifted out of the prose. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-white/10 bg-white/[0.04] px-6 py-3">
+        {isPhone ? (
+          <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+        ) : (
+          <Mail className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+        )}
+        <span className="font-mono text-[13px] text-slate-100">{action.value}</span>
         <span className="text-[11px] text-slate-500">{action.whose}</span>
         <span className="grow" />
         {isPhone ? (
           <a
             href={telHref(action.value)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-emerald-950 transition hover:bg-emerald-400"
           >
-            <Phone className="h-3 w-3" />
+            <Phone className="h-3.5 w-3.5" />
             Dial
           </a>
         ) : (
@@ -205,9 +223,9 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
             href={`mailto:${action.value}${
               action.subject ? `?subject=${encodeURIComponent(action.subject)}` : ""
             }${action.script ? `&body=${encodeURIComponent(action.script)}` : ""}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
           >
-            <Mail className="h-3 w-3" />
+            <Mail className="h-3.5 w-3.5" />
             Open mail
           </a>
         )}
@@ -223,213 +241,364 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
                 setError("Could not reach the clipboard.");
               }
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3.5 py-2 text-[13px] font-medium text-slate-200 transition hover:bg-white/10"
           >
             {copied ? (
-              <Check className="h-3 w-3 text-emerald-400" />
+              <Check className="h-3.5 w-3.5 text-emerald-400" />
             ) : (
-              <Copy className="h-3 w-3" />
+              <Copy className="h-3.5 w-3.5" />
             )}
             {copied ? "Copied" : "Copy pitch"}
           </button>
         )}
       </div>
 
-      {action.offering && (
-        <div className="rounded-lg border border-sky-900 bg-sky-950/50 p-3">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-sky-300">
-            Who we put forward
-          </p>
-          <p className="mt-0.5 text-sm font-semibold text-white">
-            {action.offering.name}
-            {action.offering.role ? ` · ${action.offering.role}` : ""}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-300">
-            {action.offering.why}
-          </p>
-          {action.offering.caveats.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {action.offering.caveats.map((c) => (
-                <span
-                  key={c}
-                  className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
-                >
-                  {c}
+      <div className="space-y-4 px-6 py-5">
+        {action.offering && (
+          <div>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-400">
+              Who we put forward
+            </p>
+            <p className="mt-1.5 text-[15px] font-semibold text-white">
+              {action.offering.name}
+              {action.offering.role && (
+                <span className="ml-2 text-[13px] font-normal text-slate-400">
+                  {action.offering.role}
                 </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+              )}
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
+              {action.offering.why}
+            </p>
+            {/* What is NOT known about them, before it is offered to a buyer. */}
+            {action.offering.caveats.length > 0 && (
+              <ul className="mt-2.5 space-y-1">
+                {action.offering.caveats.map((c) => (
+                  <li
+                    key={c}
+                    className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
+                  >
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
-      {action.script && (
-        <div className="whitespace-pre-line rounded-lg bg-slate-900 p-3 font-mono text-xs leading-relaxed text-slate-300">
-          {action.script}
-        </div>
-      )}
+        {/* The prepared words, set as a document rather than a paragraph. */}
+        {action.script && (
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 font-mono text-[12.5px] leading-[1.75] text-slate-300">
+            {action.script}
+          </pre>
+        )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-slate-500">
-          Then
-        </span>
-        <input
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="What happened? (optional)"
-          className="h-7 min-w-0 grow rounded border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 placeholder-slate-600 focus:border-slate-500 focus:outline-none"
-        />
-        {(
-          [
-            ["reached", "Got through", "bg-emerald-900/60 border-emerald-700 text-emerald-200"],
-            ["no_answer", "No answer", "bg-slate-800 border-slate-600 text-slate-200"],
-            ["dead_end", "Dead end", "bg-rose-950/60 border-rose-800 text-rose-200"],
-          ] as const
-        ).map(([outcome, label, cls]) => (
-          <button
-            key={outcome}
-            type="button"
-            disabled={logging !== null}
-            onClick={() => log(outcome)}
-            className={`inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-semibold disabled:opacity-40 ${cls}`}
-          >
-            {logging === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-            {label}
-          </button>
-        ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="What happened? (optional)"
+            className="h-9 min-w-[12rem] grow rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[13px] text-slate-200 placeholder-slate-600 transition focus:border-white/25 focus:bg-white/[0.07] focus:outline-none"
+          />
+          {/* One segmented control, not three loose buttons. */}
+          <div className="flex overflow-hidden rounded-lg border border-white/15">
+            {(
+              [
+                ["reached", "Got through", "hover:bg-emerald-500/20 text-emerald-300"],
+                ["no_answer", "No answer", "hover:bg-white/10 text-slate-300"],
+                ["dead_end", "Dead end", "hover:bg-rose-500/20 text-rose-300"],
+              ] as const
+            ).map(([outcome, label, cls], i) => (
+              <button
+                key={outcome}
+                type="button"
+                disabled={logging !== null}
+                onClick={() => log(outcome)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium transition disabled:opacity-40 ${cls} ${
+                  i > 0 ? "border-l border-white/15" : ""
+                }`}
+              >
+                {logging === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {error && <p className="text-[13px] text-rose-400">{error}</p>}
+        {action.history.length > 0 && (
+          <p className="text-[11px] text-slate-500">
+            {action.history.length}{" "}
+            {action.history.length === 1 ? "attempt" : "attempts"} already recorded —
+            last was{" "}
+            {/* A null outcome means nobody wrote down how it went. Not the
+                same as any of the three, so it is not dressed up as one. */}
+            {action.history[0].outcome
+              ? action.history[0].outcome.replace("_", " ")
+              : "not written down"}
+            .
+          </p>
+        )}
       </div>
-      {error && <p className="text-xs text-rose-400">{error}</p>}
-      {action.history.length > 0 && (
-        <p className="text-[11px] text-slate-500">
-          {action.history.length}{" "}
-          {action.history.length === 1 ? "attempt" : "attempts"} already recorded —
-          last was{" "}
-          {/* A null outcome means nobody wrote down how it went. That is not
-              the same as any of the three outcomes, so it is not dressed up
-              as one. */}
-          {action.history[0].outcome
-            ? action.history[0].outcome.replace("_", " ")
-            : "not written down"}
-          .
-        </p>
-      )}
     </div>
   );
 }
 
 // ── 02 · ASK ────────────────────────────────────────────────────────────────
 
+interface AskAnswer {
+  by: string;
+  emoji: string;
+  kind: "talent" | "research" | "refused" | "failed" | "queued";
+  answer: string;
+  people?: Array<{ id: string; name: string; role: string | null; status: string }>;
+  partners?: Array<{ id: string; name: string; trades: string[]; crewSize: number | null }>;
+  blockers?: string[];
+  missing?: string[];
+  state?: "reachable" | "one_thing_missing" | "dead" | null;
+  person?: string | null;
+  door?: string | null;
+  words?: string | null;
+  missingFact?: string | null;
+  missingOwner?: string | null;
+  deadReason?: string | null;
+  wasAnotherJob?: boolean;
+  otherTitle?: string | null;
+}
+
+const EXAMPLES = [
+  "Find HVAC and EPC contractors in Frankfurt needing subcontractors",
+  "Two best electrical supervisors for a steel job in the USA",
+  "Match our bench to the open g2 requisitions",
+];
+
 /**
- * One box. No employee to choose.
+ * One line. No employee to choose.
  *
- * The old dispatch bar made the CEO pick Scout or Hanna from a dropdown before
- * typing, which is asking him to know the org chart to ask a question. The
- * brief itself says which of them it is: anything about our own people is
- * Hanna's, anything about the market is Scout's.
+ * The dispatch bar made the CEO pick Scout or Hanna from a dropdown before
+ * typing, which asks him to know the org chart to ask a question. The routing
+ * is server-side now, because it depends on what each employee can actually
+ * do — the browser-side version created work for Hanna that `run-now` never
+ * ran, so the box said "handed out" and nothing happened.
  */
-function AskBox({ employees }: { employees: Employee[] }) {
+function AskConsole() {
   const router = useRouter();
-  const [brief, setBrief] = useState("");
-  const [stage, setStage] = useState<"idle" | "sending" | "working">("idle");
-  const [answer, setAnswer] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState<AskAnswer | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const scout = employees.find((e) => /scout/i.test(e.name)) ?? employees[0];
-  const hanna = employees.find((e) => /hanna/i.test(e.name)) ?? scout;
-
-  /** Whose question is this? Our own people, or the market. */
-  function route(text: string): Employee {
-    const ours =
-      /\b(our|we have|bench|roster|pool|worker|crew|cv|available|visa|passport|certificate|supervisor|engineer)\b/i.test(
-        text,
-      );
-    const market = /\b(find|contractor|epc|tender|project|buyer|company|market)\b/i.test(
-      text,
-    );
-    return ours && !market ? hanna : scout;
-  }
-
-  async function ask(e: React.FormEvent) {
-    e.preventDefault();
-    const text = brief.trim();
-    if (text.length < 8 || stage !== "idle") return;
-    const who = route(text);
+  async function ask(text: string) {
+    if (text.trim().length < 8 || busy) return;
+    setBusy(true);
     setError(null);
     setAnswer(null);
-    setStage("sending");
     try {
-      const created = await fetch("/api/agents/assignments", {
+      const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentInstanceId: who.id,
-          title: text.split("\n")[0].slice(0, 120),
-          objective: text,
-          priority: "high",
-          constraints: { execution_mode: "in_app", case_type: "open_research" },
-        }),
+        body: JSON.stringify({ question: text.trim() }),
       });
-      const createdBody = (await created.json().catch(() => ({}))) as {
+      const body = (await res.json().catch(() => ({}))) as AskAnswer & {
         error?: string;
       };
-      if (!created.ok) {
-        setError(createdBody.error ?? "Could not hand that out.");
-        setStage("idle");
+      if (!res.ok) {
+        setError(body.error ?? "That did not work.");
         return;
       }
-
-      setStage("working");
-      const ran = await fetch("/api/agents/run-now", { method: "POST" });
-      const ranBody = (await ran.json().catch(() => ({}))) as {
-        message?: string;
-        error?: string;
-      };
-      setAnswer(
-        ran.ok
-          ? (ranBody.message ?? "Done — it is in Back from the team below.")
-          : `Queued, but it could not run now: ${ranBody.error ?? "unknown reason"}.`,
-      );
-      setBrief("");
+      setAnswer(body);
+      setQ("");
       router.refresh();
     } catch {
       setError("Network error.");
     } finally {
-      setStage("idle");
+      setBusy(false);
     }
   }
 
-  const who = brief.trim().length >= 8 ? route(brief) : null;
-
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <form onSubmit={ask} className="flex flex-wrap items-center gap-2">
+    <div className="rounded-2xl border border-slate-200 bg-white">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void ask(q);
+        }}
+        className="flex items-center gap-2 p-2"
+      >
+        <span className="pl-2 font-mono text-sm text-sky-600">›</span>
         <input
-          value={brief}
-          onChange={(e) => setBrief(e.target.value)}
-          placeholder="Find HVAC and EPC contractors in Frankfurt needing subcontractors"
-          className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm text-slate-900 placeholder-slate-400 focus:border-slate-400 focus:outline-none"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          disabled={busy}
+          placeholder="Ask for anything — the market, or your own people"
+          className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-slate-900 placeholder-slate-400 focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"
-          disabled={stage !== "idle" || brief.trim().length < 8}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+          disabled={busy || q.trim().length < 8}
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-4 text-[13px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-30"
         >
-          {stage === "idle" ? (
-            <Send className="h-4 w-4" />
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <CornerDownLeft className="h-3.5 w-3.5" />
           )}
-          {stage === "working" ? "Working…" : "Ask"}
+          {busy ? "Working" : "Ask"}
         </button>
       </form>
-      <p className="mt-1.5 text-xs text-slate-500">
-        {stage === "working"
-          ? "Running it now — about a minute. The answer lands below."
-          : who
-            ? `Goes to ${who.emoji} ${who.name}.`
-            : "Runs immediately. Nothing is sent to anyone."}
+
+      {!answer && !busy && !error && (
+        <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-3 py-2.5">
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex}
+              type="button"
+              onClick={() => void ask(ex)}
+              className="rounded-lg bg-slate-50 px-2.5 py-1 text-[12px] text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {busy && (
+        <p className="border-t border-slate-100 px-4 py-3 text-[13px] text-slate-500">
+          Working on it. Nothing is being sent to anyone.
+        </p>
+      )}
+
+      {error && (
+        <p className="border-t border-slate-100 px-4 py-3 text-[13px] text-rose-600">
+          {error}
+        </p>
+      )}
+
+      {answer && <AskAnswerBlock a={answer} />}
+    </div>
+  );
+}
+
+function AskAnswerBlock({ a }: { a: AskAnswer }) {
+  const bad = a.kind === "refused" || a.kind === "failed";
+  return (
+    <div
+      className={`border-t px-4 py-4 ${
+        bad ? "border-amber-100 bg-amber-50/50" : "border-slate-100"
+      }`}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm">{a.emoji}</span>
+        <span className="text-[12px] font-semibold text-slate-800">{a.by}</span>
+        {a.state && (
+          <span
+            className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
+              STATE_CHIP[a.state]
+            }`}
+          >
+            {STATE_LABEL[a.state]}
+          </span>
+        )}
+        {bad && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+            {a.kind === "refused" ? "Refused" : "Failed"}
+          </span>
+        )}
+      </div>
+
+      {/* `run-now` takes the oldest claimable job, which may not be the one
+          just asked for. Saying so beats presenting another job's answer as
+          the answer to this question. */}
+      {a.wasAnotherJob && a.otherTitle && (
+        <p className="mt-1.5 text-[12px] text-slate-500">
+          This answers an earlier queued job — “{a.otherTitle}”. Yours is next;
+          press Ask again in a moment.
+        </p>
+      )}
+
+      <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-slate-800">
+        {a.answer}
       </p>
-      {answer && <p className="mt-2 text-sm text-slate-800">{answer}</p>}
-      {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+
+      {(a.people?.length || a.partners?.length) && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {a.people?.map((p) => (
+            <span
+              key={p.id}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[12px] text-emerald-800"
+            >
+              {p.name}
+              {p.role ? <span className="text-emerald-600"> · {p.role}</span> : null}
+              {p.status === "candidate" && (
+                <span className="text-emerald-600"> · off a CV</span>
+              )}
+            </span>
+          ))}
+          {a.partners?.map((p) => (
+            <span
+              key={p.id}
+              className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[12px] text-sky-800"
+            >
+              {p.name}
+              <span className="text-sky-600">
+                {" · partner"}
+                {p.crewSize !== null ? ` · up to ${p.crewSize}` : ""}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {a.person && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+          <span className="text-[13px] font-medium text-slate-900">{a.person}</span>
+          {a.door && (
+            <a
+              href={a.door}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-mono text-[12px] text-sky-700 hover:underline"
+            >
+              {a.door.replace(/^https?:\/\//, "").slice(0, 48)}
+              <ArrowUpRight className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      )}
+      {a.words && (
+        <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-700">
+          {a.words}
+        </p>
+      )}
+      {a.missingFact && (
+        <p className="mt-2 text-[12.5px] text-amber-800">
+          <span className="font-semibold">Missing:</span> {a.missingFact}
+          {a.missingOwner ? ` — ${a.missingOwner}` : ""}
+        </p>
+      )}
+      {a.deadReason && (
+        <p className="mt-2 text-[12.5px] italic text-slate-500">{a.deadReason}</p>
+      )}
+
+      {a.blockers && a.blockers.length > 0 && (
+        <ul className="mt-2.5 space-y-1">
+          {a.blockers.map((b) => (
+            <li
+              key={b}
+              className="flex items-start gap-2 text-[12.5px] leading-snug text-amber-800"
+            >
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500" />
+              {b}
+            </li>
+          ))}
+        </ul>
+      )}
+      {a.missing && a.missing.length > 0 && (
+        <p className="mt-2 text-[12px] text-slate-500">
+          Nobody has recorded: {a.missing.join("; ")}.
+        </p>
+      )}
     </div>
   );
 }
@@ -442,53 +611,63 @@ const STATE_LABEL: Record<string, string> = {
   dead: "Dead",
 };
 
-const STATE_CLASS: Record<string, string> = {
-  reachable: "bg-emerald-50 text-emerald-700",
-  one_thing_missing: "bg-amber-50 text-amber-800",
-  dead: "bg-rose-50 text-rose-700",
+const STATE_CHIP: Record<string, string> = {
+  reachable: "bg-emerald-100 text-emerald-800",
+  one_thing_missing: "bg-amber-100 text-amber-800",
+  dead: "bg-rose-100 text-rose-800",
 };
 
-function CameBackList({ items }: { items: CameBackItem[] }) {
-  // Items filed before the contract carry no state, so they are not decisions
-  // — there is nothing for them to be a decision ABOUT. Thirty-one of them in
-  // one list is the wall this screen exists to replace, and putting them above
-  // the two or three things that genuinely need answering would recreate the
-  // old Agent Desk with better fonts. They stay reachable, one click away.
-  const decisions = items.filter((i) => i.state !== null);
-  const legacy = items.filter((i) => i.state === null);
+const STATE_RAIL: Record<string, string> = {
+  reachable: "bg-emerald-500",
+  one_thing_missing: "bg-amber-500",
+  dead: "bg-rose-400",
+};
 
-  if (items.length === 0) {
+function CameBackList({
+  decisions,
+  older,
+}: {
+  decisions: CameBackItem[];
+  older: CameBackItem[];
+}) {
+  if (decisions.length === 0 && older.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+      <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-8 text-center text-[13px] text-slate-500">
         Nothing waiting. Ask for something above and it appears here.
-      </div>
+      </p>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {decisions.length > 0 ? (
-        <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {decisions.map((item) => (
             <CameBackRow key={item.key} item={item} />
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-          Nothing needs a decision. Everything below was filed before findings
-          had to say what they were.
-        </div>
+        <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
+          Nothing needs a decision.
+        </p>
       )}
 
-      {legacy.length > 0 && (
-        <details className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <summary className="cursor-pointer px-4 py-3 text-sm text-slate-600 hover:bg-slate-50">
-            <span className="font-medium text-slate-800">{legacy.length} older</span>{" "}
-            {legacy.length === 1 ? "item" : "items"}, filed before findings had to
-            say what they were. Nothing here is a decision.
+      {/* Items filed before the contract carry no state, so they are not
+          decisions — there is nothing for them to be a decision about. Thirty
+          of them above the two that matter would recreate the old Agent Desk
+          with better fonts. */}
+      {older.length > 0 && (
+        <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[13px] text-slate-500 transition hover:bg-slate-50">
+            <span className="font-mono text-[11px] tabular-nums text-slate-400 transition group-open:rotate-90">
+              ▸
+            </span>
+            <span className="font-medium text-slate-700">{older.length}</span> older
+            {older.length === 1 ? " item" : " items"}, filed before findings had to
+            say what they were
           </summary>
           <div className="divide-y divide-slate-100 border-t border-slate-100">
-            {legacy.map((item) => (
+            {older.map((item) => (
               <CameBackRow key={item.key} item={item} />
             ))}
           </div>
@@ -521,10 +700,7 @@ function CameBackRow({ item }: { item: CameBackItem }) {
           ...extra,
         }),
       });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        assignmentId?: string;
-      };
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(body.error ?? "That did not work.");
         return;
@@ -544,187 +720,199 @@ function CameBackRow({ item }: { item: CameBackItem }) {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {item.authorEmoji} {item.authorName}
+    <div className="flex gap-0">
+      {/* The state, as a rail rather than a floating pill. Scannable down the
+          left edge without reading a word. */}
+      <span
+        aria-hidden
+        className={`w-[3px] shrink-0 ${
+          item.state ? STATE_RAIL[item.state] : "bg-slate-200"
+        }`}
+      />
+      <div className="min-w-0 grow px-4 py-3.5">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p className="text-[14px] font-semibold tracking-[-0.01em] text-slate-900">
+            {item.title}
           </p>
+          {item.state ? (
+            <span
+              className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
+                STATE_CHIP[item.state]
+              }`}
+            >
+              {STATE_LABEL[item.state]}
+            </span>
+          ) : null}
+          <span className="grow" />
+          <span className="font-mono text-[11px] text-slate-400">
+            {item.authorEmoji} {item.authorName}
+          </span>
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
-            item.state
-              ? STATE_CLASS[item.state]
-              : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {item.state
-            ? STATE_LABEL[item.state]
-            : /* Filed before the contract existed. Said plainly rather than
-                 dressed up as a verdict nobody actually reached. */
-              "Before the contract"}
-        </span>
-      </div>
 
-      <p className="mt-2 text-sm leading-relaxed text-slate-700">{item.line}</p>
-
-      {item.state === "one_thing_missing" && item.missing && (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <span className="font-semibold">Missing:</span> {item.missing.fact}
-          <span className="ml-1.5 text-amber-700">— {item.missing.owner}</span>
+        <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-slate-600">
+          {item.line}
         </p>
-      )}
 
-      {item.state === "dead" && item.deadReason && (
-        <p className="mt-2 text-xs italic text-slate-500">{item.deadReason}</p>
-      )}
+        {item.missing && (
+          <p className="mt-2 text-[12.5px] text-amber-800">
+            <span className="font-semibold">Missing:</span> {item.missing.fact}
+            <span className="text-amber-600"> — {item.missing.owner}</span>
+          </p>
+        )}
 
-      {item.reach && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-          <span className="font-mono text-xs text-slate-800">{item.reach.value}</span>
-          {item.reach.howToOpen && (
-            <span className="text-xs text-slate-500">— {item.reach.howToOpen}</span>
-          )}
-        </div>
-      )}
+        {item.deadReason && (
+          <p className="mt-2 text-[12.5px] italic text-slate-500">{item.deadReason}</p>
+        )}
 
-      {done ? (
-        <p className="mt-3 text-xs font-medium text-emerald-700">{done}</p>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {item.state === "reachable" && item.reach && (
-            <>
-              {item.reach.value.includes("@") ? (
-                <a
-                  href={`mailto:${item.reach.value}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-                >
-                  <Mail className="h-3 w-3" />
-                  Open mail
-                </a>
-              ) : item.reach.kind === "link" ? (
-                <a
-                  href={item.reach.value}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-                >
-                  Open the page
-                  <ArrowRight className="h-3 w-3" />
-                </a>
-              ) : (
-                <a
-                  href={telHref(item.reach.value)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                >
-                  <Phone className="h-3 w-3" />
-                  Dial
-                </a>
-              )}
-              {item.reach.howToOpen && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigator.clipboard.writeText(item.reach?.howToOpen ?? "")
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  <Copy className="h-3 w-3" />
-                  Copy the words
-                </button>
-              )}
-            </>
-          )}
-
-          {item.state === "one_thing_missing" && item.missing && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => act("send_back", { fact: item.missing?.fact })}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
-            >
-              {busy === "send_back" && <Loader2 className="h-3 w-3 animate-spin" />}
-              Send Scout back for it
-            </button>
-          )}
-
-          {item.state === "dead" && item.kind === "finding" && (
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => act("file_refusal")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              {busy === "file_refusal" && <Loader2 className="h-3 w-3 animate-spin" />}
-              File the refusal
-            </button>
-          )}
-
-          {item.kind === "finding" && item.state !== "dead" && (
-            <button
-              type="button"
-              onClick={() => setDiscarding((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-            >
-              <Trash2 className="h-3 w-3" />
-              Discard
-            </button>
-          )}
-
-          {item.sourceUrl && (
-            <a
-              href={item.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-medium text-slate-500 hover:text-slate-800"
-            >
-              Source
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* A discard needs a reason, or the same lead is back next week — which
-          is the exact failure the dead state exists to prevent. */}
-      {discarding && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 p-2">
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Why? Wrong trade, no buyer, wrong country…"
-            className="h-8 min-w-0 grow rounded border border-rose-200 bg-white px-2 text-xs text-slate-900 placeholder-rose-300 focus:border-rose-400 focus:outline-none"
-          />
-          <button
-            type="button"
-            disabled={busy !== null || reason.trim().length < 3}
-            onClick={() => act("discard", { reason: reason.trim() })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-600 disabled:opacity-40"
-          >
-            {busy === "discard" && <Loader2 className="h-3 w-3 animate-spin" />}
-            Discard for good
-          </button>
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
-
-      {/* The full hand-in, for when the one line is not enough. Progressive
-          disclosure rather than a drawer with a Done button. */}
-      {item.fullReport && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-sky-700 hover:text-sky-900">
-            The whole report
-          </summary>
-          <div className="mt-2">
-            <AgentReport
-              text={item.fullReport}
-              authorName={item.authorName}
-              authorEmoji={item.authorEmoji}
-            />
+        {item.reach && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="font-mono text-[12.5px] text-slate-900">
+              {item.reach.value}
+            </span>
+            {item.reach.howToOpen && (
+              <span className="text-[12px] text-slate-500">
+                {item.reach.howToOpen}
+              </span>
+            )}
           </div>
-        </details>
-      )}
+        )}
+
+        {done ? (
+          <p className="mt-2.5 text-[12.5px] font-medium text-emerald-700">{done}</p>
+        ) : (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {item.state === "reachable" && item.reach && (
+              <>
+                {item.reach.value.includes("@") ? (
+                  <a
+                    href={`mailto:${item.reach.value}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    <Mail className="h-3 w-3" />
+                    Open mail
+                  </a>
+                ) : item.reach.kind === "link" ? (
+                  <a
+                    href={item.reach.value}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Open the page
+                    <ArrowUpRight className="h-3 w-3" />
+                  </a>
+                ) : (
+                  <a
+                    href={telHref(item.reach.value)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    <Phone className="h-3 w-3" />
+                    Dial
+                  </a>
+                )}
+                {item.reach.howToOpen && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigator.clipboard.writeText(item.reach?.howToOpen ?? "")
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy the words
+                  </button>
+                )}
+              </>
+            )}
+
+            {item.state === "one_thing_missing" && item.missing && (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => act("send_back", { fact: item.missing?.fact })}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
+              >
+                {busy === "send_back" && <Loader2 className="h-3 w-3 animate-spin" />}
+                Send Scout back for it
+              </button>
+            )}
+
+            {item.state === "dead" && item.kind === "finding" && (
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => act("file_refusal")}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                {busy === "file_refusal" && (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                )}
+                File the refusal
+              </button>
+            )}
+
+            {item.kind === "finding" && item.state !== "dead" && (
+              <button
+                type="button"
+                onClick={() => setDiscarding((v) => !v)}
+                className="rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-700"
+              >
+                Discard
+              </button>
+            )}
+
+            {item.sourceUrl && (
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg px-2 py-1.5 text-[12.5px] text-slate-400 transition hover:text-slate-700"
+              >
+                Source
+              </a>
+            )}
+
+            {item.fullReport && (
+              <details className="w-full">
+                <summary className="cursor-pointer py-1 text-[12.5px] text-sky-700 hover:underline">
+                  The whole report
+                </summary>
+                <div className="mt-2">
+                  <AgentReport
+                    text={item.fullReport}
+                    authorName={item.authorName}
+                    authorEmoji={item.authorEmoji}
+                  />
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+
+        {/* A discard needs a reason, or the same lead is back next week —
+            which is the exact failure the dead state exists to prevent. */}
+        {discarding && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2">
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Why? Wrong trade, no buyer, wrong country…"
+              className="h-8 min-w-[10rem] grow rounded-lg border border-rose-200 bg-white px-2.5 text-[12.5px] text-slate-900 placeholder-rose-300 focus:border-rose-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              disabled={busy !== null || reason.trim().length < 3}
+              onClick={() => act("discard", { reason: reason.trim() })}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-rose-600 disabled:opacity-40"
+            >
+              {busy === "discard" && <Loader2 className="h-3 w-3 animate-spin" />}
+              Discard for good
+            </button>
+          </div>
+        )}
+
+        {error && <p className="mt-2 text-[12.5px] text-rose-600">{error}</p>}
+      </div>
     </div>
   );
 }

@@ -302,6 +302,23 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
   if (caseType === "contact_reachability") {
     return runReachabilityAssignment(assignment);
   }
+
+  // `open_research` had to be named here.
+  //
+  // This dispatcher recognised open research only as the ABSENCE of a case
+  // type, while migration 041's trigger, the Ask box on Today, and the "send
+  // Scout back for it" action all call that same kind of work
+  // "open_research". One name with two meanings in two files — the identical
+  // shape of the two-Scouts bug — so the first question typed into the new
+  // screen was refused with "the unattended runner has no handler for
+  // open_research", by the handler that exists to run it.
+  //
+  // Named explicitly now. `null` still maps here for the play-derived and
+  // older rows that carry no type at all.
+  if (caseType === "open_research") {
+    return runOpenResearchAssignment(assignment);
+  }
+
   if (caseType !== null && caseType !== "company_qualification") {
     return refuseUnknownAssignment(assignment, caseType);
   }

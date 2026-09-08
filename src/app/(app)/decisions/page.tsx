@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/common/page-header";
 import { TodayScreen } from "@/components/modules/today-screen";
 import { getNextMove } from "@/lib/data/next-move";
 import { listWhatCameBack } from "@/lib/data/came-back";
+import { getFunnel } from "@/lib/data/funnel";
+import { FunnelStrip } from "@/components/modules/funnel-strip";
 import { listWorkforce } from "@/lib/data/workforce";
 import { getSession } from "@/lib/auth/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
@@ -34,11 +36,12 @@ export default async function DecisionsPage() {
   const svc = createServiceSupabaseClient();
   const org = session.organizationId;
 
-  const [move, cameBack, employees, projects, companies, leads, people] =
+  const [move, cameBack, employees, funnel, projects, companies, leads, people] =
     await Promise.all([
       getNextMove(org),
       listWhatCameBack(org),
       listWorkforce(org),
+      getFunnel(org),
       count(svc, "discovered_projects", "organization_id", org),
       count(svc, "companies", "organization_id", org),
       count(svc, "job_leads", "org_id", org),
@@ -63,6 +66,10 @@ export default async function DecisionsPage() {
         title="Today"
         description="One action to take, one box to ask in, and what the team brought back."
       />
+      {/* The business on one line, before the day's work. It had no data
+          representation at all: the footer wrote four unrelated numbers out
+          as a sentence. */}
+      <FunnelStrip funnel={funnel} />
       <TodayScreen
         move={move}
         employees={roster}

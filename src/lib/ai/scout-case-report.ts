@@ -44,12 +44,19 @@ export const scoutCaseReportSchema = z.object({
    * buys the labour" with nobody assigned to find out is the research job
    * handed back to the CEO.
    */
-  missingOwner: z.string().max(240).nullable().default(null),
+  // Nullable but NOT optional, and deliberately without `.default()`.
+  //
+  // `.default(null)` makes the key optional, the AI SDK then leaves it out of
+  // the JSON schema's `required` array, and OpenAI rejects the whole request:
+  // "'required' ... must include every key in properties. Missing
+  // 'missingOwner'." Every Scout research call failed on that, so the answer
+  // the CEO saw was the schema error itself.
+  missingOwner: z.string().max(240).nullable(),
   /**
    * Why this is not worth chasing. Required by the database whenever this
    * report resolves to `dead`, so the same weak lead is never presented again.
    */
-  deadReason: z.string().max(600).nullable().default(null),
+  deadReason: z.string().max(600).nullable(),
   risks: z.array(z.string().max(320)).max(8),
   questionsAnswered: z.array(z.string().max(500)).max(8),
   sources: z.array(
