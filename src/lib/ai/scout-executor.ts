@@ -15,6 +15,7 @@ import { createFinding } from "@/lib/data/findings";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { completeAssignment } from "@/lib/data/workforce";
 import { recordRefusal } from "@/lib/data/refusals";
+import { withinBudget } from "@/lib/data/agent-budget";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 type ClaimedAssignment = {
@@ -226,6 +227,28 @@ async function buildAssignmentContext(assignment: ClaimedAssignment) {
 export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkResult> {
   const assignment = await claimNextAssignment(orgId);
   if (!assignment) return { status: "idle" };
+
+  // Checked after claiming rather than before, so the ceiling is enforced per
+  // employee rather than per organisation — and the job goes straight back to
+  // the queue for tomorrow rather than being lost.
+  const budget = await withinBudget(orgId, assignment.agentInstanceId);
+  if (!budget.canRun) {
+    const service = createServiceSupabaseClient();
+    if (service) {
+      await service
+        .from("agent_assignments")
+        .update({ status: "queued" })
+        .eq("id", assignment.id)
+        .eq("org_id", assignment.orgId);
+    }
+    await addAgentMessage({
+      assignmentId: assignment.id,
+      orgId: assignment.orgId,
+      agentInstanceId: assignment.agentInstanceId,
+      body: `Not started: ${budget.summary}`,
+    });
+    return { status: "refused", assignmentId: assignment.id, reason: budget.summary };
+  }
 
   // Scout has more than one job now, and the constraint says which one.
   //

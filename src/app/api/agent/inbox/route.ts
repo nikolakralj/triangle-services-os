@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyMachineToken } from "@/lib/auth/machine";
+import { getAgentBrief } from "@/lib/data/agent-brief";
+import { getBudget, SAFE_STEPS, NEEDS_A_HUMAN } from "@/lib/data/agent-budget";
 import {
   listPendingTasksForAgent,
   completeAgentTask,
@@ -37,6 +39,15 @@ export async function GET(request: Request) {
   }
 
   const tasks = await listPendingTasksForAgent(machine.orgId, machine.name);
+  // The brief, the budget and the permitted steps travel with the work.
+  // Everything an agent needs to behave correctly arrives in one call, so
+  // nothing depends on what was pasted into a provider chat months ago.
+  const [brief, budget] = await Promise.all([
+    getAgentBrief(machine.orgId, machine.agentInstanceId),
+    machine.agentInstanceId
+      ? getBudget(machine.orgId, machine.agentInstanceId)
+      : Promise.resolve(null),
+  ]);
   // Durable assignments, with business context hydrated (e.g. the worker
   // records for "find work for these people"). Fetching starts the shift.
   const assignments = machine.agentInstanceId
@@ -45,6 +56,23 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     agent: machine.name,
+    // Read these first. They are the current version; anything you were given
+    // when you were set up may be out of date.
+    constitution: brief.constitution,
+    role: brief.role,
+    roleFile: brief.roleFile,
+    youMay: SAFE_STEPS,
+    needsAHuman: NEEDS_A_HUMAN,
+    budget: budget
+      ? {
+          runsToday: budget.runsToday,
+          runBudget: budget.runBudget,
+          costToday: Number(budget.costToday.toFixed(2)),
+          costBudget: budget.costBudget,
+          canRun: budget.canRun,
+          summary: budget.summary,
+        }
+      : null,
     assignments,
     tasks: tasks.map((t) => ({
       id: t.id,
