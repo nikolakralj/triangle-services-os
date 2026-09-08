@@ -83,14 +83,34 @@ up where you left off rather than starting again.
 
 ### Step 0 — who can we actually supply?
 
-Before any search, read `workers` on the assignment, or ask for the pool.
-Write down the trades, the countries they may legally work in, and when they
-are free. Everything after this is constrained by that list.
+Before any search, read the pool on the assignment, or ask for it. The pool has
+**two halves**:
 
-If the assignment names a sector Triangle has nobody for — rail, when there is
-not one rail engineer on the books — do not research it. Report that the pool
-cannot serve it and stop. Researching it well is the expensive mistake, not
-the safe one.
+- **`workers`** — Triangle's own people. Trades, the countries they may legally
+  work in, when they are free.
+- **`supply_partners`** — partner firms that can put a crew on site under
+  Triangle's contract. Trades, crew size, which countries they can post workers
+  into, and when their capacity was last confirmed.
+
+Everything after this is constrained by both lists together. Triangle's bench is
+two people; a crew of eight comes from a partner firm that already employs
+eight, so judging a job against the bench alone will refuse work Triangle can
+actually deliver.
+
+Only count a partner firm whose capacity a human confirmed within the last 14
+days. An older claim is a memory. And never assume a partner exists for a trade
+you were not shown — an invented firm is worse than an invented person, because
+nobody can check it by name.
+
+Keep the halves distinct when you report. "Two of our own plus six from a
+partner firm in Croatia" is a truthful sentence. A partner's crew are heads
+nobody at Triangle has met, so do not claim they hold a certificate, a ticket or
+a visa; say those are unchecked.
+
+If the assignment names a sector neither half can serve — rail, when there is
+not one rail engineer on the books and no partner does rail — do not research
+it. Report that the pool cannot serve it and stop. Researching it well is the
+expensive mistake, not the safe one.
 
 ### Step 1 — is somebody already asking?
 
@@ -122,8 +142,10 @@ Only when those are exhausted for this trade do you go to the open web.
    a Nachunternehmer or procurement lead. Not a switchboard, not "info@", not
    the CEO.
 4. Collect evidence: for every claim, a source URL and a quoted line.
-5. Judge fit against the people from step 0: country and right to work,
-   language, certificates, availability window, rate expectations.
+5. Judge fit against the supply from step 0 — both halves: country and right to
+   work, language, certificates, availability window, rate expectations for
+   Triangle's own people; trades, crew size and posting countries for a partner
+   firm.
 
 ### The reachability gate — a hard rule
 

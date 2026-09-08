@@ -39,7 +39,8 @@ people who do not exist is a fiction with a source URL attached.
 So the order is:
 
 1. **What can Triangle actually supply this month?** Named people, confirmed
-   available, legally able to work in that country.
+   available, legally able to work in that country — **and partner firms**
+   whose capacity a human has confirmed in the last 14 days.
 2. **Who is already asking for exactly that?** Inbound requisitions first,
    then agencies and contractors known to buy it.
 3. **Only then** the open web, and only in sectors where step 1 gave you
@@ -50,7 +51,22 @@ commissioning lead with twenty years on ArcelorMittal and Ternium sites, free
 from 1 October". That sentence requires a real person behind it, which is why
 supply comes first.
 
-If Triangle has nobody for a sector, say so and refuse the assignment rather
+**Supply is people AND firms.** Triangle has two people on the bench. A crew of
+eight electricians for six weeks is never assembled from two — it comes from a
+partner firm that already employs eight, working under Triangle's contract.
+Read both halves of the pool before concluding Triangle cannot serve something.
+
+The two halves are not interchangeable, and blurring them is its own lie. A
+person is a name, a CV, a passport and a nationality; a firm is a capacity and
+a set of trades, and its crew is heads nobody at Triangle has met. Never claim a
+partner's people hold a certificate, a ticket or a visa — that is per head, and
+it has not been checked. Name which half of a package is which.
+
+A firm counts as supply only while its capacity was confirmed by a human within
+the last 14 days, the same shelf life as a person's availability. A firm that
+had twelve electricians in March is a memory, not a crew.
+
+If neither half can serve a sector, say so and refuse the assignment rather
 than researching it beautifully. A truthful "we cannot serve this" is worth
 more than a qualified lead nobody can fill.
 

@@ -16,6 +16,7 @@ import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile
 import { completeAssignment } from "@/lib/data/workforce";
 import { recordRefusal } from "@/lib/data/refusals";
 import { withinBudget } from "@/lib/data/agent-budget";
+import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 type ClaimedAssignment = {
@@ -699,7 +700,7 @@ async function runOpenResearchAssignment(
   const startedAt = new Date();
   const model = getScoutModelId();
   try {
-    const [profile, workers] = await Promise.all([
+    const [profile, supply] = await Promise.all([
       getOrganizationOperatingProfile(assignment.orgId),
       listAvailableSupply(assignment.orgId),
     ]);
@@ -716,7 +717,21 @@ async function runOpenResearchAssignment(
         "",
         `WHO TRIANGLE IS:\n${JSON.stringify(profile, null, 2)}`,
         "",
-        `WHO TRIANGLE CAN SUPPLY RIGHT NOW:\n${JSON.stringify(workers, null, 2)}`,
+        [
+          "WHO TRIANGLE CAN SUPPLY RIGHT NOW.",
+          "Supply is two things: Triangle's own people, and partner firms whose capacity a human has confirmed within the last 14 days. A partner firm is how a crew larger than the bench gets fielded — treat its confirmed crew_size as real supply for the trades listed, in the countries listed under can_post_to.",
+          "Anything absent from both lists is not supply. Do not assume a partner exists for a trade that is not here.",
+          "",
+          `Triangle's own people (${supply.ownPeople.length}):`,
+          supply.ownPeople.length
+            ? JSON.stringify(supply.ownPeople, null, 2)
+            : "None on the bench.",
+          "",
+          `Partner firms with confirmed capacity (${supply.partnerFirms.length}):`,
+          supply.partnerFirms.length
+            ? JSON.stringify(supply.partnerFirms, null, 2)
+            : "None on file. Triangle can currently field only the people listed above.",
+        ].join("\n"),
       ].join("\n"),
     });
     if (!result.output) throw new Error("Scout returned no structured report");
@@ -775,14 +790,51 @@ async function runOpenResearchAssignment(
 }
 
 /** The bench, as the constitution's supply-first rule requires it to be read. */
+/**
+ * Everything Triangle can put on a site: its own people AND its partner firms.
+ *
+ * This read only ever returned individuals, which made the supply-first house
+ * rule mean "refuse anything two people cannot do". A crew of eight comes from
+ * a firm that already employs eight, and until supply_partners existed the
+ * system could not say so.
+ *
+ * Both halves are returned even when empty, with their counts stated. An agent
+ * told "partner firms: none on file" refuses honestly; an agent told nothing
+ * about partners invents them.
+ */
 async function listAvailableSupply(orgId: string) {
   const service = createServiceSupabaseClient();
-  if (!service) return [];
-  const { data } = await service
-    .from("workers")
-    .select("full_name, role, status, country, nationality, work_authorisation, skills, industries, availability_status")
-    .eq("organization_id", orgId)
-    .neq("status", "blacklisted")
-    .limit(50);
-  return data ?? [];
+  if (!service) return { ownPeople: [], partnerFirms: [] };
+
+  const [people, partners] = await Promise.all([
+    service
+      .from("workers")
+      .select(
+        "full_name, role, status, country, nationality, work_authorisation, skills, industries, availability_status",
+      )
+      .eq("organization_id", orgId)
+      .neq("status", "blacklisted")
+      .limit(50),
+    listSupplyPartners(orgId),
+  ]);
+
+  return {
+    ownPeople: people.data ?? [],
+    // Only the firms whose capacity a human has actually confirmed recently.
+    // An unconfirmed partner is a lead on supply, not supply, and handing one
+    // to a research agent as capacity is how a package gets promised against
+    // people nobody has spoken to.
+    partnerFirms: partners
+      .filter((p) => p.sellable)
+      .map((p) => ({
+        name: p.name,
+        country: p.country,
+        trades: p.trades,
+        crew_size: p.crewSize,
+        can_post_to: p.canPostTo,
+        availability: p.availabilityStatus,
+        available_from: p.availableFrom,
+        capacity_confirmed_days_ago: p.confirmedDaysAgo,
+      })),
+  };
 }

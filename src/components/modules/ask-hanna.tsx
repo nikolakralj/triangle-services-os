@@ -25,14 +25,29 @@ interface Person {
   status: string;
 }
 
+interface PartnerFirm {
+  id: string;
+  name: string;
+  trades: string[];
+  crewSize: number | null;
+  country: string | null;
+}
+
 interface Answer {
   answer: string;
   people: Person[];
+  partners: PartnerFirm[];
   blockers: string[];
   missing: string[];
 }
 
-export function AskHanna({ poolSize }: { poolSize: number }) {
+export function AskHanna({
+  poolSize,
+  partnerCount = 0,
+}: {
+  poolSize: number;
+  partnerCount?: number;
+}) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -89,7 +104,10 @@ export function AskHanna({ poolSize }: { poolSize: number }) {
       {!answer && !error && (
         <p className="mt-2 text-xs text-slate-500">
           Hanna reads all {poolSize} {poolSize === 1 ? "person" : "people"} on file
-          and answers from what is recorded — including what is not.
+          {partnerCount > 0
+            ? ` and ${partnerCount} partner ${partnerCount === 1 ? "firm" : "firms"} with confirmed capacity`
+            : ""}
+          , and answers from what is recorded — including what is not.
         </p>
       )}
 
@@ -114,6 +132,25 @@ export function AskHanna({ poolSize }: { poolSize: number }) {
                     </span>
                     <ArrowRight className="h-3 w-3" />
                   </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Firms, kept visibly separate from people. A partner's crew is
+              heads nobody here has met — showing them in the same list as
+              named workers would imply a check that has not happened. */}
+          {answer.partners.length > 0 && (
+            <ul className="mt-2.5 space-y-1">
+              {answer.partners.map((p) => (
+                <li key={p.id} className="text-sm">
+                  <span className="font-medium text-slate-800">{p.name}</span>
+                  <span className="ml-1.5 text-xs text-slate-500">
+                    partner firm
+                    {p.crewSize !== null ? ` · up to ${p.crewSize}` : ""}
+                    {p.trades.length > 0 ? ` · ${p.trades.slice(0, 3).join(", ")}` : ""}
+                    {p.country ? ` · ${p.country}` : ""}
+                  </span>
                 </li>
               ))}
             </ul>

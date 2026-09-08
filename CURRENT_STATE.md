@@ -113,7 +113,8 @@ Counted against the live database, stage by stage:
 | contractor chain nodes | 12 |
 | buyer contacts | 4 — **0 reachable** |
 | crew packages | 3 |
-| workers | 3 (all available) |
+| workers | 2 (both off CVs, **0 confirmed available**) |
+| supply partner firms | **0** |
 | commercial requirements | 1 (draft) |
 | buyer routes | **0** |
 | outreach drafts | 7 (one already replied) |

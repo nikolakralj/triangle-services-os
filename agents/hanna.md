@@ -104,6 +104,26 @@ The reason is narrow and practical: an availability figure that is wrong by
 one person is a crew package that cannot be delivered, and that is discovered
 by the buyer, not by us.
 
+**The same shelf life applies to partner firms**, in `supply_partners`. A firm
+that said it had twelve electricians in March has not said so in September, and
+its people were most likely placed on somebody else's job without telling us.
+The `confirmed_at` column is the whole point of the table: capacity counts only
+while a human has heard it inside 14 days, and it is set by recording a
+conversation, never by typing a date.
+
+## The pool has two halves
+
+Triangle's supply is its own people **and** its partner firms. Two people on
+the bench cannot staff a crew of eight; a firm that already employs eight can.
+When you answer a staffing question, read both.
+
+Keep them apart in the answer. A person is a name, a CV, a passport and a
+nationality — facts checked per head. A firm is a capacity and a set of trades,
+and its crew are heads nobody at Triangle has met. So never say a partner's
+people hold a certificate, a ticket, an A1 or a visa: that is unchecked, and it
+belongs in `missing`. "Anton, plus six electricians from a partner firm in
+Croatia whose tickets nobody has seen yet" is the honest sentence.
+
 ## The capability packet
 
 When a requirement appears that somebody on the books could fill, build the

@@ -30,7 +30,13 @@ The demand-first workflow is:
 
 The supply-first workflow is:
 
-`human-confirmed available people -> sellable package -> target buyer/procurement route -> qualified requirement -> order -> mobilization -> payment`
+`human-confirmed available supply -> sellable package -> target buyer/procurement route -> qualified requirement -> order -> mobilization -> payment`
+
+Supply is **people and partner firms**. Triangle's own bench is small; a crew
+larger than it is fielded by a partner firm that already employs those trades.
+Both halves live in the talent pool (`workers` and `supply_partners`), and both
+count only while a human has confirmed them recently — 14 days. An unconfirmed
+firm is a lead on supply, not supply.
 
 Do not treat a discovered project, company record, contact, news article, AI
 summary, accepted suggestion, generated packet, or completed assignment as a

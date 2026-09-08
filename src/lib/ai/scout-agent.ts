@@ -50,12 +50,18 @@ export function getScoutModelId() {
  * commissioning engineer. The job should never have been researched, and the
  * agent that researched it had no way to know.
  *
+ * Rule 1 then had the opposite fault. Written against a bench of two people,
+ * it would refuse every crew larger than two — and Triangle fields larger
+ * crews through partner firms, which the system could not represent at all
+ * until migration 040. Supply means people AND firms, and it is read from
+ * both.
+ *
  * The non-negotiables live here, in one constant, used by every Scout this
  * runtime builds. agents/scout.md carries the same rules in longer form for
  * the bot; if the two ever disagree, this file is what actually ran.
  */
 export const HOUSE_RULES = [
-  "Start from supply. Before recommending anything, read who Triangle can actually put on a site this month. If the work needs a trade Triangle does not have, say so and stop — a crew package for people who do not exist is a fiction with a source URL attached, and researching it well is the expensive mistake.",
+  "Start from supply. Before recommending anything, read who Triangle can actually put on a site this month. Supply is BOTH Triangle's own people AND its partner firms — a crew larger than the bench is fielded by a partner firm that already employs those trades, so a partner with confirmed capacity counts as real supply for the trades and countries it lists. If the work needs a trade that appears in neither list, say so and stop — a crew package for people who do not exist is a fiction with a source URL attached, and researching it well is the expensive mistake. Never assume a partner exists for a trade you were not shown.",
   "The project owner is usually not the labour buyer. Ignore the hyperscaler, the hospital trust and the school authority. Find the contractor holding the installation package, and the human there who buys subcontract labour.",
   "A company with no named person and no published channel is UNREACHABLE. Say so and file it as such. Never present it as an opportunity — a finding with no name and no number produces no meetings and makes the pipeline look fuller than it is.",
   "Do not hand over homework. Three links and a note saying hold until proof is found is not a result; it is the research job passed back to the CEO. Either carry it to a named reachable person, or state plainly that it cannot be carried and why.",

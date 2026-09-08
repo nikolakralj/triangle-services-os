@@ -3,8 +3,10 @@ import { PageHeader } from "@/components/common/page-header";
 import { WorkerCards } from "@/components/modules/worker-cards";
 import { WorkersFilterForm } from "@/components/modules/workers-filter";
 import { AskHanna } from "@/components/modules/ask-hanna";
+import { PartnerFirms } from "@/components/modules/partner-firms";
 import { getSession } from "@/lib/auth/session";
 import { countNotesByWorker } from "@/lib/data/worker-notes";
+import { listSupplyPartners } from "@/lib/data/supply-partners";
 import {
   searchAndFilterWorkers,
   rowToWorker,
@@ -35,7 +37,7 @@ export default async function WorkersPage({
   const country = params.country ? String(params.country) : "";
   const skill = params.skill ? String(params.skill) : "";
 
-  const [workerRows, allRows, roles, skills, countries] = await Promise.all([
+  const [workerRows, allRows, roles, skills, countries, partners] = await Promise.all([
     searchAndFilterWorkers(session.organizationId, {
       search: search || undefined,
       role: role || undefined,
@@ -47,6 +49,7 @@ export default async function WorkersPage({
     getWorkerRoles(session.organizationId),
     getWorkerSkills(session.organizationId),
     getWorkerCountries(session.organizationId),
+    listSupplyPartners(session.organizationId),
   ]);
 
   const workers = workerRows.map(rowToWorker);
@@ -63,8 +66,11 @@ export default async function WorkersPage({
   return (
     <>
       <PageHeader
-        title="Workers"
-        description="Who you can put on a job, what they can do, and when they are free."
+        // The sidebar has called this Talent Pool for a while and the page
+        // called itself Workers. Now that the pool holds firms as well as
+        // people, "Workers" is not just inconsistent — it is wrong.
+        title="Talent pool"
+        description="Who you can put on a job — your own people and your partner firms — what they can do, and when they are free."
         actions={
           <div className="flex items-center gap-2">
             <Link
@@ -76,7 +82,10 @@ export default async function WorkersPage({
           </div>
         }
       />
-      <AskHanna poolSize={allRows.length} />
+      <AskHanna
+        poolSize={allRows.length}
+        partnerCount={partners.filter((p) => p.sellable).length}
+      />
       <WorkersFilterForm
         roles={roles}
         skills={skills}
@@ -90,6 +99,9 @@ export default async function WorkersPage({
         initialSkill={skill}
       />
       <WorkerCards workers={workers} noteCounts={noteCounts} />
+      {/* The other half of the pool. Two people on the bench cannot staff a
+          crew of eight; a partner firm that already employs eight can. */}
+      <PartnerFirms partners={partners} />
     </>
   );
 }

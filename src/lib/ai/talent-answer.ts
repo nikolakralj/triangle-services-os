@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { describeRights } from "@/lib/data/work-authorisation";
+import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,11 @@ const answerSchema = z.object({
     (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []),
     z.array(z.string()).max(20),
   ),
+  /** Partner firms referred to. The pool is people AND firms. */
+  partner_ids: z.preprocess(
+    (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []),
+    z.array(z.string()).max(20),
+  ),
   blockers: z.preprocess(
     (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []),
     z.array(z.string().max(300)).max(10),
@@ -48,6 +54,14 @@ const answerSchema = z.object({
 export interface TalentAnswer {
   answer: string;
   people: Array<{ id: string; name: string; role: string | null; status: string }>;
+  /** Partner firms that can field the crew. Two people cannot staff a crew of eight. */
+  partners: Array<{
+    id: string;
+    name: string;
+    trades: string[];
+    crewSize: number | null;
+    country: string | null;
+  }>;
   blockers: string[];
   missing: string[];
 }
@@ -96,8 +110,20 @@ Rules:
    Which country a certificate is valid in is genuinely not in this data; if it
    matters, put it in "missing".
 
-Return JSON: answer, worker_ids (ids you referred to, best first), blockers,
-missing.`;
+8. The pool is people AND partner firms. Triangle's own bench is small; a crew
+   of six or eight is fielded by a partner firm that already employs those
+   trades. PARTNERS lists only firms whose capacity a human confirmed within
+   the last 14 days — treat their crew_size as real for the trades they list,
+   in the countries under can_post_to. Put their ids in partner_ids.
+   Say which half of the answer is which: "Anton and one from Elektro Novak"
+   is a truthful sentence; blurring them is not. A firm is not a named person,
+   so never claim a partner's crew has a certificate, a passport or a visa —
+   that is per head and nobody has checked it. Put it in "missing".
+   If a trade is in neither list, say the pool cannot supply it. Do not assume
+   a partner exists for a trade you were not shown.
+
+Return JSON: answer, worker_ids (ids you referred to, best first), partner_ids,
+blockers, missing.`;
 
 export async function answerAboutTalent(
   orgId: string,
@@ -109,21 +135,30 @@ export async function answerAboutTalent(
   const svc = createServiceSupabaseClient();
   if (!svc) return { error: "Database unavailable." };
 
-  const { data: rows } = await svc
-    .from("workers")
-    .select(
-      "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes, nationality, work_authorisation, visa_notes, work_history",
-    )
-    .eq("organization_id", orgId)
-    .neq("status", "blacklisted")
-    .limit(MAX_POOL);
+  const [{ data: rows }, allPartners] = await Promise.all([
+    svc
+      .from("workers")
+      .select(
+        "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes, nationality, work_authorisation, visa_notes, work_history",
+      )
+      .eq("organization_id", orgId)
+      .neq("status", "blacklisted")
+      .limit(MAX_POOL),
+    listSupplyPartners(orgId),
+  ]);
 
   const pool = rows ?? [];
-  if (pool.length === 0) {
+  // Only firms whose capacity a human confirmed recently. An unconfirmed
+  // partner offered as an answer is a promise against people nobody has
+  // spoken to.
+  const partnerPool = allPartners.filter((p) => p.sellable);
+
+  if (pool.length === 0 && partnerPool.length === 0) {
     return {
       answer:
-        "There is nobody in the pool yet. Upload CVs on Data Imports and they will be read into profiles.",
+        "There is nobody in the pool yet. Upload CVs on Data Imports and they will be read into profiles, or add a partner firm on Workers.",
       people: [],
+      partners: [],
       blockers: [],
       missing: [],
     };
@@ -162,6 +197,24 @@ export async function answerAboutTalent(
     summary: typeof w.notes === "string" ? w.notes.slice(0, 400) : null,
   }));
 
+  // A firm, described in what a staffing question turns on. Deliberately
+  // carries no passport, certificate or visa field: those are facts about a
+  // head, and a firm's crew is heads nobody here has met.
+  const partnerRoster = partnerPool.map((p) => ({
+    id: p.id,
+    firm: p.name,
+    based: [p.city, p.country].filter(Boolean).join(", ") || null,
+    trades: p.trades,
+    crew_size: p.crewSize,
+    can_post_to: p.canPostTo,
+    posting_notes: p.postingNotes,
+    availability: p.availabilityStatus,
+    available_from: p.availableFrom,
+    capacity_confirmed_days_ago: p.confirmedDaysAgo,
+    languages: p.languages,
+    sectors: p.industries,
+  }));
+
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
@@ -173,7 +226,17 @@ export async function answerAboutTalent(
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       instructions: SYSTEM,
-      input: `QUESTION: ${q}\n\nROSTER (${roster.length} people):\n${JSON.stringify(roster)}`,
+      input: [
+        `QUESTION: ${q}`,
+        "",
+        `ROSTER (${roster.length} of Triangle's own people):`,
+        roster.length ? JSON.stringify(roster) : "Nobody on the bench.",
+        "",
+        `PARTNERS (${partnerRoster.length} firms with capacity confirmed in the last 14 days):`,
+        partnerRoster.length
+          ? JSON.stringify(partnerRoster)
+          : "None on file. Triangle can currently field only the people above.",
+      ].join("\n"),
       text: {
         format: {
           type: "json_schema",
@@ -184,6 +247,7 @@ export async function answerAboutTalent(
             properties: {
               answer: { type: "string" },
               worker_ids: { type: "array", items: { type: "string" } },
+              partner_ids: { type: "array", items: { type: "string" } },
               blockers: { type: "array", items: { type: "string" } },
               missing: { type: "array", items: { type: "string" } },
             },
@@ -212,11 +276,24 @@ export async function answerAboutTalent(
         status: (w!.status as string) ?? "active",
       }));
 
+    const partnerById = new Map(partnerPool.map((p) => [p.id, p]));
+    const partners = parsed.data.partner_ids
+      .map((id) => partnerById.get(id))
+      .filter(Boolean)
+      .map((p) => ({
+        id: p!.id,
+        name: p!.name,
+        trades: p!.trades,
+        crewSize: p!.crewSize,
+        country: p!.country,
+      }));
+
     return {
       // Told not to, and it did it anyway on the first question asked of it.
       // An instruction is not a guarantee, so the ids come out here too.
       answer: stripIds(parsed.data.answer),
       people,
+      partners,
       blockers: parsed.data.blockers.map(stripIds),
       missing: parsed.data.missing,
     };
