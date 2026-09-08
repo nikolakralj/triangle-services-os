@@ -21,15 +21,28 @@ import path from "node:path";
 // take effect is a brief that goes stale.
 // ---------------------------------------------------------------------------
 
-/** Which file belongs to which role. Unknown roles get the constitution only. */
-const ROLE_FILES: Record<string, string> = {
-  project_researcher: "scout.md",
-  scout: "scout.md",
-  hr: "hanna.md",
-  triangle_hr: "hanna.md",
-  inbox_courier: "bob.md",
-  bob: "bob.md",
+/**
+ * Where a role file lives, by convention: agents/<role_key>.md.
+ *
+ * This was a hardcoded map of six entries, which meant hiring a new employee
+ * needed a code change and a deploy before it could read its own brief — and
+ * would silently receive none until then. There will be more of them; the
+ * filename is derived so a new employee only needs the markdown.
+ *
+ * The aliases remain for the roles whose file name does not match their key.
+ */
+const ROLE_ALIASES: Record<string, string> = {
+  project_researcher: "scout",
+  triangle_hr: "hanna",
+  hr: "hanna",
+  inbox_courier: "bob",
 };
+
+function roleFileFor(roleKey: string): string {
+  const base = ROLE_ALIASES[roleKey] ?? roleKey;
+  // Only ever a bare filename under agents/ — never a path from a caller.
+  return `${base.replace(/[^a-z0-9_-]/gi, "")}.md`;
+}
 
 async function readAgentDoc(file: string): Promise<string | null> {
   try {
@@ -75,10 +88,12 @@ export async function getAgentBrief(
       : { data: null };
     roleKey = (data?.role_key as string | undefined) ?? null;
   }
-  const file = roleKey ? ROLE_FILES[roleKey] : undefined;
+  const file = roleKey ? roleFileFor(roleKey) : undefined;
   const [role, constitution] = await Promise.all([
     file ? readAgentDoc(file) : Promise.resolve(null),
     readAgentDoc("shared-constitution.md"),
   ]);
-  return { role, roleFile: file ?? null, constitution };
+  // A role with no markdown yet gets the constitution and nothing else, which
+  // is honest — better than serving another employee's brief.
+  return { role, roleFile: role ? (file ?? null) : null, constitution };
 }

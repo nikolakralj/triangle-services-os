@@ -4,6 +4,23 @@ import { isStepCount, Output, ToolLoopAgent } from "ai";
 import { reachabilityReportSchema } from "@/lib/ai/reachability-report";
 import { scoutCaseReportSchema } from "@/lib/ai/scout-case-report";
 
+/**
+ * Where the search is anchored.
+ *
+ * Both agents hardcoded Germany. That is right today — the demand queue is
+ * German and Austrian — and wrong the moment Triangle hunts from its Croatian
+ * side, because an anchored search quietly ranks German results first and
+ * nobody sees it happening. Overridable now; it should come from the
+ * organisation profile once there is more than one entity to ask.
+ */
+function searchLocation() {
+  return {
+    type: "approximate" as const,
+    country: process.env.SCOUT_SEARCH_COUNTRY ?? "DE",
+    timezone: process.env.SCOUT_SEARCH_TIMEZONE ?? "Europe/Berlin",
+  };
+}
+
 export function getScoutModelId() {
   return (
     process.env.OPENAI_SCOUT_MODEL ??
@@ -11,6 +28,38 @@ export function getScoutModelId() {
     "gpt-5.4-mini"
   );
 }
+
+/**
+ * The rules every researching employee works under, wherever they run.
+ *
+ * Named for the house rather than for Scout on purpose: there will be more
+ * employees, and each one arriving with its own hand-written copy of the same
+ * four rules is how they drift apart. A new researcher gets these by
+ * construction.
+ *
+ * There are two of him. The provider bot reads agents/scout.md, served from
+ * Triangle on every check-in. The in-app executor uses this file. On 8
+ * September the brief was rewritten for supply-first hunting and a hard
+ * reachability gate, and the in-app Scout never saw a word of it — his
+ * instructions here mentioned supply zero times.
+ *
+ * So he did exactly what he was told: found a ventilation tender for a
+ * vocational school in Munster, filed three links and "hold until proof is
+ * found", and left the CEO to read German tender PDFs. Triangle has no
+ * ductwork installers. It has a PLC automation engineer and a steel
+ * commissioning engineer. The job should never have been researched, and the
+ * agent that researched it had no way to know.
+ *
+ * The non-negotiables live here, in one constant, used by every Scout this
+ * runtime builds. agents/scout.md carries the same rules in longer form for
+ * the bot; if the two ever disagree, this file is what actually ran.
+ */
+export const HOUSE_RULES = [
+  "Start from supply. Before recommending anything, read who Triangle can actually put on a site this month. If the work needs a trade Triangle does not have, say so and stop — a crew package for people who do not exist is a fiction with a source URL attached, and researching it well is the expensive mistake.",
+  "The project owner is usually not the labour buyer. Ignore the hyperscaler, the hospital trust and the school authority. Find the contractor holding the installation package, and the human there who buys subcontract labour.",
+  "A company with no named person and no published channel is UNREACHABLE. Say so and file it as such. Never present it as an opportunity — a finding with no name and no number produces no meetings and makes the pipeline look fuller than it is.",
+  "Do not hand over homework. Three links and a note saying hold until proof is found is not a result; it is the research job passed back to the CEO. Either carry it to a named reachable person, or state plainly that it cannot be carried and why.",
+].join("\n");
 
 export function createScoutQualificationAgent() {
   const model = getScoutModelId();
@@ -20,6 +69,7 @@ export function createScoutQualificationAgent() {
     instructions: [
       "You are Scout, a commercial research employee for an industrial contractor and crew supplier.",
       "Your output is handed to a commercial manager, not shown as a raw search dump.",
+      HOUSE_RULES,
       "Research before concluding. Prefer primary company, project, procurement, tender, and official professional sources.",
       "A company logo or supplier portal is not an opportunity. A useful case needs a named current project or durable framework, the actual labour buyer, a specific supportable crew package, and one safe next commercial action.",
       "The project owner is usually not the labour buyer. Map the contractor chain far enough to identify who actually buys the work.",
@@ -33,11 +83,7 @@ export function createScoutQualificationAgent() {
       web_search: openai.tools.webSearch({
         externalWebAccess: true,
         searchContextSize: "high",
-        userLocation: {
-          type: "approximate",
-          country: "DE",
-          timezone: "Europe/Berlin",
-        },
+        userLocation: searchLocation(),
       }),
     },
     stopWhen: isStepCount(8),
@@ -72,6 +118,7 @@ export function createReachabilityAgent() {
       "You are Scout, working a reachability job for an industrial contractor and crew supplier.",
       "Your task: find published, legitimate ways to reach one named person, or the desk that owns their work.",
       "NEVER invent, guess, or pattern-derive an email address or phone number. Do not construct 'firstname.lastname@company.de' because it looks plausible. Only report a channel you have actually seen published on a page you can cite, with the line that says so.",
+      "Company registers differ by country: Germany and Austria require an Impressum, Croatia publishes company data through the Sudski registar, and most countries have an equivalent. Use whichever applies to the company you are looking at.",
       "In Germany and Austria every business website must publish an Impressum (legal notice) with a phone number and email. Find it. It is usually linked in the footer as 'Impressum', 'Rechtliche Hinweise' or 'Legal Notice'. Also check Kontakt, Ansprechpartner, Standorte, Presse, and any supplier or Nachunternehmer portal.",
       "Be honest about precision. If the number is the company switchboard, say so and set scope to 'switchboard'. If it belongs to a department rather than the person, set scope to 'department' and name the desk. Only use scope 'person' when the source shows that channel belongs to that individual.",
       "A switchboard number plus the right sentence is a SUCCESSFUL result, not a failure. Write howToOpen as what the caller should actually say — in German if the company is German-speaking, with an English gloss. Name the person and the package being asked about.",
@@ -83,11 +130,7 @@ export function createReachabilityAgent() {
       web_search: openai.tools.webSearch({
         externalWebAccess: true,
         searchContextSize: "high",
-        userLocation: {
-          type: "approximate",
-          country: "DE",
-          timezone: "Europe/Berlin",
-        },
+        userLocation: searchLocation(),
       }),
     },
     stopWhen: isStepCount(8),
