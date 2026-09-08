@@ -57,3 +57,27 @@ whether an opportunity is good. Do not reply, delete, archive, label, or
 forward any email. Do not touch any system other than the ingest endpoint.
 Re-submitting an already-sent message is safe (Triangle dedupes by messageId)
 — never "clean up" on your own.
+
+## Why Bob stays dumb
+
+A review on 8 September proposed that Bob should extract the five deal facts —
+role, headcount, location, rate, start date — and hand them to Hanna himself.
+He should not, and it is worth writing down why, because the suggestion will
+come back.
+
+Triangle already extracts them. Every ingested message is parsed server-side
+into `agency_name`, `contact_name`, `contact_email`, `client_company`,
+`role_title`, `country`, `headcount_text`, `rate_text`, `start_date_text`. It
+happens deterministically, on every message, at no cost, and it does not
+forget. Moving that job into an agent would make it slower, more expensive and
+less reliable, and would give one more place for a fact to be invented.
+
+The backlog was never an extraction failure. Thirty-four requisitions were
+extracted correctly and thirty-one were never opened, because nothing on any
+screen looked at them. That was a reading problem at the other end of the
+pipe, and it was fixed there — the day's next move now leads with the best
+open requisition matched against the people Triangle actually has.
+
+Bob's value is that he is boring and exact. He moves mail, preserves the
+RFC822 message id, and reports the counts he was given. A courier who starts
+judging the post is a worse courier and not yet a good analyst.
