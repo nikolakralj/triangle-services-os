@@ -44,7 +44,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Every day",
     items: [
-      { href: "/decisions", label: "Cockpit", icon: ClipboardCheck },
+      { href: "/decisions", label: "Today", icon: ClipboardCheck },
       { href: "/dashboard", label: "Overview", icon: Gauge },
       { href: "/agents", label: "Workforce", icon: Cpu },
     ],

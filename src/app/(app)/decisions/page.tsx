@@ -1,12 +1,22 @@
 import { PageHeader } from "@/components/common/page-header";
-import { OperationsCockpit } from "@/components/modules/operations-cockpit";
+import { TodayScreen } from "@/components/modules/today-screen";
 import { getNextMove } from "@/lib/data/next-move";
-import { listDecisionInbox } from "@/lib/data/decision-inbox";
-import { listPlays } from "@/lib/data/plays";
-import { listWorkforce, listAssignments } from "@/lib/data/workforce";
-import { loadAgentFaces } from "@/lib/data/agent-identity";
+import { listWhatCameBack } from "@/lib/data/came-back";
+import { listWorkforce } from "@/lib/data/workforce";
 import { getSession } from "@/lib/auth/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+
+// ---------------------------------------------------------------------------
+// The one screen.
+//
+// This page used to load the decision inbox, the plays, the workforce, every
+// assignment, the agent faces and four table counts, and hand all of it to a
+// 956-line cockpit with a dispatch bar, a human-actions panel, a tactical-plays
+// list and a four-tab Agent Desk whose detail drawer ended in a "Done" button
+// that closed the drawer.
+//
+// Now: the next move, what came back, and the employees who can be asked.
+// ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
@@ -15,76 +25,31 @@ export default async function DecisionsPage() {
   if (!session?.organizationId) {
     return (
       <PageHeader
-        title="Operations Cockpit"
-        description="Cockpit not available — organization context required."
+        title="Today"
+        description="Not available — organization context required."
       />
     );
   }
 
   const svc = createServiceSupabaseClient();
-  const [
-    snapshot,
-    plays,
-    nextMove,
-    employees,
-    assignments,
-    faces,
-    projectsRes,
-    companiesRes,
-    leadsRes,
-    workersRes,
-  ] = await Promise.all([
-    listDecisionInbox(session.organizationId),
-    listPlays(session.organizationId),
-    getNextMove(session.organizationId),
-    listWorkforce(session.organizationId),
-    listAssignments(session.organizationId),
-    loadAgentFaces(session.organizationId),
-    svc
-      ? svc
-          .from("discovered_projects")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", session.organizationId)
-      : Promise.resolve({ count: 18 }),
-    svc
-      ? svc
-          .from("companies")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", session.organizationId)
-      : Promise.resolve({ count: 174 }),
-    svc
-      ? svc
-          .from("job_leads")
-          .select("id", { count: "exact", head: true })
-          .eq("org_id", session.organizationId)
-      : Promise.resolve({ count: 34 }),
-    svc
-      ? svc
-          .from("workers")
-          .select("id", { count: "exact", head: true })
-          .eq("organization_id", session.organizationId)
-      : Promise.resolve({ count: 2 }),
-  ]);
+  const org = session.organizationId;
 
-  const recent = assignments
-    .filter((a) => a.status === "completed" && a.resultSummary)
-    .slice(0, 5)
-    .map((a) => ({
-      id: a.id,
-      title: a.title,
-      status: a.status,
-      resultSummary: a.resultSummary,
-      authorName: faces.byId.get(a.agentInstanceId)?.name ?? "An employee",
-      authorEmoji: faces.byId.get(a.agentInstanceId)?.emoji ?? "🤖",
-      at: a.completedAt ?? a.createdAt,
-    }));
+  const [move, cameBack, employees, projects, companies, leads, people] =
+    await Promise.all([
+      getNextMove(org),
+      listWhatCameBack(org),
+      listWorkforce(org),
+      count(svc, "discovered_projects", "organization_id", org),
+      count(svc, "companies", "organization_id", org),
+      count(svc, "job_leads", "org_id", org),
+      count(svc, "workers", "organization_id", org),
+    ]);
 
-  const sortedEmployees = employees
+  // Scout first, then Hanna, then the rest — the order the router in the Ask
+  // box falls back through when a brief does not clearly belong to either.
+  const roster = employees
     .filter((e) => e.status === "active")
-    .sort((a, b) => {
-      const rank = (r: string) => (r === "project_researcher" ? 0 : r === "hr" ? 1 : 2);
-      return rank(a.roleKey) - rank(b.roleKey);
-    })
+    .sort((a, b) => rank(a.roleKey) - rank(b.roleKey))
     .map((e) => ({
       id: e.id,
       name: e.displayName,
@@ -93,25 +58,37 @@ export default async function DecisionsPage() {
     }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        title="Operations Cockpit"
-        description="Command your AI agents, review live intelligence, and execute today's high-leverage commercial actions."
+        title="Today"
+        description="One action to take, one box to ask in, and what the team brought back."
       />
-      <OperationsCockpit
-        move={nextMove}
-        employees={sortedEmployees}
-        recentResults={recent}
-        plays={plays}
-        snapshot={snapshot}
-        archives={{
-          projectsCount: projectsRes?.count ?? 18,
-          companiesCount: companiesRes?.count ?? 174,
-          leadsCount: leadsRes?.count ?? 34,
-          workersCount: workersRes?.count ?? 2,
-        }}
+      <TodayScreen
+        move={move}
+        employees={roster}
+        cameBack={cameBack}
+        counts={{ projects, companies, leads, people }}
       />
     </div>
   );
 }
 
+function rank(roleKey: string): number {
+  if (roleKey === "project_researcher") return 0;
+  if (roleKey === "hr" || roleKey === "triangle_hr") return 1;
+  return 2;
+}
+
+async function count(
+  svc: ReturnType<typeof createServiceSupabaseClient>,
+  table: string,
+  orgColumn: string,
+  org: string,
+): Promise<number> {
+  if (!svc) return 0;
+  const { count: n } = await svc
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(orgColumn, org);
+  return n ?? 0;
+}
