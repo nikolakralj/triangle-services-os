@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { AgentWorkPulse } from "@/components/modules/agent-work-pulse";
 import { getSession } from "@/lib/auth/session";
-import { countDecisionAttention } from "@/lib/data/decision-inbox";
+import { countDecisions } from "@/lib/data/came-back";
 import {
   DEMO_ORGANIZATION_PROFILE,
   getOrganizationOperatingProfile,
@@ -17,11 +17,13 @@ export default async function AppLayout({
   // getSession() is safe to call here — returns null in demo mode (no Supabase).
   const session = await getSession();
 
-  // Carried in the chrome so proposals waiting on a human are visible from
-  // every page, not only from the one project they were filed against.
+  // Carried in the chrome so decisions waiting on a human are visible from
+  // every page. Counts only findings the contract can describe: the previous
+  // count included every pending proposal ever filed, so the badge read 52
+  // while the screen it links to said "nothing to decide".
   const [approvalsCount, organizationProfile] = session?.organizationId
     ? await Promise.all([
-        countDecisionAttention(session.organizationId),
+        countDecisions(session.organizationId),
         getOrganizationOperatingProfile(session.organizationId),
       ])
     : [0, DEMO_ORGANIZATION_PROFILE];

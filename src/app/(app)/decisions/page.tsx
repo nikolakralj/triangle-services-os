@@ -3,6 +3,8 @@ import { TodayScreen } from "@/components/modules/today-screen";
 import { getNextMove } from "@/lib/data/next-move";
 import { listWhatCameBack } from "@/lib/data/came-back";
 import { getFunnel } from "@/lib/data/funnel";
+import { summarizeRefusals } from "@/lib/data/refusals";
+import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { FunnelStrip } from "@/components/modules/funnel-strip";
 import { listWorkforce } from "@/lib/data/workforce";
 import { getSession } from "@/lib/auth/session";
@@ -36,15 +38,15 @@ export default async function DecisionsPage() {
   const svc = createServiceSupabaseClient();
   const org = session.organizationId;
 
-  const [move, cameBack, employees, funnel, projects, companies, leads, people] =
+  const [move, cameBack, employees, funnel, refusals, projects, companies, people] =
     await Promise.all([
       getNextMove(org),
       listWhatCameBack(org),
       listWorkforce(org),
       getFunnel(org),
+      summarizeRefusals(org),
       count(svc, "discovered_projects", "organization_id", org),
       count(svc, "companies", "organization_id", org),
-      count(svc, "job_leads", "org_id", org),
       count(svc, "workers", "organization_id", org),
     ]);
 
@@ -70,11 +72,15 @@ export default async function DecisionsPage() {
           representation at all: the footer wrote four unrelated numbers out
           as a sentence. */}
       <FunnelStrip funnel={funnel} />
+      {/* What the system would not let anyone record. Moved off Overview:
+          it is the most informative thing this product produces and it was
+          on a page nobody had a reason to open. */}
+      <RefusalLedger summary={refusals} />
       <TodayScreen
         move={move}
         employees={roster}
         cameBack={cameBack}
-        counts={{ projects, companies, leads, people }}
+        counts={{ projects, companies, people }}
       />
     </div>
   );

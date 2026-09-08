@@ -1,5 +1,6 @@
 ﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { HOME_PATH } from "@/lib/security/redirects";
 
 /**
  * Next.js 16+ proxy (formerly middleware).
@@ -55,10 +56,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && pathname === "/login") {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/dashboard";
-    dashboardUrl.searchParams.delete("next");
-    return NextResponse.redirect(dashboardUrl);
+    const home = request.nextUrl.clone();
+    home.pathname = HOME_PATH;
+    home.searchParams.delete("next");
+    return NextResponse.redirect(home);
   }
 
   return supabaseResponse;

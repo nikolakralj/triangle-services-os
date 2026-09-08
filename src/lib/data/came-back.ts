@@ -97,6 +97,32 @@ function humanLine(
   return candidate;
 }
 
+/**
+ * How many things actually need a decision, for the sidebar badge.
+ *
+ * The badge read 52 while the screen it links to said "nothing to decide".
+ * It was counting `countDecisionAttention` — every pending proposal ever
+ * filed, including the thirty that predate the contract and carry no state.
+ * A number in the chrome that overstates what needs a human is the same lie
+ * as a pipeline that looks fuller than it is, and it trains you to ignore
+ * the badge.
+ *
+ * Only rows the contract can describe are counted, because only those can
+ * be acted on.
+ */
+export async function countDecisions(orgId: string): Promise<number> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return 0;
+  const { count } = await svc
+    .from("agent_findings")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "pending")
+    .not("finding_state", "is", null)
+    .in("finding_type", ["project", "company", "contact", "contact_channel"]);
+  return count ?? 0;
+}
+
 export async function listWhatCameBack(
   orgId: string,
   limit = 30,

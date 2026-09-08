@@ -53,7 +53,7 @@ export function TodayScreen({
   move: NextMove;
   employees: Employee[];
   cameBack: CameBackItem[];
-  counts: { projects: number; companies: number; leads: number; people: number };
+  counts: { projects: number; companies: number; people: number };
 }) {
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);

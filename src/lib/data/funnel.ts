@@ -28,7 +28,20 @@ export interface FunnelStage {
 }
 
 export interface Funnel {
+  /** The warm path: a requisition arrived asking for people. */
   stages: FunnelStage[];
+  /**
+   * The cold path: a signal Triangle found on its own.
+   *
+   * These are two genuinely different routes to an order and AGENTS.md names
+   * both — demand-first and supply-first. Overview drew this one as a list of
+   * rows on its own page while Today drew the other as a strip, which is one
+   * business in two idioms in two places: the same disease as the four
+   * vocabularies for a finished job. Both live here, on one scale, so the warm
+   * path being twelve times the size of the cold one is visible instead of
+   * being something you work out by navigating.
+   */
+  cold: FunnelStage[];
   /** Where the largest proportional drop happens, for the one-line verdict. */
   worstDrop: { from: string; to: string; lost: number } | null;
   /** Days since the oldest requisition nobody has answered. */
@@ -54,7 +67,13 @@ async function countOf(
 export async function getFunnel(org: string): Promise<Funnel> {
   const svc = createServiceSupabaseClient();
   if (!svc) {
-    return { stages: [], worstDrop: null, oldestUnansweredDays: null, oldestUnansweredFrom: null };
+    return {
+      stages: [],
+      cold: [],
+      worstDrop: null,
+      oldestUnansweredDays: null,
+      oldestUnansweredFrom: null,
+    };
   }
 
   const [requisitions, replied, named, attempts, reached, routes, orders, oldest] =
@@ -110,6 +129,41 @@ export async function getFunnel(org: string): Promise<Funnel> {
     { key: "orders", label: "Orders", n: orders, human: true },
   ];
 
+  // The cold path, moved off the Overview page. Same numbers it counted, same
+  // meaning; the difference is that it now sits beside the warm path on one
+  // scale instead of on a page of its own.
+  const [signals, packages, requirements, progressByProject] = await Promise.all([
+    countOf(svc, "discovered_projects", "organization_id", org),
+    countOf(svc, "project_packages", "org_id", org),
+    countOf(svc, "commercial_requirements", "org_id", org),
+    (async () => {
+      const { listDiscoveredProjects, rowToDiscoveredProject } = await import(
+        "@/lib/data/discovered-projects"
+      );
+      const { getProjectProgress } = await import("@/lib/data/project-progress");
+      const rows = await listDiscoveredProjects(org, { limit: 300 });
+      const ids = rows.map(rowToDiscoveredProject).map((p) => p.id);
+      return getProjectProgress(ids, org);
+    })(),
+  ]);
+
+  const withBuyer = Array.from(progressByProject.values()).filter(
+    (p) => p.hasBuyerContact,
+  ).length;
+  const coldReachable = Array.from(progressByProject.values()).filter(
+    (p) => p.hasReachableContact,
+  ).length;
+
+  const cold: FunnelStage[] = [
+    { key: "signals", label: "Signals found", n: signals, human: false },
+    { key: "cold-buyer", label: "Buyer named", n: withBuyer, human: false },
+    { key: "cold-reach", label: "Someone to call", n: coldReachable, human: false },
+    { key: "packages", label: "Crew packages", n: packages, human: true },
+    { key: "requirements", label: "Requirements", n: requirements, human: true },
+    { key: "cold-routes", label: "Buyer routes", n: routes, human: true },
+    { key: "cold-orders", label: "Orders", n: orders, human: true },
+  ];
+
   // Ranked by how many were LOST, not by percentage.
   //
   // Proportion picked the wrong step: 3 → 0 at buyer routes is a 100% loss and
@@ -130,6 +184,7 @@ export async function getFunnel(org: string): Promise<Funnel> {
 
   return {
     stages,
+    cold,
     worstDrop,
     oldestUnansweredDays,
     oldestUnansweredFrom: (firstUnanswered?.agency_name as string) ?? null,

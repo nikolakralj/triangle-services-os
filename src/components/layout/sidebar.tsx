@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   FileText,
   Cpu,
-  Gauge,
   Inbox,
   Radar,
   Settings,
@@ -45,7 +44,6 @@ const navGroups: NavGroup[] = [
     label: "Every day",
     items: [
       { href: "/decisions", label: "Today", icon: ClipboardCheck },
-      { href: "/dashboard", label: "Overview", icon: Gauge },
       { href: "/agents", label: "Workforce", icon: Cpu },
     ],
   },
@@ -97,7 +95,7 @@ export function Sidebar({ approvalsCount = 0 }: { approvalsCount?: number }) {
                 const Icon = item.icon;
                 const active =
                   pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  pathname.startsWith(item.href);
                 const highlight = item.highlight;
                 // A live count beats a static label: work waiting on a human
                 // has to be visible from anywhere in the app, not only once
