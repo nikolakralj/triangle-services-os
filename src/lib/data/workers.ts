@@ -36,6 +36,14 @@ export type WorkerRow = {
   /** Countries beyond that where the right to work has been established. */
   work_authorisation: string[];
   visa_notes: string | null;
+  /** Projects this person has done, newest first. Read from their CV. */
+  work_history: Array<{
+    customer: string | null;
+    project: string | null;
+    position: string | null;
+    period: string | null;
+    scope: string | null;
+  }>;
   created_at: string;
   updated_at: string;
   created_by: string | null;

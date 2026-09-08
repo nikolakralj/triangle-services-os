@@ -67,6 +67,14 @@ export interface ProfileWorker {
   nationality: string | null;
   workAuthorisation: string[];
   visaNotes: string | null;
+  /** Projects from the CV. Some people have twenty, some have none. */
+  workHistory: Array<{
+    customer: string | null;
+    project: string | null;
+    position: string | null;
+    period: string | null;
+    scope: string | null;
+  }>;
 }
 
 const AVAILABILITY: Record<string, { label: string; cls: string }> = {
@@ -219,6 +227,15 @@ export function WorkerProfile({
       setSaving(false);
     }
   }
+
+  // What a CV would normally carry and this one did not. Named once rather
+  // than as six headings each saying "Nothing recorded".
+  const notRecorded = [
+    worker.skills.length === 0 ? "skills" : null,
+    worker.certificates.length === 0 ? "certificates" : null,
+    worker.languages.length === 0 ? "languages" : null,
+    worker.workHistory.length === 0 ? "project history" : null,
+  ].filter(Boolean) as string[];
 
   const rate =
     worker.dailyRate != null
@@ -458,22 +475,67 @@ export function WorkerProfile({
           )}
         </div>
 
+        {/* The page is built from what the CV actually had.
+            //
+            // It used to be a fixed grid, so a nine-page CV and a one-page CV
+            // produced the same shape — the same six panels, several of them
+            // reading "Nothing recorded". A panel that exists only to say it is
+            // empty is filler, and worse, it reads as a finding: a Certificates
+            // heading over "Nothing recorded" looks like somebody checked.
+            //
+            // Empty sections are dropped and named once, together, at the
+            // bottom. */}
         <div className="space-y-4">
-          <Panel title="Skills" icon={Wrench}>
-            <Chips items={worker.skills} tone="bg-slate-100 text-slate-700" />
-          </Panel>
+          {/* What they have actually done. For a nine-page CV this is the
+              longest thing on the page; for a one-page CV it is not here at
+              all. A buyer does not buy "PLC commissioning" as a skill, they
+              buy the man who commissioned a down coiler at MMK Iskenderun. */}
+          {worker.workHistory.length > 0 && (
+            <Panel title={`Projects (${worker.workHistory.length})`} icon={Briefcase}>
+              <ol className="space-y-2.5">
+                {worker.workHistory.map((h, i) => (
+                  <li key={i} className="border-l-2 border-slate-200 pl-2.5">
+                    <p className="text-xs font-medium text-slate-900">
+                      {h.project ?? h.customer}
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      {[h.customer !== h.project ? h.customer : null, h.position, h.period]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {h.scope && (
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                        {h.scope}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          )}
 
-          <Panel title="Certificates" icon={Award}>
-            <Chips items={worker.certificates} tone="bg-violet-50 text-violet-700" />
-          </Panel>
+          {worker.skills.length > 0 && (
+            <Panel title="Skills" icon={Wrench}>
+              <Chips items={worker.skills} tone="bg-slate-100 text-slate-700" />
+            </Panel>
+          )}
 
-          <Panel title="Languages" icon={Globe}>
-            <Chips items={worker.languages} tone="bg-sky-50 text-sky-700" />
-          </Panel>
+          {worker.certificates.length > 0 && (
+            <Panel title="Certificates" icon={Award}>
+              <Chips items={worker.certificates} tone="bg-violet-50 text-violet-700" />
+            </Panel>
+          )}
 
-          {/* Right to work sits above the practical facts on purpose: a
-              passport in a drawer is no use if the person cannot legally
-              stand on the site. */}
+          {worker.languages.length > 0 && (
+            <Panel title="Languages" icon={Globe}>
+              <Chips items={worker.languages} tone="bg-sky-50 text-sky-700" />
+            </Panel>
+          )}
+
+          {/* Right to work always shows, even when nothing is on file. It is
+              the one gap where the absence is the answer — an unanswered
+              question about whether somebody may legally work is worth a
+              person's attention, not a quiet omission. */}
           <Panel title="Right to work" icon={Globe}>
             <p className="text-xs text-slate-700">{describeRights(worker)}</p>
             {worker.visaNotes && (
@@ -489,6 +551,7 @@ export function WorkerProfile({
             )}
           </Panel>
 
+          {facts.some((f) => f.on !== null) && (
           <Panel title="Can travel" icon={Car}>
             <ul className="space-y-1">
               {facts.map((f) => (
@@ -518,6 +581,15 @@ export function WorkerProfile({
               </div>
             )}
           </Panel>
+          )}
+
+          {/* Said once, at the bottom, instead of six empty headings. */}
+          {notRecorded.length > 0 && (
+            <p className="px-1 text-[11px] leading-relaxed text-slate-400">
+              Not on file: {notRecorded.join(", ")}. The CV did not say, or no
+              CV has been read yet.
+            </p>
+          )}
 
           {/* Explicitly boolean. `(0 || 0 || 0) && <Panel/>` is `0`, and React
               renders that as a literal "0" — a bare zero floating under the

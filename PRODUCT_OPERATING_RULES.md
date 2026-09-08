@@ -1,9 +1,20 @@
 # Product Operating Rules
 
-## Prime directive — updated 29 August 2026
+## Prime directive — updated 8 September 2026
 
-Triangle is a human-led, AI-assisted **contract-to-crew operating system** for
+Triangle is an agent-operated, human-accountable **contract-to-crew operating system** for
 technical staffing and subcontracting.
+
+For each job a human does, ask whether an agent can take it over end to end.
+If not, name the exact capability, evidence or authority gap. Agents own
+allowed execution and continuation; humans should not retype information,
+coordinate pages, chase agents or approve each harmless research substep.
+Measure verified outcomes and net human time saved, including review and
+rework. Use deterministic automation when sufficient.
+
+This direction does not expand runtime permissions. External-action,
+personal-data, final-record and consequential-decision approval rules below
+remain binding. Preparation is not authority to execute or declare a claim true.
 
 Every serious product change must help Triangle:
 

@@ -12,6 +12,13 @@ to continue authorizes only eligible product/app work.
 
 ## How to use this file
 
+**Execution principle - 8 September 2026:** can an agent take over each human
+job and its follow-through? If not, identify the exact capability, evidence or
+authority gap. Apply this test to the existing ordered slices; do not create a
+new agent catalog or bypass gates. The target experience is verified work plus
+genuine decisions/exceptions, not manual coordination between pages. Current
+approval boundaries remain unchanged. See the audit's 8 September clarification.
+
 `ROADMAP.md` defines the product horizon and evidence gates.
 
 This file defines what happens now, in order. A software agent must not pull a

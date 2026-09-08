@@ -5,6 +5,17 @@
 This file is the honest status report for the repo.
 It should tell a future agent what is real, what is partial, and what still needs cleanup.
 
+## Agent-ownership direction - 8 September 2026
+
+Management clarified the product test: if a human does a job, can an agent
+take it over end to end, and if not, what prevents it? The target is
+agent-operated work with human accountability, decisions and exceptions.
+Agents own allowed follow-through, not merely reports and drafts. The audit,
+vision, operating rules and roadmap guidance now record this principle.
+This is documentation only: no fresh technical audit, implemented capability
+or expanded external-action permission is claimed. Earlier snapshots remain
+dated history.
+
 ## App-development focus — 4 September 2026
 
 Management clarified that current goals focus on app development, not client

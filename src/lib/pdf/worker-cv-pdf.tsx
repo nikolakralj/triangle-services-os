@@ -88,6 +88,10 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   bullet: { fontSize: 10, marginBottom: 2.5, lineHeight: 1.35 },
+  project: { marginBottom: 7 },
+  projectName: { fontSize: 10, fontFamily: "Times-Bold" },
+  projectMeta: { fontSize: 9, color: GREY, marginTop: 1 },
+  projectScope: { fontSize: 9, marginTop: 1.5, lineHeight: 1.3 },
   note: {
     fontSize: 9,
     color: GREY,
@@ -148,6 +152,7 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
     cv.anonymised ? items.slice(0, keep) : items;
 
   const skills = shortlist(cv.skills, 10);
+  const projects = shortlist(cv.workHistory, 6);
   const certificates = shortlist(cv.certificates, 8);
 
   return (
@@ -214,6 +219,38 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
         )}
 
         <Bullets title="Certificates" items={certificates} />
+
+        {/* The projects. On a CV this is the part that sells — a buyer does
+            not buy "PLC commissioning" as a skill, they buy the man who
+            commissioned a down coiler at MMK Iskenderun and want to see where.
+            The client version keeps six: enough to establish the man is real,
+            short enough that a procurement desk reads all of it, and the count
+            says plainly that there are more. */}
+        {projects.length > 0 && (
+          <View>
+            <Text style={s.h2}>Projects</Text>
+            {projects.map((h, i) => (
+              <View key={i} style={s.project} wrap={false}>
+                <Text style={s.projectName}>{h.project ?? h.customer}</Text>
+                {[h.customer !== h.project ? h.customer : null, h.position, h.period]
+                  .filter(Boolean).length > 0 && (
+                  <Text style={s.projectMeta}>
+                    {[h.customer !== h.project ? h.customer : null, h.position, h.period]
+                      .filter(Boolean)
+                      .join("  ·  ")}
+                  </Text>
+                )}
+                {h.scope && <Text style={s.projectScope}>{h.scope}</Text>}
+              </View>
+            ))}
+            {cv.workHistory.length > projects.length && (
+              <Text style={s.projectMeta}>
+                and {cv.workHistory.length - projects.length} further projects,
+                on request
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* The practical facts a site manager asks about before anything else:
             passport, A1, own tools, own transport. */}

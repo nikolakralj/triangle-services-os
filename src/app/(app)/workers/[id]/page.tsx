@@ -63,6 +63,7 @@ export default async function WorkerDetailPage({
           nationality: row.nationality ?? null,
           workAuthorisation: row.work_authorisation ?? [],
           visaNotes: row.visa_notes ?? null,
+          workHistory: row.work_history ?? [],
           city: row.city ?? null,
           languages: row.languages ?? [],
           skills: row.skills ?? [],

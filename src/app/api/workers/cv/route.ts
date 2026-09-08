@@ -172,6 +172,7 @@ export async function POST(request: Request) {
     languages: mergeLists(extracted.guess.languages, reading?.languages, languageName),
     skills: reading?.skills ?? [],
     industries: reading?.industries ?? [],
+    work_history: reading?.work_history ?? [],
     concerns: reading?.concerns ?? [],
     read_by: reading ? "gpt-4.1-mini" : null,
     cv_document_id: doc?.id ?? null,
@@ -212,6 +213,7 @@ export async function POST(request: Request) {
     languages: payload.languages,
     industries: payload.industries,
     notes: payload.summary,
+    work_history: payload.work_history,
   };
 
   let worker: { id: string };
@@ -235,10 +237,27 @@ export async function POST(request: Request) {
 
     for (const [key, value] of Object.entries(fields)) {
       if (value == null || (Array.isArray(value) && value.length === 0)) continue;
+
+      // Project history is not a set of tags to union. Two readings of the
+      // same career produce the same jobs worded differently, and merging them
+      // would give a person two entries for one project. A newer CV carries
+      // the older projects as well, so the newer reading replaces the older
+      // one outright — unless a human has vouched for this record, in which
+      // case it only fills an empty history.
+      if (key === "work_history") {
+        const current = (existing.work_history as unknown[]) ?? [];
+        if (vouchedFor && current.length > 0) {
+          kept.push("work history stayed as it was");
+          continue;
+        }
+        update[key] = value;
+        continue;
+      }
+
       if (Array.isArray(value)) {
         update[key] = mergeLists(
           (existing[key as keyof typeof existing] as string[]) ?? [],
-          value,
+          value as string[],
           key === "languages" ? languageName : undefined,
         );
         continue;
@@ -424,6 +443,7 @@ const normalizeName = (value: string) =>
 
 type WorkerLike = {
   status: string;
+  work_history: unknown[];
   role: string | null;
   city: string | null;
   country: string | null;
@@ -453,7 +473,7 @@ async function findSamePerson(
   cv: { email: string | null; fullName: string; country: string | null },
 ): Promise<WorkerLike | null> {
   const columns =
-    "id, full_name, email, role, city, country, status, skills, certificates, languages, industries, notes";
+    "id, full_name, email, role, city, country, status, skills, certificates, languages, industries, notes, work_history";
 
   if (cv.email) {
     const { data } = await svc

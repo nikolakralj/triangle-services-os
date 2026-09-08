@@ -51,6 +51,41 @@ const cvReadingSchema = z.object({
   certificates: listOfStrings,
   languages: listOfStrings,
   industries: listOfStrings,
+  /**
+   * The projects themselves — the part of a CV that does the selling.
+   *
+   * safeParse per entry rather than for the array: one malformed project
+   * should cost that project, not the whole history.
+   */
+  work_history: z.preprocess(
+    (v) => {
+      if (!Array.isArray(v)) return [];
+      const entry = z.object({
+        customer: nullableText(160),
+        project: nullableText(240),
+        position: nullableText(120),
+        period: nullableText(80),
+        scope: nullableText(400),
+      });
+      return v
+        .map((row) => entry.safeParse(row))
+        .filter((r) => r.success)
+        .map((r) => (r as { data: unknown }).data)
+        .filter((row) => {
+          const e = row as Record<string, unknown>;
+          return Boolean(e.project || e.customer);
+        });
+    },
+    z.array(
+      z.object({
+        customer: z.string().nullable(),
+        project: z.string().nullable(),
+        position: z.string().nullable(),
+        period: z.string().nullable(),
+        scope: z.string().nullable(),
+      }),
+    ).max(40),
+  ),
   summary: nullableText(600),
   /** How much of this the CV actually supports. */
   confidence: z.preprocess(
@@ -117,6 +152,23 @@ Return ONLY what the CV supports. This is the whole job:
 - languages: as stated, keeping the level — "German fluent", "English basic".
 - industries: the sectors worked in — data centres, steel, pharma, automotive,
   oil and gas, pulp and paper.
+- work_history: the projects themselves, newest first. This is the part of a
+  CV that does the selling — a buyer does not buy "PLC commissioning" as a
+  skill, they buy somebody who has commissioned a down coiler at a steel plant,
+  and they want to see where. Each entry:
+    customer — the end client or plant owner: "MMK Iskenderun (Turkey)",
+               "Tata Steel Port Talbot". Null if only the employer is named.
+    project  — what the job was: "Down Coiler (Hot Strip Mill) commissioning",
+               "Galvanizing Line, process and entry/exit PLC".
+    position — what they did on it: "Automation Engineer", "E&I Supervisor".
+    period   — as written: "2016 - 2019", "2021", "6 months 2023". Null if
+               the CV does not date it.
+    scope    — one line of what the work involved, including the equipment or
+               systems named: "Siemens S7 400 — Step7, WinCC, Intouch".
+  Take these as the CV lists them. Do not merge two projects, do not invent a
+  customer for a project that names none, and do not turn a job title held for
+  ten years into ten projects. If the CV gives only employers and dates with no
+  projects under them, list those as entries with project null.
 - summary: two sentences a staffing manager could read out loud, saying what
   this person does and where they have done it.
 - concerns: anything a human should check before vouching for them — a long
@@ -182,6 +234,19 @@ export async function readCv(
               certificates: { type: "array", items: { type: "string" } },
               languages: { type: "array", items: { type: "string" } },
               industries: { type: "array", items: { type: "string" } },
+              work_history: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    customer: { type: ["string", "null"] },
+                    project: { type: ["string", "null"] },
+                    position: { type: ["string", "null"] },
+                    period: { type: ["string", "null"] },
+                    scope: { type: ["string", "null"] },
+                  },
+                },
+              },
               summary: { type: ["string", "null"] },
               confidence: { type: "integer" },
               concerns: { type: "array", items: { type: "string" } },

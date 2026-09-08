@@ -17,10 +17,16 @@ app development and operation for Triangle. External customer discovery and
 paid-design-partner work are paused unless management explicitly reactivates
 them; speculative SaaS features remain gated.
 
-It is human-led and AI-assisted. Its purpose is to turn truthful worker
+It is agent-operated and human-accountable. Its purpose is to turn truthful worker
 capacity and verified demand into buyer conversations, supplier approval,
 commercial orders, mobilized crews, paid invoices, and positive contribution
 margin.
+
+**Management clarification - 8 September 2026:** test every human job for
+end-to-end agent ownership. Name the exact capability, evidence or authority
+gap behind each human handoff. Agents own continuation as well as preparation.
+Measure net human effort removed without weakening quality. Current
+external-action permissions and roadmap evidence gates remain unchanged.
 
 It is not:
 

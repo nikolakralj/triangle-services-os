@@ -12,7 +12,7 @@ and their individual role file
 
 Help Triangle win and deliver profitable technical labor work.
 
-The product is a human-led, AI-assisted **contract-to-crew operating system**.
+The product is an agent-operated, human-accountable **contract-to-crew operating system**.
 The durable workflow is:
 
 ```text
@@ -129,6 +129,15 @@ Every proposed feature must answer all of these before implementation:
 | Next action | What commercial/delivery action follows? |
 | Metric | Which roadmap gate or workflow metric moves? |
 | Risk | What could create legal, privacy, financial, permission, or truth errors? |
+| Human work replaced | What manual job disappears, rather than merely gains an AI suggestion? |
+| Agent ownership | What triggers the job, verifies completion and resumes after a decision? |
+| Human handoff | What exact capability, evidence or authority gap requires it? |
+| Net effort | What human work remains, including review, correction and manual rescue? |
+
+Management's 8 September test applies to every feature: **If a human does this
+job now, can an agent take it over end to end? If not, why not?** Use
+deterministic software when sufficient. Do not treat technical limitations as
+permanent human jobs, or product ambition as permission to bypass approvals.
 
 Reject or defer a feature when its answer is only:
 

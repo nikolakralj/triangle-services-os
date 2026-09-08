@@ -1,9 +1,15 @@
 # Vision
 
-## North Star — updated 29 August 2026
+## North Star — updated 8 September 2026
 
-Triangle is a human-led, AI-assisted **contract-to-crew operating system for
+Triangle is an agent-operated, human-accountable **contract-to-crew operating system for
 cross-border technical staffing and subcontracting**.
+
+For every job a human currently does, ask: **Can an agent take over this job
+end to end? If not, what exactly prevents it?** The target is agents doing all
+work they can reliably perform within delegated authority. Humans set direction
+and handle genuine decisions, exceptions and real-world responsibilities.
+This is the product direction, not a claim of complete automation today.
 
 The system helps Triangle turn truthful worker capacity and verified demand
 into:
@@ -23,8 +29,16 @@ generates AI output, or displays an active agent workforce.
 ## Role of AI agents
 
 Humans manage the company and retain authority over consequential decisions.
-AI agents perform narrow jobs: ingestion, research, extraction, drafting,
-matching assistance, monitoring, and reporting.
+Scoped agents own complete jobs and their follow-through: ingestion, research,
+extraction, matching, preparation, monitoring and case continuation. Humans
+should not be the integration layer between those steps.
+
+Each manual handoff must identify missing integration/data, unproven
+reliability, missing authority or an actual human/physical responsibility.
+Use deterministic software where it is sufficient. Current external-action,
+personal-data and final-record approval rules remain unchanged until explicitly
+revised and tested. See the 8 September clarification in
+`docs/product/PRODUCT_AND_GROWTH_AUDIT_2026-09-07.md`.
 
 Triangle owns:
 

@@ -6,6 +6,25 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-08: Test every human job for end-to-end agent ownership
+
+Management clarified that Triangle combines agents and humans, with agents
+intended to do all work they can reliably perform within delegated authority.
+Ask of every human job: can an agent take it over end to end? If not, why not?
+
+- Agents own jobs, verification and follow-through, not only drafts.
+- Each human handoff names the decision, evidence or authority missing, or the
+  actual human/physical responsibility. Missing integrations and reliability
+  gaps are engineering work, not permanent assignments to the founders.
+- Use deterministic software when sufficient; do not add agent activity for
+  its own sake. Measure human effort including review, rework and manual rescue.
+- Current approval/privacy rules remain. This is not authorization for
+  outreach, data sharing, commitments, money movement or dormant SaaS prospecting.
+
+Recorded in the product/growth audit and reconciled with the vision,
+operating rules, roadmap, execution guidance and software-agent instructions.
+This is a direction clarification, not completed implementation.
+
 ### 2026-04-28: The product is not a generic CRM
 
 Decision:

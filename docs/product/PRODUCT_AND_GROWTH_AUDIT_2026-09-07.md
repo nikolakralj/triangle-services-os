@@ -1,6 +1,55 @@
 # Triangle Services OS: product and growth audit
 
-Review date: 7 September 2026. This is an assessment and proposed priority order, not a claim of production readiness or an amendment to approved product rules.
+Review date: 7 September 2026. Product direction clarified by management on 8 September 2026. Technical findings and counts remain the dated audit snapshot, not a fresh verification.
+
+## Governing product test - 8 September 2026
+
+**If a human is doing a job, can an agent take over that job end to end? If not, what exactly prevents it?**
+
+Triangle combines AI agents and humans. The target is agents doing all work they can reliably perform within delegated authority. Humans set direction and handle genuine decisions, exceptions and real-world responsibilities. Do not reserve a job for humans merely because agencies traditionally employ people to do it.
+
+This corrects the earlier audit's tendency to leave routine coordination and follow-through to the founders. Studying Hays and g2 identifies the jobs that need doing; it does not determine which jobs Triangle must assign to humans. Research, record preparation, matching, drafting, tracking and case continuation should be evaluated as complete agent-owned jobs, not isolated assistant features.
+
+This is a design target, not a claim that today's agents can do everything. It does not authorize outreach, CV sharing, changes to approved facts, agreements or money movement. Current approval, privacy and scoped-access rules remain in force until explicitly revised and tested.
+
+### Review jobs, not just screens
+
+For each manual step or proposed feature, answer:
+
+1. What job is the human doing, and what triggers it?
+2. Can deterministic software remove the job? If so, use it; not every automation needs a model.
+3. What can an agent complete, using which inputs, tools and evidence?
+4. What remains manual, and why: missing integration/data, unproven reliability, missing authority, or an actual human/physical responsibility?
+5. What is the smallest human decision, and can approval cover a bounded workflow instead of repeated clicks?
+6. How does the agent resume after that decision? What useful work can continue while it is pending?
+7. What proves completion, and how much human effort remains including review, correction and manual rescue?
+
+Missing integrations and reliability gaps are engineering backlog, not proof a job is inherently human. Missing authority is a permission boundary, not a model-intelligence limitation. Another agent agreeing is not independent evidence or a substitute for required human approval.
+
+### Target division of work
+
+These are design targets to validate, not claims that all capabilities are delivered or enabled.
+
+| Job | Agent ownership to pursue | Genuine handoff or current boundary |
+| --- | --- | --- |
+| Work an enquiry | Extract requirements, retrieve history, find gaps, prepare clarification and continue the case | External-message approval; the buyer supplies unknown demand facts |
+| Find the buyer route | Research, cross-check sources, map contractors and refresh stale evidence | Restricted actions or unresolved commercial decisions, not routine searching |
+| Process a CV | Extract, compare evidence, propose updates, flag duplicates and prepare documents | Required approval and conflicting identity/credential evidence; no founder retyping |
+| Build a shortlist | Apply hard constraints, compare fit, explain gaps and prepare alternatives | Availability/consent and buyer acceptance require actual evidence |
+| Prepare an offer | Assemble permitted profiles, scope, calculations and a recommendation | Authority over commitments, price exceptions and data release |
+| Manage follow-through | Track promised dates, prepare next actions and resume after approval | Existing send/commitment approvals; humans should not maintain duplicate reminders |
+| Handle routine conversations | Evaluate constrained clarification/scheduling workflows for delegation | Not enabled here; requires explicit authority, identity/privacy rules, reliability tests and escalation |
+| Administer delivery | Reconcile documents, timesheets and invoice/payment evidence; surface discrepancies | Physical work, disputed facts, attestations, regulated sign-off and financial authority |
+
+### Human interface and next milestone
+
+Show completed work, a recommendation and the exact exception. Do not ask Nikola or Ralph to move information between pages, assign each obvious subtask, chase stalled agents or approve every harmless research step.
+
+Illustrative, not a live result: The enquiry is reviewed; two profiles look relevant; start-date availability is unknown; a clarification message is ready for approval. The agent retains the case and continues after the authorized decision. Approval is not proof a message was sent or demand confirmed.
+
+After reliability and permission fixes, finish one **agent-owned intake-to-decision workflow** using existing records and roles. It starts from a real trigger, gathers context, performs allowed work, verifies outputs, presents genuine decisions, resumes after approval and exposes failure. A draft without follow-through is an intermediate artifact, not the finished job.
+
+Measure human minutes/interventions per case, correction burden, reliable completion without manual rescue and downstream commercial outcomes. Fewer clicks do not count if checking unreliable output takes more work. Do not remove valuable human involvement simply to increase an automation percentage.
 
 ## Decision
 

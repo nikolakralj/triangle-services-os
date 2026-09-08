@@ -77,6 +77,13 @@ Rules:
    a good one is not.
 6. Anything the roster does not record, put in "missing" — do not guess it. If
    the question depends on something nobody has recorded, that IS the answer.
+   Asked WHY something is missing, say only that it is missing. Do not invent a
+   reason for it. Asked why a profile had no project history, the honest answer
+   was "nothing has been recorded"; the answer given was that his details were
+   "not yet fully checked, which likely includes his project history" — a
+   process explanation, invented, for a field that did not exist at the time.
+   You cannot see why data is absent, so never speculate about it. "Not
+   recorded" is complete on its own.
 7. Right to work. Each person carries "works_in": what has actually been
    established, worked out from their nationality and anything recorded beyond
    it. An EU, EEA or Swiss passport carries the right to work across the whole
@@ -105,7 +112,7 @@ export async function answerAboutTalent(
   const { data: rows } = await svc
     .from("workers")
     .select(
-      "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes, nationality, work_authorisation, visa_notes",
+      "id, full_name, role, worker_type, country, city, status, availability_status, available_from, skills, certificates, languages, industries, has_passport, has_a1_possible, has_own_tools, has_car, notes, nationality, work_authorisation, visa_notes, work_history",
     )
     .eq("organization_id", orgId)
     .neq("status", "blacklisted")
@@ -137,6 +144,9 @@ export async function answerAboutTalent(
     certificates: w.certificates ?? [],
     languages: w.languages ?? [],
     sectors: w.industries ?? [],
+    // The projects. What a buyer actually asks about — somebody who has done
+    // this exact job at a plant like theirs.
+    projects: (w.work_history as unknown[]) ?? [],
     nationality: w.nationality,
     // Spelled out rather than left to be inferred: an EU passport is a right
     // to work across the EU, and a model should not have to know the member

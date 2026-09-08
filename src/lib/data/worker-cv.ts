@@ -37,6 +37,14 @@ export interface WorkerCvDocument {
   certificates: string[];
   languages: string[];
   industries: string[];
+  /** The projects themselves — what a buyer actually reads. */
+  workHistory: Array<{
+    customer: string | null;
+    project: string | null;
+    position: string | null;
+    period: string | null;
+    scope: string | null;
+  }>;
   availability: string;
   mobility: string[];
   practical: string[];
@@ -58,7 +66,7 @@ export async function buildWorkerCv(params: {
   const { data: w } = await svc
     .from("workers")
     .select(
-      "id, full_name, role, worker_type, email, phone, country, city, languages, skills, certificates, industries, availability_status, available_from, preferred_countries, has_passport, has_a1_possible, has_own_tools, has_car, notes",
+      "id, full_name, role, worker_type, email, phone, country, city, languages, skills, certificates, industries, availability_status, available_from, preferred_countries, has_passport, has_a1_possible, has_own_tools, has_car, notes, work_history",
     )
     .eq("organization_id", params.orgId)
     .eq("id", params.workerId)
@@ -85,6 +93,15 @@ export async function buildWorkerCv(params: {
   const certificates = list(w.certificates);
   const languages = list(w.languages);
   const industries = list(w.industries);
+  const workHistory = Array.isArray(w.work_history)
+    ? (w.work_history as Array<Record<string, string | null>>).map((h) => ({
+        customer: h.customer ?? null,
+        project: h.project ?? null,
+        position: h.position ?? null,
+        period: h.period ?? null,
+        scope: h.scope ?? null,
+      }))
+    : [];
 
   // What Triangle does not hold. Stated, because a CV that simply omits
   // availability reads as though availability were fine.
@@ -92,6 +109,7 @@ export async function buildWorkerCv(params: {
   if (skills.length === 0) notRecorded.push("Skills");
   if (certificates.length === 0) notRecorded.push("Certificates");
   if (languages.length === 0) notRecorded.push("Languages");
+  if (workHistory.length === 0) notRecorded.push("Project history");
   if (!w.country && !w.city) notRecorded.push("Location");
   // On a released CV, missing contact details are the buyer's problem to know
   // about — they were told identity would be released and it was, partially.
@@ -111,6 +129,7 @@ export async function buildWorkerCv(params: {
     certificates,
     languages,
     industries,
+    workHistory,
     availability: describeAvailability(
       w.availability_status ? String(w.availability_status) : null,
       w.available_from ? String(w.available_from) : null,
