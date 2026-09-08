@@ -1,52 +1,27 @@
 #!/bin/bash
-# Pre-commit hook: Auto-trigger Codex for formatting before commit
-# This hook runs Codex auto-polish on staged changes
+# Pre-commit: format and fix what a deterministic tool can fix. No model call.
+#
+# This used to write a "codex-format" job into .claude/orchestration/task-queue.json
+# for a model to pick up and tidy the staged files. Two things were wrong with
+# that. Formatting is a solved problem that eslint does perfectly for nothing,
+# and asking a language model to do it is paying for a worse answer. And it
+# never actually ran: the heredoc that wrote the job needs jq, jq is not
+# installed here, so every commit printed "Codex trigger queued" and queued
+# nothing — while leaving task-queue.json dirty in the working tree.
+#
 # Install: cp .claude/hooks/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
-set -e
-
-echo "🔄 [Pre-commit] Triggering Codex auto-polish..."
-
-# Load orchestration config
-CONFIG_FILE=".claude/orchestration/config.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ Orchestration config not found at $CONFIG_FILE"
-    exit 1
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx)$' || true)
+if [ -z "$STAGED" ]; then
+  exit 0
 fi
 
-# Check if Codex is enabled
-CODEX_ENABLED=$(grep -q '"enabled": true' "$CONFIG_FILE" && echo "true" || echo "false")
-if [ "$CODEX_ENABLED" != "true" ]; then
-    echo "⏭️  Codex is disabled, skipping"
-    exit 0
-fi
-
-# Get list of staged TypeScript/TSX files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx)$' || true)
-
-if [ -z "$STAGED_FILES" ]; then
-    echo "ℹ️  No TypeScript/JavaScript files staged, skipping Codex"
-    exit 0
-fi
-
-# Update task queue to signal Codex
-TASK_QUEUE=".claude/orchestration/task-queue.json"
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# Create a simple notification that Codex should run
-cat > "$TASK_QUEUE.tmp" <<EOF
-{
-  "last_trigger": "pre-commit",
-  "triggered_at": "$TIMESTAMP",
-  "action": "codex-format",
-  "files": $(echo "$STAGED_FILES" | jq -R -s -c 'split("\n")[:-1]'),
-  "status": "pending"
+echo "[pre-commit] eslint --fix on $(echo "$STAGED" | wc -l | tr -d ' ') staged file(s)"
+# shellcheck disable=SC2086
+npx eslint --fix $STAGED || {
+  echo "[pre-commit] eslint found problems it cannot fix. Commit anyway; fix them next."
 }
-EOF
-mv "$TASK_QUEUE.tmp" "$TASK_QUEUE"
-
-echo "✅ [Pre-commit] Codex trigger queued"
-echo "   Files staged: $(echo "$STAGED_FILES" | wc -l)"
-echo "   ⏳ Codex will format on next commit phase"
-
+# Re-stage anything eslint rewrote, so the fix is in the commit rather than
+# left behind in the working tree.
+echo "$STAGED" | xargs -r git add
 exit 0
