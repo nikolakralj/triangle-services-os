@@ -323,3 +323,68 @@ export async function deleteCompany(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/**
+ * The companies something is actually known about.
+ *
+ * A hundred and seventy-four rows, and eight have evidence behind them, five
+ * have ever been worked on, three have a contact and two have a website. The
+ * rest are names a researcher wrote down. Listing all of them alphabetically
+ * under a lead score nothing computes, an owner nobody sets and a "next
+ * action" that always reads n/a is a CRM with no CRM in it — the screen looks
+ * like a pipeline and contains a phone book.
+ *
+ * Nothing is deleted. The names came from real research and may matter later.
+ * They stop being presented as though they were opportunities.
+ */
+export async function companiesWithSubstance(
+  organizationId: string,
+): Promise<Set<string>> {
+  const { createServiceSupabaseClient } = await import("@/lib/supabase/server");
+  const svc = createServiceSupabaseClient();
+  const ids = new Set<string>();
+  if (!svc) return ids;
+
+  const [evidence, worked, contacts, companies] = await Promise.all([
+    svc
+      .from("agent_findings")
+      .select("promoted_entity_id")
+      .eq("org_id", organizationId)
+      .eq("promoted_entity_type", "company"),
+    svc
+      .from("agent_assignment_entities")
+      .select("entity_id")
+      .eq("org_id", organizationId)
+      .eq("entity_type", "company"),
+    svc
+      .from("buyer_contacts")
+      .select("company_name")
+      .eq("organization_id", organizationId),
+    svc
+      .from("companies")
+      .select("id, name, company_status")
+      .eq("organization_id", organizationId),
+  ]);
+
+  for (const r of evidence.data ?? []) {
+    if (r.promoted_entity_id) ids.add(r.promoted_entity_id as string);
+  }
+  for (const r of worked.data ?? []) {
+    if (r.entity_id) ids.add(r.entity_id as string);
+  }
+
+  const named = new Set(
+    (contacts.data ?? [])
+      .map((c) => String(c.company_name ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  for (const c of (companies.data ?? []) as Array<Record<string, unknown>>) {
+    const name = String(c.name ?? "").trim().toLowerCase();
+    // A status somebody moved off the default is a human saying something
+    // about this company, which counts.
+    if (named.has(name) || (c.company_status && c.company_status !== "research")) {
+      ids.add(c.id as string);
+    }
+  }
+  return ids;
+}

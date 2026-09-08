@@ -1,4 +1,5 @@
 import "server-only";
+import { recordRefusal } from "@/lib/data/refusals";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import {
   countMessagesByAssignment,
@@ -550,15 +551,77 @@ export async function listOpenAssignmentsForInstance(
 }
 
 /** A bot finishing ITS OWN assignment. Identity comes from the badge. */
+/**
+ * An assignment cannot be closed while a human question sits unanswered.
+ *
+ * The constitution has said this since 1 September — "do not mark an
+ * assignment complete if you only have a progress update or a question" — and
+ * on 8 September Bob was asked in the app why a specific email had not been
+ * ingested and closed the job with a status blurb. The rule was written down
+ * and disregarded, which is what happens to every rule that lives only in a
+ * brief.
+ *
+ * So it lives here now. Instructing an agent is a request; refusing the write
+ * is a guarantee. A question with no answer after it means the job is not
+ * finished, whatever the agent believes.
+ *
+ * Failing is still allowed. "I could not do this" is an answer.
+ */
+async function unansweredHumanQuestion(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  assignmentId: string,
+): Promise<string | null> {
+  const { data } = await svc
+    .from("assignment_messages")
+    .select("role, body, created_at")
+    .eq("assignment_id", assignmentId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const messages = data ?? [];
+  // Newest first, so the first human message reached before any agent message
+  // is one nobody replied to.
+  for (const m of messages) {
+    if (m.role === "agent") return null;
+    if (m.role === "human") return String(m.body ?? "").slice(0, 200);
+  }
+  return null;
+}
+
 export async function completeAssignment(params: {
   assignmentId: string;
   orgId: string;
   agentInstanceId: string;
   resultSummary: string;
   failed?: boolean;
-}): Promise<boolean> {
+}): Promise<boolean | { refused: string }> {
   const svc = createServiceSupabaseClient();
   if (!svc) return false;
+
+  if (!params.failed) {
+    const question = await unansweredHumanQuestion(svc, params.assignmentId);
+    if (question) {
+      await recordRefusal({
+        orgId: params.orgId,
+        surface: "Complete an assignment",
+        reason:
+          "This job cannot be reported finished: the last thing on the thread " +
+          `is a question from a human that has not been answered — "${question}". ` +
+          "Answer it with { assignmentId, message } first, then report the result.",
+        agentName: null,
+        entityType: "agent_assignment",
+        entityId: params.assignmentId,
+        kind: "boundary",
+      });
+      return {
+        refused:
+          "There is an unanswered question on this assignment. Answer it with " +
+          '{ "assignmentId": "...", "message": "..." } and then report the result. ' +
+          `The question was: "${question}"`,
+      };
+    }
+  }
+
   const { data, error } = await svc
     .from("agent_assignments")
     .update({

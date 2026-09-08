@@ -37,31 +37,42 @@ Record strategic changes in `DECISIONS.md`, and implemented/live truth in
 
 ## Current truth
 
-Read-only live data on 3 September 2026:
+Read-only live data on 8 September 2026:
 
 ```text
-25 job leads              22 new / 3 reviewing
-18 projects               12 chain nodes
-36 research suggestions   28 accepted / 7 pending / 1 rejected
-30 agent findings         10 accepted / 20 pending
-4 buyer contacts          0 reachable (one job running)
-3 packages                1 requirement, still draft
-0 buyer routes            0 recorded sends
-3 available workers       0 orders
+34 job leads              31 new / 3 reviewing — every one carries a named
+                          recruiter and a working email address
+18 projects               17 classified by sector, 1 unclassified
+174 companies             8 with evidence, 5 ever worked on, 3 with a contact
+25 agent findings pending 19 accepted / 1 rejected
+4 buyer contacts          2 reachable — Ostlund and Boxer, phone and email
+                          with the sentence to say
+2 workers                 both candidates, 0 active
+0 buyer routes            0 commercial actions, 0 orders, 0 invoices
 ```
+
+Three corrections to the 3 September block.
+
+**The supply-demand mismatch has reversed and nobody noticed.** That block
+said demand is PCS7/automation while the roster was electrical installation.
+The roster was three seed records — Anton Mueller, Jana Kowalski, Thomas
+Schmidt — invented in May, never real, deleted 7 September. What replaced them
+is an automation engineer with Step7, TIA Portal and PCS7, and an erection and
+commissioning engineer with twenty-five steel projects across Turkey, Belgium,
+the Netherlands, Mexico and the USA. Triangle now holds exactly the trade the
+inbound queue keeps asking for.
+
+**The warm queue was never opened.** Thirty-four requisitions arrived from g2
+Recruitment and Talos in sixty days; thirty-one were never read, because no
+screen queried `job_leads`. The day's move now leads with the best open
+requisition matched against the people actually on the books.
+
+**The 50-electrician package is still not supported by the database** and must
+not be used as evidence of deliverable supply. Two people cannot staff it.
 
 The 29 August block said "4 leads score 70+". `job_leads` has no `score`
 column, so that line described a field that does not exist on that table.
 Corrected rather than carried forward.
-
-27 proposals are waiting on a human, the oldest since 31 August. The sidebar
-badge reads higher (34) because the Decision Inbox also counts unsent drafts
-and failed assignments; both numbers are right for what they measure.
-
-The strongest demand is PCS7/automation. The stored available roster is
-electrical installation: electrician, cable puller, supervisor. The package
-for 50 electricians is not supported by the database. No metric may hide this
-supply-demand mismatch.
 
 ## Operator model — clarified 1 September 2026
 
@@ -123,9 +134,37 @@ the company and project flows show a concrete limitation.
    Impressum line at 90% confidence instead of a bare name; the maincubes
    package shows what it was accepted on; the maincubes requirement inherits
    its project's case and says that it is inherited.
-5. **Safe continuation policies and handoffs.** Make the allowed read-only
-   steps explicit, idempotent, budgeted, and observable. Agents may hand work
-   to another scoped role; consequential actions remain human-approved.
+5. **Safe continuation policies and handoffs — in progress (8 September).**
+   Make the allowed read-only steps explicit, idempotent, budgeted, and
+   observable. Agents may hand work to another scoped role; consequential
+   actions remain human-approved.
+
+   Three enforcement points are live, each because a rule that existed only in
+   a brief was disregarded in practice.
+
+   **An agent cannot report a job finished while a human question on its
+   thread is unanswered.** The constitution has said so since 1 September; on
+   8 September Bob was asked in the app why a specific email had not been
+   ingested and closed the assignment with a status blurb. `completeAssignment`
+   now returns a refusal, the API answers 409 quoting the question back, the
+   assignment stays queued, and nothing is recorded. Failing is still allowed —
+   "I could not do this" is an answer. Verified end to end through the agent
+   API with a throwaway badge: closes cleanly with no question, refuses with
+   one, closes once answered.
+
+   **The unattended runner refuses work it has no handler for** rather than
+   running the only prompt it has and marking it done. A play-derived
+   assignment carries no `case_type` and was being handed to the company
+   qualifier, which answered a question nobody asked and filed it as complete.
+   Refused jobs go back to queued, carry a marker so the loop does not spin on
+   them, and the reason reaches the thread and the refusal ledger.
+
+   **A refusal the code decides on is recorded as one.** `isRefusal` matched
+   the phrasing of Postgres exceptions, so a refusal written in English by this
+   codebase was silently dropped; callers can now state the kind outright.
+
+   Remaining in this slice: budgets per employee, and an explicit written list
+   of the read-only steps an agent may take without asking.
 6. **Outcome-backed learning.** Store corrections, accepted/rejected evidence,
    buyer responses, placements, delivery, and margin as evaluation history.
    Never let model-generated summaries silently overwrite canonical facts.

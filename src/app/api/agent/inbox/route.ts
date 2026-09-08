@@ -127,6 +127,12 @@ export async function POST(request: Request) {
       resultSummary: result,
       failed: body.failed === true,
     });
+    // A refusal is not a 404. The assignment exists and belongs to them —
+    // they simply have not answered the question on it yet, and saying so
+    // precisely is the difference between a rule and an obstacle.
+    if (typeof done === "object" && "refused" in done) {
+      return NextResponse.json({ error: done.refused }, { status: 409 });
+    }
     if (!done) {
       return NextResponse.json(
         { error: "No open assignment with that id belongs to this employee." },

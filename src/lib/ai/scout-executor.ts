@@ -297,6 +297,9 @@ export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkRe
       agentInstanceId: assignment.agentInstanceId,
       resultSummary: serializeScoutCaseReport(report),
     });
+    if (typeof completed === "object" && "refused" in completed) {
+      throw new Error(completed.refused);
+    }
     if (!completed) throw new Error("Assignment changed before Scout could submit it");
 
     if (report.namedProject && report.sources[0]) {
@@ -455,6 +458,9 @@ async function runReachabilityAssignment(
       agentInstanceId: assignment.agentInstanceId,
       resultSummary: serializeReachabilityReport(report),
     });
+    if (typeof completed === "object" && "refused" in completed) {
+      throw new Error(completed.refused);
+    }
     if (!completed) {
       throw new Error("Assignment changed before the reachability report could be submitted");
     }
