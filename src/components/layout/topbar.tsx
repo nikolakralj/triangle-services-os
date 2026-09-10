@@ -6,11 +6,10 @@ import {
   ChevronDown,
   FileUp,
   Plus,
-  Search,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { AskLauncher } from "@/components/missions/ask-launcher";
 
 export function Topbar({
   displayName,
@@ -29,13 +28,10 @@ export function Topbar({
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="grid min-h-14 grid-cols-1 gap-2 px-4 py-2 xl:grid-cols-[minmax(320px,1fr)_auto] xl:items-center xl:px-5">
         <div className="min-w-0">
-          <div className="relative w-full max-w-3xl">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              className="h-10 pl-9"
-              placeholder="Search projects, companies, workers, documents…"
-            />
-          </div>
+          {/* The search box that sat here searched nothing. The one box that
+              does something — ask about your people, or hand the team work —
+              takes its place, on every page and on Ctrl+K. */}
+          <AskLauncher />
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
           <span className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium leading-4 text-slate-700">

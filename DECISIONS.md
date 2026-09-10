@@ -384,6 +384,40 @@ This supersedes the execution timing of the 30 August decision that external
 customer discovery begins during Phase 0. It does not authorize speculative
 generic software or autonomous external action.
 
+### 2026-09-10: Missions are the unit of delegated work
+
+Decision:
+
+- a mission is one objective delegated to one employee; every instruction about
+  that objective is a step inside it, not a new job and not a new tab;
+- a step works from the mission's state — the objective, the conversation, and
+  everything the mission already holds, including what the CEO ruled out and
+  who was already contacted;
+- inside a mission an employee records the companies and people it finds, with
+  their sources, marked agent-found and unverified; a person verifies them or
+  rules them out, with a reason;
+- humans approve actions: contacting anyone, sending, changing commercial
+  status, deleting, committing money. The ledger still refuses a contact that
+  no person confirmed;
+- Today carries only what needs a person: people a mission made reachable, and
+  missions that ask something or stopped;
+- a mission's state (queued, working, needs you, ready, done, blocked) is
+  derived from its steps every time it is shown, never stored.
+
+Why:
+
+- the Ask box answered each question from scratch, so a follow-up re-ran the
+  original question and the queue filled with near-identical research jobs;
+- pressing "Add to Companies" for every sourced fact is transport work, and it
+  was the only way research ever reached the Companies page;
+- one shell — tabs, worker, activity, conversation — serves market research
+  and recruiting through the existing employees, instead of separate AI
+  features.
+
+Built on agent assignments, their threads and agent_runs; no new agent roles.
+Outside missions, research proposals still need human acceptance, and a named
+project enters the pipeline only when a person decides it is one.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

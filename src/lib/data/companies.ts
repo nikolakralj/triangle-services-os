@@ -31,6 +31,8 @@ export type CompanyRow = {
   next_action_at: string | null;
   created_at: string;
   updated_at: string;
+  found_by_agent_instance_id?: string | null;
+  verified_at?: string | null;
 };
 
 export async function listCompanies(
@@ -113,6 +115,8 @@ export function rowToCompany(r: CompanyRow): Company {
     nextActionAt: r.next_action_at ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    foundByAgent: Boolean(r.found_by_agent_instance_id),
+    verifiedAt: r.verified_at ?? undefined,
   };
 }
 

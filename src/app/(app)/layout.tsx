@@ -4,6 +4,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { AgentWorkPulse } from "@/components/modules/agent-work-pulse";
 import { getSession } from "@/lib/auth/session";
 import { countDecisions } from "@/lib/data/came-back";
+import { countMissionsForYou } from "@/lib/data/missions";
 import {
   DEMO_ORGANIZATION_PROFILE,
   getOrganizationOperatingProfile,
@@ -21,18 +22,23 @@ export default async function AppLayout({
   // every page. Counts only findings the contract can describe: the previous
   // count included every pending proposal ever filed, so the badge read 52
   // while the screen it links to said "nothing to decide".
-  const [approvalsCount, organizationProfile] = session?.organizationId
+  //
+  // Missions are counted the way their tabs are drawn — asked something,
+  // finished since you looked, or stopped — so the badge and the strip it
+  // leads to cannot disagree.
+  const [approvalsCount, organizationProfile, missionsCount] = session?.organizationId
     ? await Promise.all([
         countDecisions(session.organizationId),
         getOrganizationOperatingProfile(session.organizationId),
+        countMissionsForYou(session.organizationId),
       ])
-    : [0, DEMO_ORGANIZATION_PROFILE];
+    : ([0, DEMO_ORGANIZATION_PROFILE, 0] as const);
 
   return (
     <AuthGate>
       {session?.organizationId ? <AgentWorkPulse /> : null}
       <div className="flex min-h-screen bg-slate-50">
-        <Sidebar approvalsCount={approvalsCount} />
+        <Sidebar approvalsCount={approvalsCount} missionsCount={missionsCount} />
         <div className="min-w-0 flex-1">
           <Topbar
             displayName={session?.email ?? ""}

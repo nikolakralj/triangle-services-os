@@ -11,6 +11,7 @@ import {
   Radar,
   Settings,
   ShieldAlert,
+  Target,
   Upload,
   UserRound,
   ListChecks,
@@ -44,6 +45,8 @@ const navGroups: NavGroup[] = [
     label: "Every day",
     items: [
       { href: "/decisions", label: "Today", icon: ClipboardCheck },
+      // One objective each, and every instruction given inside it.
+      { href: "/missions", label: "Missions", icon: Target },
       { href: "/agents", label: "Workforce", icon: Cpu },
     ],
   },
@@ -73,7 +76,14 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export function Sidebar({ approvalsCount = 0 }: { approvalsCount?: number }) {
+export function Sidebar({
+  approvalsCount = 0,
+  missionsCount = 0,
+}: {
+  approvalsCount?: number;
+  /** Missions that asked something, finished since you looked, or stopped. */
+  missionsCount?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -100,8 +110,14 @@ export function Sidebar({ approvalsCount = 0 }: { approvalsCount?: number }) {
                 // A live count beats a static label: work waiting on a human
                 // has to be visible from anywhere in the app, not only once
                 // you've opened the right project.
-                const pending = item.href === "/decisions" && approvalsCount > 0;
-                const badge = pending ? String(approvalsCount) : item.badge;
+                const live =
+                  item.href === "/decisions"
+                    ? approvalsCount
+                    : item.href === "/missions"
+                      ? missionsCount
+                      : 0;
+                const pending = live > 0;
+                const badge = pending ? String(live) : item.badge;
                 return (
                   <Link
                     key={item.href}

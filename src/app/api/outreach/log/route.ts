@@ -40,14 +40,17 @@ const bodySchema = z
     // answered. An agency conversation has no contact record and never will.
     contactId: z.string().uuid().optional(),
     leadId: z.string().uuid().optional(),
+    // A person a mission found. They have no project and no requisition, and
+    // pressing "Sent" beside them must still land in the ledger.
+    personId: z.string().uuid().optional(),
     channelKind: z.enum(["phone", "email", "linkedin", "contact_form", "other"]),
     value: z.string().trim().min(1).max(400),
     outcome: z.enum(["sent", "reached", "no_answer", "dead_end"]),
     content: z.string().trim().max(8_000).optional(),
     note: z.string().trim().max(1_000).optional(),
   })
-  .refine((v) => Boolean(v.contactId || v.leadId), {
-    message: "Give either a contactId or a leadId.",
+  .refine((v) => Boolean(v.contactId || v.leadId || v.personId), {
+    message: "Give a contactId, a leadId or a personId.",
   });
 
 export async function POST(request: Request) {
@@ -80,8 +83,12 @@ export async function POST(request: Request) {
       surface: "Log a contact attempt",
       reason: mismatch,
       userId: access.userId,
-      entityType: parsed.data.leadId ? "job_lead" : "buyer_contact",
-      entityId: parsed.data.contactId ?? parsed.data.leadId ?? null,
+      entityType: parsed.data.leadId
+        ? "job_lead"
+        : parsed.data.personId
+          ? "contact"
+          : "buyer_contact",
+      entityId: parsed.data.contactId ?? parsed.data.leadId ?? parsed.data.personId ?? null,
       kind: "truth",
     });
     return NextResponse.json({ error: mismatch }, { status: 400 });
@@ -99,8 +106,12 @@ export async function POST(request: Request) {
       surface: "Log a contact attempt",
       reason: result.error,
       userId: access.userId,
-      entityType: parsed.data.leadId ? "job_lead" : "buyer_contact",
-      entityId: parsed.data.contactId ?? parsed.data.leadId ?? null,
+      entityType: parsed.data.leadId
+        ? "job_lead"
+        : parsed.data.personId
+          ? "contact"
+          : "buyer_contact",
+      entityId: parsed.data.contactId ?? parsed.data.leadId ?? parsed.data.personId ?? null,
     });
     return NextResponse.json({ error: result.error }, { status: 409 });
   }

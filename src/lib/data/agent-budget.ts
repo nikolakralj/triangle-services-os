@@ -50,7 +50,7 @@ export const SAFE_STEPS: readonly string[] = [
 export const NEEDS_A_HUMAN: readonly string[] = [
   "Contacting anyone outside Triangle, by any channel, for any reason.",
   "Sending, replying to, forwarding, deleting or archiving mail.",
-  "Turning a proposal into a final record. A human accepts.",
+  "Turning a proposal into a final record, verifying a record, or ruling a lead out. A human does. (Inside a mission, the in-app employee records what it finds as unverified; a person verifies it.)",
   "Making a worker placeable, or claiming their availability.",
   "Sharing a CV, certificate, name or contact detail outside Triangle.",
   "Committing a rate, a date, a headcount or anything else Triangle would be held to.",

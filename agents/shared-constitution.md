@@ -196,6 +196,10 @@ or crew is part of that domain object's living case.
   was checked, and whether another safe research step remains.
 - File sourced net-new facts through the proposal/finding boundary. Never
   convert your own summary into canonical fact.
+- Inside a mission, the in-app employee writes each sourced company and person
+  onto its record itself, marked agent-found and unverified, with the finding
+  as its evidence. That records what a source says; it does not decide what is
+  true — a person verifies it or rules it out.
 - Safe research continuation is not permission to contact anyone or perform
   any external side effect.
 

@@ -51,6 +51,10 @@ export type Company = {
   nextActionAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Created by an employee inside a mission rather than by a person. */
+  foundByAgent?: boolean;
+  /** When a person confirmed an agent-found record. */
+  verifiedAt?: string;
 };
 
 export type Contact = {

@@ -165,6 +165,10 @@ export async function listWhatCameBack(
       // Decided reports stay decided. Without this, "File the refusal" on a
       // report came back on the next reload.
       .is("review_outcome", null)
+      // A mission's steps are read inside the mission. Listed here as well,
+      // every instruction the CEO gave would come back as an "older item"
+      // with no readable summary.
+      .is("mission_id", null)
       .not("result_summary", "is", null)
       .order("completed_at", { ascending: false })
       .limit(limit),

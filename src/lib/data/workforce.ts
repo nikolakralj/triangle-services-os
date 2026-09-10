@@ -190,6 +190,8 @@ export async function createAssignment(params: {
     relation?: "input" | "target" | "context" | "output";
   }>;
   projectId?: string | null;
+  /** The mission this step belongs to, when it is one instruction inside one. */
+  missionId?: string | null;
   userId: string | null;
 }): Promise<{ id: string } | null> {
   const svc = createServiceSupabaseClient();
@@ -221,6 +223,9 @@ export async function createAssignment(params: {
       expected_output: params.expectedOutput ?? null,
       idempotency_key: params.idempotencyKey ?? null,
       project_id: params.projectId ?? null,
+      // Only sent when set, so every other caller keeps working against a
+      // database that has not had migration 043.
+      ...(params.missionId ? { mission_id: params.missionId } : {}),
       created_by: params.userId,
     })
     .select("id")

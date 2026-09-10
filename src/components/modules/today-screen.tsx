@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   Check,
   Copy,
-  CornerDownLeft,
   Loader2,
   Mail,
   Phone,
@@ -22,13 +21,16 @@ import {
   type ContactOutcome,
 } from "@/lib/data/contact-channels";
 import { AgentReport } from "@/components/modules/agent-report";
+import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
+import { MissionsZone, ReadyForYou } from "@/components/modules/today-missions";
 
 // ---------------------------------------------------------------------------
 // One screen. Three zones. Numbered because it is a real order on the page.
 //
-//   01  NOW     the hero — one action, the only thing in colour
-//   02  ASK     a console line: type, it answers underneath
-//   03  BACK    a tight list with a state rail, not a stack of cards
+//   01  NOW       the hero — one action, the only thing in colour
+//   02  READY     people a mission made reachable, and missions that ask
+//   03  MISSIONS  the work in progress, one card per objective
+//   04  BACK      older reports, a tight list with a state rail
 //
 // The first version of this worked and looked like every admin panel: one
 // border radius, one shadow, one text size, white cards on a white page. Same
@@ -72,15 +74,24 @@ export function TodayScreen({
   move,
   cameBack,
   counts,
+  missions,
+  ready,
 }: {
   move: NextMove;
   employees: Employee[];
   cameBack: CameBackItem[];
   counts: { projects: number; companies: number; people: number };
+  /** Open missions, as their tabs show them. */
+  missions: MissionTab[];
+  /** People a mission made reachable that nobody has contacted yet. */
+  ready: ReadyToContact[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
+  const asking = missions.filter(
+    (m) => m.state === "needs_you" || m.state === "blocked",
+  ).length;
 
   // Keyed by what the card is about, so a new move is a new card: the note box
   // and the button state start empty instead of carrying over from the last
@@ -102,21 +113,71 @@ export function TodayScreen({
         </div>
       </Zone>
 
-      <Zone n="02" name="Ask" note="answers here, in about a minute">
-        <AskConsole />
-      </Zone>
-
+      {/* Only what needs a person: somebody a mission made reachable, and a
+          mission that asked something or stopped. The research itself stays
+          in its mission, one click behind each row. */}
       <Zone
-        n="03"
-        name="Back from the team"
+        n="02"
+        name="Ready for you"
         note={
-          decisions.length === 0
-            ? "nothing to decide"
-            : `${decisions.length} to decide`
+          ready.length === 0 && asking === 0
+            ? "nothing waiting"
+            : [
+                ready.length > 0 ? `${ready.length} to reach` : null,
+                asking > 0
+                  ? `${asking} ${asking === 1 ? "mission needs" : "missions need"} you`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
         }
       >
-        <CameBackList decisions={decisions} older={older} />
+        <ReadyForYou people={ready} missions={missions} />
       </Zone>
+
+      {/* The Ask console that sat here answered one question and forgot it.
+          Work is a mission now; the box that starts one is on every page. */}
+      <Zone
+        n="03"
+        name="Missions"
+        note={missions.length === 0 ? "none open" : `${missions.length} open`}
+      >
+        <MissionsZone missions={missions} />
+      </Zone>
+
+      {/* Reports filed before missions existed. They still carry decisions,
+          so they stay until decided — below the work that replaced them. */}
+      {cameBack.length > 0 && (
+        <Zone
+          n="04"
+          name="Back from the team"
+          note={
+            decisions.length === 0
+              ? "nothing to decide"
+              : `${decisions.length} to decide`
+          }
+        >
+          {/* Folded: these are the one-question jobs missions replaced, and
+              opened by default they ran Today to four thousand pixels of
+              history under the work that matters. */}
+          <details className="group rounded-2xl border border-slate-200 bg-white">
+            <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-[13px] text-slate-600 transition hover:bg-slate-50">
+              <span className="font-mono text-[11px] text-slate-400 transition group-open:rotate-90">
+                ▸
+              </span>
+              <span>
+                <span className="font-semibold text-slate-900">{decisions.length}</span>{" "}
+                {decisions.length === 1 ? "report" : "reports"} from before missions still
+                {decisions.length === 1 ? " waits" : " wait"} for a decision
+                {older.length > 0 ? `, and ${older.length} older ${older.length === 1 ? "item" : "items"}` : ""}
+              </span>
+            </summary>
+            <div className="border-t border-slate-100 p-2.5">
+              <CameBackList decisions={decisions} older={older} />
+            </div>
+          </details>
+        </Zone>
+      )}
 
       {/* What is on file but not on the path to an order. Requisitions are
           deliberately not repeated here — the strip above already draws them,
@@ -510,253 +571,7 @@ function ActionPanel({
   );
 }
 
-// ── 02 · ASK ────────────────────────────────────────────────────────────────
-
-interface AskAnswer {
-  by: string;
-  emoji: string;
-  kind: "talent" | "research" | "refused" | "failed" | "queued";
-  answer: string;
-  people?: Array<{ id: string; name: string; role: string | null; status: string }>;
-  partners?: Array<{ id: string; name: string; trades: string[]; crewSize: number | null }>;
-  blockers?: string[];
-  missing?: string[];
-  state?: "reachable" | "one_thing_missing" | "dead" | null;
-  person?: string | null;
-  door?: string | null;
-  words?: string | null;
-  missingFact?: string | null;
-  missingOwner?: string | null;
-  deadReason?: string | null;
-}
-
-const EXAMPLES = [
-  "Find HVAC and EPC contractors in Frankfurt needing subcontractors",
-  "Two best electrical supervisors for a steel job in the USA",
-  "Match our bench to the open g2 requisitions",
-];
-
-/**
- * One line. No employee to choose.
- *
- * The dispatch bar made the CEO pick Scout or Hanna from a dropdown before
- * typing, which asks him to know the org chart to ask a question. The routing
- * is server-side now, because it depends on what each employee can actually
- * do — the browser-side version created work for Hanna that `run-now` never
- * ran, so the box said "handed out" and nothing happened.
- */
-function AskConsole() {
-  const router = useRouter();
-  const [q, setQ] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState<AskAnswer | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function ask(text: string) {
-    if (text.trim().length < 8 || busy) return;
-    setBusy(true);
-    setError(null);
-    setAnswer(null);
-    try {
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text.trim() }),
-      });
-      const body = (await res.json().catch(() => ({}))) as AskAnswer & {
-        error?: string;
-      };
-      if (!res.ok) {
-        setError(body.error ?? "That did not work.");
-        return;
-      }
-      setAnswer(body);
-      setQ("");
-      router.refresh();
-    } catch {
-      setError("Network error.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(q);
-        }}
-        className="flex items-center gap-2 p-2"
-      >
-        <span className="pl-2 font-mono text-sm text-sky-600">›</span>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          disabled={busy}
-          placeholder="Ask for anything — the market, or your own people"
-          className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-slate-900 placeholder-slate-400 focus:outline-none disabled:opacity-60"
-        />
-        <button
-          type="submit"
-          disabled={busy || q.trim().length < 8}
-          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-slate-900 px-4 text-[13px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-30"
-        >
-          {busy ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <CornerDownLeft className="h-3.5 w-3.5" />
-          )}
-          {busy ? "Working" : "Ask"}
-        </button>
-      </form>
-
-      {!answer && !busy && !error && (
-        <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-3 py-2.5">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => void ask(ex)}
-              className="rounded-lg bg-slate-50 px-2.5 py-1 text-[12px] text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              {ex}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {busy && (
-        <p className="border-t border-slate-100 px-4 py-3 text-[13px] text-slate-500">
-          Working on it. Nothing is being sent to anyone.
-        </p>
-      )}
-
-      {error && (
-        <p className="border-t border-slate-100 px-4 py-3 text-[13px] text-rose-600">
-          {error}
-        </p>
-      )}
-
-      {answer && <AskAnswerBlock a={answer} />}
-    </div>
-  );
-}
-
-function AskAnswerBlock({ a }: { a: AskAnswer }) {
-  const bad = a.kind === "refused" || a.kind === "failed";
-  return (
-    <div
-      className={`border-t px-4 py-4 ${
-        bad ? "border-amber-100 bg-amber-50/50" : "border-slate-100"
-      }`}
-    >
-      <div className="flex items-center gap-1.5">
-        <span className="text-sm">{a.emoji}</span>
-        <span className="text-[12px] font-semibold text-slate-800">{a.by}</span>
-        {a.state && (
-          <span
-            className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
-              STATE_CHIP[a.state]
-            }`}
-          >
-            {STATE_LABEL[a.state]}
-          </span>
-        )}
-        {bad && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-800">
-            {a.kind === "refused" ? "Refused" : "Failed"}
-          </span>
-        )}
-      </div>
-
-      <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-slate-800">
-        {a.answer}
-      </p>
-
-      {(a.people?.length || a.partners?.length) && (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {a.people?.map((p) => (
-            <span
-              key={p.id}
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[12px] text-emerald-800"
-            >
-              {p.name}
-              {p.role ? <span className="text-emerald-600"> · {p.role}</span> : null}
-              {p.status === "candidate" && (
-                <span className="text-emerald-600"> · off a CV</span>
-              )}
-            </span>
-          ))}
-          {a.partners?.map((p) => (
-            <span
-              key={p.id}
-              className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[12px] text-sky-800"
-            >
-              {p.name}
-              <span className="text-sky-600">
-                {" · partner"}
-                {p.crewSize !== null ? ` · up to ${p.crewSize}` : ""}
-              </span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {a.person && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
-          <span className="text-[13px] font-medium text-slate-900">{a.person}</span>
-          {a.door && (
-            <a
-              href={a.door}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-mono text-[12px] text-sky-700 hover:underline"
-            >
-              {a.door.replace(/^https?:\/\//, "").slice(0, 48)}
-              <ArrowUpRight className="h-3 w-3" />
-            </a>
-          )}
-        </div>
-      )}
-      {a.words && (
-        <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-700">
-          {a.words}
-        </p>
-      )}
-      {a.missingFact && (
-        <p className="mt-2 text-[12.5px] text-amber-800">
-          <span className="font-semibold">Missing:</span> {a.missingFact}
-          {a.missingOwner ? ` — ${a.missingOwner}` : ""}
-        </p>
-      )}
-      {a.deadReason && (
-        <p className="mt-2 text-[12.5px] italic text-slate-500">{a.deadReason}</p>
-      )}
-
-      {a.blockers && a.blockers.length > 0 && (
-        <ul className="mt-2.5 space-y-1">
-          {a.blockers.map((b) => (
-            <li
-              key={b}
-              className="flex items-start gap-2 text-[12.5px] leading-snug text-amber-800"
-            >
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-              {b}
-            </li>
-          ))}
-        </ul>
-      )}
-      {a.missing && a.missing.length > 0 && (
-        <p className="mt-2 text-[12px] text-slate-500">
-          Nobody has recorded: {a.missing.join("; ")}.
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ── 03 · BACK FROM THE TEAM ─────────────────────────────────────────────────
+// ── 04 · BACK FROM THE TEAM ─────────────────────────────────────────────────
 
 const STATE_LABEL: Record<string, string> = {
   reachable: "Reachable",

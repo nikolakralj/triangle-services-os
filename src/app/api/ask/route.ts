@@ -1,68 +1,64 @@
-import { NextResponse } from "next/server";
-import {
-  createServiceSupabaseClient,
-  requireApiAccess,
-} from "@/lib/supabase/server";
+import { after, NextResponse } from "next/server";
+import { z } from "zod";
+import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { answerAboutTalent } from "@/lib/ai/talent-answer";
-import { createAssignment, listWorkforce } from "@/lib/data/workforce";
-import { runScoutAssignmentById } from "@/lib/ai/scout-executor";
-import {
-  parseScoutCaseReport,
-  type FindingState,
-} from "@/lib/ai/scout-case-report";
+import { nameMission } from "@/lib/ai/mission-namer";
+import { runMissionQueue } from "@/lib/ai/mission-executor";
+import { listWorkforce } from "@/lib/data/workforce";
+import { addMissionInstruction, startMission } from "@/lib/data/missions";
+import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
-// POST /api/ask — one box, either employee, an answer back.
+// POST /api/ask — the one box.
 //
-// The routing lives here rather than in the browser because it depends on what
-// each employee can actually do, and because the first version of it was
-// wrong in a way no amount of client-side care would have caught: it created
-// an assignment for Hanna, and `run-now` only ever runs Scout, so a question
-// about Triangle's own people was filed and never executed. The box said
-// "handed out" and nothing happened, silently, for ever.
+// Two kinds of thing come through it, and they are honestly different:
 //
-// The two halves are genuinely different work and it is honest to treat them
-// differently:
+//   a quick question about the company's own people
+//        answered now, inline, by the employee who reads the pool. There is
+//        nothing to delegate; the answer is in the database.
 //
-//   Hanna  reads the pool Triangle already has. Synchronous, a few seconds,
-//          no assignment — there is nothing to delegate, the answer is in the
-//          database.
-//   Scout  goes and looks at the world. A real assignment, ~40s, subject to
-//          the finding contract, and it leaves an auditable row behind.
+//   work
+//        a MISSION. "Find EPC contractors in Germany" is not a question with
+//        an answer, it is an objective with a body of work behind it, and
+//        the next seven things the CEO says about it belong to it. So the
+//        box starts one (or adds the instruction to the mission it was asked
+//        from), sends the CEO straight to it, and the worker runs after the
+//        response — the CEO watches the mission fill instead of watching a
+//        spinner for forty seconds.
 //
-// Two corrections from the 10 September source review. Scout's half called
-// runNextScoutAssignment, which claims the OLDEST queued job — so a question
-// typed now could be answered by one queued days ago, and the screen could
-// only apologise for it in small print. It runs the job it just created. And
-// Hanna's half had no role check: a researcher, who cannot see workers on the
-// Talent Pool page, could read them out through a question.
+// This replaces one assignment per question. After two days the queue held a
+// dozen near-identical research questions, each answered from scratch,
+// because a follow-up had nowhere to go but a new job.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 /**
- * Whose question is this?
+ * A quick question about our own pool, or work?
  *
- * Our own people, or the market. Deliberately a small readable rule rather
- * than a model call: spending a second model call to decide which model to
- * call is latency the CEO pays for nothing, and when this guesses wrong the
- * answer still says who answered it.
+ * Kept as a small readable rule for the one case where speed matters — "who
+ * is available" should answer in seconds, not after a naming call. Anything
+ * that is not clearly about the pool becomes a mission, and the namer decides
+ * whether that mission is market research or recruiting.
  */
-function routeTo(text: string): "hanna" | "scout" {
+function isPoolQuestion(text: string): boolean {
   const ours =
     /\b(our|ours|we have|bench|roster|pool|worker|workers|crew|cv|cvs|available|availability|visa|passport|nationality|certificate|ticket|a1|who can|anybody|anyone|somebody)\b/i.test(
       text,
     );
-  const market =
-    /\b(find|search|look for|contractor|contractors|epc|gc|tender|tenders|project|projects|buyer|buyers|company|companies|market|subcontract|subcontractor|who buys|reach)\b/i.test(
+  const work =
+    /\b(find|search|look for|prepare|contractor|contractors|epc|gc|tender|tenders|project|projects|buyer|buyers|company|companies|market|subcontract|subcontractor|who buys|reach|research)\b/i.test(
       text,
     );
-  if (ours && !market) return "hanna";
-  if (market) return "scout";
-  return "scout";
+  return ours && !work;
 }
+
+const bodySchema = z.object({
+  question: z.string().trim().min(2).max(8_000),
+  missionId: z.string().uuid().optional(),
+});
 
 export async function POST(request: Request) {
   const access = await requireApiAccess(request);
@@ -72,34 +68,56 @@ export async function POST(request: Request) {
   const refused = refuseUnlessHuman(access, "canWrite", "ask the team for work");
   if (refused) return refused;
 
-  let body: { question?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Write what you need first." }, { status: 400 });
   }
-  const question = String(body.question ?? "").trim();
-  if (question.length < 8) {
-    return NextResponse.json({ error: "Ask a fuller question." }, { status: 400 });
-  }
+  const { question, missionId } = parsed.data;
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
       { error: "AI is not configured on this deployment." },
       { status: 503 },
     );
   }
+  const orgId = access.organizationId;
 
-  const who = routeTo(question);
+  // ── the next instruction inside a mission ────────────────────────────────
+  // Short is fine here: "electrical first" answers the question Scout asked.
+  if (missionId) {
+    const added = await addMissionInstruction({
+      orgId,
+      userId: access.userId,
+      missionId,
+      text: question,
+    });
+    if ("error" in added) {
+      return NextResponse.json({ error: added.error }, { status: 400 });
+    }
+    after(async () => {
+      try {
+        await runMissionQueue(orgId, missionId);
+      } catch (err) {
+        console.error("mission step:", err);
+      }
+    });
+    return NextResponse.json(
+      { kind: "mission", missionId, stepId: added.stepId },
+      { status: 201 },
+    );
+  }
 
-  // ── Hanna: read the pool, answer now ─────────────────────────────────────
-  if (who === "hanna") {
+  if (question.length < 8) {
+    return NextResponse.json({ error: "Ask a fuller question." }, { status: 400 });
+  }
+
+  // ── a quick question about the pool: answered now ────────────────────────
+  if (isPoolQuestion(question)) {
     // Names, CVs, nationalities and availability. A role that cannot see
-    // workers on the Talent Pool page must not be able to read them out of a
-    // question instead.
-    const noPool = refuseUnlessHuman(access, "canSeeWorkers", "ask about Triangle's people");
+    // workers on the Talent Pool page must not read them out of a question.
+    const noPool = refuseUnlessHuman(access, "canSeeWorkers", "ask about the company's people");
     if (noPool) return noPool;
 
-    const result = await answerAboutTalent(access.organizationId, question);
+    const result = await answerAboutTalent(orgId, question);
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 502 });
     }
@@ -115,92 +133,62 @@ export async function POST(request: Request) {
     });
   }
 
-  // ── Scout: a real assignment, run while you wait ─────────────────────────
-  const roster = await listWorkforce(access.organizationId);
-  const scout = roster.find(
-    (e) => e.roleKey === "project_researcher" && e.status === "active",
-  );
-  if (!scout) {
+  // ── work: a mission ──────────────────────────────────────────────────────
+  const profile = await getOrganizationOperatingProfile(orgId);
+  const naming = await nameMission(question, {
+    name: profile?.name || "the company",
+    companyProfile: profile?.companyProfile || null,
+  });
+  if (naming.kind === "recruiting") {
+    const noPool = refuseUnlessHuman(access, "canSeeWorkers", "start work on the company's people");
+    if (noPool) return noPool;
+  }
+
+  const roster = await listWorkforce(orgId);
+  const lead =
+    naming.kind === "recruiting"
+      ? roster.find((e) => (e.roleKey === "hr" || e.roleKey === "triangle_hr") && e.status === "active")
+      : roster.find((e) => e.roleKey === "project_researcher" && e.status === "active");
+  if (!lead) {
     return NextResponse.json(
-      { error: "No active researcher on the workforce to ask." },
+      {
+        error:
+          naming.kind === "recruiting"
+            ? "Nobody on the workforce reads the talent pool right now."
+            : "No active researcher on the workforce to lead this.",
+      },
       { status: 400 },
     );
   }
 
-  const created = await createAssignment({
-    orgId: access.organizationId,
-    agentInstanceId: scout.id,
-    title: question.split("\n")[0].slice(0, 120),
-    objective: question,
-    priority: "high",
-    // `open_research` must match the executor's dispatcher exactly. It did not,
-    // once: the dispatcher knew this kind of work only as the ABSENCE of a
-    // case type and refused the name itself.
-    constraints: { execution_mode: "in_app", case_type: "open_research" },
+  const started = await startMission({
+    orgId,
     userId: access.userId,
+    text: question,
+    naming,
+    leadAgentInstanceId: lead.id,
   });
-  if (!created) {
-    return NextResponse.json({ error: "Could not hand that out." }, { status: 500 });
+  if ("error" in started) {
+    return NextResponse.json({ error: started.error }, { status: 500 });
   }
 
-  // THIS job, not the oldest one in the queue.
-  const run = await runScoutAssignmentById(access.organizationId, created.id);
-
-  if (run.status === "refused") {
-    return NextResponse.json({
-      by: "Scout",
-      emoji: "🔍",
-      kind: "refused",
-      answer: run.reason,
-      assignmentId: created.id,
-    });
-  }
-  if (run.status === "failed") {
-    return NextResponse.json({
-      by: "Scout",
-      emoji: "🔍",
-      kind: "failed",
-      answer: run.error,
-      assignmentId: created.id,
-    });
-  }
-  if (run.status === "idle") {
-    return NextResponse.json({
-      by: "Scout",
-      emoji: "🔍",
-      kind: "queued",
-      answer:
-        "Filed, but it could not start just now — it may already be running. The answer will land under Back from the team.",
-      assignmentId: created.id,
-    });
-  }
-
-  const svc = createServiceSupabaseClient();
-  const { data } = svc
-    ? await svc
-        .from("agent_assignments")
-        .select("finding_state, result_summary")
-        .eq("id", created.id)
-        .eq("org_id", access.organizationId)
-        .maybeSingle()
-    : { data: null };
-
-  const report = parseScoutCaseReport((data?.result_summary as string) ?? null);
-  const state = (data?.finding_state as FindingState | null) ?? null;
-
-  return NextResponse.json({
-    by: "Scout",
-    emoji: "🔍",
-    kind: "research",
-    assignmentId: created.id,
-    state,
-    answer: report?.executiveSummary?.trim() || run.headline,
-    headline: run.headline,
-    person: report?.buyerPath?.decisionMaker ?? null,
-    door: report?.buyerPath?.publicDoor ?? report?.nextCommercialAction?.channel ?? null,
-    words: report?.nextCommercialAction?.action ?? null,
-    missingFact: report?.unknowns[0] ?? null,
-    missingOwner: report?.missingOwner ?? null,
-    deadReason: report?.deadReason ?? null,
+  after(async () => {
+    try {
+      await runMissionQueue(orgId, started.missionId);
+    } catch (err) {
+      console.error("mission start:", err);
+    }
   });
+
+  return NextResponse.json(
+    {
+      kind: "mission",
+      missionId: started.missionId,
+      stepId: started.stepId,
+      title: naming.title,
+      emoji: naming.emoji,
+      lead: lead.displayName,
+    },
+    { status: 201 },
+  );
 }

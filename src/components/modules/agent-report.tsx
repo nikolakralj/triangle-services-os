@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { parseScoutCaseReport } from "@/lib/ai/scout-case-report";
+import { parseMissionStepRecord, type MissionStepRecord } from "@/lib/ai/mission-report";
 
 // ---------------------------------------------------------------------------
 // An employee's report, readable.
@@ -115,6 +116,49 @@ function parseReport(raw: string): Block[] {
   });
 }
 
+/**
+ * A mission step, as a job on the Workforce page sees it.
+ *
+ * Its record is JSON of a different shape from a case report, and the legacy
+ * prose parser happily "reads" any JSON it is given — so without this, every
+ * instruction given inside a mission would have rendered on Workforce as an
+ * "older report" full of braces. The step's own reply is the readable part;
+ * the companies it filed live in the mission.
+ */
+function MissionStepSummary({
+  record,
+  authorName,
+  authorEmoji,
+}: {
+  record: MissionStepRecord;
+  authorName?: string;
+  authorEmoji?: string;
+}) {
+  const f = record.filed;
+  const filed =
+    record.candidates
+      ? `${f.people} ${f.people === 1 ? "person" : "people"} named from the pool`
+      : f.companies > 0
+        ? `${f.companies} ${f.companies === 1 ? "company" : "companies"} filed · ${f.reachable} with someone to reach`
+        : "Nothing new filed";
+  return (
+    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
+      {authorName && (
+        <p className="mb-0.5 text-[11px] font-medium text-slate-500">
+          {authorEmoji ? `${authorEmoji} ` : ""}
+          {authorName} · part of a mission
+        </p>
+      )}
+      <p className="whitespace-pre-line text-xs leading-relaxed text-slate-700">
+        {record.reply || record.brief.headline}
+      </p>
+      <p className="mt-1.5 text-[11px] text-slate-500">
+        {filed} — the records are in the mission.
+      </p>
+    </div>
+  );
+}
+
 export function AgentReport({
   text,
   authorName,
@@ -127,6 +171,13 @@ export function AgentReport({
   // Hooks first, unconditionally — the structured branch below is an early
   // return and React requires the same hook order on every render.
   const [showRaw, setShowRaw] = useState(false);
+
+  const missionStep = parseMissionStepRecord(text);
+  if (missionStep) {
+    return (
+      <MissionStepSummary record={missionStep} authorName={authorName} authorEmoji={authorEmoji} />
+    );
+  }
 
   // A company qualification is stored as JSON. Rendered as text it became a
   // three-hundred-word wall of braces and escaped quotes on the Workforce page

@@ -7,6 +7,7 @@ import { summarizeRefusals } from "@/lib/data/refusals";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { FunnelStrip } from "@/components/modules/funnel-strip";
 import { listWorkforce } from "@/lib/data/workforce";
+import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { getSession } from "@/lib/auth/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,8 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // list and a four-tab Agent Desk whose detail drawer ended in a "Done" button
 // that closed the drawer.
 //
-// Now: the next move, what came back, and the employees who can be asked.
+// Now: the next move, the people the missions made reachable, the missions
+// themselves, and whatever older reports still wait on a decision.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -38,17 +40,29 @@ export default async function DecisionsPage() {
   const svc = createServiceSupabaseClient();
   const org = session.organizationId;
 
-  const [move, cameBack, employees, funnel, refusals, projects, companies, people] =
-    await Promise.all([
-      getNextMove(org),
-      listWhatCameBack(org),
-      listWorkforce(org),
-      getFunnel(org),
-      summarizeRefusals(org),
-      count(svc, "discovered_projects", "organization_id", org),
-      count(svc, "companies", "organization_id", org),
-      count(svc, "workers", "organization_id", org),
-    ]);
+  const [
+    move,
+    cameBack,
+    employees,
+    funnel,
+    refusals,
+    projects,
+    companies,
+    people,
+    missions,
+    ready,
+  ] = await Promise.all([
+    getNextMove(org),
+    listWhatCameBack(org),
+    listWorkforce(org),
+    getFunnel(org),
+    summarizeRefusals(org),
+    count(svc, "discovered_projects", "organization_id", org),
+    count(svc, "companies", "organization_id", org),
+    count(svc, "workers", "organization_id", org),
+    listMissionTabs(org),
+    listReadyToContact(org),
+  ]);
 
   // Scout first, then Hanna, then the rest — the order the router in the Ask
   // box falls back through when a brief does not clearly belong to either.
@@ -66,7 +80,7 @@ export default async function DecisionsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Today"
-        description="One action to take, one box to ask in, and what the team brought back."
+        description="One action to take, the people your missions made reachable, and the work in progress."
       />
       {/* The business on one line, before the day's work. It had no data
           representation at all: the footer wrote four unrelated numbers out
@@ -81,6 +95,8 @@ export default async function DecisionsPage() {
         employees={roster}
         cameBack={cameBack}
         counts={{ projects, companies, people }}
+        missions={missions}
+        ready={ready}
       />
     </div>
   );

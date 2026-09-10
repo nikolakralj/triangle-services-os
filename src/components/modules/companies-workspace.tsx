@@ -321,6 +321,18 @@ export function CompaniesWorkspace({
                     >
                       {company.name}
                     </Link>
+                    {/* Written by an employee inside a mission, and nobody
+                        has confirmed it yet. The CEO approves actions, not
+                        facts — but he should always be able to tell which is
+                        which. */}
+                    {company.foundByAgent && !company.verifiedAt ? (
+                      <span
+                        title="Created by an employee from a public source. Nobody has confirmed it yet."
+                        className="ml-1.5 rounded-md bg-sky-50 px-1.5 py-px text-[10.5px] font-medium text-sky-700 ring-1 ring-inset ring-sky-200"
+                      >
+                        Agent-found
+                      </span>
+                    ) : null}
                     <div className="text-xs text-slate-500">
                       {company.websiteDomain}
                     </div>

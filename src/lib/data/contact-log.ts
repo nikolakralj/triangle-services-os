@@ -98,6 +98,8 @@ export async function logContactAttempt(params: {
   contactId?: string;
   /** An inbound requisition, when the conversation answers one. */
   leadId?: string;
+  /** A person a mission found — a contacts row, with no project behind it. */
+  personId?: string;
   /** ChannelKind from contact-channels. */
   channelKind: string;
   /** The number dialled or address written to — the record of what was used. */
@@ -121,6 +123,7 @@ export async function logContactAttempt(params: {
   let recipientName: string | null = null;
   let recipientEmail: string | null = null;
   let recipientCompany: string | null = null;
+  let personId: string | null = null;
 
   if (params.contactId) {
     const { data: contact } = await svc
@@ -148,6 +151,31 @@ export async function logContactAttempt(params: {
     recipientName = (lead.contact_name as string | null) ?? null;
     recipientEmail = (lead.contact_email as string | null) ?? null;
     recipientCompany = (lead.agency_name as string | null) ?? null;
+  } else if (params.personId) {
+    // Somebody a mission found. No project, no requisition — a company and a
+    // name, which is how most first conversations actually start.
+    const { data: person } = await svc
+      .from("contacts")
+      .select("id, full_name, email, company_id, do_not_contact")
+      .eq("id", params.personId)
+      .eq("organization_id", params.orgId)
+      .maybeSingle();
+    if (!person) return { ok: false, error: "Person not found." };
+    if (person.do_not_contact) {
+      return { ok: false, error: `${person.full_name as string} is marked do not contact.` };
+    }
+    personId = person.id as string;
+    recipientName = (person.full_name as string | null) ?? null;
+    recipientEmail = (person.email as string | null) ?? null;
+    if (person.company_id) {
+      const { data: company } = await svc
+        .from("companies")
+        .select("name")
+        .eq("id", person.company_id as string)
+        .eq("organization_id", params.orgId)
+        .maybeSingle();
+      recipientCompany = (company?.name as string | null) ?? null;
+    }
   } else {
     return { ok: false, error: "Nothing to log this against." };
   }
@@ -170,6 +198,9 @@ export async function logContactAttempt(params: {
       project_id: projectId,
       buyer_contact_id: contactId,
       job_lead_id: leadId,
+      // Sent only when set, so every other conversation keeps writing the
+      // columns it always has.
+      ...(personId ? { contact_id: personId } : {}),
       channel,
       subject: null,
       body: record,
@@ -189,6 +220,7 @@ export async function logContactAttempt(params: {
   const { data: action, error: actionError } = await svc.from("commercial_actions").insert({
     org_id: params.orgId,
     outreach_draft_id: draft.id,
+    ...(personId ? { contact_id: personId } : {}),
     action_type: ACTION_TYPE[channel] ?? "other",
     status: ACTION_STATUS[params.outcome],
     channel,

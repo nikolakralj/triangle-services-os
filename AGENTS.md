@@ -54,8 +54,11 @@ The current phase and freeze list are authoritative in
 `ROADMAP_EXECUTION.md`. Do not pull later roadmap features forward without
 the required evidence gate.
 
-AI agents propose and report. Humans approve final records, external
-communication, commercial commitments, personal-data sharing, and
+AI agents propose and report. Inside a mission, an employee also records what it
+finds — the companies and people, each with its source — marked agent-found and
+unverified until a person verifies or rules them out ("approve actions, not
+basic facts", 10 September). Humans approve external communication, commercial
+status and commitments, personal-data sharing, deletion, money, and
 mobilization. Provider/model is not the employee identity. Triangle's database
 is truth; agent memory is context.
 

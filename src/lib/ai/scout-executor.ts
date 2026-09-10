@@ -23,7 +23,7 @@ import { withinBudget } from "@/lib/data/agent-budget";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
-type ClaimedAssignment = {
+export type ClaimedAssignment = {
   id: string;
   orgId: string;
   agentInstanceId: string;
@@ -362,6 +362,14 @@ async function runClaimedAssignment(
     typeof assignment.constraints.case_type === "string"
       ? assignment.constraints.case_type
       : null;
+
+  // A step inside a mission reads the mission — its objective, the
+  // conversation and everything it already holds — before it works. Imported
+  // on use, because the mission executor reads supply from this file.
+  if (caseType === "mission_step") {
+    const { runClaimedMissionStep } = await import("@/lib/ai/mission-executor");
+    return runClaimedMissionStep(assignment);
+  }
 
   if (caseType === "contact_reachability") {
     return runReachabilityAssignment(assignment);
@@ -957,7 +965,7 @@ async function runOpenResearchAssignment(
  * told "partner firms: none on file" refuses honestly; an agent told nothing
  * about partners invents them.
  */
-async function listAvailableSupply(orgId: string) {
+export async function listAvailableSupply(orgId: string) {
   const service = createServiceSupabaseClient();
   if (!service) return { ownPeople: [], partnerFirms: [] };
 
