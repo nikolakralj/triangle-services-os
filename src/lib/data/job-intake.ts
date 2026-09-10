@@ -332,23 +332,40 @@ async function findDuplicateLead(
 
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Agency compared without case: g2 arrives as "g2 Recruitment", "G2
+  // Recruitment" and "g2 recruitment", and an exact match let copies of one
+  // role through as separate requisitions. ilike with its wildcards escaped is
+  // a case-insensitive equality, not a pattern.
+  const agency = lead.agencyName.replace(/[\\%_]/g, (c) => `\\${c}`);
   const { data } = await svc
     .from("job_leads")
-    .select("id, role_title")
+    .select("id, role_title, country")
     .eq("org_id", orgId)
-    .eq("agency_name", lead.agencyName)
+    .ilike("agency_name", agency)
     .is("duplicate_of_id", null)
     .gte("created_at", since);
 
   const target = normaliseTitle(lead.roleTitle);
+  const country = normaliseCountry(lead.country);
   for (const row of data ?? []) {
-    if (normaliseTitle(String(row.role_title)) === target) return row.id as string;
+    if (normaliseTitle(String(row.role_title)) !== target) continue;
+    // The country is part of the role. Matching on title alone filed two
+    // Germany PLC commissioning roles as copies of an Ireland one. Unknown on
+    // either side still counts as the same role: a re-send tends to drop the
+    // location, not change it.
+    const rowCountry = normaliseCountry(row.country as string | null);
+    if (country && rowCountry && country !== rowCountry) continue;
+    return row.id as string;
   }
   return null;
 }
 
 function normaliseTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normaliseCountry(country: string | null | undefined): string {
+  return (country ?? "").trim().toLowerCase();
 }
 
 // ── house rules ─────────────────────────────────────────────────────────────

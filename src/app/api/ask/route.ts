@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireApiAccess } from "@/lib/supabase/server";
+import {
+  createServiceSupabaseClient,
+  requireApiAccess,
+} from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { answerAboutTalent } from "@/lib/ai/talent-answer";
 import { createAssignment, listWorkforce } from "@/lib/data/workforce";
-import { runNextScoutAssignment } from "@/lib/ai/scout-executor";
+import { runScoutAssignmentById } from "@/lib/ai/scout-executor";
 import {
   parseScoutCaseReport,
   type FindingState,
 } from "@/lib/ai/scout-case-report";
-import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — one box, either employee, an answer back.
@@ -27,6 +30,13 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 //          database.
 //   Scout  goes and looks at the world. A real assignment, ~40s, subject to
 //          the finding contract, and it leaves an auditable row behind.
+//
+// Two corrections from the 10 September source review. Scout's half called
+// runNextScoutAssignment, which claims the OLDEST queued job — so a question
+// typed now could be answered by one queued days ago, and the screen could
+// only apologise for it in small print. It runs the job it just created. And
+// Hanna's half had no role check: a researcher, who cannot see workers on the
+// Talent Pool page, could read them out through a question.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -59,9 +69,8 @@ export async function POST(request: Request) {
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  if (access.demo || access.role === "viewer") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const refused = refuseUnlessHuman(access, "canWrite", "ask the team for work");
+  if (refused) return refused;
 
   let body: { question?: string };
   try {
@@ -84,6 +93,12 @@ export async function POST(request: Request) {
 
   // ── Hanna: read the pool, answer now ─────────────────────────────────────
   if (who === "hanna") {
+    // Names, CVs, nationalities and availability. A role that cannot see
+    // workers on the Talent Pool page must not be able to read them out of a
+    // question instead.
+    const noPool = refuseUnlessHuman(access, "canSeeWorkers", "ask about Triangle's people");
+    if (noPool) return noPool;
+
     const result = await answerAboutTalent(access.organizationId, question);
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 502 });
@@ -128,7 +143,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not hand that out." }, { status: 500 });
   }
 
-  const run = await runNextScoutAssignment(access.organizationId);
+  // THIS job, not the oldest one in the queue.
+  const run = await runScoutAssignmentById(access.organizationId, created.id);
 
   if (run.status === "refused") {
     return NextResponse.json({
@@ -154,19 +170,17 @@ export async function POST(request: Request) {
       emoji: "🔍",
       kind: "queued",
       answer:
-        "Filed, but something else was already running. It will appear below when it finishes.",
+        "Filed, but it could not start just now — it may already be running. The answer will land under Back from the team.",
       assignmentId: created.id,
     });
   }
 
-  // `run-now` takes the oldest claimable job, which is not necessarily this
-  // one. Read back the row that was actually completed rather than assuming.
   const svc = createServiceSupabaseClient();
   const { data } = svc
     ? await svc
         .from("agent_assignments")
-        .select("id, title, finding_state, result_summary")
-        .eq("id", run.assignmentId)
+        .select("finding_state, result_summary")
+        .eq("id", created.id)
         .eq("org_id", access.organizationId)
         .maybeSingle()
     : { data: null };
@@ -178,10 +192,7 @@ export async function POST(request: Request) {
     by: "Scout",
     emoji: "🔍",
     kind: "research",
-    /** True when the finished job was a different queued one, said plainly. */
-    wasAnotherJob: run.assignmentId !== created.id,
-    otherTitle: run.assignmentId !== created.id ? (data?.title ?? null) : null,
-    assignmentId: run.assignmentId,
+    assignmentId: created.id,
     state,
     answer: report?.executiveSummary?.trim() || run.headline,
     headline: run.headline,

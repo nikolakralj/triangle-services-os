@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import type { ContactOutcome } from "@/lib/data/contact-channels";
 
 // ---------------------------------------------------------------------------
 // What has actually been tried on a person, and what came of it.
@@ -22,9 +23,16 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // only new part.
 // ---------------------------------------------------------------------------
 
-export type AttemptOutcome = "reached" | "no_answer" | "dead_end";
+/**
+ * Defined once, in contact-channels, because the client needs the same list to
+ * draw the buttons. Two copies of one union is how two things drift apart.
+ * "sent" was added on 10 September: an email has no "no answer" at the moment
+ * it goes.
+ */
+export type AttemptOutcome = ContactOutcome;
 
 export const ATTEMPT_LABEL: Record<AttemptOutcome, string> = {
+  sent: "Sent",
   reached: "Got through",
   no_answer: "No answer",
   dead_end: "Dead end",
@@ -66,6 +74,7 @@ const ACTION_TYPE: Record<string, string> = {
 
 /** outreach_status for each outcome — the attempt happened either way. */
 const DRAFT_STATUS: Record<AttemptOutcome, string> = {
+  sent: "sent",
   reached: "replied",
   no_answer: "no_reply",
   dead_end: "replied",
@@ -73,10 +82,14 @@ const DRAFT_STATUS: Record<AttemptOutcome, string> = {
 
 /** commercial_actions.status — all three are terminal, all need confirming. */
 const ACTION_STATUS: Record<AttemptOutcome, string> = {
+  sent: "completed",
   reached: "responded",
   no_answer: "no_response",
   dead_end: "completed",
 };
+
+/** When a sent email or an unanswered call is worth trying again. */
+const FOLLOW_UP_AFTER_DAYS = 4;
 
 export async function logContactAttempt(params: {
   orgId: string;
@@ -93,7 +106,9 @@ export async function logContactAttempt(params: {
   /** What was said, or a precise record of it. */
   content?: string | null;
   note?: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; actionId: string; draftId: string } | { ok: false; error: string }
+> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { ok: false, error: "Database unavailable." };
 
@@ -139,6 +154,11 @@ export async function logContactAttempt(params: {
 
   const channel = DRAFT_CHANNEL[params.channelKind] ?? "email_cold";
   const now = new Date().toISOString();
+  // Something went and nothing came back yet, so there is a date to look again.
+  const followUpAt =
+    params.outcome === "sent" || params.outcome === "no_answer"
+      ? new Date(Date.now() + FOLLOW_UP_AFTER_DAYS * 86_400_000).toISOString()
+      : null;
   const record =
     params.content?.trim() ||
     `${VERB[channel] ?? "Contacted"} ${recipientName ?? "contact"} on ${params.value}.`;
@@ -166,7 +186,7 @@ export async function logContactAttempt(params: {
   // The ledger entry is the part that counts as commercial truth. A human
   // pressed the button, so the human confirmation is real — that is exactly
   // what the guard on this table is checking for.
-  const { error: actionError } = await svc.from("commercial_actions").insert({
+  const { data: action, error: actionError } = await svc.from("commercial_actions").insert({
     org_id: params.orgId,
     outreach_draft_id: draft.id,
     action_type: ACTION_TYPE[channel] ?? "other",
@@ -180,20 +200,23 @@ export async function logContactAttempt(params: {
     response_summary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
     outcome: params.outcome,
     occurred_at: now,
+    follow_up_at: followUpAt,
     human_confirmed_at: now,
     human_confirmed_by: params.userId,
     created_by: params.userId,
     updated_by: params.userId,
-  });
-  if (actionError) {
+  }).select("id").single();
+  if (actionError || !action) {
     // Leaving the draft behind would show an attempt in the history with
     // nothing in the ledger backing it — a record that says a call happened
     // while the books say it did not.
     await svc.from("outreach_drafts").delete().eq("id", draft.id);
-    return { ok: false, error: actionError.message };
+    return { ok: false, error: actionError?.message ?? "Could not record it." };
   }
 
-  return { ok: true };
+  // The ids go back so the screen can say what was recorded and offer to take
+  // it back. Returning only {ok:true} is why a click looked like nothing.
+  return { ok: true, actionId: action.id as string, draftId: draft.id as string };
 }
 
 /** Everything tried on these people, newest first. */
@@ -236,7 +259,12 @@ export async function getContactLog(
       );
     for (const a of actions ?? []) {
       const value = String(a.outcome ?? "");
-      if (value === "reached" || value === "no_answer" || value === "dead_end") {
+      if (
+        value === "sent" ||
+        value === "reached" ||
+        value === "no_answer" ||
+        value === "dead_end"
+      ) {
         outcomeByDraft.set(a.outreach_draft_id as string, value);
       }
     }
@@ -252,7 +280,9 @@ export async function getContactLog(
         ? "no_answer"
         : row.status === "replied"
           ? "reached"
-          : null);
+          : row.status === "sent"
+            ? "sent"
+            : null);
     const list = out.get(contactId) ?? [];
     list.push({
       id: row.id as string,
@@ -265,4 +295,75 @@ export async function getContactLog(
     out.set(contactId, list);
   }
   return out;
+}
+
+/** Long enough to catch a mis-click, short enough that the ledger stays a ledger. */
+export const UNDO_WINDOW_MINUTES = 15;
+
+/**
+ * Take back a contact attempt that was recorded by mistake.
+ *
+ * There was no way to. A mis-click on the Today card filed a requisition as
+ * answered, took it out of the queue for good, and put an attempt in the
+ * ledger that never happened; the only repair was somebody with direct
+ * database access.
+ *
+ * Only the person who recorded it, and only inside the window. An undo that
+ * works on anybody's history at any age is not an undo, it is a way to
+ * rewrite the books.
+ */
+export async function undoContactAttempt(params: {
+  orgId: string;
+  userId: string;
+  actionId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return { ok: false, error: "Database unavailable." };
+
+  const { data: action } = await svc
+    .from("commercial_actions")
+    .select("id, outreach_draft_id, sender_user_id, created_at")
+    .eq("id", params.actionId)
+    .eq("org_id", params.orgId)
+    .maybeSingle();
+  if (!action) return { ok: false, error: "That record no longer exists." };
+
+  if (action.sender_user_id !== params.userId) {
+    return { ok: false, error: "Only the person who recorded it can undo it." };
+  }
+
+  const ageMinutes =
+    (Date.now() - new Date(action.created_at as string).getTime()) / 60_000;
+  if (ageMinutes > UNDO_WINDOW_MINUTES) {
+    return {
+      ok: false,
+      error: `Too late to undo — it was recorded ${Math.round(ageMinutes)} minutes ago, and undo is only for a mis-click.`,
+    };
+  }
+
+  // The ledger entry first: it references the draft.
+  const { error: actionError } = await svc
+    .from("commercial_actions")
+    .delete()
+    .eq("id", params.actionId)
+    .eq("org_id", params.orgId)
+    .eq("sender_user_id", params.userId);
+  if (actionError) return { ok: false, error: actionError.message };
+
+  if (action.outreach_draft_id) {
+    const { error: draftError } = await svc
+      .from("outreach_drafts")
+      .delete()
+      .eq("id", action.outreach_draft_id as string)
+      .eq("org_id", params.orgId);
+    // Left behind, the draft would keep the requisition marked as answered —
+    // a half-undo that looks complete. Say so instead.
+    if (draftError) {
+      return {
+        ok: false,
+        error: `The ledger entry is gone but the draft behind it could not be removed: ${draftError.message}`,
+      };
+    }
+  }
+  return { ok: true };
 }

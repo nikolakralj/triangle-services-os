@@ -44,6 +44,8 @@ export interface CameBackItem {
   deadReason: string | null;
   /** The employee's full hand-in, for progressive disclosure. */
   fullReport: string | null;
+  /** Follow-up work already sent out for this item, newest first. */
+  handedOff: { assignmentId: string; status: string } | null;
 
   sourceUrl: string | null;
 }
@@ -113,14 +115,26 @@ function humanLine(
 export async function countDecisions(orgId: string): Promise<number> {
   const svc = createServiceSupabaseClient();
   if (!svc) return 0;
-  const { count } = await svc
-    .from("agent_findings")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "pending")
-    .not("finding_state", "is", null)
-    .in("finding_type", ["project", "company", "contact", "contact_channel"]);
-  return count ?? 0;
+  // Counted the way the screen counts them: findings AND reports that carry a
+  // state and are not yet decided. Counting findings alone let the badge
+  // disagree with the page it links to — the mismatch this exists to remove.
+  const [findings, reports] = await Promise.all([
+    svc
+      .from("agent_findings")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "pending")
+      .not("finding_state", "is", null)
+      .in("finding_type", ["project", "company", "contact", "contact_channel"]),
+    svc
+      .from("agent_assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "completed")
+      .not("finding_state", "is", null)
+      .is("review_outcome", null),
+  ]);
+  return (findings.count ?? 0) + (reports.count ?? 0);
 }
 
 export async function listWhatCameBack(
@@ -148,6 +162,9 @@ export async function listWhatCameBack(
       )
       .eq("org_id", orgId)
       .eq("status", "completed")
+      // Decided reports stay decided. Without this, "File the refusal" on a
+      // report came back on the next reload.
+      .is("review_outcome", null)
       .not("result_summary", "is", null)
       .order("completed_at", { ascending: false })
       .limit(limit),
@@ -196,6 +213,7 @@ export async function listWhatCameBack(
           : null,
       deadReason: state === "dead" ? firstString(p.dead_reason) : null,
       fullReport: null,
+      handedOff: null,
       sourceUrl: (row.source_url as string) ?? null,
     });
   }
@@ -259,8 +277,35 @@ export async function listWhatCameBack(
           ? report?.deadReason ?? firstString(raw?.notFoundReason)
           : null,
       fullReport: (row.result_summary as string) ?? null,
+      handedOff: null,
       sourceUrl: report?.sources[0]?.url ?? null,
     });
+  }
+
+  // Follow-up work names the item it was sent for. Read it, so an item Scout
+  // is already fetching says so instead of offering the button again — a
+  // second press used to create a second job.
+  if (items.length > 0) {
+    const { data: children } = await svc
+      .from("agent_assignments")
+      .select("id, status, constraints, created_at")
+      .eq("org_id", orgId)
+      .in(
+        "constraints->>parent_id",
+        items.map((i) => i.id),
+      )
+      .order("created_at", { ascending: false });
+    const latestChild = new Map<string, { assignmentId: string; status: string }>();
+    for (const child of children ?? []) {
+      const parentId = (child.constraints as Record<string, unknown> | null)?.parent_id;
+      if (typeof parentId === "string" && !latestChild.has(parentId)) {
+        latestChild.set(parentId, {
+          assignmentId: child.id as string,
+          status: child.status as string,
+        });
+      }
+    }
+    for (const item of items) item.handedOff = latestChild.get(item.id) ?? null;
   }
 
   return items

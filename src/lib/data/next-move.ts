@@ -35,6 +35,8 @@ export interface NextMoveAction {
   contactId: string;
   /** Set when this answers an inbound requisition rather than a contact. */
   leadId?: string;
+  /** Where the role is, so two roles with one title can be told apart. */
+  country?: string | null;
   /** Who we would put forward, when the move is a reply about somebody. */
   offering?: {
     workerId: string;
@@ -157,16 +159,23 @@ export async function getNextMove(
     const who = best.candidates[0];
     const others = leadMatches.length - 1;
     return {
+      // The country is in the headline because one person sends one title for
+      // different countries. Without it, answering "PLC Commissioning
+      // Engineer" produced a card reading "PLC Commissioning Engineer" — a
+      // different role that looked exactly like the one just done.
       headline: `Reply to ${best.contactName ?? best.agency ?? "the agency"} about the ${
         best.roleTitle ?? "open role"
-      }`,
+      }${best.country ? ` role in ${best.country}` : ""}`,
       because: [
         `${best.agency ?? "An agency"} asked${
           best.country ? ` for ${best.country}` : ""
         }${best.startText ? `, starting ${best.startText}` : ""}.`,
+        best.copies > 1
+          ? `They sent this role ${best.copies} times — one reply covers every copy.`
+          : null,
         `${who.name} fits it: ${who.why}.`,
         others > 0
-          ? `${others} more open ${others === 1 ? "requisition" : "requisitions"} behind this one.`
+          ? `${others} more open ${others === 1 ? "role" : "roles"} behind this one.`
           : null,
       ]
         .filter(Boolean)
@@ -177,6 +186,7 @@ export async function getNextMove(
       action: {
         contactId: "",
         leadId: best.leadId,
+        country: best.country,
         personName: best.contactName ?? best.agency ?? "The agency",
         personRole: best.roleTitle,
         company: best.agency,

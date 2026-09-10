@@ -37,6 +37,12 @@ export interface LeadMatch {
   rateText: string | null;
   headcountText: string | null;
   receivedAt: string;
+  /**
+   * How many requisitions this card stands for. g2 sent one Ireland
+   * commissioning role four times; answering one produced its twin, so the
+   * card looked untouched and every click looked like nothing.
+   */
+  copies: number;
   /** Who we could put forward, best first. */
   candidates: Array<{
     id: string;
@@ -49,6 +55,25 @@ export interface LeadMatch {
     caveats: string[];
     score: number;
   }>;
+}
+
+/**
+ * Which real role a requisition belongs to.
+ *
+ * Job intake links a re-sent role to its first copy through duplicate_of_id,
+ * but it matched on agency and title only, so two Germany roles were filed as
+ * copies of an Ireland one. The country is part of the role. Grouping on
+ * (first copy, country) keeps intake's link and undoes its mistake without
+ * rewriting what intake recorded.
+ */
+export function leadGroupKey(lead: {
+  id: string;
+  duplicate_of_id?: string | null;
+  country?: string | null;
+}): string {
+  const root = lead.duplicate_of_id ?? lead.id;
+  const country = (lead.country ?? "").trim().toLowerCase();
+  return `${root}|${country}`;
 }
 
 /** Words that match everything and therefore mean nothing. */
@@ -88,7 +113,7 @@ export async function matchOpenLeads(
     svc
       .from("job_leads")
       .select(
-        "id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at",
+        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at",
       )
       .eq("org_id", orgId)
       .in("status", ["new", "reviewing"])
@@ -114,15 +139,53 @@ export async function matchOpenLeads(
     .from("outreach_drafts")
     .select("job_lead_id")
     .eq("org_id", orgId)
-    .not("job_lead_id", "is", null);
-  const alreadyAnswered = new Set(
-    (answered ?? []).map((r) => r.job_lead_id as string),
+    .not("job_lead_id", "is", null)
+    // An unsent draft is not a reply.
+    .neq("status", "draft");
+
+  // Answered by ROLE, not by row. A reply filed against any copy of a role
+  // answers every copy — otherwise the next card is the same role again.
+  const answeredIds = Array.from(
+    new Set((answered ?? []).map((r) => r.job_lead_id as string).filter(Boolean)),
   );
+  let answeredGroups = new Set<string>();
+  if (answeredIds.length > 0) {
+    const { data: answeredLeads } = await svc
+      .from("job_leads")
+      .select("id, duplicate_of_id, country")
+      .eq("org_id", orgId)
+      .in("id", answeredIds);
+    answeredGroups = new Set(
+      (answeredLeads ?? []).map((l) =>
+        leadGroupKey({
+          id: l.id as string,
+          duplicate_of_id: (l.duplicate_of_id as string | null) ?? null,
+          country: (l.country as string | null) ?? null,
+        }),
+      ),
+    );
+  }
 
   const matches: LeadMatch[] = [];
+  /** Group key -> the card already built for that role, to count its copies. */
+  const cardByGroup = new Map<string, LeadMatch>();
+  const seenGroups = new Set<string>();
 
   for (const lead of leads) {
-    if (alreadyAnswered.has(lead.id as string)) continue;
+    const group = leadGroupKey({
+      id: lead.id as string,
+      duplicate_of_id: (lead.duplicate_of_id as string | null) ?? null,
+      country: (lead.country as string | null) ?? null,
+    });
+    if (answeredGroups.has(group)) continue;
+    if (seenGroups.has(group)) {
+      // Leads arrive newest first, so the card already built is the newest
+      // copy; an older copy only adds to its count.
+      const card = cardByGroup.get(group);
+      if (card) card.copies += 1;
+      continue;
+    }
+    seenGroups.add(group);
 
     const wanted = terms(
       lead.role_title as string,
@@ -195,7 +258,7 @@ export async function matchOpenLeads(
     if (candidates.length === 0) continue;
     candidates.sort((a, b) => b.score - a.score);
 
-    matches.push({
+    const card: LeadMatch = {
       leadId: lead.id as string,
       agency: (lead.agency_name as string | null) ?? null,
       contactName: (lead.contact_name as string | null) ?? null,
@@ -208,7 +271,10 @@ export async function matchOpenLeads(
       headcountText: (lead.headcount_text as string | null) ?? null,
       receivedAt: lead.created_at as string,
       candidates: candidates.slice(0, 3),
-    });
+      copies: 1,
+    };
+    matches.push(card);
+    cardByGroup.set(group, card);
   }
 
   // Best match first, then most recent — a requisition goes cold in days.

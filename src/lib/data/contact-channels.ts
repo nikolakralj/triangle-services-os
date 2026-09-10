@@ -175,3 +175,48 @@ export function bestChannel(contact: ReachableContactLike): ContactChannel | nul
 export function telHref(value: string): string {
   return `tel:${value.replace(/[^\d+]/g, "")}`;
 }
+
+/**
+ * The three things that can happen, in the words that fit the channel.
+ *
+ * The Today card offered "Got through · No answer · Dead end" under an email
+ * with an Open mail button. Those are phone words. "No answer" pressed under
+ * an email that had not been sent recorded a contact that never happened, and
+ * because a recorded reply takes a requisition out of the queue, it filed the
+ * requisition as handled.
+ *
+ * Still three one-click outcomes — never a stage, a score or a form.
+ */
+export type ContactOutcome = "sent" | "reached" | "no_answer" | "dead_end";
+
+export function outcomesFor(kind: ChannelKind | string | null | undefined): Array<{
+  outcome: ContactOutcome;
+  label: string;
+  tone: "good" | "neutral" | "bad";
+}> {
+  if (kind === "phone") {
+    return [
+      { outcome: "reached", label: "Got through", tone: "good" },
+      { outcome: "no_answer", label: "No answer", tone: "neutral" },
+      { outcome: "dead_end", label: "Dead end", tone: "bad" },
+    ];
+  }
+  return [
+    { outcome: "sent", label: "Sent", tone: "neutral" },
+    { outcome: "reached", label: "They replied", tone: "good" },
+    { outcome: "dead_end", label: "Not for us", tone: "bad" },
+  ];
+}
+
+/** What to call it after the click: "Recorded: Sent". */
+export function outcomeSentence(
+  outcome: ContactOutcome,
+  kind: ChannelKind | string | null | undefined,
+): string {
+  const found = outcomesFor(kind).find((o) => o.outcome === outcome);
+  if (found) return found.label;
+  if (outcome === "sent") return "Sent";
+  if (outcome === "no_answer") return "No answer";
+  if (outcome === "dead_end") return "Dead end";
+  return "Got through";
+}

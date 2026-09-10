@@ -17,8 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   contactChannels,
+  outcomesFor,
   telHref,
   type ContactChannel,
+  type ContactOutcome,
 } from "@/lib/data/contact-channels";
 
 // ---------------------------------------------------------------------------
@@ -75,7 +77,7 @@ export interface ContactAttemptRow {
   verb: string;
   at: string;
   note: string | null;
-  outcome: "reached" | "no_answer" | "dead_end" | null;
+  outcome: ContactOutcome | null;
 }
 
 export function BuyerContactsPanel({
@@ -430,7 +432,7 @@ function AttemptTrail({
   const [note, setNote] = useState("");
   const primary = channels[0];
 
-  async function log(outcome: "reached" | "no_answer" | "dead_end", why?: string) {
+  async function log(outcome: ContactOutcome, why?: string) {
     if (!primary) return;
     setBusy(outcome);
     setFailed(null);
@@ -514,19 +516,17 @@ function AttemptTrail({
       ) : (
         <div className="mt-1.5 flex flex-wrap items-center gap-1">
           <span className="text-[11px] text-slate-400">Log a contact:</span>
-          {(
-            [
-              ["reached", "Got through"],
-              ["no_answer", "No answer"],
-              ["dead_end", "Dead end"],
-            ] as const
-          ).map(([outcome, label]) => (
+          {/* The words fit the channel: "No answer" under an email records a
+              contact that did not happen. */}
+          {outcomesFor(primary?.kind).map(({ outcome, label }) => (
             <button
               key={outcome}
               type="button"
               disabled={busy !== null}
               onClick={() =>
-                outcome === "no_answer" ? void log(outcome) : setAsking(outcome)
+                outcome === "no_answer" || outcome === "sent"
+                  ? void log(outcome)
+                  : setAsking(outcome)
               }
               className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
             >

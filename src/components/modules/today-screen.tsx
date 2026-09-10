@@ -10,10 +10,17 @@ import {
   Loader2,
   Mail,
   Phone,
+  Undo2,
+  X,
 } from "lucide-react";
 import type { NextMove, NextMoveAction } from "@/lib/data/next-move";
 import type { CameBackItem } from "@/lib/data/came-back";
-import { telHref } from "@/lib/data/contact-channels";
+import {
+  outcomeSentence,
+  outcomesFor,
+  telHref,
+  type ContactOutcome,
+} from "@/lib/data/contact-channels";
 import { AgentReport } from "@/components/modules/agent-report";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +43,13 @@ import { AgentReport } from "@/components/modules/agent-report";
 // where the content is data a human will copy or dial — addresses, numbers,
 // the prepared words — which is also what makes the script look like a
 // document rather than a paragraph.
+//
+// A click has to visibly do something. On 8 September the outcome buttons
+// saved every time and showed nothing: the page refreshed into the next
+// requisition, which was a copy of the same role, so the card looked untouched
+// and the CEO reported that whatever he clicked, nothing happened. A strip now
+// says what was recorded and offers Undo, and the card below it is a
+// different role.
 // ---------------------------------------------------------------------------
 
 interface Employee {
@@ -43,6 +57,15 @@ interface Employee {
   name: string;
   emoji: string;
   roleTitle: string | null;
+}
+
+/** What was just recorded from the NOW card, so it can be seen and taken back. */
+interface LoggedAttempt {
+  actionId: string;
+  /** "Sent", "No answer", "They replied". */
+  sentence: string;
+  who: string;
+  about: string;
 }
 
 export function TodayScreen({
@@ -55,13 +78,28 @@ export function TodayScreen({
   cameBack: CameBackItem[];
   counts: { projects: number; companies: number; people: number };
 }) {
+  const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
+
+  // Keyed by what the card is about, so a new move is a new card: the note box
+  // and the button state start empty instead of carrying over from the last
+  // person.
+  const cardKey = move.action?.leadId || move.action?.contactId || move.headline;
 
   return (
     <div className="space-y-7">
       <Zone n="01" name="Now" note="one action — the rest can wait">
-        <NowCard move={move} />
+        <div className="space-y-2">
+          {logged && (
+            <RecordedStrip
+              key={logged.actionId}
+              logged={logged}
+              onClear={() => setLogged(null)}
+            />
+          )}
+          <NowCard key={cardKey} move={move} onLogged={setLogged} />
+        </div>
       </Zone>
 
       <Zone n="02" name="Ask" note="answers here, in about a minute">
@@ -88,6 +126,98 @@ export function TodayScreen({
         on file · {counts.people} people · {counts.projects} projects ·{" "}
         {counts.companies} companies
       </p>
+    </div>
+  );
+}
+
+/**
+ * "Recorded: Sent — Oliver Hall · PLC Commissioning Engineer in Ireland. Undo"
+ *
+ * The missing piece behind "whatever I click, nothing happens". The write
+ * always succeeded; nothing on the page ever said so.
+ */
+function RecordedStrip({
+  logged,
+  onClear,
+}: {
+  logged: LoggedAttempt;
+  onClear: () => void;
+}) {
+  const router = useRouter();
+  const [state, setState] = useState<"recorded" | "undoing" | "undone">("recorded");
+  const [error, setError] = useState<string | null>(null);
+
+  async function undo() {
+    setState("undoing");
+    setError(null);
+    try {
+      const res = await fetch("/api/outreach/log", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: logged.actionId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Could not undo it.");
+        setState("recorded");
+        return;
+      }
+      setState("undone");
+      router.refresh();
+    } catch {
+      setError("Network error.");
+      setState("recorded");
+    }
+  }
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-2.5 text-[13px] ${
+        state === "undone"
+          ? "border-slate-200 bg-white text-slate-600"
+          : "border-emerald-200 bg-emerald-50 text-emerald-900"
+      }`}
+    >
+      {state === "undone" ? (
+        <span>Undone — {logged.who} is back on the list.</span>
+      ) : (
+        <span className="flex items-start gap-1.5">
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+          <span>
+            <span className="font-semibold">Recorded: {logged.sentence}</span> —{" "}
+            {logged.who}
+            {logged.about ? ` · ${logged.about}` : ""}. The card below is what is
+            next.
+          </span>
+        </span>
+      )}
+      <span className="grow" />
+      {state !== "undone" && (
+        <button
+          type="button"
+          onClick={() => void undo()}
+          disabled={state === "undoing"}
+          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-50"
+        >
+          {state === "undoing" ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Undo2 className="h-3 w-3" />
+          )}
+          Undo
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label="Dismiss"
+        className="rounded p-1 text-slate-400 transition hover:text-slate-700"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      {error && <p className="w-full text-[12px] text-rose-700">{error}</p>}
     </div>
   );
 }
@@ -122,7 +252,13 @@ function Zone({
 
 // ── 01 · NOW ────────────────────────────────────────────────────────────────
 
-function NowCard({ move }: { move: NextMove }) {
+function NowCard({
+  move,
+  onLogged,
+}: {
+  move: NextMove;
+  onLogged: (logged: LoggedAttempt) => void;
+}) {
   if (move.clear || !move.action) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center">
@@ -145,29 +281,42 @@ function NowCard({ move }: { move: NextMove }) {
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} />
+      <ActionPanel action={move.action} onLogged={onLogged} />
     </div>
   );
 }
 
+const TONE: Record<"good" | "neutral" | "bad", string> = {
+  good: "text-emerald-300 hover:bg-emerald-500/20",
+  neutral: "text-slate-300 hover:bg-white/10",
+  bad: "text-rose-300 hover:bg-rose-500/20",
+};
+
 /**
- * Dial, copy, then log what happened.
+ * Dial or open mail, copy, then record what happened.
  *
- * Behaviour carried over from the cockpit: the one part of that screen that
- * did the right thing. The CEO's maximum effort is a copied email or picking
- * up the phone, and the three outcomes are the whole of the contact history —
- * no stages, no scores, no forms.
+ * The CEO's maximum effort is a copied email or picking up the phone, and the
+ * three outcomes are the whole of the contact history — no stages, no scores,
+ * no forms. The three words now fit the channel: "No answer" under an email
+ * that had not been sent recorded a contact that never happened.
  */
-function ActionPanel({ action }: { action: NextMoveAction }) {
+function ActionPanel({
+  action,
+  onLogged,
+}: {
+  action: NextMoveAction;
+  onLogged: (logged: LoggedAttempt) => void;
+}) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
-  const [logging, setLogging] = useState<string | null>(null);
+  const [logging, setLogging] = useState<ContactOutcome | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const isPhone = action.channelKind === "phone";
+  const outcomes = outcomesFor(action.channelKind);
 
-  async function log(outcome: "reached" | "no_answer" | "dead_end") {
+  async function log(outcome: ContactOutcome) {
     setLogging(outcome);
     setError(null);
     try {
@@ -184,11 +333,22 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
           note: note.trim() || undefined,
         }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(body.error ?? "Could not log that.");
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        actionId?: string;
+      };
+      if (!res.ok || !body.actionId) {
+        setError(body.error ?? "Could not record that.");
         return;
       }
+      onLogged({
+        actionId: body.actionId,
+        sentence: outcomeSentence(outcome, action.channelKind),
+        who: action.personName,
+        about: [action.personRole, action.country ? `in ${action.country}` : null]
+          .filter(Boolean)
+          .join(" "),
+      });
       setNote("");
       router.refresh();
     } catch {
@@ -303,19 +463,13 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
           />
           {/* One segmented control, not three loose buttons. */}
           <div className="flex overflow-hidden rounded-lg border border-white/15">
-            {(
-              [
-                ["reached", "Got through", "hover:bg-emerald-500/20 text-emerald-300"],
-                ["no_answer", "No answer", "hover:bg-white/10 text-slate-300"],
-                ["dead_end", "Dead end", "hover:bg-rose-500/20 text-rose-300"],
-              ] as const
-            ).map(([outcome, label, cls], i) => (
+            {outcomes.map(({ outcome, label, tone }, i) => (
               <button
                 key={outcome}
                 type="button"
                 disabled={logging !== null}
-                onClick={() => log(outcome)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium transition disabled:opacity-40 ${cls} ${
+                onClick={() => void log(outcome)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium transition disabled:opacity-40 ${TONE[tone]} ${
                   i > 0 ? "border-l border-white/15" : ""
                 }`}
               >
@@ -325,6 +479,17 @@ function ActionPanel({ action }: { action: NextMoveAction }) {
             ))}
           </div>
         </div>
+
+        {/* Open mail hands the words to your mail program and sends nothing.
+            Saying so here is what stops "Sent" being pressed for an email
+            that is still sitting in a draft. */}
+        {!isPhone && (
+          <p className="text-[11px] text-slate-500">
+            Open mail sends nothing by itself — press{" "}
+            <span className="text-slate-300">Sent</span> once the email has actually
+            gone.
+          </p>
+        )}
 
         {error && <p className="text-[13px] text-rose-400">{error}</p>}
         {action.history.length > 0 && (
@@ -363,8 +528,6 @@ interface AskAnswer {
   missingFact?: string | null;
   missingOwner?: string | null;
   deadReason?: string | null;
-  wasAnotherJob?: boolean;
-  otherTitle?: string | null;
 }
 
 const EXAMPLES = [
@@ -506,16 +669,6 @@ function AskAnswerBlock({ a }: { a: AskAnswer }) {
           </span>
         )}
       </div>
-
-      {/* `run-now` takes the oldest claimable job, which may not be the one
-          just asked for. Saying so beats presenting another job's answer as
-          the answer to this question. */}
-      {a.wasAnotherJob && a.otherTitle && (
-        <p className="mt-1.5 text-[12px] text-slate-500">
-          This answers an earlier queued job — “{a.otherTitle}”. Yours is next;
-          press Ask again in a moment.
-        </p>
-      )}
 
       <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-slate-800">
         {a.answer}
@@ -685,6 +838,13 @@ function CameBackRow({ item }: { item: CameBackItem }) {
   const [reason, setReason] = useState("");
   const [done, setDone] = useState<string | null>(null);
 
+  // Follow-up work already out for this item. The button used to be offered
+  // again while Scout was still working, and a second press made a second job.
+  const fetching =
+    item.handedOff !== null &&
+    (item.handedOff.status === "queued" || item.handedOff.status === "active");
+  const answeredByScout = item.handedOff?.status === "completed";
+
   async function act(action: string, extra: Record<string, unknown> = {}) {
     setBusy(action);
     setError(null);
@@ -692,24 +852,30 @@ function CameBackRow({ item }: { item: CameBackItem }) {
       const res = await fetch("/api/came-back", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          kind: item.kind,
-          id: item.id,
-          title: item.title,
-          ...extra,
-        }),
+        // Only what identifies the record and what the human decided. The
+        // missing fact and the title used to travel from the browser and were
+        // trusted; the server reads them from the record now.
+        body: JSON.stringify({ action, kind: item.kind, id: item.id, ...extra }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        alreadyOut?: boolean;
+        warning?: string;
+      };
       if (!res.ok) {
         setError(body.error ?? "That did not work.");
         return;
       }
       setDone(
         action === "send_back"
-          ? "Handed out — the answer will land here."
-          : "Recorded. It will not come back.",
+          ? body.alreadyOut
+            ? "Scout already has this — the answer will land here."
+            : "Sent to Scout — the answer will land here."
+          : action === "discard"
+            ? "Discarded with your reason. It will not come back."
+            : "Filed. It will not come back.",
       );
+      if (body.warning) setError(body.warning);
       setDiscarding(false);
       router.refresh();
     } catch {
@@ -825,23 +991,39 @@ function CameBackRow({ item }: { item: CameBackItem }) {
               </>
             )}
 
-            {item.state === "one_thing_missing" && item.missing && (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => act("send_back", { fact: item.missing?.fact })}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
-              >
-                {busy === "send_back" && <Loader2 className="h-3 w-3 animate-spin" />}
-                Send Scout back for it
-              </button>
+            {item.state === "one_thing_missing" && item.missing && fetching && (
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                Scout is fetching it — the answer will land here.
+              </span>
             )}
 
-            {item.state === "dead" && item.kind === "finding" && (
+            {item.state === "one_thing_missing" && item.missing && answeredByScout && (
+              <span className="text-[12.5px] text-slate-500">
+                Scout came back on this — the report is in this list.
+              </span>
+            )}
+
+            {item.state === "one_thing_missing" &&
+              item.missing &&
+              !fetching &&
+              !answeredByScout && (
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void act("send_back")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40"
+                >
+                  {busy === "send_back" && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Send Scout back for it
+                </button>
+              )}
+
+            {item.state === "dead" && (
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={() => act("file_refusal")}
+                onClick={() => void act("file_refusal")}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
               >
                 {busy === "file_refusal" && (
@@ -851,7 +1033,7 @@ function CameBackRow({ item }: { item: CameBackItem }) {
               </button>
             )}
 
-            {item.kind === "finding" && item.state !== "dead" && (
+            {item.state !== "dead" && (
               <button
                 type="button"
                 onClick={() => setDiscarding((v) => !v)}
@@ -902,7 +1084,7 @@ function CameBackRow({ item }: { item: CameBackItem }) {
             <button
               type="button"
               disabled={busy !== null || reason.trim().length < 3}
-              onClick={() => act("discard", { reason: reason.trim() })}
+              onClick={() => void act("discard", { reason: reason.trim() })}
               className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-rose-600 disabled:opacity-40"
             >
               {busy === "discard" && <Loader2 className="h-3 w-3 animate-spin" />}

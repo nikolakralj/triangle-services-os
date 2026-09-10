@@ -157,6 +157,47 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
   return null;
 }
 
+/** Claim exactly this row, if it is queued work for an active Scout in this org. */
+async function claimAssignmentById(
+  orgId: string,
+  assignmentId: string,
+): Promise<ClaimedAssignment | null> {
+  const service = createServiceSupabaseClient();
+  if (!service) return null;
+
+  const { data: scouts } = await service
+    .from("agent_instances")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("role_key", "project_researcher")
+    .eq("status", "active");
+  const scoutIds = (scouts ?? []).map((row) => row.id as string);
+  if (scoutIds.length === 0) return null;
+
+  // The same atomic queued -> active step the queue runner uses, so a job can
+  // never be run twice by two callers racing for it.
+  const { data: claimed } = await service
+    .from("agent_assignments")
+    .update({ status: "active", started_at: new Date().toISOString() })
+    .eq("id", assignmentId)
+    .eq("org_id", orgId)
+    .eq("status", "queued")
+    .in("agent_instance_id", scoutIds)
+    .select("id,org_id,agent_instance_id,title,objective,expected_output,constraints")
+    .maybeSingle();
+  if (!claimed) return null;
+
+  return {
+    id: claimed.id as string,
+    orgId: claimed.org_id as string,
+    agentInstanceId: claimed.agent_instance_id as string,
+    title: claimed.title as string,
+    objective: claimed.objective as string,
+    expectedOutput: (claimed.expected_output as string) ?? null,
+    constraints: (claimed.constraints as Record<string, unknown>) ?? {},
+  };
+}
+
 async function buildAssignmentContext(assignment: ClaimedAssignment) {
   const service = createServiceSupabaseClient();
   if (!service) throw new Error("Database unavailable");
@@ -255,11 +296,34 @@ async function buildAssignmentContext(assignment: ClaimedAssignment) {
 export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkResult> {
   const assignment = await claimNextAssignment(orgId);
   if (!assignment) return { status: "idle" };
+  return runClaimedAssignment(assignment);
+}
 
+/**
+ * Run one specific assignment, now.
+ *
+ * The Ask box created a job and then called runNextScoutAssignment, which
+ * claims the OLDEST queued job — so a question typed today could be answered
+ * by a job queued last week while the question itself waited. The screen said
+ * so in small print, which was honest about the bug rather than free of it.
+ * This claims the row it is given, or nothing.
+ */
+export async function runScoutAssignmentById(
+  orgId: string,
+  assignmentId: string,
+): Promise<ScoutWorkResult> {
+  const assignment = await claimAssignmentById(orgId, assignmentId);
+  if (!assignment) return { status: "idle" };
+  return runClaimedAssignment(assignment);
+}
+
+async function runClaimedAssignment(
+  assignment: ClaimedAssignment,
+): Promise<ScoutWorkResult> {
   // Checked after claiming rather than before, so the ceiling is enforced per
   // employee rather than per organisation — and the job goes straight back to
   // the queue for tomorrow rather than being lost.
-  const budget = await withinBudget(orgId, assignment.agentInstanceId);
+  const budget = await withinBudget(assignment.orgId, assignment.agentInstanceId);
   if (!budget.canRun) {
     const service = createServiceSupabaseClient();
     if (service) {

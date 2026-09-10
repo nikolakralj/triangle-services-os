@@ -82,6 +82,10 @@ export async function requireApiAccess(request: Request) {
       return {
         ok: true as const,
         demo: false,
+        // The static key borrows MCP_USER_ID, so `userId` alone looks like a
+        // person. It is not one, and a route that records what a human did
+        // has to be able to tell.
+        actor: "machine" as const,
         userId,
         organizationId: orgId,
         role: "admin",
@@ -105,6 +109,7 @@ export async function requireApiAccess(request: Request) {
     return {
       ok: true as const,
       demo: true,
+      actor: "demo" as const,
       userId: "demo-user",
       organizationId: "00000000-0000-0000-0000-000000000001",
       role: "admin",
@@ -154,6 +159,7 @@ export async function requireApiAccess(request: Request) {
   return {
     ok: true as const,
     demo: false,
+    actor: "human" as const,
     userId: user.id,
     organizationId: member.organization_id as string,
     role: member.role as string,
