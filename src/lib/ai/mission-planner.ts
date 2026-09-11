@@ -1,8 +1,12 @@
 import "server-only";
-import { openai } from "@ai-sdk/openai";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { getScoutModelId } from "@/lib/ai/scout-agent";
+import {
+  missionModel,
+  missionProvider,
+  missionProviderOptions,
+  missionTimeout,
+} from "@/lib/ai/mission-models";
 import {
   defaultPlan,
   RECRUITING_METRICS,
@@ -97,14 +101,14 @@ ${METRIC_GUIDE[input.kind]}`;
 
 export async function draftMissionPlan(input: PlanningInput): Promise<SettledPlan> {
   const fallback = defaultPlan(input.kind);
-  if (!process.env.OPENAI_API_KEY) return fallback;
+  if (!missionProvider()) return fallback;
   try {
     const call = {
-      model: openai(getScoutModelId()),
+      model: missionModel("plan"),
       system: systemPrompt(input),
       prompt: promptFor(input),
-      timeout: 20_000,
-      providerOptions: { openai: { store: false } },
+      timeout: missionTimeout("plan"),
+      providerOptions: missionProviderOptions("plan"),
     };
     const draft =
       input.kind === "recruiting"

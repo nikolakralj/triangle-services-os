@@ -1,8 +1,12 @@
 import "server-only";
-import { openai } from "@ai-sdk/openai";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { getScoutModelId } from "@/lib/ai/scout-agent";
+import {
+  missionModel,
+  missionProvider,
+  missionProviderOptions,
+  missionTimeout,
+} from "@/lib/ai/mission-models";
 import type { MissionKind } from "@/lib/data/mission-shared";
 
 // ---------------------------------------------------------------------------
@@ -77,16 +81,16 @@ function cleanEmoji(value: string | null): string | null {
 
 export async function nameMission(text: string, org: NamingOrganization): Promise<MissionNaming> {
   const fallback = fallbackNaming(text);
-  if (!process.env.OPENAI_API_KEY) return fallback;
+  if (!missionProvider()) return fallback;
 
   try {
     const { output } = await generateText({
-      model: openai(getScoutModelId()),
+      model: missionModel("name"),
       system: systemPrompt(org),
       prompt: text.slice(0, 2_000),
       output: Output.object({ schema: namingSchema }),
-      timeout: 12_000,
-      providerOptions: { openai: { store: false } },
+      timeout: missionTimeout("name"),
+      providerOptions: missionProviderOptions("name"),
     });
     if (!output) return fallback;
 

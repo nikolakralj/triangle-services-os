@@ -5,30 +5,17 @@ import { companyReachSchema, missionStepReportSchema } from "@/lib/ai/mission-re
 import { reachabilityReportSchema } from "@/lib/ai/reachability-report";
 import { scoutCaseReportSchema } from "@/lib/ai/scout-case-report";
 import { AUTONOMY_STANDARD } from "@/lib/data/mission-shared";
+import {
+  missionModel,
+  missionProviderOptions,
+  missionWebSearch,
+  openAiResearchModelId,
+  searchLocation,
+} from "@/lib/ai/mission-models";
 
-/**
- * Where the search is anchored.
- *
- * Both agents hardcoded Germany. That is right today — the demand queue is
- * German and Austrian — and wrong the moment Triangle hunts from its Croatian
- * side, because an anchored search quietly ranks German results first and
- * nobody sees it happening. Overridable now; it should come from the
- * organisation profile once there is more than one entity to ask.
- */
-function searchLocation() {
-  return {
-    type: "approximate" as const,
-    country: process.env.SCOUT_SEARCH_COUNTRY ?? "DE",
-    timezone: process.env.SCOUT_SEARCH_TIMEZONE ?? "Europe/Berlin",
-  };
-}
-
+/** The OpenAI model the case-research agents below still run on. Missions choose theirs in mission-models. */
 export function getScoutModelId() {
-  return (
-    process.env.OPENAI_SCOUT_MODEL ??
-    process.env.OPENAI_RESEARCH_MODEL ??
-    "gpt-5.4-mini"
-  );
+  return openAiResearchModelId();
 }
 
 /**
@@ -129,10 +116,8 @@ export const MISSION_RULES = [
  * snippets. This run has one job and cannot finish it from a snippet.
  */
 export function createCompanyReachAgent() {
-  const model = getScoutModelId();
-
   return new ToolLoopAgent({
-    model: openai(model),
+    model: missionModel("reach"),
     instructions: [
       "You are Scout, finding the way into ONE company for an industrial crew supplier. The mission already chose this company; your job is the person to ask for and the published door to them.",
       "Open the company's own pages — do not answer from search snippets. In Germany, Austria and Switzerland every business site has an Impressum (legal notice) naming the Geschäftsführung, with a phone number and an email; also open Kontakt, Ansprechpartner, Standorte or Niederlassungen, and any Einkauf, Lieferanten or Nachunternehmer page. Elsewhere, open the equivalent legal notice, contact and supplier pages. If you were not given the website, find the company's own site first — not LinkedIn, not a job board, not a directory.",
@@ -143,29 +128,17 @@ export function createCompanyReachAgent() {
       "If no person or channel is published, say so in notFoundReason and name the pages you opened. A sourced absence is a real result.",
       "Do not contact anyone, fill in a form, or register on a portal. Cite the pages you opened in sources.",
     ].join("\n"),
-    tools: {
-      web_search: openai.tools.webSearch({
-        externalWebAccess: true,
-        searchContextSize: "high",
-        userLocation: searchLocation(),
-      }),
-    },
+    tools: { web_search: missionWebSearch() },
     stopWhen: isStepCount(6),
     output: Output.object({ schema: companyReachSchema }),
-    providerOptions: {
-      openai: {
-        store: false,
-      },
-    },
+    providerOptions: missionProviderOptions("reach"),
   });
 }
 
 /** Scout working one step of a mission: a list of targets, not one case. */
 export function createMissionScoutAgent() {
-  const model = getScoutModelId();
-
   return new ToolLoopAgent({
-    model: openai(model),
+    model: missionModel("research"),
     instructions: [
       "You are Scout, a commercial research employee for an industrial contractor and crew supplier.",
       SUPPLY_AND_BUYER_RULES.join("\n"),
@@ -173,21 +146,11 @@ export function createMissionScoutAgent() {
       "Research before concluding. Prefer primary company, project, procurement, tender, and official professional sources.",
       "Separate what a source says from what you infer. Fewer reliable targets are better than a long speculative list.",
     ].join("\n"),
-    tools: {
-      web_search: openai.tools.webSearch({
-        externalWebAccess: true,
-        searchContextSize: "high",
-        userLocation: searchLocation(),
-      }),
-    },
+    tools: { web_search: missionWebSearch() },
     // A list of companies takes more looking than one company does.
     stopWhen: isStepCount(10),
     output: Output.object({ schema: missionStepReportSchema }),
-    providerOptions: {
-      openai: {
-        store: false,
-      },
-    },
+    providerOptions: missionProviderOptions("research"),
   });
 }
 

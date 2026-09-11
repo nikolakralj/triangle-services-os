@@ -8,6 +8,7 @@ import { runMissionQueue } from "@/lib/ai/mission-executor";
 import { listWorkforce } from "@/lib/data/workforce";
 import { addMissionInstruction, startMission } from "@/lib/data/missions";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
+import { missionProvider } from "@/lib/ai/mission-models";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — the one box.
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Write what you need first." }, { status: 400 });
   }
   const { question, missionId } = parsed.data;
-  if (!process.env.OPENAI_API_KEY) {
+  if (!missionProvider()) {
     return NextResponse.json(
       { error: "AI is not configured on this deployment." },
       { status: 503 },

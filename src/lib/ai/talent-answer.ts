@@ -1,6 +1,12 @@
 import "server-only";
 import { z } from "zod";
-import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { generateText, Output } from "ai";
+import {
+  missionModel,
+  missionProvider,
+  missionProviderOptions,
+  missionTimeout,
+} from "@/lib/ai/mission-models";
 import { describeRights } from "@/lib/data/work-authorisation";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
@@ -49,6 +55,15 @@ const answerSchema = z.object({
     (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []),
     z.array(z.string().max(200)).max(10),
   ),
+});
+
+/** What the model is asked for. answerSchema then trims it to what the screen shows. */
+const talentOutputSchema = z.object({
+  answer: z.string(),
+  worker_ids: z.array(z.string()),
+  partner_ids: z.array(z.string()),
+  blockers: z.array(z.string()),
+  missing: z.array(z.string()),
 });
 
 export interface TalentAnswer {
@@ -215,18 +230,16 @@ export async function answerAboutTalent(
     sectors: p.industries,
   }));
 
-  let client: ReturnType<typeof getOpenAIClient>;
-  try {
-    client = getOpenAIClient();
-  } catch {
-    return { error: "AI is not configured on this deployment." };
-  }
+  if (!missionProvider()) return { error: "AI is not configured on this deployment." };
 
   try {
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      instructions: SYSTEM,
-      input: [
+    const { output } = await generateText({
+      model: missionModel("talent"),
+      system: SYSTEM,
+      output: Output.object({ schema: talentOutputSchema }),
+      timeout: missionTimeout("talent"),
+      providerOptions: missionProviderOptions("talent"),
+      prompt: [
         `QUESTION: ${q}`,
         "",
         `ROSTER (${roster.length} of Triangle's own people):`,
@@ -237,30 +250,10 @@ export async function answerAboutTalent(
           ? JSON.stringify(partnerRoster)
           : "None on file. Triangle can currently field only the people above.",
       ].join("\n"),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "talent_answer",
-          strict: false,
-          schema: {
-            type: "object",
-            properties: {
-              answer: { type: "string" },
-              worker_ids: { type: "array", items: { type: "string" } },
-              partner_ids: { type: "array", items: { type: "string" } },
-              blockers: { type: "array", items: { type: "string" } },
-              missing: { type: "array", items: { type: "string" } },
-            },
-            required: ["answer", "worker_ids"],
-          },
-        },
-      },
     });
+    if (!output) return { error: "No answer came back. Try asking again." };
 
-    const raw = response.output_text?.trim();
-    if (!raw) return { error: "No answer came back. Try asking again." };
-
-    const parsed = answerSchema.safeParse(JSON.parse(raw));
+    const parsed = answerSchema.safeParse(output);
     if (!parsed.success) return { error: "The answer came back malformed." };
 
     // Resolve the ids against the roster rather than trusting the names in the

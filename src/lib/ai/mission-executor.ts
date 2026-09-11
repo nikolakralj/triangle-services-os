@@ -2,11 +2,8 @@ import "server-only";
 import { answerAboutTalent } from "@/lib/ai/talent-answer";
 import { ensureMissionPlan } from "@/lib/ai/mission-planner";
 import { noteInstructionDecisions } from "@/lib/ai/mission-memory";
-import {
-  createCompanyReachAgent,
-  createMissionScoutAgent,
-  getScoutModelId,
-} from "@/lib/ai/scout-agent";
+import { createCompanyReachAgent, createMissionScoutAgent } from "@/lib/ai/scout-agent";
+import { missionModelLabel, missionTimeout } from "@/lib/ai/mission-models";
 import {
   citesASource,
   cleanTargets,
@@ -465,7 +462,7 @@ async function reachPass(
           onStepFinish: async (step) => {
             await appendMissionActivity(runId, searchActivityOf(step));
           },
-          timeout: 75_000,
+          timeout: missionTimeout("reach"),
         });
         if (result.output) out[index] = mergeReach(target, result.output);
       } catch (error) {
@@ -486,7 +483,7 @@ async function runResearchStep(
   assignment: ClaimedAssignment,
   ctx: MissionRunContext,
 ): Promise<ScoutWorkResult> {
-  const model = getScoutModelId();
+  const { provider, model } = missionModelLabel("research");
   const events: ActivityEvent[] = [];
   const runId = await startMissionRun({
     orgId: assignment.orgId,
@@ -494,7 +491,7 @@ async function runResearchStep(
     assignmentId: assignment.id,
     agentInstanceId: assignment.agentInstanceId,
     agentName: ctx.agentName,
-    provider: "openai",
+    provider,
     model,
     first: activity("started", `Started: “${clip(ctx.instruction, 90)}”`),
   });
@@ -554,7 +551,7 @@ async function runResearchStep(
       onStepFinish: async (step) => {
         await appendMissionActivity(runId, searchActivityOf(step));
       },
-      timeout: 120_000,
+      timeout: missionTimeout("research"),
     });
     const report = result.output;
     if (!report) throw new Error(`${ctx.agentName} returned no structured report.`);
@@ -786,8 +783,7 @@ async function runRecruitingStep(
     assignmentId: assignment.id,
     agentInstanceId: assignment.agentInstanceId,
     agentName: ctx.agentName,
-    provider: "openai",
-    model: "gpt-4.1-mini",
+    ...missionModelLabel("talent"),
     first: activity("started", `Started: “${clip(ctx.instruction, 90)}”`),
   });
 

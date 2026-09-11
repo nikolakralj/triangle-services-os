@@ -145,11 +145,18 @@ async function writeEvents(
  */
 export function searchActivityOf(step: unknown): ActivityEvent[] {
   const content = (step as { content?: unknown })?.content;
-  if (!Array.isArray(content)) return [];
   const out: ActivityEvent[] = [];
   const seen = new Set<string>();
+  const add = (line: ActivityEvent | null) => {
+    if (line && !seen.has(line.text)) {
+      seen.add(line.text);
+      out.push(line);
+    }
+  };
+  const searched = (queries: string[]) =>
+    queries.length > 0 ? activity("searched", `Searched “${queries.slice(0, 2).join("” · “")}”`) : null;
 
-  for (const part of content) {
+  for (const part of Array.isArray(content) ? content : []) {
     const p = part as {
       type?: string;
       toolName?: string;
@@ -163,29 +170,64 @@ export function searchActivityOf(step: unknown): ActivityEvent[] {
       | { action?: Record<string, unknown> }
       | undefined;
     const action = payload?.action;
-    if (!action || typeof action !== "object") continue;
 
-    let line: ActivityEvent | null = null;
-    if (action.type === "search") {
-      const queries = Array.isArray(action.queries)
-        ? action.queries.map(String)
-        : typeof action.query === "string"
-          ? [action.query]
-          : [];
-      if (queries.length > 0) {
-        line = activity("searched", `Searched “${queries.slice(0, 2).join("” · “")}”`);
+    // OpenAI reports what its search did as an action.
+    if (action && typeof action === "object") {
+      if (action.type === "search") {
+        add(
+          searched(
+            Array.isArray(action.queries)
+              ? action.queries.map(String)
+              : typeof action.query === "string"
+                ? [action.query]
+                : [],
+          ),
+        );
+      } else if (action.type === "openPage" && typeof action.url === "string") {
+        add(activity("opened", `Read ${shortUrl(action.url)}`));
+      } else if (action.type === "findInPage" && typeof action.url === "string") {
+        add(
+          activity(
+            "looked",
+            `Looked for “${String(action.pattern ?? "").slice(0, 60)}” on ${shortUrl(action.url)}`,
+          ),
+        );
       }
-    } else if (action.type === "openPage" && typeof action.url === "string") {
-      line = activity("opened", `Read ${shortUrl(action.url)}`);
-    } else if (action.type === "findInPage" && typeof action.url === "string") {
-      line = activity(
-        "looked",
-        `Looked for “${String(action.pattern ?? "").slice(0, 60)}” on ${shortUrl(action.url)}`,
+      continue;
+    }
+
+    // Grok reports the query it ran as the call's input, sometimes as JSON text.
+    if (p.type === "tool-call") {
+      let input = p.input as unknown;
+      if (typeof input === "string") {
+        try {
+          input = JSON.parse(input);
+        } catch {
+          input = { query: input };
+        }
+      }
+      const args = input as { query?: unknown; queries?: unknown } | null;
+      add(
+        searched(
+          Array.isArray(args?.queries)
+            ? args.queries.map(String)
+            : typeof args?.query === "string"
+              ? [args.query]
+              : [],
+        ),
       );
     }
-    if (line && !seen.has(line.text)) {
-      seen.add(line.text);
-      out.push(line);
+  }
+
+  // A provider that reports pages as citations rather than page actions: what
+  // the step cited is what it worked from.
+  if (!out.some((e) => e.kind === "opened" || e.kind === "looked")) {
+    const sources = (step as { sources?: unknown })?.sources;
+    for (const source of Array.isArray(sources) ? sources : []) {
+      const s = source as { sourceType?: string; url?: unknown };
+      if (s?.sourceType === "url" && typeof s.url === "string") {
+        add(activity("opened", `Cited ${shortUrl(s.url)}`));
+      }
     }
   }
   return out;

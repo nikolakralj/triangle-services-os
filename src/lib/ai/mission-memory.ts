@@ -1,8 +1,12 @@
 import "server-only";
-import { openai } from "@ai-sdk/openai";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import { getScoutModelId } from "@/lib/ai/scout-agent";
+import {
+  missionModel,
+  missionProvider,
+  missionProviderOptions,
+  missionTimeout,
+} from "@/lib/ai/mission-models";
 import { setCriteriaTargets } from "@/lib/data/mission-plan";
 import { metricLabel } from "@/lib/data/mission-progress";
 import {
@@ -116,7 +120,7 @@ export async function noteInstructionDecisions(params: {
   criteria: readonly MissionCriterion[];
 }): Promise<NotedDecisions> {
   const none: NotedDecisions = { added: [], replaced: [], moved: [] };
-  if (!process.env.OPENAI_API_KEY || !params.messageId) return none;
+  if (!missionProvider() || !params.messageId) return none;
   // A retried step already wrote down what its instruction decided — and a
   // database that cannot keep decisions is not worth a model call.
   const already = await countDecisionsFromMessage(params.orgId, params.messageId);
@@ -143,12 +147,12 @@ export async function noteInstructionDecisions(params: {
   let extracted: z.infer<typeof extractionSchema> | undefined;
   try {
     const result = await generateText({
-      model: openai(getScoutModelId()),
+      model: missionModel("memory"),
       system: SYSTEM,
       prompt,
       output: Output.object({ schema: extractionSchema }),
-      timeout: 15_000,
-      providerOptions: { openai: { store: false } },
+      timeout: missionTimeout("memory"),
+      providerOptions: missionProviderOptions("memory"),
     });
     extracted = result.output;
   } catch (err) {
