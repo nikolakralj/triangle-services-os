@@ -9,6 +9,7 @@ import {
   setMissionClosed,
 } from "@/lib/data/missions";
 import { setCriteriaTargets } from "@/lib/data/mission-plan";
+import { setDecisionActive } from "@/lib/data/mission-memory";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { runMissionQueue } from "@/lib/ai/mission-executor";
 import { ensureMissionPlan } from "@/lib/ai/mission-planner";
@@ -23,6 +24,9 @@ import { ensureMissionPlan } from "@/lib/ai/mission-planner";
 //   plan      give a mission without one a finish line and a route now,
 //             instead of with its next instruction
 //   criteria  move the finish line: { targets: { named_buyers: 10 } }
+//   remove_decision, restore_decision
+//             take one of the CEO's decisions out of force, or put it back:
+//             { decisionId }
 //
 // Instructions go through POST /api/ask with a missionId, the same door as
 // everything else anybody asks for.
@@ -32,8 +36,9 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const bodySchema = z.object({
-  action: z.enum(["close", "reopen", "seen", "retry", "plan", "criteria"]),
+  action: z.enum(["close", "reopen", "seen", "retry", "plan", "criteria", "remove_decision", "restore_decision"]),
   targets: z.record(z.string(), z.number()).optional(),
+  decisionId: z.string().uuid().optional(),
 });
 
 export async function PATCH(
@@ -51,7 +56,7 @@ export async function PATCH(
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Say what to do: close, reopen, seen, retry, plan or criteria." },
+      { error: "Say what to do: close, reopen, seen, retry, plan, criteria, remove_decision or restore_decision." },
       { status: 400 },
     );
   }
@@ -98,6 +103,20 @@ export async function PATCH(
     });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
     return NextResponse.json({ ok: true, changed: result.changed });
+  }
+
+  if (action === "remove_decision" || action === "restore_decision") {
+    const decisionId = parsed.data.decisionId;
+    if (!decisionId) return NextResponse.json({ error: "Say which decision." }, { status: 400 });
+    const result = await setDecisionActive({
+      orgId: access.organizationId,
+      missionId: id,
+      decisionId,
+      userId: access.userId,
+      active: action === "restore_decision",
+    });
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: 409 });
+    return NextResponse.json({ ok: true });
   }
 
   if (action === "retry") {

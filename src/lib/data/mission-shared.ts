@@ -80,6 +80,7 @@ export const AUTONOMY_STANDARD = {
 export type ActivityKind =
   | "started"
   | "planned"
+  | "noted"
   | "searched"
   | "opened"
   | "looked"
@@ -103,6 +104,7 @@ export interface ActivityEvent {
 const ACTIVITY_KINDS = new Set<string>([
   "started",
   "planned",
+  "noted",
   "progress",
   "searched",
   "opened",
@@ -339,6 +341,26 @@ export interface MissionProgress {
   current: PlanStepProgress | null;
 }
 
+// ── what the CEO decided ────────────────────────────────────────────────────
+
+export type DecisionKind = "exclude" | "focus" | "prefer" | "limit" | "other";
+
+/**
+ * A standing decision inside a mission — "Exclude HVAC-only companies." — with
+ * the CEO's own words it was taken from. Everything else a mission remembers
+ * is read from its records.
+ */
+export interface MissionDecision {
+  id: string;
+  kind: DecisionKind;
+  text: string;
+  quote: string;
+  status: "active" | "superseded" | "removed";
+  decidedAt: string;
+  /** Written down by the employee from an instruction, not typed by a person. */
+  recordedByAgent: boolean;
+}
+
 export interface MissionWorkspace {
   mission: {
     id: string;
@@ -369,6 +391,8 @@ export interface MissionWorkspace {
   partners: MissionPartner[];
   /** Null until the mission has a finish line. */
   progress: MissionProgress | null;
+  /** Every decision recorded, oldest first — in force or not. */
+  decisions: MissionDecision[];
   counts: {
     researched: number;
     qualified: number;

@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createAssignment } from "@/lib/data/workforce";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { loadMissionPlan } from "@/lib/data/mission-plan";
+import { loadMissionDecisions } from "@/lib/data/mission-memory";
 import { evaluateProgress } from "@/lib/data/mission-progress";
 import type { MissionNaming } from "@/lib/ai/mission-namer";
 import {
@@ -20,6 +21,7 @@ import {
   type MissionChannel,
   type MissionCompanyRow,
   type MissionCriterion,
+  type MissionDecision,
   type MissionKind,
   type MissionMessage,
   type MissionPartner,
@@ -920,7 +922,7 @@ export async function getMissionWorkspace(
   if (error || !row) return null;
   const mission = row as MissionRow;
 
-  const [stepMap, holdings, tabs, lead, planRows] = await Promise.all([
+  const [stepMap, holdings, tabs, lead, planRows, decisions] = await Promise.all([
     loadSteps(svc, orgId, [missionId]),
     loadMissionHoldings(orgId, missionId),
     listMissionTabs(orgId),
@@ -932,6 +934,7 @@ export async function getMissionWorkspace(
           .maybeSingle()
       : Promise.resolve({ data: null }),
     loadMissionPlan(orgId, missionId),
+    loadMissionDecisions(orgId, missionId),
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const stepIds = steps.map((s) => s.id);
@@ -1037,6 +1040,7 @@ export async function getMissionWorkspace(
     candidates,
     partners,
     progress,
+    decisions,
   };
 }
 
@@ -1119,6 +1123,13 @@ export interface MissionRunContext {
   /** The finish line and the route, when the mission has them. */
   criteria: MissionCriterion[];
   plan: MissionPlanStep[];
+  /** The CEO's standing decisions in force. */
+  decisions: MissionDecision[];
+  /** The message this step's instruction arrived in, and whose words they were. */
+  instructionMessageId: string | null;
+  instructionAuthor: string | null;
+  /** What the worker asked the CEO at the end of the step before, if anything. */
+  lastQuestion: string | null;
 }
 
 /**
@@ -1147,7 +1158,7 @@ export async function loadMissionRunContext(
   if (!row) return null;
   const mission = row as MissionRow;
 
-  const [stepMap, holdings, agent, planRows] = await Promise.all([
+  const [stepMap, holdings, agent, planRows, decisions] = await Promise.all([
     loadSteps(svc, orgId, [missionId]),
     loadMissionHoldings(orgId, missionId),
     mission.lead_agent_instance_id
@@ -1158,6 +1169,7 @@ export async function loadMissionRunContext(
           .maybeSingle()
       : Promise.resolve({ data: null }),
     loadMissionPlan(orgId, missionId),
+    loadMissionDecisions(orgId, missionId),
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const step = steps.find((s) => s.id === stepId);
@@ -1169,6 +1181,24 @@ export async function loadMissionRunContext(
     .filter((m) => !(m.stepId === stepId && m.role === "human"))
     .filter((m) => m.at <= (step.started_at ?? new Date().toISOString()))
     .map((m) => ({ role: m.role, body: m.body, at: m.at }));
+
+  // The words this step was given, and whose — the evidence any decision
+  // written down from them cites.
+  const { data: asked } = await svc
+    .from("assignment_messages")
+    .select("id, author_user_id")
+    .eq("org_id", orgId)
+    .eq("assignment_id", stepId)
+    .eq("role", "human")
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+
+  // The question the step before ended on; this instruction may answer it.
+  const previous = steps
+    .filter((s) => s.id !== stepId && s.created_at <= step.created_at)
+    .map((s) => parseMissionStepRecord(s.result_summary))
+    .find((r) => r !== null);
 
   return {
     mission: {
@@ -1185,6 +1215,10 @@ export async function loadMissionRunContext(
     holdings,
     criteria: planRows.criteria,
     plan: planRows.plan,
+    decisions: decisions.filter((d) => d.status === "active"),
+    instructionMessageId: (asked?.id as string | undefined) ?? null,
+    instructionAuthor: (asked?.author_user_id as string | null | undefined) ?? null,
+    lastQuestion: previous?.questionForCeo ?? null,
   };
 }
 

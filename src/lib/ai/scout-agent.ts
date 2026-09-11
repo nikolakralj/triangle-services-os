@@ -116,6 +116,7 @@ export const MISSION_RULES = [
   "Give every target its company website when you can find it. After this step, each company still missing a person or a door has its own site opened for the Impressum and contact pages, so a correct website matters more than a guessed name.",
   "`project` is the NAME of a specific current project — a site, a client's plant, a contract — found in a source, or null. Never a description of what the company does.",
   "The mission has a finish line (SUCCESS WHEN) and a PLAN, both counted from the records on file, never from what you say. The latest instruction comes first. When it is broad — 'find…', 'continue', 'finish this' — spend the step on the plan step marked →. When every criterion is met, say so in `reply` and do not go looking for more. Never claim a criterion is met or state how many are on file.",
+  "The MISSION STATE is the mission's memory. CEO DECISIONS IN FORCE are the CEO's standing instructions for this mission: apply every one to every target and every sentence, even when the latest instruction does not repeat it. A newer instruction that contradicts one wins. The conversation you are shown is only the recent exchange.",
   `YOUR AUTHORITY (${AUTONOMY_STANDARD.name}). You may: ${AUTONOMY_STANDARD.can.join("; ")}. You must ask first — and so never do yourself: ${AUTONOMY_STANDARD.mustAsk.join("; ")}.`,
 ].join("\n");
 

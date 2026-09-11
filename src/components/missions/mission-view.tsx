@@ -43,6 +43,7 @@ import { MissionTabs } from "@/components/missions/mission-tabs";
 import { MissionMark, StateChip } from "@/components/missions/mission-state";
 import { WorkerPanel } from "@/components/missions/worker-panel";
 import { FinishLine } from "@/components/missions/finish-line";
+import { MissionDecisions } from "@/components/missions/mission-decisions";
 
 // ---------------------------------------------------------------------------
 // A mission.
@@ -513,6 +514,13 @@ function ResearchOverview({
         progress={workspace.progress}
         leadName={name}
         running={running}
+        canWrite={canWrite}
+      />
+
+      <MissionDecisions
+        missionId={mission.id}
+        decisions={workspace.decisions}
+        leadName={name}
         canWrite={canWrite}
       />
 
@@ -1113,6 +1121,12 @@ function RecruitingOverview({
         progress={workspace.progress}
         leadName={lead?.name ?? "The worker"}
         running={running}
+        canWrite={canWrite}
+      />
+      <MissionDecisions
+        missionId={workspace.mission.id}
+        decisions={workspace.decisions}
+        leadName={lead?.name ?? "The worker"}
         canWrite={canWrite}
       />
       {canSeeWorkers ? <CandidateTable rows={candidates} /> : <NoWorkers />}

@@ -1,6 +1,7 @@
 import "server-only";
 import { answerAboutTalent } from "@/lib/ai/talent-answer";
 import { ensureMissionPlan } from "@/lib/ai/mission-planner";
+import { noteInstructionDecisions } from "@/lib/ai/mission-memory";
 import {
   createCompanyReachAgent,
   createMissionScoutAgent,
@@ -35,7 +36,9 @@ import type {
   ActivityEvent,
   MissionChannel,
   MissionCompanyRow,
+  MissionDecision,
 } from "@/lib/data/mission-shared";
+import { describeMissionState } from "@/lib/data/mission-memory";
 import {
   describeHoldings,
   loadMissionHoldings,
@@ -46,7 +49,7 @@ import {
   type MissionHoldings,
   type MissionRunContext,
 } from "@/lib/data/missions";
-import type { MissionPlanRows } from "@/lib/data/mission-plan";
+import { loadMissionPlan, type MissionPlanRows } from "@/lib/data/mission-plan";
 import {
   describeProgress,
   evaluateProgress,
@@ -90,6 +93,12 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 const REACH_LIMIT = 6;
 /** How many sites are read at once. */
 const REACH_CONCURRENCY = 3;
+/**
+ * How much of the conversation a step reads. The mission's memory carries
+ * what must outlast it — the CEO's decisions, and what the records say — so
+ * the conversation is only the recent exchange, not the whole history.
+ */
+const RECENT_MESSAGES = 6;
 
 function clip(text: string | null | undefined, max: number): string {
   const t = (text ?? "").replace(/\s+/g, " ").trim();
@@ -198,6 +207,51 @@ async function planFirst(
   } catch (error) {
     console.error("planFirst:", error instanceof Error ? error.message : error);
     return { criteria: [], plan: [] };
+  }
+}
+
+/**
+ * What the CEO decided in this instruction, written down before the work so
+ * it still holds when the instruction has left the conversation. Returns the
+ * decisions in force and the finish line as they stand afterwards.
+ */
+async function noteDecisions(
+  assignment: ClaimedAssignment,
+  ctx: MissionRunContext,
+  runId: string | null,
+  planRows: MissionPlanRows,
+): Promise<{ decisions: MissionDecision[]; planRows: MissionPlanRows }> {
+  try {
+    const noted = await noteInstructionDecisions({
+      orgId: assignment.orgId,
+      missionId: ctx.mission.id,
+      stepId: assignment.id,
+      agentInstanceId: assignment.agentInstanceId,
+      kind: ctx.mission.kind,
+      objective: ctx.mission.objective,
+      instruction: ctx.instruction,
+      messageId: ctx.instructionMessageId,
+      authorUserId: ctx.instructionAuthor,
+      lastQuestion: ctx.lastQuestion,
+      inForce: ctx.decisions,
+      criteria: planRows.criteria,
+    });
+    await appendMissionActivity(runId, [
+      ...noted.added.map((d) => activity("noted", `Noted your decision: ${d.text}`)),
+      ...noted.replaced.map((d) => activity("noted", `No longer in force: ${d.text}`)),
+      ...noted.moved.map((m) =>
+        activity("planned", `Moved the finish line as you said: ${metricLabel(m.metric, m.target)}`),
+      ),
+    ]);
+    const replaced = new Set(noted.replaced.map((d) => d.id));
+    return {
+      decisions: [...ctx.decisions.filter((d) => !replaced.has(d.id)), ...noted.added],
+      planRows:
+        noted.moved.length > 0 ? await loadMissionPlan(assignment.orgId, ctx.mission.id) : planRows,
+    };
+  } catch (error) {
+    console.error("noteDecisions:", error instanceof Error ? error.message : error);
+    return { decisions: ctx.decisions, planRows };
   }
 }
 
@@ -344,7 +398,9 @@ function conversationBlock(ctx: MissionRunContext, limit: number): string {
   const recent = all.slice(-limit);
   const omitted = all.length - recent.length;
   return [
-    `CONVERSATION SO FAR (oldest first${omitted > 0 ? `; ${omitted} earlier messages left out` : ""}):`,
+    `RECENT CONVERSATION (oldest first${
+      omitted > 0 ? `; ${omitted} earlier messages left out — what they decided is in the MISSION STATE` : ""
+    }):`,
     ...recent.map(
       (m) =>
         `[${m.role === "human" ? "CEO" : ctx.agentName} · ${m.at.slice(0, 16).replace("T", " ")}] ${clip(m.body, 600)}`,
@@ -454,18 +510,28 @@ async function runResearchStep(
       [profile?.name, profile?.companyProfile ? clip(profile.companyProfile, 300) : null]
         .filter(Boolean)
         .join(" — ") || "a supplier of industrial crews to contractors";
-    // Before the work: when the mission is finished, and how it gets there.
-    const planRows = await planFirst(assignment, ctx, runId, profile);
+    // Before the work: when the mission is finished and how it gets there,
+    // and what the CEO decided in this instruction.
+    const planned = await planFirst(assignment, ctx, runId, profile);
+    const { decisions, planRows } = await noteDecisions(assignment, ctx, runId, planned);
     const before = evaluateProgress(planRows.criteria, planRows.plan, factsOf(ctx.holdings));
     const prompt = [
       `MISSION: ${[ctx.mission.emoji, ctx.mission.title].filter(Boolean).join(" ")}`,
       `OBJECTIVE: ${ctx.mission.objective}`,
       "",
-      conversationBlock(ctx, 16),
+      describeMissionState({
+        holdings: ctx.holdings,
+        decisions,
+        criteria: planRows.criteria,
+        progress: before,
+        lastQuestion: ctx.lastQuestion,
+      }),
+      ...(before ? ["", describeProgress(before)] : []),
       "",
       "WHAT THIS MISSION ALREADY HOLDS (do not re-file a company unless you learned something new about it):",
       describeHoldings(ctx.holdings),
-      ...(before ? ["", describeProgress(before)] : []),
+      "",
+      conversationBlock(ctx, RECENT_MESSAGES),
       "",
       "WHO TRIANGLE CAN SUPPLY RIGHT NOW.",
       "Supply is Triangle's own people and partner firms whose capacity a human confirmed within the last 14 days. Anything absent from both lists is not supply.",
@@ -684,6 +750,10 @@ async function runResearchStep(
         sitesRead: reached.filter((t) => t.reachChecked).length,
         heldCompaniesRead: backlog.length,
         progress: progressAfter ? { percent: progressAfter.percent, met: progressAfter.met } : null,
+        memory: {
+          decisionsInForce: decisions.length,
+          conversationMessages: Math.min(ctx.conversation.length, RECENT_MESSAGES),
+        },
       },
     });
     await touchMission(assignment.orgId, ctx.mission.id);
@@ -723,13 +793,17 @@ async function runRecruitingStep(
 
   try {
     const profile = await getOrganizationOperatingProfile(assignment.orgId);
-    const planRows = await planFirst(assignment, ctx, runId, profile);
+    const planned = await planFirst(assignment, ctx, runId, profile);
+    const { decisions, planRows } = await noteDecisions(assignment, ctx, runId, planned);
     const question = [
       `WHAT THIS PIECE OF WORK IS FOR: ${ctx.mission.objective}`,
       planRows.criteria.length > 0
         ? `IT IS FINISHED WHEN THERE ARE: ${planRows.criteria.map((c) => metricLabel(c.metric, c.target)).join("; ")}.`
         : null,
-      ctx.conversation.length > 0 ? conversationBlock(ctx, 10) : null,
+      decisions.length > 0
+        ? `THE CEO HAS DECIDED (apply every one): ${decisions.map((d) => d.text).join(" ")}`
+        : null,
+      ctx.conversation.length > 0 ? conversationBlock(ctx, RECENT_MESSAGES) : null,
       `WHAT THE CEO ASKS NOW: ${ctx.instruction}`,
     ]
       .filter(Boolean)
