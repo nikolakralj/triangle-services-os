@@ -375,6 +375,8 @@ export interface AssignmentForBot {
   }>;
   /** The project this job is about, when it is about one. */
   project: { id: string; name: string } | null;
+  /** The mission this job is one instruction inside, when it is one. */
+  missionId: string | null;
   /** Everything said on this job so far, oldest first. */
   thread: Array<{ from: string; text: string; at: string }>;
   /**
@@ -397,13 +399,18 @@ export async function listOpenAssignmentsForInstance(
   const { data } = await svc
     .from("agent_assignments")
     .select(
-      "id, title, objective, priority, due_at, constraints, expected_output, status, project_id",
+      "id, title, objective, priority, due_at, constraints, expected_output, status, project_id, mission_id",
     )
     .eq("org_id", orgId)
     .eq("agent_instance_id", agentInstanceId)
     .in("status", ["queued", "active"])
     .order("created_at");
-  const rows = data ?? [];
+  // Work Triangle's own runner does is not the bot's. Handing it out anyway let
+  // the bot and the runner take the same job, and whoever finished second was
+  // told the job did not exist.
+  const rows = (data ?? []).filter(
+    (r) => (r.constraints as Record<string, unknown> | null)?.execution_mode !== "in_app",
+  );
   if (rows.length === 0) return [];
 
   const queued = rows.filter((r) => r.status === "queued").map((r) => r.id as string);
@@ -549,6 +556,7 @@ export async function listOpenAssignmentsForInstance(
       workers: byAssignment.get(r.id as string) ?? [],
       entities: entitiesByAssignment.get(r.id as string) ?? [],
       project: pid ? { id: pid, name: projectNames.get(pid) ?? "unknown project" } : null,
+      missionId: (r.mission_id as string | null) ?? null,
       thread: t?.thread ?? [],
       newQuestions: t?.newQuestions ?? [],
     };

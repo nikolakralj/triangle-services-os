@@ -4,6 +4,12 @@ import { createAssignment } from "@/lib/data/workforce";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { loadMissionPlan } from "@/lib/data/mission-plan";
 import { loadMissionDecisions } from "@/lib/data/mission-memory";
+import {
+  botWaitingReason,
+  employeeMissionRuntime,
+  STALE_BOT_STEP_MINUTES,
+  type MissionRuntime,
+} from "@/lib/data/bot-runtime";
 import { evaluateProgress } from "@/lib/data/mission-progress";
 import type { MissionNaming } from "@/lib/ai/mission-namer";
 import {
@@ -127,10 +133,14 @@ export function deriveMissionState(
   const active = steps.find((s) => s.status === "active");
   if (active) {
     const started = active.started_at ? new Date(active.started_at).getTime() : now;
-    if (now - started > STALE_STEP_MINUTES * 60_000) {
+    const onBot = active.constraints?.execution_mode === "bot";
+    // A bot works at its own pace on its own computer; Triangle's runner does not.
+    if (now - started > (onBot ? STALE_BOT_STEP_MINUTES : STALE_STEP_MINUTES) * 60_000) {
       return {
         state: "blocked",
-        reason: "The last run stopped without reporting back. Try it again.",
+        reason: onBot
+          ? "The bot picked this up and has not reported back for two hours. Try it again to wake it."
+          : "The last run stopped without reporting back. Try it again.",
       };
     }
     return { state: "working", reason: null };
@@ -147,7 +157,8 @@ export function deriveMissionState(
         reason: "Today's run budget is spent. It picks up again tomorrow.",
       };
     }
-    return { state: "queued", reason: null };
+    const forBot = queued.find((s) => s.constraints?.execution_mode === "bot");
+    return { state: "queued", reason: forBot ? botWaitingReason(forBot.constraints) : null };
   }
 
   const latest = steps[0];
@@ -270,7 +281,7 @@ export async function startMission(params: {
   text: string;
   naming: MissionNaming;
   leadAgentInstanceId: string;
-}): Promise<{ missionId: string; stepId: string } | { error: string }> {
+}): Promise<{ missionId: string; stepId: string; runtime: MissionRuntime } | { error: string }> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { error: "Database unavailable." };
 
@@ -301,7 +312,7 @@ export async function startMission(params: {
     text: params.text,
   });
   if ("error" in step) return step;
-  return { missionId: data.id as string, stepId: step.stepId };
+  return { missionId: data.id as string, stepId: step.stepId, runtime: step.runtime };
 }
 
 /**
@@ -318,7 +329,10 @@ export async function addMissionInstruction(params: {
   userId: string | null;
   missionId: string;
   text: string;
-}): Promise<{ missionId: string; stepId: string } | { error: string }> {
+}): Promise<
+  | { missionId: string; stepId: string; runtime: MissionRuntime; agentInstanceId: string }
+  | { error: string }
+> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { error: "Database unavailable." };
 
@@ -351,7 +365,12 @@ export async function addMissionInstruction(params: {
     text: params.text,
   });
   if ("error" in step) return step;
-  return { missionId: params.missionId, stepId: step.stepId };
+  return {
+    missionId: params.missionId,
+    stepId: step.stepId,
+    runtime: step.runtime,
+    agentInstanceId: mission.lead_agent_instance_id as string,
+  };
 }
 
 async function addStep(
@@ -363,15 +382,18 @@ async function addStep(
     userId: string | null;
     text: string;
   },
-): Promise<{ stepId: string } | { error: string }> {
+): Promise<{ stepId: string; runtime: MissionRuntime } | { error: string }> {
   const text = params.text.trim().slice(0, 8_000);
+  // Who does the work: Triangle's own runner, or the employee's bot on its own
+  // platform, which Triangle wakes and then leaves to it.
+  const runtime = await employeeMissionRuntime(params.orgId, params.agentInstanceId);
   const created = await createAssignment({
     orgId: params.orgId,
     agentInstanceId: params.agentInstanceId,
     title: text.split("\n")[0].slice(0, 120),
     objective: text,
     priority: "high",
-    constraints: { execution_mode: "in_app", case_type: "mission_step" },
+    constraints: { execution_mode: runtime, case_type: "mission_step" },
     missionId: params.missionId,
     userId: params.userId,
   });
@@ -396,7 +418,7 @@ async function addStep(
     .eq("id", params.missionId)
     .eq("org_id", params.orgId);
 
-  return { stepId: created.id };
+  return { stepId: created.id, runtime };
 }
 
 export async function touchMission(orgId: string, missionId: string): Promise<void> {
@@ -459,25 +481,34 @@ export async function setMissionClosed(params: {
 export async function retryMissionStep(params: {
   orgId: string;
   missionId: string;
-}): Promise<{ stepId: string } | { error: string }> {
+}): Promise<
+  | { stepId: string; runtime: MissionRuntime; agentInstanceId: string }
+  | { error: string }
+> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { error: "Database unavailable." };
   const steps = (await loadSteps(svc, params.orgId, [params.missionId])).get(params.missionId) ?? [];
   const latest = steps[0];
   if (!latest) return { error: "There is nothing to try again." };
 
+  const onBot = latest.constraints?.execution_mode === "bot";
   const stale =
     latest.status === "active" &&
     latest.started_at !== null &&
-    Date.now() - new Date(latest.started_at).getTime() > STALE_STEP_MINUTES * 60_000;
+    Date.now() - new Date(latest.started_at).getTime() >
+      (onBot ? STALE_BOT_STEP_MINUTES : STALE_STEP_MINUTES) * 60_000;
   const refusedToday =
     latest.status === "queued" && typeof latest.constraints?.budget_refused_at === "string";
-  if (latest.status !== "failed" && !stale && !refusedToday) {
+  // A bot step still waiting can be woken again — its webhook may not have
+  // answered the first time.
+  const waitingForBot = latest.status === "queued" && onBot;
+  if (latest.status !== "failed" && !stale && !refusedToday && !waitingForBot) {
     return { error: "The last step has not stopped, so there is nothing to try again." };
   }
 
   const constraints = { ...(latest.constraints ?? {}) };
   delete constraints.budget_refused_at;
+  delete constraints.wake;
   const { error } = await svc
     .from("agent_assignments")
     .update({
@@ -490,7 +521,7 @@ export async function retryMissionStep(params: {
     .eq("id", latest.id)
     .eq("org_id", params.orgId);
   if (error) return { error: error.message };
-  return { stepId: latest.id };
+  return { stepId: latest.id, runtime: onBot ? "bot" : "in_app", agentInstanceId: latest.agent_instance_id };
 }
 
 /** The oldest step still waiting, if nothing in the mission is running. */
@@ -505,8 +536,23 @@ export async function nextQueuedStep(orgId: string, missionId: string): Promise<
       Date.now() - new Date(s.started_at).getTime() <= STALE_STEP_MINUTES * 60_000,
   );
   if (running) return null;
-  const queued = steps.filter((s) => s.status === "queued");
+  // A step on the employee's bot is the bot's; Triangle's runner never takes it.
+  const queued = steps.filter((s) => s.status === "queued" && s.constraints?.execution_mode !== "bot");
   return queued.length > 0 ? queued[queued.length - 1].id : null;
+}
+
+/** Whether a mission's work is done by its lead's bot or by Triangle's own runner. */
+export async function missionLeadRuntime(orgId: string, missionId: string): Promise<MissionRuntime | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data } = await svc
+    .from("missions")
+    .select("lead_agent_instance_id")
+    .eq("id", missionId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!data?.lead_agent_instance_id) return null;
+  return employeeMissionRuntime(orgId, data.lead_agent_instance_id as string);
 }
 
 // ── what a mission holds ────────────────────────────────────────────────────

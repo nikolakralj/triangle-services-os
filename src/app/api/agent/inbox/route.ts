@@ -11,6 +11,7 @@ import {
   completeAssignment,
 } from "@/lib/data/workforce";
 import { addAgentMessage } from "@/lib/data/assignment-threads";
+import { botMissionForInbox, isBotMissionStep } from "@/lib/data/mission-bot";
 
 // ---------------------------------------------------------------------------
 // The agent-facing side of the Agent Console.
@@ -53,6 +54,17 @@ export async function GET(request: Request) {
   const assignments = machine.agentInstanceId
     ? await listOpenAssignmentsForInstance(machine.orgId, machine.agentInstanceId)
     : [];
+  // A mission step carries its mission: the instruction, the finish line, the
+  // CEO's decisions, what the mission holds and what Triangle can supply.
+  // Collecting it starts the step, so the CEO sees it was picked up.
+  const agentInstanceId = machine.agentInstanceId;
+  const withMissions = await Promise.all(
+    assignments.map(async (a) =>
+      a.constraints.case_type === "mission_step" && a.missionId && agentInstanceId
+        ? { ...a, mission: await botMissionForInbox(machine.orgId, agentInstanceId, a) }
+        : a,
+    ),
+  );
 
   return NextResponse.json({
     agent: machine.name,
@@ -73,7 +85,7 @@ export async function GET(request: Request) {
           summary: budget.summary,
         }
       : null,
-    assignments,
+    assignments: withMissions,
     tasks: tasks.map((t) => ({
       id: t.id,
       instruction: t.instruction,
@@ -83,7 +95,8 @@ export async function GET(request: Request) {
       "Work assignments first. Each one carries hydrated `workers` and `entities` case context, `expectedOutput`, `thread` (everything said so far), and `newQuestions` (what a human has asked since your last check and you have not answered yet). " +
       "Answer a question without finishing the job: POST { assignmentId, message }. " +
       "Report the job finished: POST { assignmentId, result }, adding failed: true if you could not do it. " +
-      "Quick notes: POST { taskId, result }. Never send email; never invent facts.",
+      "Quick notes: POST { taskId, result }. Never send email; never invent facts. " +
+      "A mission step (constraints.case_type mission_step) carries `mission` — the instruction, finish line, decisions, holdings and supply. Work it through `mission.report`: file targets and activity as you go, then POST /api/agent/missions/{missionId}/complete. Do not finish a mission step with `result` here.",
   });
 }
 
@@ -125,6 +138,18 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "This badge is not linked to an employee." },
         { status: 400 },
+      );
+    }
+
+    // A mission step is finished with its reply and brief, which a plain
+    // result would leave out. A message on it is still a message.
+    if (result && (await isBotMissionStep(machine.orgId, assignmentId))) {
+      return NextResponse.json(
+        {
+          error:
+            "Finish a mission step with POST /api/agent/missions/{missionId}/complete, so its reply and brief reach the mission. Use `message` here only to answer a question.",
+        },
+        { status: 409 },
       );
     }
 

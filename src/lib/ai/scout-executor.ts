@@ -124,6 +124,9 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
       .contains("constraints", { execution_mode: "bot" })
       .not("constraints", "cs", REFUSED_MARKER)
       .lt("created_at", stalledBefore)
+      // A mission that runs on the bot waits for the bot. Taking it over after
+      // six hours would quietly hand the CEO's mission to another model.
+      .is("mission_id", null)
       .order("created_at")
       .limit(5),
   ]);
@@ -173,6 +176,19 @@ async function claimAssignmentById(
     .eq("status", "active");
   const scoutIds = (scouts ?? []).map((row) => row.id as string);
   if (scoutIds.length === 0) return null;
+
+  // A mission step that runs on the employee's bot stays the bot's, even when
+  // somebody presses run now.
+  const { data: target } = await service
+    .from("agent_assignments")
+    .select("constraints")
+    .eq("id", assignmentId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const targetConstraints = (target?.constraints as Record<string, unknown> | null) ?? {};
+  if (targetConstraints.execution_mode === "bot" && targetConstraints.case_type === "mission_step") {
+    return null;
+  }
 
   // The same atomic queued -> active step the queue runner uses, so a job can
   // never be run twice by two callers racing for it.

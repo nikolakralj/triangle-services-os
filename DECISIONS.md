@@ -465,6 +465,40 @@ a request, needs independent retries, pauses for the CEO, and must resume after
 a crash or a deploy — and lifts the Phase 0 freeze on new orchestration for
 mission runs only: built in Postgres and Next.js, with no new workflow runtime.
 
+### 2026-09-11: A mission can run on its employee's own bot
+
+Decision:
+
+- Triangle keeps the record, the permissions, the rules and the audit; the
+  model or bot doing the work is replaceable. Moving an employee to another
+  model is a setting, not a rewrite;
+- an employee can be switched to run its missions on its own bot (Scout on
+  Grok first). Its steps then reach it only through Triangle: the step waits in
+  its inbox and Triangle calls the bot's wake-up webhook the moment the step is
+  assigned or retried. The scheduled inbox check stays as the backup;
+- the wake-up call carries only the event and the ids. The bot reads the
+  mission from Triangle — condensed state, finish line, the CEO's decisions,
+  what the mission holds, and supply by role without anyone's name — and
+  writes back with its badge: activity, the finish line, quoted decisions, the
+  companies and people it found, and the finished step;
+- every write is checked where it lands: the badge's employee must own the
+  step, the step must be the bot's and still open, a decision's quote must be
+  in the CEO's instruction word for word, and what was filed is counted from
+  the findings, never from the bot's report;
+- Triangle's own runner never takes a bot's step, and the unattended pulse
+  does not take one over when it stalls. A waiting step says what it waits
+  for, and a retry wakes the bot again;
+- employees not switched keep running in Triangle's own runner.
+
+Why:
+
+- Scout on Grok found its work only by polling, so an instruction waited for
+  the next scheduled check — up to half an hour in working hours, overnight
+  outside them — and Scout's inbox could also hand it steps Triangle was
+  running itself;
+- the CEO wants the Grok bot to do the mission work with its own tools and
+  memory, with Triangle as the truth it reads from and writes to.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

@@ -282,6 +282,10 @@ export async function runMissionStepById(orgId: string, stepId: string): Promise
     .eq("org_id", orgId)
     .maybeSingle();
   if (!row || row.status !== "queued" || !row.mission_id) return { status: "idle" };
+  // A step that runs on the employee's bot is the bot's to do.
+  if ((row.constraints as Record<string, unknown> | null)?.execution_mode === "bot") {
+    return { status: "idle" };
+  }
 
   const { data: agent } = await svc
     .from("agent_instances")

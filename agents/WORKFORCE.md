@@ -116,6 +116,20 @@ work while an authenticated manager session is open. External provider polling
 remains supported for older assignments, but provider chat is never the
 canonical conversation or report store.
 
+A mission step runs where its employee lives. By default Triangle's own runner
+works it (`execution_mode: in_app`). An employee switched to its own bot
+(`agent_instances.config.mission_runtime = "bot"`; Scout on Grok first) gets
+its mission steps as `execution_mode: bot`: the step waits in the employee's
+inbox, and Triangle calls the bot's wake-up webhook (`BOT_WAKE_URL_<ROLE>`,
+signed with `BOT_WAKE_KEY_<ROLE>`) when the step is assigned or retried,
+carrying only the event and the ids. The bot reads the mission from
+`GET /api/agent/missions/:id?assignmentId=…` and writes back with its badge to
+`/targets`, `/activity`, `/decisions`, `/plan` and `/complete`. Every write is
+refused unless the badge's employee owns the step and the step is still open,
+and a plain inbox result cannot close a mission step. Triangle's runner never
+takes a bot's step and the stalled-job takeover leaves it alone; the bot's own
+scheduled inbox check is the backup for a missed wake-up.
+
 Köster and GOLDBECK are the first verified in-app cases. Their structured
 reports, project proposals, assignment conversation, and provider/model/token
 audit all remain in Triangle. No contact was performed.

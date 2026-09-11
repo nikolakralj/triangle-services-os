@@ -6,7 +6,8 @@ import { answerAboutTalent } from "@/lib/ai/talent-answer";
 import { nameMission } from "@/lib/ai/mission-namer";
 import { runMissionQueue } from "@/lib/ai/mission-executor";
 import { listWorkforce } from "@/lib/data/workforce";
-import { addMissionInstruction, startMission } from "@/lib/data/missions";
+import { addMissionInstruction, missionLeadRuntime, startMission } from "@/lib/data/missions";
+import { employeeMissionRuntime, wakeEmployee, type MissionRuntime } from "@/lib/data/bot-runtime";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { missionProvider } from "@/lib/ai/mission-models";
 
@@ -56,6 +57,36 @@ function isPoolQuestion(text: string): boolean {
   return ours && !work;
 }
 
+/**
+ * Hand a new step to whoever does the mission's work: Triangle's own runner,
+ * or the lead's bot on its own platform, which is woken and then left to it.
+ */
+async function handOff(
+  orgId: string,
+  missionId: string,
+  step: { stepId: string; runtime: MissionRuntime; agentInstanceId: string },
+): Promise<void> {
+  try {
+    if (step.runtime === "bot") {
+      await wakeEmployee({
+        orgId,
+        agentInstanceId: step.agentInstanceId,
+        stepId: step.stepId,
+        missionId,
+        event: "mission_step",
+      });
+    } else {
+      await runMissionQueue(orgId, missionId);
+    }
+  } catch (err) {
+    console.error("mission step:", err);
+  }
+}
+
+function aiNotConfigured() {
+  return NextResponse.json({ error: "AI is not configured on this deployment." }, { status: 503 });
+}
+
 const bodySchema = z.object({
   question: z.string().trim().min(2).max(8_000),
   missionId: z.string().uuid().optional(),
@@ -74,17 +105,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Write what you need first." }, { status: 400 });
   }
   const { question, missionId } = parsed.data;
-  if (!missionProvider()) {
-    return NextResponse.json(
-      { error: "AI is not configured on this deployment." },
-      { status: 503 },
-    );
-  }
   const orgId = access.organizationId;
 
   // ── the next instruction inside a mission ────────────────────────────────
   // Short is fine here: "electrical first" answers the question Scout asked.
   if (missionId) {
+    // A mission its lead's bot runs needs no AI inside Triangle at all.
+    if ((await missionLeadRuntime(orgId, missionId)) !== "bot" && !missionProvider()) {
+      return aiNotConfigured();
+    }
     const added = await addMissionInstruction({
       orgId,
       userId: access.userId,
@@ -94,15 +123,9 @@ export async function POST(request: Request) {
     if ("error" in added) {
       return NextResponse.json({ error: added.error }, { status: 400 });
     }
-    after(async () => {
-      try {
-        await runMissionQueue(orgId, missionId);
-      } catch (err) {
-        console.error("mission step:", err);
-      }
-    });
+    after(() => handOff(orgId, missionId, added));
     return NextResponse.json(
-      { kind: "mission", missionId, stepId: added.stepId },
+      { kind: "mission", missionId, stepId: added.stepId, runtime: added.runtime },
       { status: 201 },
     );
   }
@@ -117,6 +140,7 @@ export async function POST(request: Request) {
     // workers on the Talent Pool page must not read them out of a question.
     const noPool = refuseUnlessHuman(access, "canSeeWorkers", "ask about the company's people");
     if (noPool) return noPool;
+    if (!missionProvider()) return aiNotConfigured();
 
     const result = await answerAboutTalent(orgId, question);
     if ("error" in result) {
@@ -162,6 +186,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // A lead whose missions run on its bot needs no AI inside Triangle.
+  if ((await employeeMissionRuntime(orgId, lead.id)) !== "bot" && !missionProvider()) {
+    return aiNotConfigured();
+  }
+
   const started = await startMission({
     orgId,
     userId: access.userId,
@@ -173,13 +202,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: started.error }, { status: 500 });
   }
 
-  after(async () => {
-    try {
-      await runMissionQueue(orgId, started.missionId);
-    } catch (err) {
-      console.error("mission start:", err);
-    }
-  });
+  after(() =>
+    handOff(orgId, started.missionId, {
+      stepId: started.stepId,
+      runtime: started.runtime,
+      agentInstanceId: lead.id,
+    }),
+  );
 
   return NextResponse.json(
     {

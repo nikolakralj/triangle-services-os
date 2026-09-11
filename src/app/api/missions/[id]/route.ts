@@ -12,6 +12,7 @@ import { setCriteriaTargets } from "@/lib/data/mission-plan";
 import { setDecisionActive } from "@/lib/data/mission-memory";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { runMissionQueue } from "@/lib/ai/mission-executor";
+import { wakeEmployee } from "@/lib/data/bot-runtime";
 import { ensureMissionPlan } from "@/lib/ai/mission-planner";
 
 // ---------------------------------------------------------------------------
@@ -127,7 +128,18 @@ export async function PATCH(
     const orgId = access.organizationId;
     after(async () => {
       try {
-        await runMissionQueue(orgId, id);
+        // A bot step is woken again; Triangle's own steps run again here.
+        if (result.runtime === "bot") {
+          await wakeEmployee({
+            orgId,
+            agentInstanceId: result.agentInstanceId,
+            stepId: result.stepId,
+            missionId: id,
+            event: "mission_retry",
+          });
+        } else {
+          await runMissionQueue(orgId, id);
+        }
       } catch (err) {
         console.error("mission retry:", err);
       }
