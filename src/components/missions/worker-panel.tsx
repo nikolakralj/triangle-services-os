@@ -9,6 +9,8 @@ import {
   ChevronRight,
   CircleDot,
   FileSearch,
+  Flag,
+  Gauge,
   Globe,
   Loader2,
   RotateCcw,
@@ -42,6 +44,8 @@ const RUNNING: MissionState[] = ["queued", "working"];
 
 const ICON: Record<ActivityKind, { Icon: typeof Search; tone: string }> = {
   started: { Icon: ChevronRight, tone: "text-slate-400" },
+  planned: { Icon: Flag, tone: "text-sky-600" },
+  progress: { Icon: Gauge, tone: "text-sky-600" },
   searched: { Icon: Search, tone: "text-slate-400" },
   opened: { Icon: Globe, tone: "text-slate-400" },
   looked: { Icon: FileSearch, tone: "text-slate-400" },

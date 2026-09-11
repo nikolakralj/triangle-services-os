@@ -362,6 +362,11 @@ function cleanSources(raw: Array<{ url: string; claim: string }>): Array<{ url: 
   );
 }
 
+/** Whether a target cites at least one source that is a real web address. */
+export function citesASource(t: { sources: Array<{ url: string; claim: string }> }): boolean {
+  return cleanSources(t.sources).length > 0;
+}
+
 type Unsettled = Omit<CleanTarget, "state" | "missing" | "missingOwner" | "deadReason">;
 
 /**

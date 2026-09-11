@@ -79,6 +79,7 @@ export const AUTONOMY_STANDARD = {
  */
 export type ActivityKind =
   | "started"
+  | "planned"
   | "searched"
   | "opened"
   | "looked"
@@ -88,6 +89,7 @@ export type ActivityKind =
   | "dead"
   | "dropped"
   | "asked"
+  | "progress"
   | "finished"
   | "failed"
   | "refused";
@@ -100,6 +102,8 @@ export interface ActivityEvent {
 
 const ACTIVITY_KINDS = new Set<string>([
   "started",
+  "planned",
+  "progress",
   "searched",
   "opened",
   "looked",
@@ -264,6 +268,77 @@ export interface MissionPartner {
   confirmedDaysAgo: number | null;
 }
 
+// ── the finish line ─────────────────────────────────────────────────────────
+
+/**
+ * What a mission's progress is counted in. Each is a question the records
+ * answer on their own — never a number the worker reports about itself.
+ */
+export type MissionMetric =
+  | "companies_found"
+  | "companies_in_play"
+  | "named_buyers"
+  | "contact_routes"
+  | "project_evidence"
+  | "reachable"
+  | "candidates_named"
+  | "candidates_available"
+  | "partners_confirmed";
+
+/**
+ * The kinds of work one worker does inside a mission. Named now so that a pass
+ * can later run — or be handed to another employee — on its own, without the
+ * mission changing shape.
+ */
+export type MissionPass =
+  | "discover"
+  | "research"
+  | "verify"
+  | "qualify"
+  | "rank"
+  | "prepare"
+  | "match";
+
+/** When the mission is finished: "20 companies still in play". */
+export interface MissionCriterion {
+  metric: MissionMetric;
+  target: number;
+  setBy: "agent" | "human";
+}
+
+/** How it gets there: "Name the buyer at each", done when its metric says so. */
+export interface MissionPlanStep {
+  position: number;
+  pass: MissionPass;
+  title: string;
+  metric: MissionMetric;
+}
+
+export interface CriterionProgress extends MissionCriterion {
+  actual: number;
+  met: boolean;
+  /** "20 companies still in play" — from the metric, never from a model. */
+  label: string;
+}
+
+export interface PlanStepProgress extends MissionPlanStep {
+  target: number;
+  actual: number;
+  done: boolean;
+}
+
+/** Counted from the records every time it is shown, like the state. */
+export interface MissionProgress {
+  criteria: CriterionProgress[];
+  plan: PlanStepProgress[];
+  /** 0–100: how much of each criterion is reached, averaged. 100 only when all are met. */
+  percent: number;
+  met: boolean;
+  stepsDone: number;
+  /** The first plan step not yet done. */
+  current: PlanStepProgress | null;
+}
+
 export interface MissionWorkspace {
   mission: {
     id: string;
@@ -292,6 +367,8 @@ export interface MissionWorkspace {
   sources: MissionSourceRow[];
   candidates: MissionCandidate[];
   partners: MissionPartner[];
+  /** Null until the mission has a finish line. */
+  progress: MissionProgress | null;
   counts: {
     researched: number;
     qualified: number;

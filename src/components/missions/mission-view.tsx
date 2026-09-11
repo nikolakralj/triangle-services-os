@@ -42,6 +42,7 @@ import {
 import { MissionTabs } from "@/components/missions/mission-tabs";
 import { MissionMark, StateChip } from "@/components/missions/mission-state";
 import { WorkerPanel } from "@/components/missions/worker-panel";
+import { FinishLine } from "@/components/missions/finish-line";
 
 // ---------------------------------------------------------------------------
 // A mission.
@@ -134,6 +135,14 @@ function MissionHeader({ workspace, canWrite }: { workspace: MissionWorkspace; c
             {mission.title}
           </h1>
           <StateChip state={state} />
+          {workspace.progress && (
+            <span
+              className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[12px] font-semibold tabular-nums text-slate-700"
+              title={`${workspace.progress.criteria.filter((c) => c.met).length} of ${workspace.progress.criteria.length} success criteria met`}
+            >
+              {workspace.progress.percent}%
+            </span>
+          )}
         </div>
         <p className="mt-2 max-w-3xl text-[14.5px] leading-relaxed text-slate-600">{mission.objective}</p>
         <p className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500">
@@ -429,7 +438,7 @@ function Surfaces({
           (research ? (
             <ResearchOverview workspace={workspace} canWrite={canWrite} onOpen={setActive} />
           ) : (
-            <RecruitingOverview workspace={workspace} canSeeWorkers={canSeeWorkers} />
+            <RecruitingOverview workspace={workspace} canWrite={canWrite} canSeeWorkers={canSeeWorkers} />
           ))}
         {active === "companies" && (
           <CompanyTable rows={workspace.companies} missionId={missionId} canWrite={canWrite} />
@@ -498,6 +507,14 @@ function ResearchOverview({
           <Recommended text={latest.brief.recommended} company={firstMove} canWrite={canWrite} />
         ) : null}
       </section>
+
+      <FinishLine
+        missionId={mission.id}
+        progress={workspace.progress}
+        leadName={name}
+        running={running}
+        canWrite={canWrite}
+      />
 
       <section>
         <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -1040,9 +1057,11 @@ function SourceList({ rows }: { rows: MissionSourceRow[] }) {
 
 function RecruitingOverview({
   workspace,
+  canWrite,
   canSeeWorkers,
 }: {
   workspace: MissionWorkspace;
+  canWrite: boolean;
   canSeeWorkers: boolean;
 }) {
   const { latest, lead, state, candidates, partners } = workspace;
@@ -1089,6 +1108,13 @@ function RecruitingOverview({
           </p>
         )}
       </section>
+      <FinishLine
+        missionId={workspace.mission.id}
+        progress={workspace.progress}
+        leadName={lead?.name ?? "The worker"}
+        running={running}
+        canWrite={canWrite}
+      />
       {canSeeWorkers ? <CandidateTable rows={candidates} /> : <NoWorkers />}
     </div>
   );

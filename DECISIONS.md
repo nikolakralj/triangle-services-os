@@ -418,6 +418,53 @@ Built on agent assignments, their threads and agent_runs; no new agent roles.
 Outside missions, research proposals still need human acceptance, and a named
 project enters the pipeline only when a person decides it is one.
 
+### 2026-09-11: Missions finish on facts, with as few instructions as possible
+
+Decision:
+
+- mission work is measured by how few instructions the CEO gives before a
+  mission comes back ready for a decision. The Germany EPC mission needed five;
+  the target is one;
+- every mission has a plan (how it gets there) and success criteria (when it
+  is finished). Progress is counted from the records, never from what a worker
+  reports about itself;
+- one worker runs passes — discover, research, verify, qualify, rank, prepare —
+  before any new named agent. A pass may later be delegated without changing
+  the mission the CEO sees;
+- continuation is a durable run engine: bounded, resumable, idempotent and
+  retryable runs, with run and spend limits enforced in the database. A
+  scheduler only wakes it; it is not the intelligence;
+- a long mission is read as condensed state — objective, criteria, CEO
+  decisions, known facts, open questions, next work — plus its records and the
+  latest conversation, not its whole history;
+- evidence-based verification and entity resolution (company, person, role,
+  contact route: n of 4) come before unattended continuation. A record below
+  the threshold is never presented as ready to contact;
+- autonomy has three classes, enforced where the action happens — tool
+  permissions and database guards — never by a prompt alone. The AI decides,
+  logs, and can be undone: what to search next, research depth, ranking,
+  rejecting poor fits, retries, stopping when the criteria are met. The AI
+  prepares and a person approves: outreach, call recommendations, proposals,
+  candidate recommendations, follow-ups. Only a person acts: sending anything
+  externally, price, rate or headcount commitments, spending, contracts,
+  important deletion;
+- monitoring is company-, project- and opportunity-first. A person's record
+  changes only for business-relevant professional changes found in public
+  sources; nobody is tracked for their own sake.
+
+Why:
+
+- a worker told only the next instruction stops after it, and the CEO becomes
+  the scheduler;
+- the first mission runs already filed a lookalike company and two people under
+  one name; unattended hours would multiply that;
+- an instruction that says "never send email" is not a boundary.
+
+This meets the 29 August gate for durable orchestration — mission work outlives
+a request, needs independent retries, pauses for the CEO, and must resume after
+a crash or a deploy — and lifts the Phase 0 freeze on new orchestration for
+mission runs only: built in Postgres and Next.js, with no new workflow runtime.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

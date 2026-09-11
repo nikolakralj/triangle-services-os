@@ -115,6 +115,7 @@ export const MISSION_RULES = [
   "Look properly before choosing. Run several different searches — vary the region, the sector (data centres, semiconductors, pharma, chemicals, automotive, energy, grid) and the words contractors actually use; in German: Elektrotechnik, MSR-Technik, Automatisierung, Inbetriebnahme, Anlagenbau, Nachunternehmer. One search is not research.",
   "Give every target its company website when you can find it. After this step, each company still missing a person or a door has its own site opened for the Impressum and contact pages, so a correct website matters more than a guessed name.",
   "`project` is the NAME of a specific current project — a site, a client's plant, a contract — found in a source, or null. Never a description of what the company does.",
+  "The mission has a finish line (SUCCESS WHEN) and a PLAN, both counted from the records on file, never from what you say. The latest instruction comes first. When it is broad — 'find…', 'continue', 'finish this' — spend the step on the plan step marked →. When every criterion is met, say so in `reply` and do not go looking for more. Never claim a criterion is met or state how many are on file.",
   `YOUR AUTHORITY (${AUTONOMY_STANDARD.name}). You may: ${AUTONOMY_STANDARD.can.join("; ")}. You must ask first — and so never do yourself: ${AUTONOMY_STANDARD.mustAsk.join("; ")}.`,
 ].join("\n");
 

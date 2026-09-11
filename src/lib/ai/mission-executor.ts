@@ -1,11 +1,13 @@
 import "server-only";
 import { answerAboutTalent } from "@/lib/ai/talent-answer";
+import { ensureMissionPlan } from "@/lib/ai/mission-planner";
 import {
   createCompanyReachAgent,
   createMissionScoutAgent,
   getScoutModelId,
 } from "@/lib/ai/scout-agent";
 import {
+  citesASource,
   cleanTargets,
   companyKey,
   domainOf,
@@ -36,13 +38,26 @@ import type {
 } from "@/lib/data/mission-shared";
 import {
   describeHoldings,
+  loadMissionHoldings,
   loadMissionRunContext,
   nextQueuedStep,
   STALE_STEP_MINUTES,
   touchMission,
+  type MissionHoldings,
   type MissionRunContext,
 } from "@/lib/data/missions";
-import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
+import type { MissionPlanRows } from "@/lib/data/mission-plan";
+import {
+  describeProgress,
+  evaluateProgress,
+  metricLabel,
+  progressSentence,
+  type MissionFacts,
+} from "@/lib/data/mission-progress";
+import {
+  getOrganizationOperatingProfile,
+  type OrganizationOperatingProfile,
+} from "@/lib/data/organization-profile";
 import { completeAssignment } from "@/lib/data/workforce";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -140,6 +155,50 @@ function holdingToTarget(c: MissionCompanyRow): CleanTarget {
     deadReason: c.deadReason,
     sources: c.sources.slice(0, 3),
   };
+}
+
+/** What a mission holds, as the progress counter reads it. */
+function factsOf(holdings: MissionHoldings): MissionFacts {
+  return { companies: holdings.companies, candidates: [], partners: [] };
+}
+
+/**
+ * Before the first piece of work: a finish line and a route, when the mission
+ * has none. Never blocks the step — a mission that cannot be planned is worked
+ * the way it was before.
+ */
+async function planFirst(
+  assignment: ClaimedAssignment,
+  ctx: MissionRunContext,
+  runId: string | null,
+  profile: OrganizationOperatingProfile | null,
+): Promise<MissionPlanRows> {
+  if (ctx.criteria.length > 0) return { criteria: ctx.criteria, plan: ctx.plan };
+  try {
+    const planned = await ensureMissionPlan({
+      orgId: assignment.orgId,
+      missionId: ctx.mission.id,
+      kind: ctx.mission.kind,
+      objective: ctx.mission.objective,
+      instructions: [
+        ...ctx.conversation.filter((m) => m.role === "human").map((m) => m.body),
+        ctx.instruction,
+      ],
+      org: { name: profile?.name || "the company", companyProfile: profile?.companyProfile || null },
+    });
+    if (planned.wrote && planned.criteria.length > 0) {
+      await appendMissionActivity(runId, [
+        activity(
+          "planned",
+          `Set the finish line: ${planned.criteria.map((c) => metricLabel(c.metric, c.target)).join(" · ")}`,
+        ),
+      ]);
+    }
+    return { criteria: planned.criteria, plan: planned.plan };
+  } catch (error) {
+    console.error("planFirst:", error instanceof Error ? error.message : error);
+    return { criteria: [], plan: [] };
+  }
 }
 
 // ── claiming ────────────────────────────────────────────────────────────────
@@ -395,6 +454,9 @@ async function runResearchStep(
       [profile?.name, profile?.companyProfile ? clip(profile.companyProfile, 300) : null]
         .filter(Boolean)
         .join(" — ") || "a supplier of industrial crews to contractors";
+    // Before the work: when the mission is finished, and how it gets there.
+    const planRows = await planFirst(assignment, ctx, runId, profile);
+    const before = evaluateProgress(planRows.criteria, planRows.plan, factsOf(ctx.holdings));
     const prompt = [
       `MISSION: ${[ctx.mission.emoji, ctx.mission.title].filter(Boolean).join(" ")}`,
       `OBJECTIVE: ${ctx.mission.objective}`,
@@ -403,6 +465,7 @@ async function runResearchStep(
       "",
       "WHAT THIS MISSION ALREADY HOLDS (do not re-file a company unless you learned something new about it):",
       describeHoldings(ctx.holdings),
+      ...(before ? ["", describeProgress(before)] : []),
       "",
       "WHO TRIANGLE CAN SUPPLY RIGHT NOW.",
       "Supply is Triangle's own people and partner firms whose capacity a human confirmed within the last 14 days. Anything absent from both lists is not supply.",
@@ -434,7 +497,9 @@ async function runResearchStep(
     // attached, is the worker referring back to it — not a lead it dropped.
     const holdingByKey = new Map(ctx.holdings.companies.map((c) => [companyKey(c.name), c]));
     const fresh = report.targets.filter(
-      (t) => !(holdingByKey.has(companyKey(t.company)) && t.sources.length === 0),
+      // The same test cleanTargets applies, or a held company cited with an
+      // unusable link comes back as "left out: no source to cite".
+      (t) => !(holdingByKey.has(companyKey(t.company)) && !citesASource(t)),
     );
     const cleaned = cleanTargets(fresh);
     const dropped = cleaned.dropped;
@@ -588,6 +653,26 @@ async function runResearchStep(
     if (typeof completed === "object" && "refused" in completed) throw new Error(completed.refused);
     if (!completed) throw new Error("The step changed before it could be reported.");
 
+    // How far the mission moved, counted again from what is now on file.
+    const progressAfter = before
+      ? evaluateProgress(
+          planRows.criteria,
+          planRows.plan,
+          factsOf(await loadMissionHoldings(assignment.orgId, ctx.mission.id)),
+        )
+      : null;
+    if (before && progressAfter) {
+      events.push(
+        activity(
+          "progress",
+          progressAfter.met
+            ? `Finish line reached — ${progressSentence(progressAfter)}`
+            : `Finish line: ${progressSentence(progressAfter)}${
+                progressAfter.percent !== before.percent ? ` (was ${before.percent}%)` : ""
+              }${progressAfter.current ? ` · next: ${progressAfter.current.title}` : ""}`,
+        ),
+      );
+    }
     events.push(activity("finished", finishedLine(record)));
     await finishMissionRun(runId, {
       status: "completed",
@@ -598,6 +683,7 @@ async function runResearchStep(
         filed: record.filed,
         sitesRead: reached.filter((t) => t.reachChecked).length,
         heldCompaniesRead: backlog.length,
+        progress: progressAfter ? { percent: progressAfter.percent, met: progressAfter.met } : null,
       },
     });
     await touchMission(assignment.orgId, ctx.mission.id);
@@ -636,8 +722,13 @@ async function runRecruitingStep(
   });
 
   try {
+    const profile = await getOrganizationOperatingProfile(assignment.orgId);
+    const planRows = await planFirst(assignment, ctx, runId, profile);
     const question = [
       `WHAT THIS PIECE OF WORK IS FOR: ${ctx.mission.objective}`,
+      planRows.criteria.length > 0
+        ? `IT IS FINISHED WHEN THERE ARE: ${planRows.criteria.map((c) => metricLabel(c.metric, c.target)).join("; ")}.`
+        : null,
       ctx.conversation.length > 0 ? conversationBlock(ctx, 10) : null,
       `WHAT THE CEO ASKS NOW: ${ctx.instruction}`,
     ]

@@ -275,6 +275,11 @@ binding claim, or contact a third party without explicit authority.
    their management cost.
 10. Measure useful outcomes, accuracy, time saved, and review burden—not task
     or token volume.
+11. Autonomy is enforced where an action happens — tool permissions and
+    database guards — never by an instruction to the agent alone.
+12. Monitoring is company-, project- and opportunity-first. A person's record
+    changes only for business-relevant professional changes found in public
+    sources.
 
 ## Product and UX rules
 
@@ -293,6 +298,9 @@ binding claim, or contact a third party without explicit authority.
 9. Reconsider spatial/Collaboration Field UX only after real multi-user/agent
    coordination pain meets the gate in `ROADMAP.md`.
 10. Accessibility and mobile operation are requirements, not polish.
+11. Delegated work is measured by how few instructions it needs before it comes
+    back ready for a decision. Progress is counted from records, never from
+    what an agent says about itself.
 
 ## Build rules
 

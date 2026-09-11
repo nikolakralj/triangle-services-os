@@ -2,6 +2,8 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createAssignment } from "@/lib/data/workforce";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
+import { loadMissionPlan } from "@/lib/data/mission-plan";
+import { evaluateProgress } from "@/lib/data/mission-progress";
 import type { MissionNaming } from "@/lib/ai/mission-namer";
 import {
   parseMissionStepRecord,
@@ -17,10 +19,12 @@ import {
   type MissionCandidate,
   type MissionChannel,
   type MissionCompanyRow,
+  type MissionCriterion,
   type MissionKind,
   type MissionMessage,
   type MissionPartner,
   type MissionPersonRow,
+  type MissionPlanStep,
   type MissionProjectRow,
   type MissionSourceRow,
   type MissionState,
@@ -916,7 +920,7 @@ export async function getMissionWorkspace(
   if (error || !row) return null;
   const mission = row as MissionRow;
 
-  const [stepMap, holdings, tabs, lead] = await Promise.all([
+  const [stepMap, holdings, tabs, lead, planRows] = await Promise.all([
     loadSteps(svc, orgId, [missionId]),
     loadMissionHoldings(orgId, missionId),
     listMissionTabs(orgId),
@@ -927,6 +931,7 @@ export async function getMissionWorkspace(
           .eq("id", mission.lead_agent_instance_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    loadMissionPlan(orgId, missionId),
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const stepIds = steps.map((s) => s.id);
@@ -994,6 +999,13 @@ export async function getMissionWorkspace(
       }));
   }
 
+  // Counted here, from the same rows the page draws — never stored.
+  const progress = evaluateProgress(planRows.criteria, planRows.plan, {
+    companies: holdings.companies,
+    candidates,
+    partners,
+  });
+
   const leadRow = lead.data as Record<string, unknown> | null;
   return {
     mission: {
@@ -1024,6 +1036,7 @@ export async function getMissionWorkspace(
     ...holdings,
     candidates,
     partners,
+    progress,
   };
 }
 
@@ -1065,6 +1078,29 @@ export async function getMissionPulse(
 
 // ── what a step is given ────────────────────────────────────────────────────
 
+/** What a planner reads: the objective and every instruction, oldest first. */
+export async function loadMissionBrief(
+  orgId: string,
+  missionId: string,
+): Promise<{ kind: MissionKind; objective: string; instructions: string[] } | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data: row } = await svc
+    .from("missions")
+    .select(MISSION_FIELDS)
+    .eq("id", missionId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!row) return null;
+  const mission = row as MissionRow;
+  const steps = (await loadSteps(svc, orgId, [missionId])).get(missionId) ?? [];
+  return {
+    kind: mission.kind,
+    objective: mission.objective,
+    instructions: steps.map((s) => s.objective).reverse(),
+  };
+}
+
 export interface MissionRunContext {
   mission: {
     id: string;
@@ -1080,6 +1116,9 @@ export interface MissionRunContext {
   /** Everything said before this instruction, oldest first. */
   conversation: Array<{ role: "human" | "agent"; body: string; at: string }>;
   holdings: MissionHoldings;
+  /** The finish line and the route, when the mission has them. */
+  criteria: MissionCriterion[];
+  plan: MissionPlanStep[];
 }
 
 /**
@@ -1108,7 +1147,7 @@ export async function loadMissionRunContext(
   if (!row) return null;
   const mission = row as MissionRow;
 
-  const [stepMap, holdings, agent] = await Promise.all([
+  const [stepMap, holdings, agent, planRows] = await Promise.all([
     loadSteps(svc, orgId, [missionId]),
     loadMissionHoldings(orgId, missionId),
     mission.lead_agent_instance_id
@@ -1118,6 +1157,7 @@ export async function loadMissionRunContext(
           .eq("id", mission.lead_agent_instance_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    loadMissionPlan(orgId, missionId),
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const step = steps.find((s) => s.id === stepId);
@@ -1143,6 +1183,8 @@ export async function loadMissionRunContext(
     instruction: step.objective,
     conversation,
     holdings,
+    criteria: planRows.criteria,
+    plan: planRows.plan,
   };
 }
 
