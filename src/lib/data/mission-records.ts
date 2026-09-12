@@ -148,7 +148,11 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
     promoted_entity_id: company.id,
     source_url: t.sources[0]?.url ?? null,
     evidence_text: t.sources[0]?.claim || t.why,
-    idempotency_key: `mission:${ctx.stepId}:company:${t.companyKey}`,
+    // The state belongs in the key. A bot files as it goes, so the same
+    // company arrives first without a person and again once its door is
+    // found; keyed without the state, that upgrade was silently dropped and
+    // the company stayed "missing one thing" for the finish line.
+    idempotency_key: `mission:${ctx.stepId}:company:${t.companyKey}:${t.state}`,
     payload: {
       source: "mission",
       company_name: t.company,
@@ -196,7 +200,7 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
       promoted_entity_id: result.contactId,
       source_url: t.sources[0]?.url ?? null,
       evidence_text: t.sources[0]?.claim || t.why,
-      idempotency_key: `mission:${ctx.stepId}:contact:${t.companyKey}:${companyKey(t.person)}`,
+      idempotency_key: `mission:${ctx.stepId}:contact:${t.companyKey}:${companyKey(t.person)}:${t.state}`,
       payload: {
         source: "mission",
         full_name: t.person,
