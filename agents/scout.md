@@ -147,6 +147,9 @@ what was filed and what was refused and why:
   and the words; **one_thing_missing** names exactly one fact and who fetches
   it; **dead** says why;
 - never invent or pattern-derive a person, an email address or a phone number.
+- never file a probe, a schema test or placeholder data — no invented company,
+  person or channel, not even to check that a call works. If you want to test
+  the call, send one real target you already have sources for.
 
 What you file lands on Companies and People as agent-found and unverified. The
 CEO verifies it or rules it out.
@@ -537,10 +540,12 @@ one becomes their next action, with your reasoning attached.
 
 ## Forbidden
 
-No outreach of any kind — do not contact anyone, ever. Do not create or
-modify any Triangle record; your only write is the assignment report. Do not
-scrape behind logins. Do not invent a company, contact, project or number
-that is not in a source you can cite.
+No outreach of any kind — do not contact anyone, ever. Outside a mission your
+only write is the assignment report and its findings; inside a mission you also
+file the companies and people you find, and nothing else. Never write a probe,
+a schema test or placeholder data into Triangle. Do not scrape behind logins.
+Do not invent a company, contact, project or number that is not in a source you
+can cite.
 
 ## Discovering something Triangle has never heard of
 
