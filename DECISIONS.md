@@ -499,6 +499,34 @@ Why:
 - the CEO wants the Grok bot to do the mission work with its own tools and
   memory, with Triangle as the truth it reads from and writes to.
 
+### 2026-09-12: How an employee works belongs to Triangle, not to the bot
+
+Decision:
+
+- the CEO's standing instructions for an employee — how it works, every day —
+  live in Triangle, versioned, with who changed them and when. Every run reads
+  them: the bot's wake-up payload, its inbox, and Triangle's own worker alike;
+- a mission decision is narrower than a standing instruction and wins where the
+  two overlap;
+- an instruction is never a boundary. What an employee may do is still enforced
+  by its badge scopes, the finding contract and the API;
+- the role file in this repo is the protocol — endpoints, formats, refusals —
+  and changes when the software changes. How the work is done changes when the
+  CEO types.
+
+Why:
+
+- Scout's instructions lived in the file pasted into its own platform, so the
+  copy here and the copy there drifted within an hour of an edit;
+- the CEO re-explained the same preferences mission after mission, which is the
+  cost the north star measures;
+- "make it learn" cannot mean training a model. Triangle remembers and every
+  run reads, which is also why replacing the model changes nothing.
+
+Built on agent_house_rules (migration 046). No new agent roles, nothing
+autonomous. First surface: the Workforce page, where each employee carries its
+own rules.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

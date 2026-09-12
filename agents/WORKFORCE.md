@@ -130,6 +130,15 @@ and a plain inbox result cannot close a mission step. Triangle's runner never
 takes a bot's step and the stalled-job takeover leaves it alone; the bot's own
 scheduled inbox check is the backup for a missed wake-up.
 
+How an employee works is the CEO's to write and Triangle's to keep: standing
+instructions per employee (`agent_house_rules`, migration 046), versioned with
+who changed them and when. They travel with the work — the inbox response and
+every mission payload carry `houseRules`, and Triangle's own worker is handed
+the same block — so nothing has to be pasted into a bot's platform and kept in
+step by hand. A mission decision is narrower and wins where the two overlap.
+Rules are instructions, never permissions: scopes, the finding contract and the
+API still decide what an employee may do.
+
 Köster and GOLDBECK are the first verified in-app cases. Their structured
 reports, project proposals, assignment conversation, and provider/model/token
 audit all remain in Triangle. No contact was performed.

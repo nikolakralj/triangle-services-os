@@ -1,6 +1,7 @@
 import "server-only";
 import { recordRefusal } from "@/lib/data/refusals";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { loadHouseRulesByEmployee } from "@/lib/data/house-rules";
 import {
   countMessagesByAssignment,
   takeThreadForBot,
@@ -33,6 +34,8 @@ export interface WorkforceEmployee {
   neverStarted: boolean;
   openAssignments: number;
   badgeName: string | null;
+  /** How the CEO wants this employee to work — read on every run (migration 046). */
+  houseRules: { body: string; version: number; setAt: string } | null;
 }
 
 export interface HumanMember {
@@ -115,6 +118,10 @@ export async function listWorkforce(orgId: string): Promise<WorkforceEmployee[]>
       });
     }
   }
+  const houseRules = await loadHouseRulesByEmployee(
+    orgId,
+    (instancesRes.data ?? []).map((i) => i.id as string),
+  );
   const openCounts = new Map<string, number>();
   for (const a of openRes.data ?? []) {
     const k = a.agent_instance_id as string;
@@ -142,6 +149,10 @@ export async function listWorkforce(orgId: string): Promise<WorkforceEmployee[]>
       neverStarted: lastUsedAt === null,
       openAssignments: openCounts.get(i.id as string) ?? 0,
       badgeName: badge?.name ?? null,
+      houseRules: (() => {
+        const r = houseRules.get(i.id as string);
+        return r ? { body: r.body, version: r.version, setAt: r.setAt } : null;
+      })(),
     };
   });
 }

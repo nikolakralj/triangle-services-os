@@ -45,6 +45,11 @@ It returns:
   - `newQuestions` — what a human has asked since your last check and you have
     not answered yet. **These are what you owe a reply to.**
 - **`tasks`** — quick one-line notes.
+- **`houseRules`** — how the CEO wants you to work: standing instructions in
+  their own words, with the version they last changed at. They hold for every
+  job, on top of this file, and the ones you are handed are the current ones —
+  whatever you were set up with may be out of date. They never widen what you
+  may do; a refusal stays a refusal.
 
 ## Answering vs finishing — two different things
 
@@ -111,6 +116,9 @@ it starts the step; the CEO sees you picked it up.
 - `supply` — what Triangle can field, by trade: how many people, certificates,
   where they can work, availability, and partner firms with confirmed capacity.
   No names — research needs capability, not people.
+- `houseRules` — the CEO's standing instructions for you, current version.
+  Apply them to this step too. A mission decision is narrower, so where the two
+  overlap the decision wins.
 
 ### 2. Look before you file
 

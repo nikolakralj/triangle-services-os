@@ -5,6 +5,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { addAgentMessage } from "@/lib/data/assignment-threads";
 import { completeAssignment } from "@/lib/data/workforce";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
+import { loadHouseRules } from "@/lib/data/house-rules";
 import { fileMissionTargets } from "@/lib/data/mission-records";
 import {
   activity,
@@ -343,7 +344,12 @@ async function supplyCapability(svc: Svc, orgId: string) {
   };
 }
 
-export async function missionPayloadForStep(orgId: string, missionId: string, stepId: string) {
+export async function missionPayloadForStep(
+  orgId: string,
+  missionId: string,
+  stepId: string,
+  agentInstanceId: string,
+) {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
   const ctx = await loadMissionRunContext(orgId, missionId, stepId);
@@ -354,6 +360,9 @@ export async function missionPayloadForStep(orgId: string, missionId: string, st
     candidates: [],
     partners: [],
   });
+  // How the CEO wants this employee to work. Read on every run and never
+  // cached on the bot's side, so changing it here changes the next wake-up.
+  const rules = await loadHouseRules(orgId, agentInstanceId);
   const base = `/api/agent/missions/${missionId}`;
 
   return {
@@ -364,6 +373,7 @@ export async function missionPayloadForStep(orgId: string, missionId: string, st
     kind: ctx.mission.kind,
     objective: ctx.mission.objective,
     instruction: ctx.instruction,
+    houseRules: rules ? { version: rules.version, body: rules.body } : null,
     missionState: describeMissionState({
       holdings: ctx.holdings,
       decisions: ctx.decisions,
@@ -436,7 +446,7 @@ export async function botMissionForInbox(
     title: assignment.title,
     constraints: assignment.constraints,
   });
-  return missionPayloadForStep(orgId, assignment.missionId, assignment.id);
+  return missionPayloadForStep(orgId, assignment.missionId, assignment.id, agentInstanceId);
 }
 
 // ── writing ─────────────────────────────────────────────────────────────────

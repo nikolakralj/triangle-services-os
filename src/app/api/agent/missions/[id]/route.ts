@@ -18,7 +18,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   await pickUpBotStep(auth.step);
-  const payload = await missionPayloadForStep(auth.machine.orgId, id, auth.step.id);
+  const payload = await missionPayloadForStep(
+    auth.machine.orgId,
+    id,
+    auth.step.id,
+    auth.step.agentInstanceId,
+  );
   if (!payload) return NextResponse.json({ error: "The mission could not be read." }, { status: 404 });
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
 }

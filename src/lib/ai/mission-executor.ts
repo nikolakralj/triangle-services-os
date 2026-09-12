@@ -59,6 +59,7 @@ import {
   type OrganizationOperatingProfile,
 } from "@/lib/data/organization-profile";
 import { completeAssignment } from "@/lib/data/workforce";
+import { houseRulesForPrompt, loadHouseRules } from "@/lib/data/house-rules";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -516,10 +517,16 @@ async function runResearchStep(
     const planned = await planFirst(assignment, ctx, runId, profile);
     const { decisions, planRows } = await noteDecisions(assignment, ctx, runId, planned);
     const before = evaluateProgress(planRows.criteria, planRows.plan, factsOf(ctx.holdings));
+    // The same standing instructions a bot is handed, so the work does not
+    // change character with whoever happens to run the step.
+    const houseRules = houseRulesForPrompt(
+      await loadHouseRules(assignment.orgId, assignment.agentInstanceId),
+    );
     const prompt = [
       `MISSION: ${[ctx.mission.emoji, ctx.mission.title].filter(Boolean).join(" ")}`,
       `OBJECTIVE: ${ctx.mission.objective}`,
       "",
+      ...(houseRules ? [houseRules, ""] : []),
       describeMissionState({
         holdings: ctx.holdings,
         decisions,
@@ -795,8 +802,13 @@ async function runRecruitingStep(
     const profile = await getOrganizationOperatingProfile(assignment.orgId);
     const planned = await planFirst(assignment, ctx, runId, profile);
     const { decisions, planRows } = await noteDecisions(assignment, ctx, runId, planned);
+    // Reading the pool is still this employee's job, done the CEO's way.
+    const houseRules = houseRulesForPrompt(
+      await loadHouseRules(assignment.orgId, assignment.agentInstanceId),
+    );
     const question = [
       `WHAT THIS PIECE OF WORK IS FOR: ${ctx.mission.objective}`,
+      houseRules,
       planRows.criteria.length > 0
         ? `IT IS FINISHED WHEN THERE ARE: ${planRows.criteria.map((c) => metricLabel(c.metric, c.target)).join("; ")}.`
         : null,

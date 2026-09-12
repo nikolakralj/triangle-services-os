@@ -62,6 +62,7 @@ export default async function WorkforcePage() {
         workers={workers}
         projects={projects}
         canHire={session.role === "admin"}
+        canWriteRules={session.role === "admin" || session.role === "partner"}
         tasks={tasks}
         runs={runs}
         suggestedJobs={suggestedJobs.map((j) => ({

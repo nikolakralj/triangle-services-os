@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
 import { HireEmployee } from "@/components/modules/hire-employee";
+import { HouseRules } from "@/components/modules/house-rules";
 import { AgentReport } from "@/components/modules/agent-report";
 import type { AgentTask, AgentRun } from "@/lib/data/agents";
 import type {
@@ -123,6 +124,7 @@ export function AgentConsole({
   workers,
   projects,
   canHire,
+  canWriteRules,
   tasks,
   runs,
   suggestedJobs,
@@ -135,6 +137,7 @@ export function AgentConsole({
   projects: ProjectLite[];
   /** Issuing credentials is an admin action; partners see the team, not the door. */
   canHire: boolean;
+  canWriteRules: boolean;
   tasks: AgentTask[];
   runs: AgentRun[];
   /** Jobs Triangle derived from its own data. See lib/data/job-suggestions.ts. */
@@ -394,6 +397,12 @@ export function AgentConsole({
                       then ask it to run once.
                     </p>
                   )}
+                  <HouseRules
+                    employeeId={e.id}
+                    name={e.displayName}
+                    rules={e.houseRules}
+                    canEdit={canWriteRules}
+                  />
                 </div>
               </div>
             ))
