@@ -35,6 +35,41 @@ Update this file when:
 Record strategic changes in `DECISIONS.md`, and implemented/live truth in
 `CURRENT_STATE.md`.
 
+## Development — now
+
+Updated 14 September 2026. This is the single ordered list of product work; the
+[work queue](AUTONOMOUS_WORK_QUEUE.md) holds each item's acceptance criteria.
+None of it counts toward the Phase 0 exit gate below — human sends, buyer
+conversations, a packet and a supplier route do.
+
+1. **Sent-message record** (DEV-001). A person sends from a Triangle draft; one
+   action records the final content, recipient, time and a follow-up date, and
+   overdue follow-ups appear on Today. First, because the gate needs five
+   recorded human sends with follow-ups and final content, and nothing records
+   them yet (P0 items 1 and 2 below).
+2. **Source check at filing** (DEV-002). A door counts as reachable only when its
+   channel appears on the page it cites; a page that cannot be read is marked
+   unchecked. Two of ten Austrian doors cited pages without their channel.
+3. **Hanna writes to the pool from her bot** (DEV-003). Candidate and
+   availability records through the badge API, and availability checks drafted
+   for a person to send. The gate needs one package backed by people confirmed
+   available.
+4. **Bob takes follow-through** (DEV-004). Once the CEO grants his badge mission
+   scope and his wake-up exists: lead triage, missing-fact chasers, packet-send
+   and supplier-registration tracking, all as drafts.
+5. **Known defects** (DEV-005). The Today recommended card must carry the person
+   it names; STRABAG and ANDRITZ need re-sourcing.
+
+Next, once the gate is moving: a minimal event outbox (client reply received,
+follow-up due, availability stale) that wakes the owning employee; learning from
+the CEO's edits; budget and cost per mission; separate research and
+communications computers for bots.
+
+Not now: a workforce registry, marketplace hiring, quality scores, autonomous
+sending. Background: the
+[architecture study](docs/product/WORKFORCE_ARCHITECTURE_2026-09-13.html) and the
+11–14 September entries in [DECISIONS](DECISIONS.md).
+
 ## Last documented live snapshot — 8 September 2026
 
 This is dated evidence, not a live dashboard. See [CURRENT_STATE](CURRENT_STATE.md)
@@ -170,7 +205,8 @@ the company and project flows show a concrete limitation.
    Source reconciliation, 10 September: budget settings and written safe-step
    guidance exist. Monetary accounting, atomic reservations, recovery and
    enforced role boundaries remain incomplete or unproven. This is partial
-   implementation, not completion of CASE-004 or its collaboration gate.
+   implementation, not completion of CASE-004 or its collaboration gate. Requests between employees (migration 047) and a
+   per-employee messaging policy landed on 14 September; see CURRENT_STATE.
 6. **Outcome-backed learning.** Store corrections, accepted/rejected evidence,
    buyer responses, placements, delivery, and margin as evaluation history.
    Never let model-generated summaries silently overwrite canonical facts.

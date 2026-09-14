@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Triangle Workforce Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ground: #f3f5f8;
+    --surface: #ffffff;
+    --surface-2: #eaeff5;
+    --ink: #0e1726;
+    --ink-2: #2f3d52;
+    --muted: #5a6a7f;
+    --rule: #d7dfe8;
+    --accent: #0b5cad;
+    --accent-soft: #e2edf9;
+    --ok: #0d7a4e;
+    --ok-soft: #e0f2e9;
+    --warn: #975a00;
+    --warn-soft: #faefd9;
+    --no: #b3261e;
+    --no-soft: #fae4e2;
+    --obs: #5a3fb3;
+    --obs-soft: #ebe6fa;
+    --shadow: 0 1px 2px rgba(14, 23, 38, 0.05);
+    --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --cond: "IBM Plex Sans Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0a111c;
+      --surface: #101a29;
+      --surface-2: #162235;
+      --ink: #e6edf6;
+      --ink-2: #c2cedc;
+      --muted: #8d9fb5;
+      --rule: #233249;
+      --accent: #6cb0ff;
+      --accent-soft: #13304f;
+      --ok: #56c892;
+      --ok-soft: #0f2f1f;
+      --warn: #efb35a;
+      --warn-soft: #39290d;
+      --no: #ff8a80;
+      --no-soft: #3c1614;
+      --obs: #b4a0ff;
+      --obs-soft: #241b44;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0a111c;
+    --surface: #101a29;
+    --surface-2: #162235;
+    --ink: #e6edf6;
+    --ink-2: #c2cedc;
+    --muted: #8d9fb5;
+    --rule: #233249;
+    --accent: #6cb0ff;
+    --accent-soft: #13304f;
+    --ok: #56c892;
+    --ok-soft: #0f2f1f;
+    --warn: #efb35a;
+    --warn-soft: #39290d;
+    --no: #ff8a80;
+    --no-soft: #3c1614;
+    --obs: #b4a0ff;
+    --obs-soft: #241b44;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .page {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 28px 96px;
+  }
+  @media (max-width: 960px) {
+    .page { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 24px 18px 72px; }
+    nav.toc { position: static; }
+  }
+
+  nav.toc { position: sticky; top: 24px; align-self: start; font-size: 13.5px; }
+  nav.toc p { margin: 0 0 10px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  nav.toc a {
+    display: grid; grid-template-columns: 22px 1fr; gap: 6px;
+    padding: 5px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none;
+  }
+  nav.toc a:hover { background: var(--surface-2); color: var(--ink); }
+  nav.toc .code { font-family: var(--mono); color: var(--muted); font-size: 12px; padding-top: 1px; }
+
+  .label {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+  }
+
+  main { min-width: 0; }
+  main > section { margin-top: 64px; scroll-margin-top: 20px; }
+  h1, h2 { font-family: var(--cond); font-weight: 600; letter-spacing: -0.005em; text-wrap: balance; }
+  h1 { font-size: clamp(2rem, 3.6vw, 2.6rem); line-height: 1.12; margin: 0; }
+  h2 { font-size: 1.62rem; line-height: 1.2; margin: 6px 0 14px; }
+  h3 { font-size: 1.04rem; margin: 26px 0 8px; font-weight: 600; text-wrap: balance; }
+  p, li { max-width: 72ch; }
+  p { margin: 0 0 12px; color: var(--ink-2); }
+  ul, ol { color: var(--ink-2); padding-left: 1.2em; margin: 0 0 12px; }
+  li { margin: 4px 0; }
+  strong { color: var(--ink); font-weight: 600; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  q { font-style: italic; }
+  q::before, q::after { content: ""; }
+
+  /* the drawing-sheet title block */
+  .titleblock {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .titleblock .head { padding: 26px 26px 22px; }
+  .titleblock .head p { margin: 10px 0 0; font-size: 1.02rem; }
+  .titleblock dl {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .titleblock dl div { padding: 12px 16px; border-right: 1px solid var(--rule); min-width: 0; }
+  .titleblock dl div:last-child { border-right: 0; }
+  .titleblock dt { margin: 0 0 2px; }
+  .titleblock dd { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+  @media (max-width: 720px) {
+    .titleblock dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .titleblock dl div:nth-child(2) { border-right: 0; }
+    .titleblock dl div:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+  }
+
+  .verdict {
+    margin-top: 22px; background: var(--accent-soft); border-radius: 10px; padding: 20px 24px;
+  }
+  .verdict h2 { margin-top: 2px; font-size: 1.3rem; }
+  .verdict ol { margin: 0; display: grid; gap: 6px; }
+  .verdict li { color: var(--ink); }
+
+  .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0; }
+  @media (max-width: 720px) { .split { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; }
+  .panel h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .panel ul { margin-bottom: 0; }
+  .panel.can h3 { color: var(--ok); }
+  .panel.cannot h3 { color: var(--no); }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 999px; white-space: nowrap; font-weight: 500;
+  }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.obs { background: var(--obs-soft); color: var(--obs); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.no { background: var(--no-soft); color: var(--no); }
+
+  .table-wrap { overflow-x: auto; margin: 14px 0 18px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+  tr:last-child td { border-bottom: 0; }
+  thead th { background: var(--surface-2); font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td { color: var(--ink-2); }
+  td:first-child { color: var(--ink); font-weight: 500; }
+  td .src { display: block; margin-top: 3px; font-size: 12.5px; }
+  .compare thead th { white-space: normal; }
+  .compare td { min-width: 170px; }
+  .compare td:first-child { min-width: 110px; }
+  .rate { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+  .rate.good { background: var(--ok-soft); color: var(--ok); }
+  .rate.mixed { background: var(--warn-soft); color: var(--warn); }
+  .rate.poor { background: var(--no-soft); color: var(--no); }
+  th.choice, td.choice { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+
+  /* the architecture drawing */
+  .drawing {
+    display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 14px;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px;
+    margin: 16px 0;
+  }
+  .layers { display: grid; gap: 0; min-width: 0; }
+  .layer {
+    border: 1px solid var(--rule); border-radius: 9px; padding: 12px 14px; background: var(--ground); min-width: 0;
+  }
+  .layer.core { border: 2px solid var(--accent); background: var(--accent-soft); }
+  .layer .label { display: block; margin-bottom: 4px; }
+  .layer .title { font-family: var(--cond); font-weight: 600; font-size: 1.12rem; color: var(--ink); }
+  .layer .body { font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); white-space: nowrap; }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .link {
+    display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 0;
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: center;
+  }
+  .link .arrow { color: var(--accent); font-size: 15px; line-height: 1; }
+  .spine {
+    border-radius: 9px; background: var(--ink); color: var(--ground);
+    display: flex; align-items: center; justify-content: center; padding: 12px 6px;
+  }
+  .spine span {
+    writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--mono);
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .drawing { grid-template-columns: minmax(0, 1fr); }
+    .spine { order: -1; padding: 8px; }
+    .spine span { writing-mode: horizontal-tb; transform: none; }
+  }
+
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin: 14px 0; }
+  .chain .node { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; color: var(--ink); }
+  .chain .node.human { border-color: var(--ok); color: var(--ok); font-weight: 600; }
+  .chain .node.core { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chain .to { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+
+  .roadmap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 14px 0; }
+  @media (max-width: 820px) { .roadmap { grid-template-columns: minmax(0, 1fr); } }
+  .roadmap .panel ul { padding-left: 1.05em; font-size: 14.5px; }
+
+  .levels td:first-child { font-family: var(--mono); white-space: nowrap; }
+  .lvl { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+  .lvl.g { background: var(--ok); } .lvl.a { background: var(--warn); } .lvl.r { background: var(--no); }
+
+  .callout {
+    border-left: 3px solid var(--no); background: var(--no-soft); border-radius: 0 10px 10px 0;
+    padding: 14px 18px; margin: 16px 0;
+  }
+  .callout h3 { margin: 0 0 6px; color: var(--no); }
+  .callout p, .callout li { color: var(--ink); }
+  .note { font-size: 13.5px; color: var(--muted); }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 8px; }
+  ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; max-width: none; }
+  ol.steps > li::before {
+    content: counter(s); font-family: var(--mono); font-size: 12px; color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 50%; width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .exists { font-family: var(--mono); font-size: 11px; color: var(--ok); }
+  .tobuild { font-family: var(--mono); font-size: 11px; color: var(--warn); }
+
+  .sources ol { font-size: 13.5px; }
+  .sources li { max-width: none; overflow-wrap: anywhere; }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <p class="label">Contents</p>
+    <ol>
+      <li><a href="#verdict"><span class="code">—</span>Verdict</a></li>
+      <li><a href="#a"><span class="code">A</span>Possible today</a></li>
+      <li><a href="#b"><span class="code">B</span>Not possible today</a></li>
+      <li><a href="#c"><span class="code">C</span>Architecture</a></li>
+      <li><a href="#d"><span class="code">D</span>Scout, Hanna, Bob</a></li>
+      <li><a href="#e"><span class="code">E</span>Marketplace map</a></li>
+      <li><a href="#f"><span class="code">F</span>Plugins and data</a></li>
+      <li><a href="#g"><span class="code">G</span>Data model ideas</a></li>
+      <li><a href="#h"><span class="code">H</span>Orchestration</a></li>
+      <li><a href="#i"><span class="code">I</span>Security and credentials</a></li>
+      <li><a href="#j"><span class="code">J</span>MVP</a></li>
+      <li><a href="#k"><span class="code">K</span>Roadmap</a></li>
+      <li><a href="#l"><span class="code">L</span>Push back</a></li>
+      <li><a href="#sources"><span class="code">↗</span>Sources</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="titleblock">
+      <div class="head">
+        <span class="label">Architecture study · for discussion</span>
+        <h1>Triangle Workforce Architecture</h1>
+        <p>Can Scout, Hanna and Bob become managers who delegate to other Bots, with Triangle holding every fact and decision? What Grok Bot actually supports today, what it doesn't, and the architecture that follows.</p>
+      </div>
+      <dl>
+        <div><dt class="label">Document</dt><dd>TSOS-ARCH-001</dd></div>
+        <div><dt class="label">Revision</dt><dd>A · 13 Sep 2026</dd></div>
+        <div><dt class="label">Status</dt><dd>Research only — no code</dd></div>
+        <div><dt class="label">Platform</dt><dd>Grok Bot (beta since 11 Aug 2026)</dd></div>
+      </dl>
+    </header>
+
+    <section class="verdict" id="verdict" style="margin-top:22px">
+      <span class="label">Verdict</span>
+      <h2>Grok does the labour. Triangle must own the orchestration.</h2>
+      <ol>
+        <li><strong>Triangle can wake a Bot but cannot command one.</strong> A webhook routine starts a run; there is no documented API to message a Bot, assign it work, or wait for a structured result. Everything of record has to flow back through Triangle's own API.</li>
+        <li><strong>A Marketplace Bot is a template, not a contractor.</strong> Installing one creates a copy in your account, on your computer, with your logins. "Hiring a specialist for one task" is not a platform concept.</li>
+        <li><strong>Bots under one user are one security principal.</strong> They share the computer, browser sessions, files and connectors. Separate mailboxes per Bot isolate nothing; separate Cursor users do.</li>
+        <li><strong>Choose architecture B</strong> — but the front door is Triangle's software (missions, assignments, approvals), not a fourth chat Bot. Three persistent managers; delegation between them goes through Triangle as assignments.</li>
+        <li><strong>Prove one chain before building any registry:</strong> Nikola → Scout → Hanna → Bob → Nikola approves, with every hop an assignment Triangle can see, retry and audit.</li>
+      </ol>
+    </section>
+
+    <section id="a">
+      <span class="label">A · What is technically possible today</span>
+      <h2>Confirmed platform capabilities</h2>
+      <p>Only official xAI and Cursor documentation counts as confirmed; <span class="tag obs">Observed</span> means we saw it in Triangle's own production on 12 September.</p>
+
+      <div class="split">
+        <div class="panel can">
+          <h3>What Triangle can start programmatically</h3>
+          <ul>
+            <li>Wake one specific Bot through its <strong>webhook routine</strong> (POST + key) <span class="tag obs">Observed</span></li>
+            <li>Serve state and accept results through its <strong>own API or an MCP connector</strong> the Bot calls</li>
+            <li>Rely on <strong>scheduled routines</strong> as a backup clock</li>
+            <li>Launch <strong>Cursor Cloud Agents</strong> with up to 20 subagents via API — separate from Grok Bots</li>
+          </ul>
+        </div>
+        <div class="panel cannot">
+          <h3>What it cannot</h3>
+          <ul>
+            <li>Send a message to a Bot or into a group chat</li>
+            <li>Assign a task and await a structured result</li>
+            <li>Create a Bot, add a Bot to a group, or spawn parallel Bots</li>
+            <li>Invoke a Marketplace Bot without installing it as a full-access Bot</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Capability</th><th>What the documentation says</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Persistent named Bots</td><td>Role, skills, routines and memory per Bot. <q>Conversations and learned context stay separate per Bot.</q><span class="src"><a href="https://docs.x.ai/grok-bot/overview">xAI · Overview</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>One computer per user</td><td><q>All of your Bots use the same cloud computer, sharing its files, browser sessions, and app logins.</q> Each user gets a dedicated Firecracker microVM; computers run in the United States.<span class="src"><a href="https://docs.x.ai/grok-bot/overview">xAI · Overview</a> · <a href="https://cursor.com/docs/grok-bot/security-faq">Cursor · Security FAQ</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Connectors are account-wide</td><td><q>Installed connectors are account-wide. Their availability is not isolated to one Bot.</q> Signing in for one Bot makes the session available to the others.<span class="src"><a href="https://docs.x.ai/grok-bot/computer-and-apps">xAI · Computer and apps</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Bot-to-Bot messages</td><td><q>A Bot can send an asynchronous message to another Bot. The receiving Bot wakes, handles the request, and can reply later.</q><span class="src"><a href="https://docs.x.ai/grok-bot/chat-and-collaboration">xAI · Message and collaborate</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Group chats and handoffs</td><td>You create a group of two to six Bots; they pass work and ownership. The docs advise <q>a single owner at each stage</q>; handoff messages to a group are text-only.<span class="src"><a href="https://docs.x.ai/grok-bot/chat-and-collaboration">xAI · Message and collaborate</a> · <a href="https://x.ai/news/introducing-grok-bot">xAI · Announcement</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Routines</td><td>Run on a schedule or, where supported, after an event (Slack, GitHub). Owned by one Bot; up to 50 per Bot; the last 20 run records are kept.<span class="src"><a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">xAI · Skills and routines</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Webhook triggers</td><td>A private endpoint started by a POST with an API key. Triangle's wake-up to Scout was accepted with HTTP 200 and a background run called Triangle 23 seconds later — outside the chat Nikola was watching.<span class="src"><a href="https://cursor.com/docs/cloud-agent/automations">Cursor · Automations</a></span></td><td><span class="tag ok">Confirmed</span> <span class="tag obs">Observed</span></td></tr>
+            <tr><td>Skills</td><td>A saved way of working: when to use it, required access, the sequence, how to validate the result, what to return, what needs approval.<span class="src"><a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">xAI · Skills and routines</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Approvals (Auto Review)</td><td>Evaluates <q>shell commands, plugin calls, computer use, automation writes … and delegation</q>. Active for all users; each member keeps an off switch. Memory writes are not reviewed.<span class="src"><a href="https://docs.x.ai/grok-bot/security">xAI · Security</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Untrusted content</td><td><q>Outside content is marked as untrusted data</q> — controls <q>reduce, but do not eliminate</q> risk, <q>another reason to keep consequential actions behind approval.</q><span class="src"><a href="https://docs.x.ai/grok-bot/security">xAI · Security</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Templates and sharing</td><td>A shared Bot becomes <q>a copy on the recipient's account. It does not give them your computer, logins, or conversation history.</q> Independent guides describe Marketplace installs the same way.<span class="src"><a href="https://docs.x.ai/grok-bot/bots">xAI · Create and manage Bots</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Separate identity</td><td><q>When a workload needs its own computer and credential set, give it its own Cursor user.</q><span class="src"><a href="https://cursor.com/docs/grok-bot/security-faq">Cursor · Security FAQ</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+            <tr><td>Custom MCP connectors</td><td>Add a custom connector by URL; the server must be reachable from the public internet. Open community bug reports on custom remotes in Grok Bot.<span class="src"><a href="https://docs.x.ai/grok/connectors">xAI · Connectors</a> · <a href="https://forum.cursor.com/t/grokbot-custom-connectors/169965">Cursor forum</a></span></td><td><span class="tag ok">Confirmed</span> <span class="tag warn">Unstable</span></td></tr>
+            <tr><td>Programmatic subagents</td><td>Cursor Cloud Agents API: create agents with up to 20 subagents and 50 MCP servers; results by polling or streaming; <q>Webhooks are coming soon.</q> Not documented as reaching Grok Bots.<span class="src"><a href="https://cursor.com/docs/cloud-agent/api/endpoints">Cursor · Cloud Agents API</a></span></td><td><span class="tag ok">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="b">
+      <span class="label">B · What isn't possible today</span>
+      <h2>The gaps that decide the design</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wanted</th><th>Reality today</th><th>Consequence for Triangle</th></tr></thead>
+          <tbody>
+            <tr><td>Triangle assigns work to a Bot and waits for the result</td><td><span class="tag no">Not documented</span> No API to message or task a Bot; only triggers.</td><td>Wake by webhook; the Bot pulls work and pushes results through Triangle's API. Already built for Scout.</td></tr>
+            <tr><td>Structured results between Bots</td><td><span class="tag no">Not documented</span> Handoffs are messages; group handoffs are text-only.</td><td>Structured output lives in Triangle (findings, drafts, assignments), not in chat.</td></tr>
+            <tr><td>A Bot spawns Bots or parallel workers</td><td><span class="tag no">Not documented</span> Group chats are created by the user. The docs warn that too many parallel handoffs duplicate work.</td><td>No dynamic swarms on Grok. Fan-out, if ever needed, via Cloud Agents subagents — a separate runtime.</td></tr>
+            <tr><td>Hire a Marketplace Bot for one job</td><td><span class="tag no">Not a concept</span> Install = a permanent Bot on your computer with every login.</td><td>Treat templates as skills to read and copy into a manager, not as employees to call.</td></tr>
+            <tr><td>Keep one Bot's logins from another</td><td><span class="tag no">Not possible</span> within one user; connectors and sessions are shared.</td><td>Isolation means separate Cursor users, split by risk.</td></tr>
+            <tr><td>Scope plugins per Bot</td><td><span class="tag no">Not documented</span></td><td>Enforce what Triangle can (badge scopes); control what sits on each computer.</td></tr>
+            <tr><td>Grok Bots with subagents</td><td><span class="tag warn">Assumption</span> Possibly internal; not documented for Bots.</td><td>Don't design around it.</td></tr>
+            <tr><td>Audit trail and network allowlists</td><td><span class="tag warn">Enterprise only</span> Audit logs, action recording (90 days), network policy.</td><td>Until then, Triangle's own run and activity records are the audit.</td></tr>
+            <tr><td>EU data residency</td><td><span class="tag no">Not today</span> Computers run in the US.</td><td>Candidate and buyer personal data needs a transfer basis and minimisation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Grok Bot is in beta. Everything here is as documented on 13 September 2026 and may change; the design keeps every hop durable on Triangle's side so a platform change is an adapter, not a rewrite.</p>
+    </section>
+
+    <section id="c">
+      <span class="label">C · Recommended architecture</span>
+      <h2>B, with Triangle's software as the front door</h2>
+
+      <div class="drawing" role="img" aria-label="Layered architecture: people give outcomes to Triangle, Triangle wakes three manager Bots that pull state and push results, managers use skills and later subagents, plugins and service accounts at the bottom, with Triangle's database as the single source of truth alongside every layer.">
+        <div class="layers">
+          <div class="layer">
+            <span class="label">People</span>
+            <div class="title">Nikola · Ralph</div>
+            <div class="body">State outcomes, approve anything external, own money, commitments and relationships.</div>
+          </div>
+          <div class="link"><span class="arrow">↓</span> outcomes · approvals <span class="arrow">↑</span> briefs · drafts to approve</div>
+          <div class="layer core">
+            <span class="label">Triangle — software, not a Bot</span>
+            <div class="title">Missions · assignments · approvals · audit</div>
+            <div class="chips">
+              <span class="chip"><b>Routing</b> which manager owns it</span>
+              <span class="chip"><b>Task contracts</b> assignments</span>
+              <span class="chip"><b>Gates</b> source checks, verification</span>
+              <span class="chip"><b>Budgets</b> per mission</span>
+              <span class="chip"><b>Events</b> wake the owner</span>
+              <span class="chip"><b>House rules</b> per employee</span>
+            </div>
+          </div>
+          <div class="link"><span class="arrow">↓</span> wake-up webhook · work via API / MCP <span class="arrow">↑</span> findings · drafts · child assignments</div>
+          <div class="layer">
+            <span class="label">Persistent managers — Grok Bots</span>
+            <div class="chips">
+              <span class="chip"><b>Scout</b> opportunities and buyers</span>
+              <span class="chip"><b>Hanna</b> people and supply</span>
+              <span class="chip"><b>Bob</b> revenue follow-through</span>
+            </div>
+            <div class="body" style="margin-top:8px">Delegate to each other only through a Triangle assignment. Grok chat is for conversation, not for the record.</div>
+          </div>
+          <div class="link"><span class="arrow">↓</span> inside one manager's domain only</div>
+          <div class="layer">
+            <span class="label">Specialist capability</span>
+            <div class="body">Skills copied from reviewed templates now; Cloud Agents subagents for research fan-out later, only where measured to help.</div>
+          </div>
+          <div class="link"><span class="arrow">↓</span></div>
+          <div class="layer">
+            <span class="label">Plugins and accounts</span>
+            <div class="body">Service accounts with least privilege, grouped by risk into separate Cursor users. No personal accounts on a Bot's computer.</div>
+          </div>
+        </div>
+        <div class="spine"><span>Triangle database — the only truth</span></div>
+      </div>
+
+      <p><strong>Why not a "Triangle AI" Bot on Grok as the front door?</strong> It would be a fourth Bot on the same computer, with the same logins, keeping a second copy of the state in its conversation — and Triangle could not drive it anyway, because there is no API to message it. Ctrl+K in Triangle already is the single interface; what's missing is routing an outcome across managers, which is software.</p>
+
+      <h3>Three architectures compared</h3>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th>Quality</th><th>A · Three independent Bots</th><th class="choice">B · Triangle front door + three managers</th><th>C · Triangle hires everything</th></tr></thead>
+          <tbody>
+            <tr><td>Complexity</td><td><span class="rate good">Low</span>What you run now</td><td class="choice"><span class="rate mixed">Medium</span>Delegation and gates in Triangle</td><td><span class="rate poor">High</span>Selection, contexting, cleanup per job</td></tr>
+            <tr><td>Reliability</td><td><span class="rate mixed">Medium</span>One owner per job, but you relay between them</td><td class="choice"><span class="rate good">High</span>Every hop durable, retryable, idempotent</td><td><span class="rate poor">Low</span>Needs invoke-and-await the platform lacks</td></tr>
+            <tr><td>Continuity</td><td><span class="rate mixed">Per Bot</span>Lost across Bots</td><td class="choice"><span class="rate good">Best</span>Managers persist; state in the database</td><td><span class="rate poor">Worst</span>No standing owner of a domain</td></tr>
+            <tr><td>Context</td><td><span class="rate poor">Siloed</span>Each Bot's own memory</td><td class="choice"><span class="rate good">Shared</span>Mission state read every run</td><td><span class="rate poor">Rebuilt</span>Every job starts cold</td></tr>
+            <tr><td>Debugging</td><td><span class="rate mixed">Per Bot</span>Blind across Bots</td><td class="choice"><span class="rate good">Good</span>Parent and child assignments show the path</td><td><span class="rate poor">Hard</span>Transient workers, scattered logs</td></tr>
+            <tr><td>Cost</td><td><span class="rate good">Lowest</span></td><td class="choice"><span class="rate mixed">Medium</span>Wake-ups and checks add runs</td><td><span class="rate poor">Highest</span>Re-contexting and verification each job</td></tr>
+            <tr><td>Latency</td><td><span class="rate good">Low</span>Direct chat</td><td class="choice"><span class="rate mixed">Medium</span>Seconds per wake-up hop</td><td><span class="rate poor">High</span>Install, context, verify</td></tr>
+            <tr><td>Scalability</td><td><span class="rate poor">Poor</span>You are the router</td><td class="choice"><span class="rate good">Good</span>Add skills or a manager without redesign</td><td><span class="rate mixed">On paper</span>Blocked by identity and invocation limits</td></tr>
+            <tr><td>Observability</td><td><span class="rate mixed">Partial</span>Only what Bots write back</td><td class="choice"><span class="rate good">High</span>One ledger of assignments, runs, evidence</td><td><span class="rate poor">Low</span>Until a registry exists</td></tr>
+            <tr><td>User experience</td><td><span class="rate poor">Router</span>You pick the Bot</td><td class="choice"><span class="rate good">One instruction</span>Proven on the Austria mission</td><td><span class="rate good">One instruction</span>If it worked</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <h3>Today</h3>
+          <p style="margin:0"><strong>B-lite.</strong> The three Bots you have, with Triangle as the only place work of record is assigned and finished. No extra front-door Bot.</p>
+        </div>
+        <div class="panel">
+          <h3>6–12 months, and long-term</h3>
+          <p style="margin:0"><strong>B.</strong> Event-driven wake-ups, verification gates, child assignments between managers. Long-term, dynamic specialists only <em>inside</em> a manager's domain, chosen from measured outcomes — never C at the top.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="d">
+      <span class="label">D · Future roles</span>
+      <h2>What each manager owns, delegates, and never does</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Manager</th><th>Owns — measured by</th><th>May delegate</th><th>Never</th></tr></thead>
+          <tbody>
+            <tr><td>Scout<br><span class="note">Opportunities and buyers</span></td><td>Signals, projects, the contractor chain, the buyer, the buying committee and their published door. <strong>Verified doors per week.</strong></td><td>Fact-checks to a verification skill; broad discovery fan-out later.</td><td>Contact anyone. File without a source.</td></tr>
+            <tr><td>Hanna<br><span class="note">People and supply</span></td><td>Pool freshness under the 14-day rule, sourcing channels, attraction drafts, CV intake, referral asks, partner-firm capacity. <strong>CVs in, people confirmed available.</strong></td><td>Interview scheduling later; publishing ads to a person.</td><td>Publish, message candidates, share a CV, decide suitability alone.</td></tr>
+            <tr><td>Bob<br><span class="note">Revenue follow-through</span></td><td>Lead triage from Triangle's mail sync, reply drafts, follow-up dates, overdue chasers, submission packets, prequalification progress. <strong>Replies, meetings, packets sent by a person.</strong></td><td>Tone polishing; meeting prep later.</td><td>Send, commit a rate, date or headcount, accept terms.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>One change to your chain:</strong> the buying committee belongs to Scout, not Hanna. Buyer contacts and job candidates are held for different purposes under data-protection law; one "people" manager holding both blurs the legal basis, retention and consent. Hanna's cross-domain job is supply: <em>which of our confirmed people fit this buyer's package?</em></p>
+    </section>
+
+    <section id="e">
+      <span class="label">E · Marketplace Bot map</span>
+      <h2>Templates to learn from, not employees to install</h2>
+      <p class="note">Judged from each listing's title and one-line description only; no template's instructions were inspected. Installing any of them hands it your computer and every login on it, so read a template before adopting its skills.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Class</th><th>Bots</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><span class="tag ok">High value now</span></td><td>Researchy · GTM Loop Closer · Talent Discovery</td><td>Fact-checking for Scout's doors; follow-through patterns for Bob; sourcing patterns for Hanna. Copy the skill, keep your manager.</td></tr>
+            <tr><td><span class="tag obs">Potentially useful</span></td><td>Outbound Prospecting · Copy Humanizer · Recruiting Coordinator · Sales Call Coach · dr eggbot · Alfred · tinkabot</td><td>Test Prospecting against Scout on one German industrial search first. Coordinator and Call Coach once interviews and recorded calls exist. dr eggbot and Alfred for designing and auditing the Bot setup; tinkabot for wrapping Triangle's API as a connector.</td></tr>
+            <tr><td><span class="tag warn">Later</span></td><td>SEO &amp; AEO Desk · AI Search Visibility</td><td>Marketing, once there is an offer page and proof worth being found for.</td></tr>
+            <tr><td><span class="tag no">Not relevant</span></td><td>Pitch Deck Coach · Cooper · Stills &amp; Clips Desk · Clip Bot · Apple Search Ads Review · Haggle Bot · Event Request Desk · Office Ops Desk</td><td>No job in contract-to-crew today.</td></tr>
+            <tr><td><span class="tag no">Duplicates Triangle</span></td><td>Projects Manager · Executive Assistant</td><td>Missions and Today already do this; an assistant would also need your personal accounts.</td></tr>
+            <tr><td><span class="tag warn">Should be software</span></td><td>Follow-up due dates · overdue lists · availability staleness · certificate expiry · duplicates · "is the channel on the cited page"</td><td>Deterministic, cheaper, testable — no model needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="f">
+      <span class="label">F · Plugin and data map</span>
+      <h2>What would materially raise each manager's ceiling</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Manager</th><th>Systems</th><th>Condition</th></tr></thead>
+          <tbody>
+            <tr><td>Scout</td><td>Triangle API or MCP · public web · company registers (Austrian Firmenbuch, German company register) · public tender portals · news · a B2B contact data source such as Apollo</td><td>LinkedIn only by reading what a person could see — its terms forbid scraping and automated accounts. Record a legal basis for B2B contact data.</td></tr>
+            <tr><td>Hanna</td><td>A dedicated jobs@ mailbox · CV storage through Triangle · country job boards · calendar later · Triangle's talent pool</td><td>Publishing by a person. A candidate-filing endpoint doesn't exist yet. Recruitment AI is high-risk under the EU AI Act — people decide.</td></tr>
+            <tr><td>Bob</td><td>Triangle follow-ups and commercial actions · a dedicated sales@ mailbox for drafts · calendar · supplier and prequalification portals · WhatsApp Business Platform</td><td>Sending stays human. Business chat through the official Business Platform with a business number, not a personal account.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The rule for every account: a <strong>service account with the least rights</strong>, owned by a named person, listed in Triangle — never a founder's personal login.</p>
+    </section>
+
+    <section id="g">
+      <span class="label">G · Data model ideas — conceptual only</span>
+      <h2>Most of it exists; extend, don't invent</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concept</th><th>Already in Triangle</th><th>Would add</th></tr></thead>
+          <tbody>
+            <tr><td>Task contract</td><td><span class="exists">EXISTS</span> <code>agent_assignments</code>: objective, expected output, constraints, status, due date, result, idempotency key, mission, review outcome</td><td><span class="tobuild">ADD</span> parent assignment · requested-by employee · output contract checked on completion · budget · highest permission level · verification requirement</td></tr>
+            <tr><td>Evidence</td><td><span class="exists">EXISTS</span> <code>agent_findings</code>: source URL, quoted evidence, three states enforced by the database</td><td><span class="tobuild">ADD</span> checked by (rule or person) · method · checked at</td></tr>
+            <tr><td>Workforce registry</td><td><span class="exists">EXISTS</span> <code>agent_instances</code> (identity) · <code>agent_provider_bindings</code> (brain) · <code>machine_credentials</code> (scoped badge) · <code>agent_house_rules</code></td><td><span class="tobuild">ADD</span> declared capabilities · compute principal · service accounts used. Derive quality from runs and reviews — never a typed-in score.</td></tr>
+            <tr><td>Events</td><td><span class="exists">PARTLY</span> wake-ups, stall timers, daily crons</td><td><span class="tobuild">ADD</span> an event outbox: type, subject, due, routed-to assignment</td></tr>
+            <tr><td>External actions</td><td><span class="exists">PARTLY</span> commercial actions, outreach ledger, approvals; the 29 Aug decision to keep AI draft and final sent content apart</td><td><span class="tobuild">ADD</span> permission level · approved by · sent by · final content</td></tr>
+            <tr><td>Principals</td><td><span class="tobuild">NONE</span></td><td><span class="tobuild">ADD</span> compute principal ↔ Bots · service account ↔ owner ↔ risk</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Labour market and quality scores:</strong> sensible in principle, excessive now. Three employees and tens of jobs a week produce noise, not rankings. Measure outcomes per manager first — verified doors, CVs in, replies — and let preferences emerge once there is volume.</p>
+    </section>
+
+    <section id="h">
+      <span class="label">H · Orchestration model</span>
+      <h2>If it isn't an assignment in Triangle, it didn't happen</h2>
+      <ol class="steps">
+        <li><div><strong>An outcome becomes a mission</strong> with a finish line counted from records. <span class="exists">EXISTS</span></div></li>
+        <li><div><strong>Triangle routes it to one owner</strong> and wakes that Bot. <span class="exists">EXISTS for Scout</span></div></li>
+        <li><div><strong>The owner delegates across domains by creating a child assignment through Triangle's API</strong> — objective, output contract, budget, deadline. Triangle wakes the assignee. A Grok chat handoff alone is never the record. <span class="tobuild">TO BUILD</span></div></li>
+        <li><div><strong>The assignee works with its own tools</strong> and files results with sources against the contract. <span class="exists">EXISTS for targets</span></div></li>
+        <li><div><strong>Gates before anything counts:</strong> cheap rules first (channel on the cited page, duplicates, required fields); a second-model verifier only for failures and for facts that trigger contact or a commitment. <span class="tobuild">TO BUILD</span></div></li>
+        <li><div><strong>Completion only through Triangle;</strong> the parent recounts its progress from records. <span class="exists">EXISTS</span></div></li>
+        <li><div><strong>Stalls are re-woken on a timer;</strong> after a set number of attempts, a person is asked. <span class="exists">PARTLY</span></div></li>
+        <li><div><strong>Budgets per mission and per assignment;</strong> over budget means stop and ask. <span class="tobuild">TO BUILD</span></div></li>
+        <li><div><strong>Every external action is a draft awaiting approval</strong> in Triangle, with the approver recorded. <span class="exists">PARTLY</span></div></li>
+      </ol>
+
+      <h3>Permission levels</h3>
+      <p>Your L0–L5 scale is right. It already exists in words — the <code>SAFE_STEPS</code> and <code>NEEDS_A_HUMAN</code> lists handed to every Bot. What it needs is the enforcement point next to each level, because a level is only real where the action happens.</p>
+      <div class="table-wrap">
+        <table class="levels">
+          <thead><tr><th>Level</th><th>Meaning</th><th>Who acts</th><th>Enforced by</th></tr></thead>
+          <tbody>
+            <tr><td><span class="lvl g"></span>L0</td><td>Read and research</td><td>Bot alone</td><td>Badge scopes in Triangle</td></tr>
+            <tr><td><span class="lvl g"></span>L1</td><td>Write internal state, unverified</td><td>Bot alone</td><td>Triangle API and the finding contract in the database</td></tr>
+            <tr><td><span class="lvl g"></span>L2</td><td>Create drafts</td><td>Bot alone</td><td>Drafts stored in Triangle, never in the outbox of a live account</td></tr>
+            <tr><td><span class="lvl a"></span>L3</td><td>External interaction without commitment</td><td>A person approves, per rule</td><td>Auto Review rules — a member can switch them off, so a policy, not a wall</td></tr>
+            <tr><td><span class="lvl a"></span>L4</td><td>Send communication</td><td>A person presses send</td><td>Not giving a Bot send-capable credentials. Gmail has no draft-only permission, so the mailbox Triangle drafts into must be one a person sends from.</td></tr>
+            <tr><td><span class="lvl r"></span>L5</td><td>Commercial, legal or financial commitment</td><td>Always a person</td><td>Contracts, rates and money outside any Bot's reach</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="i">
+      <span class="label">I · Security and credential model</span>
+      <h2>Five identities that must not be conflated</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Identity</th><th>What it is</th><th>Security boundary?</th></tr></thead>
+          <tbody>
+            <tr><td>Bot persona</td><td>Name, role, memory, skills — Scout, Hanna, Bob</td><td><span class="tag no">No</span></td></tr>
+            <tr><td>Compute principal</td><td>The Cursor user: its computer, browser sessions, files, connectors</td><td><span class="tag ok">Yes — the only one on Grok</span></td></tr>
+            <tr><td>Service account</td><td>A SaaS login a principal uses: jobs@, sales@, an Apollo seat</td><td><span class="tag ok">Yes, inside that system</span></td></tr>
+            <tr><td>Human account</td><td>Nikola's Gmail, WhatsApp, LinkedIn — personal identity and legal accountability</td><td><span class="tag warn">Must stay off Bot computers</span></td></tr>
+            <tr><td>Triangle identity</td><td><code>agent_instance</code> plus badge scopes</td><td><span class="tag warn">Attribution only on a shared computer</span> — any Bot there can read a token kept in a file</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>scout@, hanna@, bob@ — does it work?</h3>
+      <p>As service accounts, yes, and it's good hygiene: each costs a seat in Google Workspace, Apollo or whatever system issues it. But on one Cursor user all three logins are available to all three Bots, so separate mailboxes don't separate the Bots. <strong>Separate by risk, not by persona:</strong></p>
+      <ul>
+        <li><strong>Research principal:</strong> Scout. Reads untrusted web pages all day, so it holds a Triangle badge and nothing personal or send-capable.</li>
+        <li><strong>Communications principal:</strong> Bob, and Hanna's candidate drafting. Holds the business mailboxes and calendar; browses little; strictest approval rules.</li>
+        <li><strong>Nothing personal on either.</strong> Your WhatsApp, Gmail and LinkedIn stay on devices you operate.</li>
+      </ul>
+      <p class="note">Each extra principal is another Cursor seat and another computer to sign in and maintain — so two principals, not three.</p>
+
+      <div class="callout">
+        <h3>Bob answering your WhatsApp — stop the automatic replies</h3>
+        <ul>
+          <li><strong>It's L4 on your identity with no approval.</strong> Your own rules put contacting anyone outside Triangle with a person.</li>
+          <li><strong>Anyone who messages you can now address a Bot that holds your account</strong> — including instructions hidden inside a message. The platform itself says such controls reduce, not eliminate, that risk.</li>
+          <li><strong>On a shared computer, every Bot of that user can use the session</strong> — including Scout, which reads arbitrary web pages. Whether Bob runs on the same Cursor user, or as a desktop agent on a Windows PC, is worth confirming.</li>
+          <li><strong>WhatsApp's guidelines forbid</strong> <q>auto-messaging, auto-dialing, or automation to harm WhatsApp or our users</q>, with suspension as the remedy — a real risk to the number your clients and candidates know.</li>
+          <li><strong>Client and candidate messages would be processed on US-hosted computers.</strong></li>
+        </ul>
+        <p style="margin:6px 0 0"><strong>Instead:</strong> let Bob draft replies for you to send, or move business chat to the WhatsApp Business Platform with a business number.</p>
+      </div>
+    </section>
+
+    <section id="j">
+      <span class="label">J · MVP</span>
+      <h2>One delegation chain, with Triangle holding all state</h2>
+      <p>Your chain, with the one change from section D — the buyer stays with Scout, and Hanna contributes the crew — built on the Austria mission that already has 8 verified doors:</p>
+      <div class="chain" aria-label="Delegation chain">
+        <span class="node human">Nikola · one instruction</span><span class="to">→</span>
+        <span class="node core">Triangle mission</span><span class="to">→</span>
+        <span class="node">Scout · requirement + verified door</span><span class="to">→</span>
+        <span class="node">Hanna · crew from confirmed people</span><span class="to">→</span>
+        <span class="node">Bob · first-contact draft</span><span class="to">→</span>
+        <span class="node human">Nikola approves and sends</span><span class="to">→</span>
+        <span class="node">Bob · follow-up date</span>
+      </div>
+      <div class="split">
+        <div class="panel">
+          <h3>Passes when</h3>
+          <ul>
+            <li>One instruction from Nikola, nothing more</li>
+            <li>Every hop is a Triangle assignment with its parent</li>
+            <li>Every door passes the source check</li>
+            <li>The crew uses only people confirmed in 14 days</li>
+            <li>Zero messages sent by a Bot</li>
+            <li>Time and cost per hop are recorded</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Build only this</h3>
+          <ul>
+            <li>Child assignments created with a badge</li>
+            <li>Wake-ups and the bot switch for Hanna and Bob</li>
+            <li>The source check at filing</li>
+            <li>Bob's draft with approve-and-send by a person</li>
+            <li>The chain shown on the mission page</li>
+          </ul>
+          <p class="note" style="margin:10px 0 0">Not now: registry, scores, Marketplace hiring, event bus, a Triangle chat Bot.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="k">
+      <span class="label">K · Roadmap</span>
+      <h2>Now → 3 months → 12 months</h2>
+      <div class="roadmap">
+        <div class="panel">
+          <h3>Now · 0–4 weeks</h3>
+          <ul>
+            <li>Stop WhatsApp auto-replies</li>
+            <li>Deploy house rules</li>
+            <li>Source check at filing</li>
+            <li>The MVP chain</li>
+            <li>Decide the two compute principals</li>
+            <li>Candidate filing for Hanna</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>3 months</h3>
+          <ul>
+            <li>Event outbox: reply received, follow-up overdue, availability stale, certificate expiring, new signal</li>
+            <li>Budgets and cost per mission</li>
+            <li>Verifier for failed checks</li>
+            <li>Learning from your edits</li>
+            <li>Mission tools in Triangle's MCP, if connectors stabilise</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>12 months</h3>
+          <ul>
+            <li>Outcome goals split into missions with a plan you approve</li>
+            <li>Capabilities and derived performance per manager and skill</li>
+            <li>Subagent fan-out where measured to beat one run</li>
+            <li>Enterprise audit and action recording, if volume and personal data justify it</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="l">
+      <span class="label">L · Push back</span>
+      <h2>Where the plan overreaches</h2>
+      <ol class="steps">
+        <li><div><strong>A "Triangle AI" Bot duplicates the front door.</strong> It would be a fourth Bot and a second source of state, and Triangle couldn't drive it. The app is the interface.</div></li>
+        <li><div><strong>Marketplace Bots aren't hireable specialists.</strong> Installing one gives a stranger's instructions your logins. Use them as skill sources after reading them.</div></li>
+        <li><div><strong>Architecture C and an AI labour market need volume you don't have.</strong> Scores from tens of jobs a week are noise.</div></li>
+        <li><div><strong>The buying committee isn't Hanna's.</strong> Buyer contacts and candidates have different legal purposes; keep them apart.</div></li>
+        <li><div><strong>Separate mailboxes don't separate Bots.</strong> Only separate Cursor users do.</div></li>
+        <li><div><strong>Grok chats aren't a record.</strong> No structured results, 20 run records per routine, text-only group handoffs.</div></li>
+        <li><div><strong>Parallel swarms are discouraged by the platform itself</strong> — too many parallel handoffs duplicate work.</div></li>
+        <li><div><strong>Which model is smartest doesn't change the architecture.</strong> Keep the brain swappable, as you decided on 11 September.</div></li>
+        <li><div><strong>Orchestration isn't the Phase 0 bottleneck.</strong> Human-sent messages, buyer conversations and a delivered placement are. Build the chain that ends in a send.</div></li>
+        <li><div><strong>The platform is in beta,</strong> with open bug reports on webhooks and custom connectors. Keep every hop durable on Triangle's side.</div></li>
+      </ol>
+    </section>
+
+    <section id="sources" class="sources">
+      <span class="label">Sources</span>
+      <h2>Documentation consulted, 13 September 2026</h2>
+      <ol>
+        <li><a href="https://docs.x.ai/grok-bot/overview">xAI — Grok Bot overview</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/chat-and-collaboration">xAI — Message and collaborate</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">xAI — Skills and routines</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/computer-and-apps">xAI — Use the computer and apps</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/bots">xAI — Create and manage Bots</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/teams-and-enterprises">xAI — Teams and enterprises</a></li>
+        <li><a href="https://docs.x.ai/grok-bot/security">xAI — Security</a></li>
+        <li><a href="https://x.ai/news/introducing-grok-bot">xAI — Introducing Grok Bot</a></li>
+        <li><a href="https://x.ai/bot/marketplace">xAI — Grok Bot Marketplace</a></li>
+        <li><a href="https://docs.x.ai/grok/connectors">xAI — Connectors</a></li>
+        <li><a href="https://cursor.com/docs/grok-bot/security-faq">Cursor — Grok Bot security FAQ</a></li>
+        <li><a href="https://cursor.com/docs/cloud-agent/automations">Cursor — Automations</a></li>
+        <li><a href="https://cursor.com/docs/cloud-agent/api/endpoints">Cursor — Cloud Agents API</a></li>
+        <li><a href="https://forum.cursor.com/t/grokbot-custom-connectors/169965">Cursor community forum — Grok Bot custom connectors</a></li>
+        <li><a href="https://www.whatsapp.com/legal/messaging-guidelines">WhatsApp — Messaging Guidelines</a></li>
+        <li>Triangle production records: wake-up of 12 September; Austria mission; <code>agent-budget.ts</code> autonomy lists; migration 023 assignments</li>
+      </ol>
+    </section>
+
+    <footer>Research only. Nothing in this document was implemented, and no database or production code was changed while writing it.</footer>
+  </main>
+</div>
+
+</body>
+</html>

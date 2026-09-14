@@ -1,6 +1,6 @@
 # Triangle workforce model
 
-**Updated:** 2 September 2026
+**Updated:** 14 September 2026
 
 This file explains how runtime business agents fit the actual product. Product
 and coding agents must also follow `SOFTWARE_AGENT_INSTRUCTIONS.md`.
@@ -59,7 +59,9 @@ The database currently has three active identities:
 - canonical file: `agents/bob.md`;
 - moves raw inbox messages into Triangle;
 - does not classify, score, reply, archive, or contact anyone;
-- value: reliable, idempotent transport into the shared pipeline.
+- value: reliable, idempotent transport into the shared pipeline;
+- direction since 14 September: commercial operations (`agents/bob.md`). Mission
+  work waits for a mission scope on his badge and a wake-up routine.
 
 ### Scout — Project Researcher
 
@@ -67,7 +69,8 @@ The database currently has three active identities:
 - researches public sources, contractor chains, buyer routes, and work suited
   to attached workers/packages;
 - reports evidence-backed findings;
-- does not contact anyone or approve its own work.
+- does not contact anyone or approve its own work;
+- works missions on its own Grok bot since 11 September, woken by Triangle.
 
 ### Hanna — resourcing
 
@@ -84,6 +87,10 @@ characteristics, and she does not enrich from outside sources. Scout searches
 the open web about companies; Hanna does not do that about people.
 
 Scope changes remain a management decision. `worker.propose` is the whole job.
+
+Since 14 September Hanna works missions on her own Grok bot and may ask
+colleagues for work through Triangle. Her wider job in `agents/hanna.md` works
+inside the privacy rules above; loosening them is a management decision.
 
 ## Assignment is the work object
 

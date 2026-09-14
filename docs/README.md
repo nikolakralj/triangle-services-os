@@ -2,7 +2,7 @@
 
 Latest review: [10 September source update](product/REVIEW_UPDATE_2026-09-10.md). It records which September 8 findings changed after the Today screen replaced the cockpit.
 
-Updated 10 September 2026. This index routes readers; it does not replace product
+Updated 14 September 2026. This index routes readers; it does not replace product
 rules. Stable root filenames are retained because coding agents and existing
 references use them.
 
@@ -24,6 +24,7 @@ references use them.
 
 - [Job Intake](../JOB_INTAKE.md): mail ingestion, extraction and reply workflow.
 - [Research Workbench](../RESEARCH_WORKBENCH.md): sourced proposals and human acceptance.
+- [Mission protocol](../agents/missions.md): how any employee works a mission and asks a colleague for work; served with every job.
 - [Runtime workforce](../agents/WORKFORCE.md), [constitution](../agents/shared-constitution.md), [Bob](../agents/bob.md), [Scout](../agents/scout.md), [Hanna](../agents/hanna.md).
 - [Deployment](../DEPLOY.md) and [SMTP setup](../SMTP_SETUP.md): operator runbooks; configuration and provider claims need verification at use time.
 - [Tenant onboarding](product/TENANT_ONBOARDING_READINESS.md): record-presence checks, not commercial clearance.
@@ -41,6 +42,7 @@ references use them.
 | [Sellable-product strategy](strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md) | Long-term hypothesis; external discovery is paused |
 | [Design-partner targets](strategy/DESIGN_PARTNER_TARGETS_2026-09-04.md) | Dormant research, not current staffing demand or permission to contact |
 | [Problem interview kit](strategy/PROBLEM_INTERVIEW_KIT_2026-09-04.md) and [evidence log](strategy/problem-interview-evidence-log.csv) | Dormant customer-discovery materials |
+| [Workforce architecture study, 13 September](product/WORKFORCE_ARCHITECTURE_2026-09-13.html) | What the Grok Bot platform supports and the chosen architecture; basis for the 14 September decisions |
 
 ## Resolve contradictions
 

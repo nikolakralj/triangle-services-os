@@ -50,6 +50,53 @@ instruction to continue does not activate it.
 
 ## Product Track B — ordered queue
 
+The current order is set in ROADMAP_EXECUTION → Development — now. DEV items
+come first.
+
+### DEV-001 — Sent-message record
+
+**Status:** READY
+**Why now:** Phase 0 needs five human sends recorded with final content and a
+follow-up date.
+
+**Acceptance:** from any Triangle draft a person records a send — final text,
+recipient, channel, time — in one action; a follow-up date is required; overdue
+follow-ups appear on Today; the AI draft and the final sent text are both kept;
+Triangle sends nothing itself.
+
+### DEV-002 — Source check at filing
+
+**Status:** READY
+
+**Acceptance:** a reachable finding is accepted only when its phone or email
+appears on a cited page Triangle can read; a finding whose page cannot be read
+is filed as unchecked and shown that way; every refusal gives the employee its
+reason.
+
+### DEV-003 — Hanna writes to the pool from her bot
+
+**Status:** READY
+
+**Acceptance:** Hanna's badge can propose candidates and availability updates in
+a mission through the mission API, counted by the recruiting finish line;
+availability checks are drafts a person sends; her privacy rules hold.
+
+### DEV-004 — Bob takes follow-through
+
+**Status:** BLOCKED_EXTERNAL — CEO decision on Bob's badge scope; Bob's wake-up
+routine.
+
+**Acceptance:** Bob works mission steps and requests on his bot: lead triage
+with reasons, missing-fact chaser drafts, packet-send and supplier-registration
+records; Bob sends nothing.
+
+### DEV-005 — Known defects
+
+**Status:** READY
+
+**Acceptance:** the Today recommended card's action carries the person the
+recommendation names; the STRABAG and ANDRITZ doors are re-sourced or ruled out.
+
 ### PZ-001 — Tenant operating profile
 
 **Status:** DONE (repository 30 August 2026; migration 027 applied 31 August 2026)  
@@ -235,7 +282,10 @@ having no case at all.
 
 ### CASE-004 — Agent handoffs and safe continuation policy
 
-**Status:** GATED
+**Status:** PARTLY BUILT (14 September 2026) — requests between employees through
+Triangle (migration 047), wake-up on the answer, depth and fan-out limits, and a
+per-employee messaging policy. Budget and time limits, retries beyond wake-ups,
+and human escalation remain.
 **Gate:** at least two runtime roles repeatedly collaborate on the same real
 case and manual assignment handoff causes measurable delay or lost context.
 
