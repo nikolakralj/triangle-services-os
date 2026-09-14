@@ -80,6 +80,65 @@ export async function fileMissionTargets(
   return out;
 }
 
+// A company or person that is plainly not real — "Example GmbH", "Schema Probe
+// Elektro", "Jane Doe", anything at example.com — is refused here, whoever files
+// it. Two bots filed endpoint probes into real records after the protocol told
+// them in writing not to. A sentence in a protocol is not a boundary; this is.
+const NOT_A_NAME = new Set([
+  "gmbh", "mbh", "ag", "kg", "ohg", "co", "se", "ltd", "llc", "inc", "sa", "sas", "srl", "sro", "doo",
+  "bv", "nv", "oy", "ab", "as", "plc", "und", "and", "the", "elektro", "electric", "electrical",
+  "technik", "company", "firma", "group", "gruppe", "holding", "services", "service", "industrial",
+  "bau", "montage",
+]);
+const PLACEHOLDER_WORDS = new Set([
+  "example", "examples", "test", "tests", "testing", "probe", "probes", "dummy", "placeholder",
+  "fake", "sample", "lorem", "ipsum", "schema", "acme", "foo", "bar", "baz",
+]);
+const PLACEHOLDER_PERSON = /\b(doe|mustermann|musterfrau|example|test|probe|dummy|placeholder|sample)\b/i;
+
+function placeholderHost(value: string | null | undefined): boolean {
+  if (!value) return false;
+  let host = value;
+  if (value.includes("@")) host = value.split("@").pop() ?? value;
+  else if (/^https?:\/\//i.test(value) || /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(value)) {
+    try {
+      host = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`).hostname;
+    } catch {
+      return false;
+    }
+  } else {
+    return false;
+  }
+  const h = host.toLowerCase().replace(/\.$/, "");
+  return h === "localhost" || /(^|\.)example\.(com|org|net)$/.test(h) || /\.(example|test|invalid|localhost)$/.test(h);
+}
+
+/** Why a target is obviously not real, or null when it may be. */
+export function placeholderReason(t: {
+  company: string;
+  website?: string | null;
+  person?: string | null;
+  channel?: { value: string } | null;
+  sources?: Array<{ url: string }>;
+}): string | null {
+  const words = t.company
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !NOT_A_NAME.has(w) && !/^\d+$/.test(w));
+  if (words.length > 0 && words.every((w) => PLACEHOLDER_WORDS.has(w))) {
+    return `"${t.company}" looks like a placeholder, not a company you read about. File only what a source shows.`;
+  }
+  if (t.person && PLACEHOLDER_PERSON.test(t.person)) {
+    return `"${t.person}" looks like a placeholder, not a real person.`;
+  }
+  if (placeholderHost(t.website)) return `${t.website} is a placeholder address, not a company's site.`;
+  if (placeholderHost(t.channel?.value)) return `${t.channel?.value} is a placeholder address.`;
+  if ((t.sources ?? []).some((s) => placeholderHost(s.url))) return "A source points at a placeholder address.";
+  return null;
+}
+
 async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<FiledTarget> {
   const result: FiledTarget = {
     target: t,
@@ -89,6 +148,12 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
     contactIsNew: false,
     refused: null,
   };
+
+  const placeholder = placeholderReason(t);
+  if (placeholder) {
+    result.refused = placeholder;
+    return result;
+  }
 
   // A company the mission already holds is filed onto exactly that record.
   // Matching it again by name or domain once put a Neuss machine builder's

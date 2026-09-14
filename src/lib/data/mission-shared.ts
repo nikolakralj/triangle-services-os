@@ -249,6 +249,10 @@ export interface MissionStepView {
   /** The sentence a failed step stored instead of a record. */
   error: string | null;
   activity: ActivityEvent[];
+  /** Who worked this step. Not always the mission's lead once colleagues ask each other. */
+  worker: string | null;
+  /** The colleague who asked for this step, when it was a request and not the CEO's instruction. */
+  askedBy: string | null;
 }
 
 export interface MissionCandidate {

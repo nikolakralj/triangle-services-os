@@ -68,7 +68,7 @@ const TAB_LIMIT = 12;
 const MISSION_FIELDS =
   "id, org_id, title, emoji, objective, kind, lead_agent_instance_id, created_by, created_at, updated_at, last_seen_at, closed_at";
 const STEP_FIELDS =
-  "id, mission_id, status, title, objective, created_at, started_at, completed_at, result_summary, constraints, agent_instance_id";
+  "id, mission_id, status, title, objective, created_at, started_at, completed_at, result_summary, constraints, agent_instance_id, requested_by_agent_instance_id";
 
 interface MissionRow {
   id: string;
@@ -97,6 +97,7 @@ interface StepRow {
   result_summary: string | null;
   constraints: Record<string, unknown> | null;
   agent_instance_id: string;
+  requested_by_agent_instance_id: string | null;
 }
 
 interface FindingRow {
@@ -984,10 +985,25 @@ export async function getMissionWorkspace(
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const stepIds = steps.map((s) => s.id);
-  const [messages, activityByStep] = await Promise.all([
+  // A mission's steps are no longer all its lead's: a colleague may have been
+  // asked for one. Name who worked each step and who asked for it.
+  const staffIds = Array.from(
+    new Set(
+      steps
+        .flatMap((s) => [s.agent_instance_id, s.requested_by_agent_instance_id])
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const [messages, activityByStep, staff] = await Promise.all([
     loadMessages(svc, orgId, stepIds),
     loadRunActivity(svc, orgId, stepIds),
+    staffIds.length > 0
+      ? svc.from("agent_instances").select("id, display_name").eq("org_id", orgId).in("id", staffIds)
+      : Promise.resolve({ data: [] }),
   ]);
+  const staffName = new Map(
+    ((staff.data ?? []) as Array<{ id: string; display_name: string }>).map((e) => [e.id, e.display_name]),
+  );
 
   const { state, reason } = deriveMissionState(mission, steps);
   const stepViews: MissionStepView[] = steps.map((s) => ({
@@ -1000,6 +1016,10 @@ export async function getMissionWorkspace(
     record: parseMissionStepRecord(s.result_summary),
     error: s.status === "failed" ? s.result_summary : null,
     activity: activityByStep.get(s.id) ?? [],
+    worker: staffName.get(s.agent_instance_id) ?? null,
+    askedBy: s.requested_by_agent_instance_id
+      ? (staffName.get(s.requested_by_agent_instance_id) ?? "A colleague")
+      : null,
   }));
   const latest = stepViews.find((s) => s.record)?.record ?? null;
 

@@ -146,9 +146,16 @@ export async function POST(request: Request) {
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 502 });
     }
+    // Triangle's own pool reader writes this answer, inline. It signs with the
+    // name of the employee who reads the pool only while she works inside
+    // Triangle; once she works on her own bot, these are not her words.
+    const reader = (await listWorkforce(orgId)).find(
+      (e) => (e.roleKey === "hr" || e.roleKey === "triangle_hr") && e.status === "active",
+    );
+    const readerOnBot = reader ? (await employeeMissionRuntime(orgId, reader.id)) === "bot" : true;
     return NextResponse.json({
-      by: "Hanna",
-      emoji: "👤",
+      by: reader && !readerOnBot ? reader.displayName : "Triangle's pool lookup",
+      emoji: reader && !readerOnBot ? "👤" : "🔎",
       kind: "talent",
       answer: result.answer,
       people: result.people,

@@ -386,6 +386,21 @@ function HumanBubble({ text, at }: { text: string; at: string | null }) {
   );
 }
 
+/** Work one employee asked another for. Not the CEO's words, so not the CEO's bubble. */
+function RequestBubble({ from, to, text, at }: { from: string; to: string; text: string; at: string | null }) {
+  return (
+    <div className="flex flex-col items-end">
+      <p className="mb-1 pr-1 text-[11px] font-medium text-slate-500">
+        {from} asked {to}
+      </p>
+      <p className="ml-8 whitespace-pre-line rounded-2xl rounded-br-md bg-sky-50 px-3.5 py-2.5 text-[13px] leading-relaxed text-sky-950 ring-1 ring-sky-200/70">
+        {text}
+      </p>
+      {at && <span className="mt-1 pr-1 text-[10.5px] text-slate-400">{ago(at)}</span>}
+    </div>
+  );
+}
+
 function StepBlock({
   step,
   messages,
@@ -405,16 +420,21 @@ function StepBlock({
   const replies = messages.filter((m) => m.role === "agent");
   const events = live ?? step.activity;
   const question = isLatest ? step.record?.questionForCeo : null;
+  const worker = step.worker ?? name;
 
   return (
     <div className="space-y-2">
-      <HumanBubble text={instruction} at={step.createdAt} />
+      {step.askedBy ? (
+        <RequestBubble from={step.askedBy} to={worker} text={instruction} at={step.createdAt} />
+      ) : (
+        <HumanBubble text={instruction} at={step.createdAt} />
+      )}
 
       {live ? (
         <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-3 py-2.5">
           <p className="flex items-center gap-2 text-[12px] font-semibold text-sky-800">
             <Loader2 className="h-3 w-3 animate-spin" />
-            {step.status === "queued" ? `Waiting for ${name} to start` : `${name} is working`}
+            {step.status === "queued" ? `Waiting for ${worker} to start` : `${worker} is working`}
             <span className="grow" />
             <span className="font-mono text-[11px] font-medium tabular-nums text-sky-700">{clock}</span>
           </p>
@@ -426,7 +446,10 @@ function StepBlock({
 
       {replies.map((m) => (
         <div key={m.id} className="mr-6">
-          <p className="mb-1 pl-1 text-[11px] font-medium text-slate-500">{name}</p>
+          <p className="mb-1 pl-1 text-[11px] font-medium text-slate-500">
+            {worker}
+            {step.askedBy ? ` · answering ${step.askedBy}` : ""}
+          </p>
           <p className="whitespace-pre-line rounded-2xl rounded-bl-md bg-slate-50 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 ring-1 ring-slate-200/70">
             {m.body}
           </p>
