@@ -1,5 +1,7 @@
 # Autonomous Product Work Queue
 
+> Documentation reconciliation, 10 September: CASE-004 remains GATED for general inter-role handoffs. Slice 5 already contains partial continuation controls; see ROADMAP_EXECUTION and CURRENT_STATE. Existing code does not satisfy the remaining gate or authorize additional scope.
+
 **Adopted:** 30 August 2026  
 **Purpose:** give Codex and other software/product agents an ordered,
 evidence-gated queue that can be executed without re-planning the product on

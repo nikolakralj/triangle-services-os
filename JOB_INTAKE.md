@@ -1,10 +1,12 @@
 # Job Intake
 
+> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision.
+
 Reads agency/recruiter email, turns it into scored opportunities, and drafts replies.
 Added 2026-08-25. Productization boundary added 2026-08-30. Read the
 repository operating rules before changing behavior.
 
-## Current operating note — 29 August 2026
+## Historical operating snapshot — 29 August 2026
 
 The module works, but the commercial loop has not been activated:
 
@@ -232,7 +234,7 @@ copy/send manually → mark "I sent this".
    password** (Account → Security → 2-Step Verification → App passwords), not the
    normal password. Company domains use the ordinary mailbox password.
 3. Job Intake → **Sync now**, or "Read older mail…" for a backfill.
-4. Scheduled: `vercel.json` runs sync every 15 min, 08:00–19:00 Mon–Fri. Needs
+4. Scheduled: `vercel.json` currently schedules sync daily at 06:00 UTC. Needs
    `CRON_SECRET` and `CRON_ORGANIZATION_ID`.
 
 ## Why IMAP and not "Sign in with Google"

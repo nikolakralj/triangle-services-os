@@ -35,7 +35,10 @@ Update this file when:
 Record strategic changes in `DECISIONS.md`, and implemented/live truth in
 `CURRENT_STATE.md`.
 
-## Current truth
+## Last documented live snapshot — 8 September 2026
+
+This is dated evidence, not a live dashboard. See [CURRENT_STATE](CURRENT_STATE.md)
+for the newer source snapshot and review limits.
 
 Read-only live data on 8 September 2026:
 
@@ -63,16 +66,17 @@ the Netherlands, Mexico and the USA. Triangle now holds exactly the trade the
 inbound queue keeps asking for.
 
 **The warm queue was never opened.** Thirty-four requisitions arrived from g2
-Recruitment and Talos in sixty days; thirty-one were never read, because no
-screen queried `job_leads`. The day's move now leads with the best open
+Recruitment and Talos in sixty days; thirty-one were still marked new. A separate Job Intake screen already queried
+`job_leads`; the default next-move path previously omitted that queue. A new
+status alone does not prove that nobody read the email. The day's move now leads with the best open
 requisition matched against the people actually on the books.
 
 **The 50-electrician package is still not supported by the database** and must
-not be used as evidence of deliverable supply. Two people cannot staff it.
+not be used as evidence of deliverable supply. Individual profiles alone cannot establish it. Recently human-confirmed partner-firm capacity also counts as supply; its coverage must be checked against the requirement.
 
-The 29 August block said "4 leads score 70+". `job_leads` has no `score`
-column, so that line described a field that does not exist on that table.
-Corrected rather than carried forward.
+The 29 August block said "4 leads score 70+". The numeric field is
+`team_potential`, not `score`; the column name does not invalidate the old count.
+That count remains historical and requires a new query before operational use.
 
 ## Operator model — clarified 1 September 2026
 
@@ -163,8 +167,10 @@ the company and project flows show a concrete limitation.
    the phrasing of Postgres exceptions, so a refusal written in English by this
    codebase was silently dropped; callers can now state the kind outright.
 
-   Remaining in this slice: budgets per employee, and an explicit written list
-   of the read-only steps an agent may take without asking.
+   Source reconciliation, 10 September: budget settings and written safe-step
+   guidance exist. Monetary accounting, atomic reservations, recovery and
+   enforced role boundaries remain incomplete or unproven. This is partial
+   implementation, not completion of CASE-004 or its collaboration gate.
 6. **Outcome-backed learning.** Store corrections, accepted/rejected evidence,
    buyer responses, placements, delivery, and margin as evaluation history.
    Never let model-generated summaries silently overwrite canonical facts.
