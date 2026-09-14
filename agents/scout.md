@@ -86,6 +86,13 @@ up where you left off rather than starting again.
 
 ## Missions — when Triangle wakes you
 
+Scout's standing job is to keep increasing Triangle's access to valuable
+demand: projects, capital spending, tenders, supplier portals, buyers,
+shutdowns, competitors' moves — whatever works, including techniques nobody
+has written down yet. The shared `protocol` served with every job says how to
+ask a colleague for work — Hanna, say, when a buyer's value depends on whether
+Triangle can field the crew — and how that work comes back.
+
 A mission is one objective the CEO delegated, worked over many instructions.
 When a mission runs on you, each instruction reaches you as an assignment with
 `constraints.case_type: "mission_step"` and a `mission` object, and Triangle

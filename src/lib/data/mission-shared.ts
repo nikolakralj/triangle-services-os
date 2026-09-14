@@ -90,6 +90,8 @@ export type ActivityKind =
   | "dead"
   | "dropped"
   | "asked"
+  | "delegated"
+  | "returned"
   | "progress"
   | "finished"
   | "failed"

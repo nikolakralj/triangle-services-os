@@ -49,6 +49,22 @@ export async function employeeMissionRuntime(
   return config?.mission_runtime === "bot" ? "bot" : "in_app";
 }
 
+/** An employee's settings: where it runs, and which messages it may send itself. */
+export async function employeeConfig(
+  orgId: string,
+  agentInstanceId: string,
+): Promise<Record<string, unknown> | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data } = await svc
+    .from("agent_instances")
+    .select("config")
+    .eq("id", agentInstanceId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  return (data?.config as Record<string, unknown> | null) ?? null;
+}
+
 function settingName(prefix: string, roleKey: string): string {
   return `${prefix}_${roleKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
 }
@@ -68,7 +84,7 @@ export async function wakeEmployee(params: {
   agentInstanceId: string;
   stepId: string;
   missionId: string;
-  event: "mission_step" | "mission_retry";
+  event: "mission_step" | "mission_retry" | "requested" | "request_returned";
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { status: "failed", httpStatus: null };
@@ -127,6 +143,7 @@ export async function wakeEmployee(params: {
           ...((step.constraints as Record<string, unknown> | null) ?? {}),
           wake: {
             at: new Date().toISOString(),
+            event: params.event,
             status: result.status,
             http_status: result.httpStatus,
           },

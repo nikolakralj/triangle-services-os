@@ -1,17 +1,18 @@
 import { after, NextResponse } from "next/server";
-import { authorizeBotStep, completeBotStep } from "@/lib/data/mission-bot";
+import { authorizeBotStep, pickUpBotStep } from "@/lib/data/mission-bot";
+import { requestWork } from "@/lib/data/delegation";
 import { wakeEmployee } from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
-// POST /api/agent/missions/:id/complete — a bot finishes its mission step.
+// POST /api/agent/missions/:id/delegate — ask a colleague for work.
 //
-// { assignmentId, reply, brief: { headline, summary, recommended },
-//   questionForCeo, suggestedNext: [{ label, instruction }] }
-// or { assignmentId, failed: true, reason }.
+// { assignmentId, to, title, objective, expectedOutput?, priority? }
 //
-// What was filed is counted from the step's findings, not taken from the
-// report. The reply lands in the mission's conversation, the brief on its
-// overview, and the finish line is recounted.
+// `to` is a colleague's name or role, as listed in `colleagues` on the
+// mission. The request becomes an assignment under the step asking, in the
+// same mission, and the colleague is woken. When it finishes, the step that
+// asked sees the answer in `requestedWork` and its employee is woken again.
+// Several requests may run at once; retrying the same request returns it.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -22,20 +23,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const auth = await authorizeBotStep(request, id, body?.assignmentId, { write: true });
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const result = await completeBotStep(auth.step, body ?? {});
+  await pickUpBotStep(auth.step);
+  const result = await requestWork(auth.step, body ?? {});
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  // Work a colleague asked for: wake the one who asked, so the answer is used.
   const { wake, ...answer } = result;
   if (wake) {
     const orgId = auth.step.orgId;
     after(async () => {
       try {
-        await wakeEmployee({ orgId, ...wake, event: "request_returned" });
+        await wakeEmployee({ orgId, ...wake, event: "requested" });
       } catch (err) {
-        console.error("report-back wake:", err);
+        console.error("request wake:", err);
       }
     });
   }
-  return NextResponse.json(answer);
+  return NextResponse.json(answer, { status: answer.alreadyAsked ? 200 : 201 });
 }

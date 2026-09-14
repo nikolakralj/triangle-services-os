@@ -97,3 +97,12 @@ export async function getAgentBrief(
   // is honest — better than serving another employee's brief.
   return { role, roleFile: role ? (file ?? null) : null, constitution };
 }
+
+/**
+ * How any employee works a mission on its own platform, and asks colleagues for
+ * work. The same for every employee, current or future, so it is read here on
+ * every run instead of being pasted into each bot.
+ */
+export async function loadMissionProtocol(): Promise<string | null> {
+  return readAgentDoc("missions.md");
+}

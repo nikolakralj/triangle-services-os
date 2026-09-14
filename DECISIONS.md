@@ -527,6 +527,40 @@ Built on agent_house_rules (migration 046). No new agent roles, nothing
 autonomous. First surface: the Workforce page, where each employee carries its
 own rules.
 
+### 2026-09-14: Work between employees is a graph Triangle holds
+
+Decision:
+
+- Triangle is the control plane; Scout, Hanna and Bob are peers, not a
+  hierarchy. Scout owns demand, Hanna owns Triangle's access to people, Bob
+  owns commercial operations — turning both into revenue and keeping work
+  moving. None of them is the others' boss;
+- any employee may ask any other for work. The request is an assignment under
+  the work it came from, in the same mission, and the answer wakes the one who
+  asked. Requests may run in parallel; nothing encodes an order such as Scout,
+  then Hanna, then Bob;
+- employees may talk freely on their own platform, but work with a result is
+  recorded in Triangle, because a chat message cannot be retried, shown to the
+  CEO, or answered with a wake-up;
+- roles are outcomes, not task lists: new techniques need no migration, and a
+  new employee is a new row with a badge and a wake-up, not new code;
+- external communication is a per-employee policy — auto, approval or
+  forbidden per kind of message. Today every kind is approval or forbidden, and
+  a commitment is never an employee's to make. "Auto" takes effect only once
+  Triangle records what was sent.
+
+Why:
+
+- the Grok Bot platform can wake a Bot but offers no way to assign it work and
+  receive a structured result, so durable delegation has to live here;
+- a mandatory manager in the middle would make one employee a serial bottleneck
+  when demand and supply can be worked at the same time;
+- the end goal is employees that actually work, not ones that ask the CEO to
+  press send forever — the policy grows without a rebuild.
+
+Built on agent_assignments (migration 047) and the architecture study of
+13 September. No workforce registry, marketplace hiring or labour market yet.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

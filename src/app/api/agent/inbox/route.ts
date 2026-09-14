@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyMachineToken } from "@/lib/auth/machine";
-import { getAgentBrief } from "@/lib/data/agent-brief";
+import { getAgentBrief, loadMissionProtocol } from "@/lib/data/agent-brief";
+import { employeeConfig } from "@/lib/data/bot-runtime";
+import { communicationPolicyFor } from "@/lib/data/communication-policy";
 import { getBudget, SAFE_STEPS, NEEDS_A_HUMAN } from "@/lib/data/agent-budget";
 import {
   listPendingTasksForAgent,
@@ -62,6 +64,10 @@ export async function GET(request: Request) {
   // The CEO's standing instructions for this employee travel with the work, so
   // nothing has to be pasted into the bot's own platform and kept in step.
   const houseRules = agentInstanceId ? await loadHouseRules(machine.orgId, agentInstanceId) : null;
+  const [protocol, config] = await Promise.all([
+    loadMissionProtocol(),
+    agentInstanceId ? employeeConfig(machine.orgId, agentInstanceId) : Promise.resolve(null),
+  ]);
   const withMissions = await Promise.all(
     assignments.map(async (a) =>
       a.constraints.case_type === "mission_step" && a.missionId && agentInstanceId
@@ -78,6 +84,8 @@ export async function GET(request: Request) {
     role: brief.role,
     roleFile: brief.roleFile,
     houseRules: houseRules ? { version: houseRules.version, body: houseRules.body } : null,
+    communicationPolicy: communicationPolicyFor(config),
+    protocol,
     youMay: SAFE_STEPS,
     needsAHuman: NEEDS_A_HUMAN,
     budget: budget
@@ -102,7 +110,8 @@ export async function GET(request: Request) {
       "Report the job finished: POST { assignmentId, result }, adding failed: true if you could not do it. " +
       "Quick notes: POST { taskId, result }. Never send email; never invent facts. " +
       "A mission step (constraints.case_type mission_step) carries `mission` — the instruction, finish line, decisions, holdings and supply. Work it through `mission.report`: file targets and activity as you go, then POST /api/agent/missions/{missionId}/complete. Do not finish a mission step with `result` here. " +
-      "`houseRules` is how the CEO wants you to work, in their own words, with the version it last changed at: follow it on every job, on top of your role file.",
+      "`houseRules` is how the CEO wants you to work, in their own words, with the version it last changed at: follow it on every job, on top of your role file. " +
+      "`protocol` is how every employee works a mission and asks a colleague for work; `communicationPolicy` says which messages you may send yourself.",
   });
 }
 

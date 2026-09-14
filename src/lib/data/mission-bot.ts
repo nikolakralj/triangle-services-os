@@ -6,6 +6,10 @@ import { addAgentMessage } from "@/lib/data/assignment-threads";
 import { completeAssignment } from "@/lib/data/workforce";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { loadHouseRules } from "@/lib/data/house-rules";
+import { listColleagues, listRequestedWork, reportBack } from "@/lib/data/delegation";
+import { communicationPolicyFor } from "@/lib/data/communication-policy";
+import { loadMissionProtocol } from "@/lib/data/agent-brief";
+import { employeeConfig } from "@/lib/data/bot-runtime";
 import { fileMissionTargets } from "@/lib/data/mission-records";
 import {
   activity,
@@ -363,6 +367,34 @@ export async function missionPayloadForStep(
   // How the CEO wants this employee to work. Read on every run and never
   // cached on the bot's side, so changing it here changes the next wake-up.
   const rules = await loadHouseRules(orgId, agentInstanceId);
+  // Who asked for this work, what it has asked of others, who else works here,
+  // what it may send itself, and the protocol every employee shares.
+  const [stepLinks, config, colleagues, requestedWork, protocol] = await Promise.all([
+    svc
+      .from("agent_assignments")
+      .select("parent_assignment_id, requested_by_agent_instance_id")
+      .eq("id", stepId)
+      .eq("org_id", orgId)
+      .maybeSingle(),
+    employeeConfig(orgId, agentInstanceId),
+    listColleagues(orgId, agentInstanceId),
+    listRequestedWork(orgId, stepId),
+    loadMissionProtocol(),
+  ]);
+  const parentId = (stepLinks.data?.parent_assignment_id as string | null | undefined) ?? null;
+  const requesterId = (stepLinks.data?.requested_by_agent_instance_id as string | null | undefined) ?? null;
+  let requestedBy: { name: string; parentAssignmentId: string | null; parentTitle: string | null } | null = null;
+  if (requesterId) {
+    const [{ data: requester }, { data: parent }] = await Promise.all([
+      svc.from("agent_instances").select("display_name").eq("id", requesterId).maybeSingle(),
+      svc.from("agent_assignments").select("title").eq("id", parentId ?? "").maybeSingle(),
+    ]);
+    requestedBy = {
+      name: (requester?.display_name as string | undefined) ?? "A colleague",
+      parentAssignmentId: parentId,
+      parentTitle: (parent?.title as string | undefined) ?? null,
+    };
+  }
   const base = `/api/agent/missions/${missionId}`;
 
   return {
@@ -374,6 +406,11 @@ export async function missionPayloadForStep(
     objective: ctx.mission.objective,
     instruction: ctx.instruction,
     houseRules: rules ? { version: rules.version, body: rules.body } : null,
+    requestedBy,
+    requestedWork,
+    colleagues,
+    communicationPolicy: communicationPolicyFor(config),
+    protocol,
     missionState: describeMissionState({
       holdings: ctx.holdings,
       decisions: ctx.decisions,
@@ -422,6 +459,7 @@ export async function missionPayloadForStep(
       activity: `POST ${base}/activity`,
       decisions: `POST ${base}/decisions`,
       finishLine: `POST ${base}/plan`,
+      requestWork: `POST ${base}/delegate`,
       complete: `POST ${base}/complete`,
     },
   };
@@ -801,7 +839,8 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
     });
     await finishMissionRun(runId, { status: "failed", events: [activity("failed", clip(reason, 200))], error: reason });
     await touchMission(step.orgId, step.missionId);
-    return { ok: true, failed: true } as const;
+    const wake = await reportBack(step.orgId, step.id, { headline: null, failedReason: reason });
+    return { ok: true, failed: true, wake } as const;
   }
 
   const parsed = completeInput.safeParse(raw);
@@ -876,7 +915,13 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
     summary: { filed, progress: progress ? { percent: progress.percent, met: progress.met } : null },
   });
   await touchMission(step.orgId, step.missionId);
-  return { ok: true, filed, progress: progress ? { percent: progress.percent, met: progress.met } : null } as const;
+  const wake = await reportBack(step.orgId, step.id, { headline: record.brief.headline });
+  return {
+    ok: true,
+    filed,
+    progress: progress ? { percent: progress.percent, met: progress.met } : null,
+    wake,
+  } as const;
 }
 
 // ── looking before filing ───────────────────────────────────────────────────

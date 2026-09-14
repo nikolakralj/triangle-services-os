@@ -139,6 +139,18 @@ step by hand. A mission decision is narrower and wins where the two overlap.
 Rules are instructions, never permissions: scopes, the finding contract and the
 API still decide what an employee may do.
 
+Employees ask each other for work through Triangle, never only in a chat on
+their own platform. A request is an assignment with `parent_assignment_id`
+and `requested_by_agent_instance_id` (migration 047), in the same mission as
+the work it came from, created with `POST /api/agent/missions/:id/delegate`.
+Triangle wakes the colleague; when the request finishes, the step that asked
+sees it in `requestedWork` and its employee is woken again. It is a graph, not
+a pipeline: anyone may ask anyone, requests run in parallel, and nothing in the
+schema names an employee. Limits: eight open requests per piece of work, five
+deep. The shared protocol every employee follows is `agents/missions.md`,
+served with every job. What an employee may send outside Triangle is a
+per-employee `communicationPolicy` — approval-required or forbidden today.
+
 Köster and GOLDBECK are the first verified in-app cases. Their structured
 reports, project proposals, assignment conversation, and provider/model/token
 audit all remain in Triangle. No contact was performed.
