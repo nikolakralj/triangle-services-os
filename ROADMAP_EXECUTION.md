@@ -80,7 +80,7 @@ Hanna's bot cannot yet write to the pool.
 a mission through the mission API, counted by the recruiting finish line;
 availability checks are drafts a person sends; her privacy rules hold.
 
-**Done 15 September.** `POST /api/agent/missions/{id}/pool` with `worker.propose`
+**Done 15 September** (`b678056`). `POST /api/agent/missions/{id}/pool` with `worker.propose`
 names people already in the pool, attaches a pending CV, or files a pending
 worker finding; availability updates stay pending until a person accepts;
 `check` words become an outreach draft (never sent). Recruiting finish line
