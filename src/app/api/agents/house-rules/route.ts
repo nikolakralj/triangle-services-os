@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
-import { loadHouseRules, saveHouseRules } from "@/lib/data/house-rules";
+import { loadHouseRules, saveHouseRules, appendHouseRule, resolveEmployeeByRole } from "@/lib/data/house-rules";
 
 // ---------------------------------------------------------------------------
 // How an employee works — the CEO's standing instructions for one employee.
 //
-//   GET /api/agents/house-rules?employee=<id>   what is in force
+//   GET /api/agents/house-rules?employee=<id>&role=<roleKey>   what is in force
 //   PUT /api/agents/house-rules                 { employee, body }
+//   POST /api/agents/house-rules/append         { employee | role, rule }
 //
 // A bot never reads them here: they arrive with its work, in the inbox and in
 // every mission payload, so there is nothing to fetch and nothing to remember.
@@ -22,12 +23,22 @@ export async function GET(request: Request) {
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  const employee = new URL(request.url).searchParams.get("employee") ?? "";
+  const url = new URL(request.url);
+  let employee = url.searchParams.get("employee") ?? "";
+  const role = url.searchParams.get("role");
+
+  if (!employee && role) {
+    const resolved = await resolveEmployeeByRole(access.organizationId, role);
+    if (resolved) {
+      employee = resolved.id;
+    }
+  }
+
   if (!z.string().uuid().safeParse(employee).success) {
     return NextResponse.json({ error: "Say which employee." }, { status: 400 });
   }
   const rules = await loadHouseRules(access.organizationId, employee);
-  return NextResponse.json({ rules }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ rules, employeeId: employee }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function PUT(request: Request) {
@@ -67,4 +78,71 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: saved.error }, { status: 400 });
   }
   return NextResponse.json({ rules: saved.body.trim() ? saved : null, version: saved.version });
+}
+
+export async function POST(request: Request) {
+  const access = await requireApiAccess(request);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  const refused = refuseUnlessHuman(access, "canWrite", "add a rule for how an employee works");
+  if (refused) return refused;
+  if (access.demo) {
+    return NextResponse.json(
+      { error: "How an employee works is read-only in demo mode." },
+      { status: 403 },
+    );
+  }
+  if (access.role !== "admin" && access.role !== "partner") {
+    return NextResponse.json(
+      { error: "Only an admin or partner can change how an employee works." },
+      { status: 403 },
+    );
+  }
+
+  const parsed = z
+    .object({
+      employee: z.string().uuid().optional(),
+      role: z.string().optional(),
+      rule: z.string().min(3).max(1_000),
+    })
+    .safeParse(await request.json().catch(() => ({})));
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Send the employee or role, and the rule text." }, { status: 400 });
+  }
+
+  let employeeId = parsed.data.employee;
+  let employeeName = "Employee";
+  if (!employeeId && parsed.data.role) {
+    const resolved = await resolveEmployeeByRole(access.organizationId, parsed.data.role);
+    if (!resolved) {
+      return NextResponse.json({ error: `No active employee with role '${parsed.data.role}'.` }, { status: 404 });
+    }
+    employeeId = resolved.id;
+    employeeName = resolved.name;
+  }
+
+  if (!employeeId) {
+    return NextResponse.json({ error: "Could not identify which employee to apply this rule to." }, { status: 400 });
+  }
+
+  const saved = await appendHouseRule({
+    orgId: access.organizationId,
+    agentInstanceId: employeeId,
+    newRule: parsed.data.rule,
+    userId: access.userId,
+  });
+
+  if ("error" in saved) {
+    return NextResponse.json({ error: saved.error }, { status: 400 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    employeeId,
+    employeeName,
+    version: saved.version,
+    rules: saved,
+  });
 }

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OutreachDraftRow, OutreachChannel } from "@/lib/data/outreach";
+import { LearnRulePrompt } from "@/components/modules/learn-rule-prompt";
 
 interface BuyerLabel {
   contactId?: string | null;
@@ -104,6 +105,7 @@ function DraftCard({
   const [error, setError] = useState<string | null>(null);
   const [confirmingSent, setConfirmingSent] = useState(false);
   const [followUp, setFollowUp] = useState("");
+  const [showLearnPrompt, setShowLearnPrompt] = useState(false);
 
   const meta = CHANNEL_META[draft.channel];
   const Icon = meta.icon;
@@ -245,7 +247,10 @@ function DraftCard({
                   patchDraft("edit", {
                     subject: isEmail ? editedSubject : null,
                     body: editedBody,
-                  }).then(() => setEditing(false))
+                  }).then(() => {
+                    setEditing(false);
+                    setShowLearnPrompt(true);
+                  })
                 }
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
@@ -383,6 +388,18 @@ function DraftCard({
             </>
           )}
         </div>
+
+        {showLearnPrompt && (
+          <div className="mt-3">
+            <LearnRulePrompt
+              targetRole="project_researcher"
+              targetEmployeeName="Scout"
+              diffSummary="edited outreach draft"
+              suggestedRulePlaceholder="e.g. In outreach to GCs, lead with crew capacity and mobility before mentioning rates."
+              onDismiss={() => setShowLearnPrompt(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
