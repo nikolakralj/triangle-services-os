@@ -846,8 +846,8 @@ function CompanyItem({
       focusHoldingId === row.companyId ||
       parseMissionHoldingHash(window.location.hash) === row.companyId;
     if (!match) return;
-    setOpen(true);
     const frame = window.requestAnimationFrame(() => {
+      setOpen(true);
       document.getElementById(missionHoldingAnchor(row.companyId))?.scrollIntoView({
         block: "center",
       });
