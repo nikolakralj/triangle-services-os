@@ -13,8 +13,8 @@ Before building product features, read:
 - `ROADMAP.md`
 - `ROADMAP_EXECUTION.md`
 - `SOFTWARE_AGENT_INSTRUCTIONS.md`
-- `WORKFLOW_SIGNAL_TO_PLACEMENT.md`
-- `RESEARCH_WORKBENCH.md`
+- `docs/reference/WORKFLOW_SIGNAL_TO_PLACEMENT.md`
+- `docs/reference/RESEARCH_WORKBENCH.md`
 - `DECISIONS.md`
 - `CURRENT_STATE.md`
 
@@ -62,7 +62,7 @@ status and commitments, personal-data sharing, deletion, money, and
 mobilization. Provider/model is not the employee identity. Triangle's database
 is truth; agent memory is context.
 
-For Job Intake work, also read `JOB_INTAKE.md`. For agent/workforce work, also
+For Job Intake work, also read `docs/reference/JOB_INTAKE.md`. For agent/workforce work, also
 read `agents/WORKFORCE.md`, `agents/shared-constitution.md`, and the
 affected role file.
 

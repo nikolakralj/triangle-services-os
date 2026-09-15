@@ -96,13 +96,13 @@ Five commits after the original review replace the cockpit with Today, add the
 three-state finding contract in migration 041, repair report parsing, route
 Hanna questions directly, and consolidate Overview into Today. The old hardcoded
 count fallbacks and missing note input are gone. Count errors still become zero.
-See the [source update](docs/product/REVIEW_UPDATE_2026-09-10.md) for remaining
+See the [source update](docs/reviews/REVIEW_UPDATE_2026-09-10.md) for remaining
 and new defects. Commit-reported signed-in checks were not rerun here.
 
 ## Remaining priorities
 
 The ordered development list lives in
-[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md#development--now). The [critical review](docs/product/CRITICAL_REVIEW_2026-09-08.md) provides
+[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md#development--now). The [critical review](docs/reviews/CRITICAL_REVIEW_2026-09-08.md) provides
 source evidence and acceptance criteria. Highest priorities are actor/role
 permissions, truthful availability and final-content recording, binding Run Now
 to its assignment, real cost enforcement, CV provenance and meaningful tests.
@@ -110,7 +110,8 @@ Review recommendations do not change phase gates or authorize implementation.
 
 ## Last documented commercial snapshot
 
-The 8 September block in ROADMAP_EXECUTION recorded 34 leads, 18 projects,
+The 8 September block in the
+[archived execution plan](docs/archive/2026-09-15/ROADMAP_EXECUTION.md) recorded 34 leads, 18 projects,
 174 companies, two candidate workers, and zero buyer routes, commercial actions,
 orders and invoices. It predates the latest partner-firm change and was not
 requeried here. Candidate skill overlap is not confirmed deployable capacity;

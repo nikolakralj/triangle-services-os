@@ -178,7 +178,7 @@ export async function POST(request: Request) {
     }
 
     // Bots are deliberately dumb — they forward everything and make no
-    // classification decisions (see JOB_INTAKE.md). So the cheap envelope
+    // classification decisions (see docs/reference/JOB_INTAKE.md). So the cheap envelope
     // filter runs HERE, before the LLM call, same as the IMAP path. Matches
     // are dropped without a stored row, exactly like IMAP skips them.
     if (isObviousNoiseHeader(msg.from ?? null, subject)) {

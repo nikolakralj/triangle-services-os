@@ -12,7 +12,7 @@
 //
 // Why a script rather than "click forgot password": Supabase's built-in
 // mailer is rate limited and this project has no SMTP configured yet, so the
-// email route silently stops working after a few attempts. See SMTP_SETUP.md.
+// email route silently stops working after a few attempts. See docs/operations/SMTP_SETUP.md.
 
 import { readFileSync } from "node:fs";
 

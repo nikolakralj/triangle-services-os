@@ -85,7 +85,7 @@ private Antigravity sessions cannot support a complete personal assessment.
 
 ## Documentation organization and evidence
 
-The [documentation map](../README.md) identifies authority and reading order.
+The [documentation map](../../README.md) identifies authority and reading order.
 README, HANDOFF, CLAUDE and CURRENT_STATE are concise entry points. Eleven older
 files are preserved in the [archive](../archive/README.md); legacy development
 agent guides redirect to the actual [automation limits](../operations/DEVELOPMENT_AUTOMATION.md).

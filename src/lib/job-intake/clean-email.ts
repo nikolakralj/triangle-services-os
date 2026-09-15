@@ -108,7 +108,7 @@ function collapse(text: string): string {
 //
 // Shared by both intake paths: the IMAP fetcher (skips the body download) and
 // /api/job-intake/ingest (skips the LLM call when a deliberately-dumb bot
-// forwards its whole inbox — see JOB_INTAKE.md, "Make Bob dumber").
+// forwards its whole inbox — see docs/reference/JOB_INTAKE.md, "Make Bob dumber").
 
 const NOISE_SENDER = [
   /@.*\.linkedin\.com$/i,

@@ -38,7 +38,7 @@ reliability, missing authority or an actual human/physical responsibility.
 Use deterministic software where it is sufficient. Current external-action,
 personal-data and final-record approval rules remain unchanged until explicitly
 revised and tested. See the 8 September clarification in
-`docs/product/PRODUCT_AND_GROWTH_AUDIT_2026-09-07.md`.
+`docs/archive/audits/PRODUCT_AND_GROWTH_AUDIT_2026-09-07.md`.
 
 Triangle owns:
 

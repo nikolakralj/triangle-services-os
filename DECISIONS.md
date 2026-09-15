@@ -561,6 +561,31 @@ Why:
 Built on agent_assignments (migration 047) and the architecture study of
 13 September. No workforce registry, marketplace hiring or labour market yet.
 
+### 2026-09-15: One map, one list of next steps
+
+Decision:
+
+- the root README is the only map of the documentation, and ROADMAP_EXECUTION
+  is the only list of next steps, each item with its acceptance criteria. The
+  separate work queue, HANDOFF and the docs/README map are retired;
+- the living documents stay at the root. How a module works goes to
+  docs/reference, how to run the app to docs/operations, dated reviews to
+  docs/reviews, and everything superseded or paused to docs/archive;
+- the role files under agents/ keep their paths, because Triangle serves them to
+  the employees' bots.
+
+Why:
+
+- next steps were spread over four files — ROADMAP_EXECUTION, the work queue,
+  HANDOFF and the docs map — that each had to be kept in step, next to a
+  deployment guide that still described pushing straight to production;
+- the CEO asked for total clarity about future work and for unnecessary
+  documents to be deleted or grouped.
+
+This replaces the 8 September choice to keep reference files at the root for
+stable paths; the references in agent instructions, scripts and code comments
+moved with them.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

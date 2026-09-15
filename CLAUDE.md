@@ -3,8 +3,10 @@
 @AGENTS.md
 
 Read [SOFTWARE_AGENT_INSTRUCTIONS](SOFTWARE_AGENT_INSTRUCTIONS.md) and the
-[documentation map](docs/README.md). Current implementation status belongs in
-[CURRENT_STATE](CURRENT_STATE.md); do not maintain a competing snapshot here.
+[README](README.md), which says which file answers which question. Next steps
+live only in [ROADMAP_EXECUTION](ROADMAP_EXECUTION.md) and implementation status
+only in [CURRENT_STATE](CURRENT_STATE.md); do not keep a competing list or
+snapshot here.
 
 ## Implementation references
 
@@ -16,7 +18,7 @@ Read [SOFTWARE_AGENT_INSTRUCTIONS](SOFTWARE_AGENT_INSTRUCTIONS.md) and the
 - Page session/capabilities: `src/lib/auth/session.ts`.
 - Domain access: `src/lib/data/`; service-role access bypasses RLS, so explicit
   organization scoping and authorization are essential.
-- Research contracts: [RESEARCH_WORKBENCH](RESEARCH_WORKBENCH.md).
+- Research contracts: [RESEARCH_WORKBENCH](docs/reference/RESEARCH_WORKBENCH.md).
 - Runtime workforce contracts: [agents/WORKFORCE](agents/WORKFORCE.md).
 - Migrations: inspect `supabase/migrations/`; do not rely on a hardcoded range
   in an old guide. No automatic production migration or seed execution.
@@ -25,7 +27,7 @@ Read [SOFTWARE_AGENT_INSTRUCTIONS](SOFTWARE_AGENT_INSTRUCTIONS.md) and the
 
 Use the scripts in `package.json`: `dev`, `lint`, `check:tenant-identity`,
 `build`, and `test:e2e`. Existing E2E coverage has material gaps documented in
-the [critical review](docs/product/CRITICAL_REVIEW_2026-09-08.md).
+the [critical review](docs/reviews/CRITICAL_REVIEW_2026-09-08.md).
 
 The `.claude` named-agent scripts are legacy shell automation, not proof of
 independent Codex/Antigravity/DevPit execution or review. See

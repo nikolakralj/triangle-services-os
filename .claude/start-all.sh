@@ -97,7 +97,7 @@ echo "   pkill -f orchestrator"
 echo "   pkill -f file-watcher"
 echo ""
 echo "📚 Documentation:"
-echo "   cat .claude/ORCHESTRATION.md"
+echo "   cat docs/operations/DEVELOPMENT_AUTOMATION.md"
 echo ""
 
 # Wait and check services

@@ -237,7 +237,7 @@ next-move path. Likewise `team_potential` is a numeric score even though its col
 is not named `score`. Missing that literal column does not invalidate every older
 statement about scored leads.
 
-The [organization pass](../README.md) adds a current index, concise current-state
+The [organization pass](../../README.md) adds a current index, concise current-state
 file, archived old snapshots and explicit limits in affected guides. It does not
 rewrite historical tests as if they had been rerun.
 

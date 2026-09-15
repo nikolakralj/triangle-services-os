@@ -67,20 +67,18 @@ Before proposing or changing product behavior:
    - `PRODUCT_OPERATING_RULES.md`;
    - `ROADMAP.md`;
    - `ROADMAP_EXECUTION.md`;
-   - `AUTONOMOUS_WORK_QUEUE.md`;
-   - `docs/strategy/SELLABLE_PRODUCT_STRATEGY_2026-08-30.md`;
-   - `WORKFLOW_SIGNAL_TO_PLACEMENT.md`;
-   - `RESEARCH_WORKBENCH.md`;
+   - `docs/reference/WORKFLOW_SIGNAL_TO_PLACEMENT.md`;
+   - `docs/reference/RESEARCH_WORKBENCH.md`;
    - `DECISIONS.md`;
    - `CURRENT_STATE.md`.
-5. Read `JOB_INTAKE.md` for mail/lead work.
+5. Read `docs/reference/JOB_INTAKE.md` for mail/lead work.
 6. Read `agents/WORKFORCE.md`, `agents/shared-constitution.md`, and the
    affected role file for agent/workforce work.
 7. Inspect the actual route, data layer, migration, API, and live state before
    accepting a document's claim that something is missing.
 8. Identify the active roadmap phase and its exit gate.
-9. If asked to continue independently, select the first eligible `READY` item
-   from Product Track B in `AUTONOMOUS_WORK_QUEUE.md`; do not invent a new
+9. If asked to continue independently, select the first `READY` item under
+   *Development — now* in `ROADMAP_EXECUTION.md`; do not invent a new
    backlog. Customer/client research requires a separate explicit instruction
    and is never implied by “continue.”
 
@@ -185,8 +183,10 @@ Until its gate is met:
 
 Allowed work is a verified bug fix or friction removal directly blocking the
 current commercial actions, plus the narrow tenant-identity, permission, and
-onboarding safety work listed as `READY` in `AUTONOMOUS_WORK_QUEUE.md`. Customer
-research and pilot preparation are allowed; contacting a prospect is not.
+onboarding safety work listed as `READY` in `ROADMAP_EXECUTION.md`. Customer
+research and pilot preparation are paused by the 4 September management
+decision unless management asks for them; contacting a prospect is never an
+agent's job.
 
 ## 8. Product vocabulary and truth rules
 
@@ -515,8 +515,9 @@ Update the right source, not every file:
 | Runtime role behavior | `agents/<role>.md` |
 | Runtime universal policy | `agents/shared-constitution.md` |
 | Coding/agent process or pitfall | `AGENTS.md` or this file |
-| Job Intake implementation | `JOB_INTAKE.md` |
-| Research workbench contract | `RESEARCH_WORKBENCH.md` |
+| Job Intake implementation | `docs/reference/JOB_INTAKE.md` |
+| Research workbench contract | `docs/reference/RESEARCH_WORKBENCH.md` |
+| Release, environment, badges, bots | `docs/operations/DEPLOY.md` |
 
 Do not let chat become the only place a decision exists.
 
@@ -543,7 +544,8 @@ truth documents were updated.
 
 When the user authorizes independent product work:
 
-1. pick the first `READY` queue item whose evidence gate is already satisfied;
+1. pick the first `READY` item in `ROADMAP_EXECUTION.md` whose evidence gate is
+   already satisfied;
 2. state the item ID and intended state transition;
 3. mark it `IN_PROGRESS` and keep the slice reviewable;
 4. inspect before editing and preserve current patterns unless evidence

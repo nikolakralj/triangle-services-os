@@ -770,7 +770,7 @@ suggestions are diagnostic metrics, never company success metrics.
 ## Research basis
 
 The detailed competitive, commercial, procurement, and legal review is in
-`docs/strategy/CONTRACT_FIRST_STRATEGY_REVIEW_2026-08-28.md`.
+`docs/archive/strategy-paused/CONTRACT_FIRST_STRATEGY_REVIEW_2026-08-28.md`.
 
 Key implications verified against current primary sources:
 

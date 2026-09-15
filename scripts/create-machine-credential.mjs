@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 
-// Load .env.local (UTF-8; see JOB_INTAKE.md gotchas about PowerShell encoding)
+// Load .env.local (UTF-8; see docs/reference/JOB_INTAKE.md gotchas about PowerShell encoding)
 const env = {};
 for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
   const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
