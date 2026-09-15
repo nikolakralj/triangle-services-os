@@ -1,6 +1,6 @@
 # Current state
 
-Updated 14 September 2026. This week's development comes first; the 10 September
+Updated 15 September 2026. This week's development comes first; the 10 September
 source review follows it. Earlier sessions are preserved in the
 [history archive](docs/archive/2026-09-08/CURRENT_STATE.md).
 
@@ -10,18 +10,18 @@ source review follows it. Earlier sessions are preserved in the
 | --- | --- |
 | Checkout | `C:\Users\nikol\Projects\triangle-services-os` |
 | Branch | `wip-jules-2026-05-03T18-13-13-596Z` |
-| Last code commit | `ad72085`, 14 September; the 10 September review read `c7b4174` |
+| Last code commit | `f9e9685`, 15 September; the 10 September review read `c7b4174` |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
-| Existing product work | Earlier uncommitted report protection is now in committed history; this pass changes documentation only |
-| Repository schema | Migrations through `047_assignment_delegation.sql`; 044–047 applied to the live database 11–14 September |
-| Production version | `ad72085`, confirmed through `/api/version` on 14 September |
-| Live commercial counts | Not freshly queried; earlier snapshots are dated evidence only |
+| Existing product work | Committed; nothing from this week is left uncommitted |
+| Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044–048 applied to the live database 11–15 September |
+| Production version | `ad72085`, confirmed through `/api/version` on 14 September; `f9e9685` is not promoted yet |
+| Live commercial counts | Commercial ledger queried 15 September (below); other snapshots are dated evidence only |
 | Verification | Per change, listed with each change below; the 10 September review itself reran no signed-in business test |
 
 Do not infer deployment or applied migrations from committed source. Earlier
 claims of passing builds or live smoke tests describe their original snapshots.
 
-## This week — 10 to 14 September
+## This week — 10 to 15 September
 
 Delegated work is now a **mission**: one objective, every instruction a step
 inside it. Employees can work missions on their own Grok bots, with Triangle as
@@ -37,6 +37,7 @@ the record they read from and write to.
 | Requests between employees through Triangle; the answer wakes the asker (047) | `6aa4968` | First real hand-off, 14 September: Hanna asked Scout for buyers and Scout answered her | Full chain check needs two test badges |
 | Messaging policy per employee: approval or forbidden for every kind of message | `6aa4968` | Carried in every payload | No sending path, so "auto" cannot take effect yet |
 | Fixes: finish-line under-count; reply authors, Ask pool label, placeholder refusal | `0a9ee6c`, `ad72085` | Checked on production, 14 September | Placeholder refusal not yet triggered by a real filing |
+| Sent-message record: words editable before sending, Triangle's draft and the sent text both kept, a follow-up date on every send, due follow-ups on Today, Job Intake replies in the ledger (048) | `f9e9685` | Signed-in check 9/9 on a throwaway lead, 15 September | A follow-up message is recorded without its words; not yet on production |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
@@ -44,8 +45,14 @@ mission scope. The Today recommended card can pair one person's advice with
 another person's action button, and two Austrian doors (STRABAG, ANDRITZ) cite
 pages that do not show their channel.
 
-Phase 0 commercial proof is still not established: no human sends, buyer
-conversations, packets or supplier routes are recorded.
+Phase 0 commercial proof is still not established. The commercial ledger on
+15 September holds thirteen records, all on recruiter requisitions: eight
+replies sent on 10 September, each with a follow-up date of 14 September and no
+answer recorded since, and five outcomes recorded on 8 September while the
+Today card still showed call words under emails, so those may not be real
+replies. The text recorded for the eight is the prepared reply, because an edit
+could not be recorded before 15 September. No buyer conversations, packets or
+supplier routes are recorded.
 
 ## Management direction
 

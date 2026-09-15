@@ -38,7 +38,7 @@ management changes the order, or when the gate is met or fails.
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-### DEV-001 — Sent-message record · `IN_PROGRESS`
+### DEV-001 — Sent-message record · `DONE`
 
 **Why now:** the gate needs five human sends recorded with final content and a
 follow-up date, and nothing surfaces follow-ups.
@@ -48,6 +48,11 @@ recipient, channel, time — in one action; a follow-up date is always set, by
 default so recording stays one action; due and overdue follow-ups appear on
 Today; the AI draft and the final sent text are both kept; the reply and outcome
 can be added later; Triangle sends nothing itself.
+
+**Done 15 September** (`f9e9685`, migration 048), checked signed in 9/9. Limits:
+a follow-up message is recorded without its words until Bob drafts chasers
+(DEV-004), and each send is its own follow-up, so one recruiter answered about
+four roles shows four rows.
 
 ### DEV-002 — Source check at filing · `READY`
 
@@ -79,7 +84,10 @@ records. Bob sends nothing.
 ### DEV-005 — Known defects · `READY`
 
 **Acceptance:** the Today recommended card's action carries the person the
-recommendation names; the STRABAG and ANDRITZ doors are re-sourced or ruled out.
+recommendation names; the STRABAG and ANDRITZ doors are re-sourced or ruled out;
+a requisition that arrived forwarded does not take Triangle's own address as the
+recruiter's — on 15 September the Today card offered to email Computer Futures'
+Austria requisition to `nikola.kralj@triangle-services.com`.
 
 ### DEV-006 — Tenant identity leaks · `READY`
 
