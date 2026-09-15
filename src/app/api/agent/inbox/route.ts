@@ -27,8 +27,11 @@ import { loadHouseRules } from "@/lib/data/house-rules";
 // required — reading your own inbox is inherent to having an identity.
 //
 // This is how humans steer bots WITHOUT opening the bot platform's app:
-// instructions written in the dashboard are picked up here on the agent's
-// next run. A queue, not a chat — bot platforms poll; they cannot be pushed.
+// instructions written in the dashboard are picked up here. Triangle
+// webhook-wakes a bot-runtime employee when a human posts on the thread
+// (`human_followup`); the scheduled inbox check is the backup if that wake
+// is missing or fails. A queue, not a chat — picking up the thread is what
+// marks a follow-up delivered.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";

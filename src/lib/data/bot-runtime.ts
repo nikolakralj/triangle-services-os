@@ -14,8 +14,9 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 //   anything else                                    Triangle's own runner does them
 //
 // A bot only sees work when it checks in, and Triangle cannot open a Grok chat.
-// But a Grok routine can start from a signed webhook, so Triangle calls it the
-// moment an instruction is given:
+// But a Grok routine can start from a signed webhook, so Triangle calls it
+// when an instruction, retry, colleague request, returned request, or human
+// follow-up on the assignment thread is recorded:
 //
 //   BOT_WAKE_URL_<ROLE_KEY>   the routine's webhook URL
 //   BOT_WAKE_KEY_<ROLE_KEY>   its sender key, sent as a bearer token
@@ -69,22 +70,33 @@ function settingName(prefix: string, roleKey: string): string {
   return `${prefix}_${roleKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
 }
 
+export type WakeEvent =
+  | "mission_step"
+  | "mission_retry"
+  | "requested"
+  | "request_returned"
+  | "human_followup";
+
 export interface WakeResult {
   status: "sent" | "failed" | "not_configured";
   httpStatus: number | null;
 }
 
 /**
- * Call the employee's wake-up webhook for one step, and write down on the step
- * that it was called and what came back. Never throws; a bot that could not be
- * woken still collects the step at its next scheduled check.
+ * Call the employee's wake-up webhook for one assignment (a mission step, a
+ * colleague request, or a human follow-up on the thread), and write down on
+ * that assignment that it was called and what came back. Never throws; a bot
+ * that could not be woken still collects the work at its next scheduled check.
+ *
+ * `missionId` is null when the assignment is not inside a mission; the bot
+ * still gets `assignmentId` and reads the thread from its inbox.
  */
 export async function wakeEmployee(params: {
   orgId: string;
   agentInstanceId: string;
   stepId: string;
-  missionId: string;
-  event: "mission_step" | "mission_retry" | "requested" | "request_returned";
+  missionId: string | null;
+  event: WakeEvent;
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { status: "failed", httpStatus: null };
@@ -169,4 +181,14 @@ export function botWaitingReason(constraints: Record<string, unknown> | null | u
     return "No wake-up webhook is set, so the bot picks this up at its next scheduled check.";
   }
   return "Waiting for the bot to pick this up.";
+}
+
+/**
+ * What the assignment thread says after a human follow-up: queued, not
+ * delivered. Same honesty as `botWaitingReason` when a wake was attempted.
+ */
+export function followUpPickupNotice(wake: WakeResult | null, reopened: boolean): string {
+  const head = reopened ? "Reopened. Queued." : "Queued.";
+  if (!wake) return `${head} Waiting for pickup.`;
+  return `${head} ${botWaitingReason({ wake })}`;
 }

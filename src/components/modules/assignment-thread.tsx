@@ -11,10 +11,11 @@ import type { AssignmentMessage } from "@/lib/data/assignment-threads";
 // Collapsed by default and fetched on open — a workforce page with twenty jobs
 // should not pull twenty threads nobody is reading.
 //
-// The honesty that matters here is delivery. Bot platforms poll; we cannot
-// push. So a follow-up sits as "not picked up yet" until the agent's next
-// inbox check, and the UI says exactly that instead of implying the message
-// has been read.
+// The honesty that matters here is delivery. Triangle can webhook-wake a
+// bot-runtime employee when you post, but that is a pickup request, not a
+// chat send. A follow-up stays "not picked up yet" until the agent fetches
+// the thread (or answers in it). If the wake is missing or fails, they pick
+// it up on the next scheduled inbox check.
 // ---------------------------------------------------------------------------
 
 export function AssignmentThread({
@@ -85,6 +86,8 @@ export function AssignmentThread({
       const data = (await res.json().catch(() => ({}))) as {
         messages?: AssignmentMessage[];
         reopened?: boolean;
+        notice?: string;
+        wake?: { status?: string } | null;
         error?: string;
       };
       if (!res.ok) {
@@ -94,9 +97,10 @@ export function AssignmentThread({
       setDraft("");
       setMessages(data.messages ?? []);
       setNotice(
-        data.reopened
-          ? `Reopened — the ${recipient} will route this to the employee.`
-          : `Sent to the ${recipient}.`,
+        data.notice ??
+          (data.reopened
+            ? "Reopened. Queued. Waiting for pickup."
+            : "Queued. Waiting for pickup."),
       );
       router.refresh();
     } catch {

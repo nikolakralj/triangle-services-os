@@ -1,5 +1,11 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import {
+  employeeMissionRuntime,
+  followUpPickupNotice,
+  wakeEmployee,
+  type WakeResult,
+} from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // The conversation attached to an assignment.
@@ -8,10 +14,11 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // Scout for projects in Austria and there was nowhere to put "which of those
 // are near Linz?" — only a new assignment that knew nothing about the first.
 //
-// Bot platforms poll; you cannot push to them. So a follow-up is not delivered
-// when you write it, it is delivered when the agent next checks its inbox.
-// `delivered_at` records that honestly instead of pretending the agent has
-// already seen it.
+// A follow-up is queued, not delivered. For a bot-runtime employee Triangle
+// webhook-wakes them (`human_followup`); if the webhook is missing or fails,
+// they still pick it up on the next scheduled inbox check. `delivered_at`
+// stays null until they fetch the thread, so the UI does not pretend they
+// have already seen it.
 // ---------------------------------------------------------------------------
 
 export interface AssignmentMessage {
@@ -93,35 +100,47 @@ export async function listAssignmentMessages(
  * If the assignment was already finished, this reopens it — otherwise the
  * follow-up would sit in a thread the agent never looks at again, which is
  * exactly the dead end this feature exists to remove.
+ *
+ * When the owner runs on a bot, Triangle then webhook-wakes them. The
+ * message is already stored; a missing or failed wake does not roll it back.
  */
 export async function addHumanMessage(params: {
   assignmentId: string;
   orgId: string;
   userId: string | null;
   body: string;
-}): Promise<{ ok: boolean; reopened: boolean; error?: string }> {
+}): Promise<{
+  ok: boolean;
+  reopened: boolean;
+  wake: WakeResult | null;
+  notice: string;
+  error?: string;
+}> {
+  const failed = (error: string) => ({
+    ok: false,
+    reopened: false,
+    wake: null,
+    notice: "",
+    error,
+  });
   const svc = createServiceSupabaseClient();
-  if (!svc) return { ok: false, reopened: false, error: "Database unavailable" };
+  if (!svc) return failed("Database unavailable");
 
   const body = params.body.trim().slice(0, 8000);
-  if (!body) return { ok: false, reopened: false, error: "Message is empty." };
+  if (!body) return failed("Message is empty.");
 
   const { data: assignment } = await svc
     .from("agent_assignments")
-    .select("id, status, constraints")
+    .select("id, status, constraints, agent_instance_id, mission_id")
     .eq("id", params.assignmentId)
     .eq("org_id", params.orgId)
     .maybeSingle();
 
   if (!assignment) {
-    return { ok: false, reopened: false, error: "Assignment not found." };
+    return failed("Assignment not found.");
   }
   if (assignment.status === "cancelled") {
-    return {
-      ok: false,
-      reopened: false,
-      error: "This assignment was cancelled. Start a new one.",
-    };
+    return failed("This assignment was cancelled. Start a new one.");
   }
 
   const { error } = await svc.from("assignment_messages").insert({
@@ -131,18 +150,17 @@ export async function addHumanMessage(params: {
     body,
     author_user_id: params.userId,
   });
-  if (error) return { ok: false, reopened: false, error: error.message };
+  if (error) return failed(error.message);
 
   const finished = ["completed", "failed"].includes(assignment.status as string);
+  const constraints =
+    (assignment.constraints as Record<string, unknown> | null) ?? {};
   if (finished) {
-    const constraints =
-      (assignment.constraints as Record<string, unknown> | null) ?? {};
     await svc
       .from("agent_assignments")
       .update({
         // In-app workers are push-capable: the next workforce pulse claims
-        // the reopened job. External provider bots still use their existing
-        // active/polling contract.
+        // the reopened job. A bot-runtime owner is woken below.
         status: constraints.execution_mode === "in_app" ? "queued" : "active",
         completed_at: null,
       })
@@ -150,7 +168,28 @@ export async function addHumanMessage(params: {
       .eq("org_id", params.orgId);
   }
 
-  return { ok: true, reopened: finished };
+  const agentInstanceId = (assignment.agent_instance_id as string | null) ?? null;
+  let wake: WakeResult | null = null;
+  if (agentInstanceId) {
+    const runtime = await employeeMissionRuntime(params.orgId, agentInstanceId);
+    const usesBotWake = runtime === "bot" || constraints.execution_mode === "bot";
+    if (usesBotWake) {
+      wake = await wakeEmployee({
+        orgId: params.orgId,
+        agentInstanceId,
+        stepId: params.assignmentId,
+        missionId: (assignment.mission_id as string | null) ?? null,
+        event: "human_followup",
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    reopened: finished,
+    wake,
+    notice: followUpPickupNotice(wake, finished),
+  };
 }
 
 /**

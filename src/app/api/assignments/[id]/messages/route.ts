@@ -68,5 +68,11 @@ export async function POST(
   }
 
   const messages = await listAssignmentMessages(id, access.organizationId);
-  return NextResponse.json({ ok: true, reopened: result.reopened, messages });
+  return NextResponse.json({
+    ok: true,
+    reopened: result.reopened,
+    notice: result.notice,
+    wake: result.wake,
+    messages,
+  });
 }

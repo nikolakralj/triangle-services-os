@@ -1,6 +1,6 @@
 # Triangle workforce model
 
-**Updated:** 14 September 2026
+**Updated:** 15 September 2026
 
 This file explains how runtime business agents fit the actual product. Product
 and coding agents must also follow `SOFTWARE_AGENT_INSTRUCTIONS.md`.
@@ -128,14 +128,16 @@ works it (`execution_mode: in_app`). An employee switched to its own bot
 (`agent_instances.config.mission_runtime = "bot"`; Scout on Grok first) gets
 its mission steps as `execution_mode: bot`: the step waits in the employee's
 inbox, and Triangle calls the bot's wake-up webhook (`BOT_WAKE_URL_<ROLE>`,
-signed with `BOT_WAKE_KEY_<ROLE>`) when the step is assigned or retried,
-carrying only the event and the ids. The bot reads the mission from
-`GET /api/agent/missions/:id?assignmentId=…` and writes back with its badge to
-`/targets`, `/activity`, `/decisions`, `/plan` and `/complete`. Every write is
-refused unless the badge's employee owns the step and the step is still open,
-and a plain inbox result cannot close a mission step. Triangle's runner never
-takes a bot's step and the stalled-job takeover leaves it alone; the bot's own
-scheduled inbox check is the backup for a missed wake-up.
+signed with `BOT_WAKE_KEY_<ROLE>`) when the step is assigned or retried, when
+a colleague is asked or answers, and when a human posts on the assignment
+thread (`human_followup`), carrying only the event and the ids. The bot reads
+the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
+with its badge to `/targets`, `/activity`, `/decisions`, `/plan` and
+`/complete`. Every write is refused unless the badge's employee owns the step
+and the step is still open, and a plain inbox result cannot close a mission
+step. Triangle's runner never takes a bot's step and the stalled-job takeover
+leaves it alone; the bot's own scheduled inbox check is the backup for a
+missed wake-up.
 
 How an employee works is the CEO's to write and Triangle's to keep: standing
 instructions per employee (`agent_house_rules`, migration 046), versioned with

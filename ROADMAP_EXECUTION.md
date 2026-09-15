@@ -108,6 +108,20 @@ work.
 **Acceptance:** the check passes; commercial drafting reads the approved
 organization profile instead of hardcoded names.
 
+### DEV-007 — Wake on assignment follow-up · `IN_PROGRESS`
+
+**Why:** the CEO posted in Hanna's assignment thread and the UI said the
+message was sent; Hanna never woke. Mission steps and colleague requests
+already call `wakeEmployee`; a human follow-up on the thread did not. This is
+the assignment-follow-up slice of the deferred event outbox, not the outbox
+itself.
+
+**Acceptance:** posting on `/api/assignments/[id]/messages` wakes a
+bot-runtime owner with a `human_followup` event (ids only); a missing or
+failed wake still stores the message and says the next scheduled check will
+pick it up; the UI does not read as instant delivery; the amber badge stays
+until the employee answers in-thread.
+
 ### Only if live work stalls on it
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues
