@@ -210,11 +210,12 @@ diagnostics with a banner that commercial mail exceptions belong on Today;
 tables, APIs, sync, scoring, and drafts are untouched; Bob mail-wake is not
 this item.
 
-**Done 15 September.** No migration. No redirect ? bookmarks keep the page.
-Checked: lint, production build, tenant-identity; sidebar source has no
-Job Intake href; `/job-intake` still compiles as a page. Could not signed-in
-check here. Nikola: confirm the sidebar has no Job Intake, then open
-`/job-intake` from a bookmark and read the diagnostics banner.
+**Done 15 September** (`d4afc51`). No migration. No redirect ? bookmarks keep
+the page. Checked: lint 0, production build 0, tenant-identity 0; sidebar
+source has no Job Intake href; `GET /job-intake` 200; job-intake APIs still
+in the route table. Could not signed-in check here. Nikola: confirm the
+sidebar has no Job Intake, then open `/job-intake` from a bookmark and read
+the diagnostics banner.
 
 
 ### Only if live work stalls on it
