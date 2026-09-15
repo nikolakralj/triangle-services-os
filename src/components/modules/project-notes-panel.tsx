@@ -58,7 +58,7 @@ export function ProjectNotesPanel({
     <div className="space-y-2">
       <p className="text-xs text-slate-500">
         Freeform memory for this project — required documents, buyer quirks,
-        client preferences. The Project Agent reads this on every run.
+        client preferences. Scout reads this when assigned to the project.
       </p>
       <textarea
         value={body}

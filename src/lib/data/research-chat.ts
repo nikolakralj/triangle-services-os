@@ -1,13 +1,10 @@
 /**
- * Data layer for the conversational research agent.
+ * Data layer for the (retired) conversational research agent.
  *
- * Handles:
- *   - Conversation lifecycle (find-or-create per project)
- *   - Message persistence
- *   - Memory context assembly (accepted/rejected suggestions + history)
- *
- * The HTTP layer in /api/research/chat reads from here, calls OpenAI with
- * tools, then writes back via createResearchSuggestion + saveMessage.
+ * Conversation and message rows may still exist. `/api/research/chat` is not
+ * an operating path — it returns 410. New research is a Scout mission /
+ * Workforce hand-off; suggestions still go through `research_suggestions`
+ * and Approvals.
  */
 
 import { createServiceSupabaseClient } from "@/lib/supabase/server";

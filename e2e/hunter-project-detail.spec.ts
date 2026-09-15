@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Hunter Project Detail Queue", () => {
-  test("renders queue-first layout when authenticated", async ({ page }) => {
+test.describe("Hunter Project Detail", () => {
+  test("opens a signal without Research Agent chat", async ({ page }) => {
     await page.goto("/hunter");
 
     if (page.url().includes("/login")) {
@@ -15,9 +15,13 @@ test.describe("Hunter Project Detail Queue", () => {
     }
 
     await detailLink.click();
-    await expect(page.locator("h3:has-text('Research Queue')")).toBeVisible();
-    await expect(page.locator("button:has-text('Run AI Research')")).toBeVisible();
-    await expect(page.locator("button:has-text('Open Chat')")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Research Agent" })).toHaveCount(0);
+    await expect(
+      page.getByPlaceholder("Ask the agent to research something..."),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Research is a Scout mission, not a chat on this page"),
+    ).toBeVisible();
+    await expect(page.getByText(/Inbox \(\d+ pending\)/)).toBeVisible();
   });
 });
-

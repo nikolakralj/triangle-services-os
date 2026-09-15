@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * One-shot research UI. Not mounted in the product: the project Research
+ * Agent chat is retired, and `/api/research/run` is not an operating path
+ * from Signal Inbox. Left in source in case a one-shot is wired later.
+ */
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";

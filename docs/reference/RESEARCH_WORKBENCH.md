@@ -23,9 +23,7 @@ Implemented in code:
 - `src/lib/data/research.ts`
 - `src/app/api/research/suggestions/[id]/route.ts`
 - `src/components/modules/research-suggestions-panel.tsx`
-- project detail page shows pending research suggestions
-- `src/app/api/research/chat/route.ts` with persistent project conversation
-- `src/app/api/research/run/route.ts` for one-shot advanced research
+- project detail (Signal Inbox) shows pending research suggestions
 - unified `/approvals` queue across research suggestions and agent findings
 - agent findings can propose previously unknown projects/companies/contacts
 - accepted company findings can create a company and place it on a project
@@ -34,6 +32,14 @@ Implemented in code:
   queue an idempotent research-only continuation for the same employee
 - company pages present the linked evidence, work, outcome gaps, and assignment
   conversation as one living case
+
+**Project Research Agent chat is retired** (CEO, 15 September 2026). Do not
+treat `/api/research/chat` as an operating path — it returns 410. Do not put a
+chat panel back on the project page. New research is a Scout mission or
+Workforce hand-off. Signal Inbox remains the project/signal list; suggestions
+still accept onto the contractor chain and Approvals. `/api/research/run` is
+one-shot plumbing and is not mounted in the product UI. No migration; ask
+Nikola before adding one.
 
 The MCP route is authenticated, org-scoped, Zod-validated, rate-limited, and logs tool calls to `ai_tool_calls`.
 
@@ -76,9 +82,10 @@ This does not allow an agent to accept its own facts or contact anyone. It
 removes unnecessary human transport between pages while preserving the
 proposal -> human review -> deterministic write boundary.
 
-Project chat and linked assignment threads are the current memory mechanisms.
-Do not add a generic vector-memory or parallel case database unless this
-pattern demonstrates a real retrieval or coordination failure.
+Mission and assignment threads are the current memory mechanisms. Project
+Research Agent chat is retired. Do not add a generic vector-memory or parallel
+case database unless this pattern demonstrates a real retrieval or coordination
+failure.
 
 ## Available MCP Tools
 

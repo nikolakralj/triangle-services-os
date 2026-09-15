@@ -324,7 +324,7 @@ function PackageSection({
     // look like a silent failure. Tell the user why instead of running it.
     if (!hasRoles) {
       setFindNotice(
-        "This package has no roles defined, so there's nothing to match workers against. Add roles to the package (e.g. via the Project Agent) and try again.",
+        "This package has no roles defined, so there's nothing to match workers against. Add roles to the package (accept a Scout package suggestion, or edit the package) and try again.",
       );
       setFindError(null);
       return;
@@ -760,7 +760,7 @@ export function WorkerMatchPanel({ packages, initialMatches }: WorkerMatchPanelP
       <Card>
         <CardHeader
           title="Worker matching"
-          description="No packages defined for this project yet. Ask the agent to identify package opportunities."
+          description="No packages defined for this project yet. Start a Scout mission to identify package opportunities, then accept them here or on Approvals."
         />
       </Card>
     );

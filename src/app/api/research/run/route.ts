@@ -23,6 +23,15 @@ import {
   isOrganizationProfileComplete,
 } from "@/lib/data/organization-profile";
 
+/**
+ * POST /api/research/run — one-shot structured research.
+ *
+ * Not mounted in the product UI (the project chat that replaced the Run
+ * button is itself retired). Left as plumbing; Scout missions and MCP
+ * propose tools are the operating research path. Do not treat this as a
+ * conversational OpenAI path.
+ */
+
 const requestSchema = z.object({
   projectId: z.string().uuid(),
 });

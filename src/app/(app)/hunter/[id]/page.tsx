@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldAlert,
-  Zap,
   Waypoints,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +23,7 @@ import { PromoteProjectButton } from "@/components/modules/promote-project-butto
 import { UpdateProjectStatusButton } from "@/components/modules/update-project-status-button";
 import { ContractorChainPanel } from "@/components/modules/contractor-chain-panel";
 import { ResearchSuggestionsPanel } from "@/components/modules/research-suggestions-panel";
-import { ResearchChatPanel } from "@/components/modules/research-chat-panel";
+import { ResearchPathPointer } from "@/components/modules/research-path-pointer";
 import { OutreachDraftsPanel } from "@/components/modules/outreach-drafts-panel";
 import { OutreachComposer } from "@/components/modules/outreach-composer";
 import { BuyerContactsPanel } from "@/components/modules/buyer-contacts-panel";
@@ -154,39 +153,30 @@ export default async function DiscoveredProjectDetailPage({
   const showWeakDefault = query.showWeak === "true";
 
   return (
-    <div className="flex h-[calc(100vh-100px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-      {/* Left Panel: The Orchestrator Chat */}
-      <div className="flex w-3/5 flex-col border-r border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
-              <Zap className="h-5 w-5 text-sky-400" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Project Agent</h2>
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] font-medium text-slate-500 uppercase tracking-tight truncate max-w-[200px] block">
-                  Active: {project.projectName}
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
           <Link
             href="/hunter"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-all"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Exit Project
+            Signal Inbox
           </Link>
-        </div>
-        <div className="flex-1 overflow-hidden relative bg-slate-50">
-          <ResearchChatPanel projectId={project.id} />
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            {project.projectName}
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-slate-500">
+            Signal, contractor chain, and pending research suggestions. New
+            research is a Scout mission, not a chat here.
+          </p>
         </div>
       </div>
 
-      {/* Right Panel: Intelligence Deck */}
-      <div className="w-2/5 overflow-y-auto bg-slate-50/30 p-6 space-y-6">
+      <ResearchPathPointer projectName={project.projectName} />
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
         <PersistedCollapsible
           storageKey={`hunter:${project.id}:chain`}
           title="Contractor Chain"
@@ -195,7 +185,8 @@ export default async function DiscoveredProjectDetailPage({
         >
           {savedChainNodes.length === 0 ? (
             <div className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500 text-center">
-              No accepted chain nodes yet. Ask the agent to map the GC and MEP roles.
+              No accepted chain nodes yet. Start a Scout mission to map the GC
+              and MEP roles, then accept suggestions here or on Approvals.
             </div>
           ) : null}
           <ContractorChainPanel
@@ -235,6 +226,7 @@ export default async function DiscoveredProjectDetailPage({
           storageKey={`hunter:${project.id}:inbox`}
           title={`Inbox (${pendingSuggestionCount} pending)`}
           description="Pending AI suggestions to review."
+          defaultOpen
         >
           <ResearchSuggestionsPanel 
             suggestions={allResearchSuggestions} 
@@ -263,7 +255,9 @@ export default async function DiscoveredProjectDetailPage({
             )}
           </div>
         </PersistedCollapsible>
+        </div>
 
+        <div className="space-y-6">
         <PersistedCollapsible
           storageKey={`hunter:${project.id}:workers`}
           title="Worker Matching"
@@ -364,7 +358,7 @@ export default async function DiscoveredProjectDetailPage({
         <PersistedCollapsible
           storageKey={`hunter:${project.id}:memory`}
           title="Project Memory"
-          description="Your notes for this project. The agent reads them on every run."
+          description="Your notes for this project. Scout reads them when assigned here."
         >
           <ProjectNotesPanel
             projectId={project.id}
@@ -390,6 +384,7 @@ export default async function DiscoveredProjectDetailPage({
             />
           </div>
         </PersistedCollapsible>
+        </div>
       </div>
     </div>
   );

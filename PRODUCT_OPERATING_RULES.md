@@ -348,6 +348,9 @@ current labor-buyer or procurement attack point.
 
 Useful when suggestions are sourced, reviewed, and connected to a next human
 action. Accepted research without action is stored knowledge, not conversion.
+Project Research Agent chat is retired: research a signal through a Scout
+mission or Workforce hand-off. Signal Inbox stays a project/signal list;
+suggestions still go to Approvals and contractor-chain accept.
 
 ### Package/matching
 

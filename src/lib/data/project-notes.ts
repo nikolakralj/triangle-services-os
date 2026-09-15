@@ -4,7 +4,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // ---------------------------------------------------------------------------
 // Project notes — a single freeform "memory" note per discovered project.
 // The user writes context (required documents, buyer quirks, client
-// preferences) that the Project Agent reads on every run.
+// preferences) that Scout reads when assigned to the project.
 // ---------------------------------------------------------------------------
 
 export interface ProjectNote {

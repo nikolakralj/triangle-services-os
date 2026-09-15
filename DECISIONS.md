@@ -6,6 +6,27 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-15: Project Research Agent chat is retired
+
+Decision:
+
+- hide and disable the project Research Agent chat on Signal Inbox / project
+  detail; `/api/research/chat` is not an operating path;
+- research a signal through a Scout mission or Workforce hand-off, not by
+  chatting on the project page;
+- keep Signal Inbox as the project/signal list; keep research suggestions,
+  Approvals, and contractor-chain accept;
+- do not add a migration for this cut; ask Nikola before any migration.
+
+This supersedes the project-conversation half of the 1 September case-memory
+decision. Mission and assignment threads remain the memory mechanism.
+
+Why:
+
+- chatting on a project was a parallel research path beside Scout missions;
+- suggestions and human accept are the workbench; conversational OpenAI on
+  the project page is not.
+
 ### 2026-09-08: Test every human job for end-to-end agent ownership
 
 Management clarified that Triangle combines agents and humans, with agents
