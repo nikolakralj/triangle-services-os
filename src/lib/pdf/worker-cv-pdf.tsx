@@ -1,9 +1,9 @@
-// One person's CV, in Triangle's own house style.
+// One person's CV, in the active organization's house style.
 // Rendered server-side via renderToBuffer. Do NOT add "server-only".
 //
-// Modelled on the CV Triangle already sends — the one for Nikola Kralj, nine
-// pages of it. That document is serif, black on white, with the company name
-// as a plain letterhead over the Sofia address, a centred "Curriculum Vitae",
+// Modelled on the CV the company already sends — nine pages of it. That
+// document is serif, black on white, with the company name as a plain
+// letterhead over the registered address, a centred "Curriculum Vitae",
 // and label/value rows down the left margin. Its only colours are a dark red
 // and a blue used sparingly on headings.
 //
@@ -20,7 +20,7 @@
 //
 //   Named version  — full name and contact, released deliberately.
 //
-// Neither carries a rate. That is Triangle's cost, not the buyer's business.
+// Neither carries a rate. That is the supplier's cost, not the buyer's business.
 
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
 import type { WorkerCvDocument } from "@/lib/data/worker-cv";
@@ -35,19 +35,9 @@ const BLUE = "#0070c0";
 const GREY = "#757171";
 const RULE = "#d9d9d9";
 
-// The letterhead as it appears on the paper Triangle already sends.
-//
-// The legal name is spelled out rather than taken from the organisation
-// record: the registration number and VAT id below it belong to Triangle
-// Services OOD specifically, and a header that says one entity over a footer
-// that identifies another is the kind of detail a procurement desk notices.
-const LETTERHEAD = {
-  legalName: "Triangle Services OOD",
-  addressLine1: "53A, Nikola Vaptzarov Blvd.",
-  addressLine2: "1407 Sofia, Bulgaria",
-  registration: "Commercial Register : 2071 39321",
-  vat: "VAT # : BG 2071 39321",
-};
+// The letterhead is the active organization's paper identity, passed in on
+// the document. Tenant-zero defaults live in the approved organization
+// profile seed, not here.
 
 const s = StyleSheet.create({
   page: {
@@ -163,12 +153,14 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
     >
       <Page size="A4" style={s.page}>
         <View style={s.head} fixed>
-          <Text style={s.orgName}>{LETTERHEAD.legalName}</Text>
-          <Text style={s.address}>
-            {LETTERHEAD.addressLine1}
-            {"\n"}
-            {LETTERHEAD.addressLine2}
-          </Text>
+          <Text style={s.orgName}>{cv.letterhead.legalName}</Text>
+          {(cv.letterhead.addressLine1 || cv.letterhead.addressLine2) && (
+            <Text style={s.address}>
+              {[cv.letterhead.addressLine1, cv.letterhead.addressLine2]
+                .filter(Boolean)
+                .join("\n")}
+            </Text>
+          )}
         </View>
 
         <Text style={s.title}>Curriculum Vitae</Text>
@@ -266,13 +258,13 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
         )}
 
         <View style={s.footer} fixed>
-          <Text>{LETTERHEAD.registration}</Text>
+          <Text>{cv.letterhead.registration ?? ""}</Text>
           <Text
             render={({ pageNumber, totalPages }) =>
               `${cv.reference} · ${pageNumber} / ${totalPages}`
             }
           />
-          <Text>{LETTERHEAD.vat}</Text>
+          <Text>{cv.letterhead.vat ?? ""}</Text>
         </View>
       </Page>
     </Document>

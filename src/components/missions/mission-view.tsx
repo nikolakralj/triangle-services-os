@@ -23,6 +23,7 @@ import {
   AUTONOMY_STANDARD,
   ago,
   hostOf,
+  pickRecommendedCompany,
   type MissionAttempt,
   type MissionCandidate,
   type MissionChannel,
@@ -476,8 +477,7 @@ function ResearchOverview({
   const running = state === "queued" || state === "working";
   const briefAt = steps.find((s) => s.record)?.completedAt ?? null;
   const live = companies.filter((c) => !c.notForUs);
-  const firstMove =
-    live.find((c) => c.state === "reachable" && !c.lastAttempt && c.person?.contactId && c.channel) ?? null;
+  const firstMove = pickRecommendedCompany(latest?.brief.recommended, companies);
   const name = lead?.name ?? "The worker";
 
   return (

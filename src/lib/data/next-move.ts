@@ -8,6 +8,10 @@ import {
 } from "@/lib/data/contact-channels";
 import { getContactLog, type ContactAttempt } from "@/lib/data/contact-log";
 import { matchOpenLeads, draftLeadReply } from "@/lib/data/lead-match";
+import {
+  getOrganizationOperatingProfile,
+  operatingTeamName,
+} from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // The single most valuable thing available right now — and the means to do it
@@ -93,9 +97,11 @@ interface ContactRow {
 export async function getNextMove(
   orgId: string,
   /** Signs the drafted reply. A letter from nobody does not get answered. */
-  senderName = "Nikola",
+  senderName?: string,
 ): Promise<NextMove> {
   const svc = createServiceSupabaseClient();
+  const profile = await getOrganizationOperatingProfile(orgId);
+  const signedBy = senderName?.trim() || operatingTeamName(profile);
   if (!svc) {
     return {
       headline: "Nothing to show",
@@ -195,7 +201,7 @@ export async function getNextMove(
         value: best.contactEmail ?? "",
         whose: "their own",
         sourceUrl: null,
-        script: draftLeadReply(best, senderName),
+        script: draftLeadReply(best, signedBy),
         subject: `Re: ${best.roleTitle ?? "your requirement"}${
           best.country ? ` — ${best.country}` : ""
         }`,

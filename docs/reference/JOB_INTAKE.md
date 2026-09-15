@@ -79,6 +79,7 @@ src/lib/job-intake/
   mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later.
   clean-email.ts    HTML→text + signature stripping. Pure, no server imports.
   extract.ts        Classify + extract + score. Holds the prompt and the score bands.
+  contact-email.ts  Recruiter address: never the receiving mailbox or a forwarder.
   draft-reply.ts    Writes the reply using the active organization profile.
   credentials.ts    AES-256-GCM encrypt/decrypt, resolveMailboxPassword, safeEqual.
   ingest.ts         Orchestrates a run. Idempotent, never throws.
@@ -218,9 +219,10 @@ The follow-up appears on Today until something newer is recorded for that lead.
   15s / 10s / 180s.
 - **imapflow hides the useful error.** `err.message` is `"Command failed"`; the real
   reason is on `err.responseText` / `err.authenticationFailed` / `err.serverResponseCode`.
-- **A failed sync must not advance `last_synced_at`**, or the next run skips mail that
-  was never read. It must also not set `status='error'`, because `listActiveMailAccounts`
-  filters on `status='active'` — one hiccup would silently drop the mailbox forever.
+- **A forwarded requisition is not from the mailbox that received it.** Envelope
+  From on a forward is someone already inside the company. `contactEmail` is the
+  original recruiter from From:/Von:/mailto headers; `@triangle-services.com` and
+  the receiving mailbox are never stored as the person to reply to.
 - **Never write `.env.local` from PowerShell `>>` or `Out-File`** without
   `-Encoding utf8`. It writes UTF-16, Node reads gibberish, and the variable silently
   becomes undefined. This had broken `EMAIL_WEBHOOK_SECRET` (repaired 2026-08-25).

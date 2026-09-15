@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { canWorkIn } from "@/lib/data/work-authorisation";
+import { isInternalMailbox } from "@/lib/job-intake/contact-email";
 
 // ---------------------------------------------------------------------------
 // The warm demand nobody was looking at.
@@ -178,6 +179,7 @@ export async function matchOpenLeads(
       country: (lead.country as string | null) ?? null,
     });
     if (answeredGroups.has(group)) continue;
+    if (isInternalMailbox(lead.contact_email as string | null)) continue;
     if (seenGroups.has(group)) {
       // Leads arrive newest first, so the card already built is the newest
       // copy; an older copy only adds to its count.

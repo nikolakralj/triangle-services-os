@@ -192,6 +192,7 @@ export async function POST(request: Request) {
         subject,
         senderName: msg.fromName ?? null,
         senderEmail: msg.from ?? null,
+        recipientEmail: msg.to ?? mailbox,
         body,
         // Callers usually forward HTML; plain text is fine too.
         bodyIsHtml: msg.bodyIsHtml ?? /<[a-z][\s\S]*>/i.test(body),
@@ -234,7 +235,7 @@ export async function POST(request: Request) {
         const leadId = await createJobLead({
           orgId: organizationId,
           inboundEmailId: stored.id,
-          contactEmail: msg.from ?? null,
+          contactEmail: extraction.lead.contactEmail,
           lead: extraction.lead,
         });
         if (leadId) result.leadsCreated += 1;

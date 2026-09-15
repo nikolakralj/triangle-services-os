@@ -448,3 +448,93 @@ export function hostOf(url: string): string {
     return url.slice(0, 40);
   }
 }
+
+// ── recommended first move ──────────────────────────────────────────────────
+
+function foldKey(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const NAME_NOISE = new Set([
+  "gmbh", "mbh", "ag", "se", "kg", "ltd", "limited", "llc", "inc", "corp",
+  "plc", "group", "holding", "holdings", "company", "services", "international",
+  "the", "and", "for", "with", "call", "write", "email", "first", "next",
+  "team", "start", "then",
+]);
+
+function distinctiveTokens(value: string): string[] {
+  return foldKey(value)
+    .split(" ")
+    .filter((w) => w.length >= 4 && !NAME_NOISE.has(w));
+}
+
+function hasPhrase(haystack: string, phrase: string): boolean {
+  if (!phrase) return false;
+  return new RegExp(`(?:^|\\s)${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|$)`).test(
+    ` ${haystack} `,
+  );
+}
+
+function namedScore(recommended: string, company: MissionCompanyRow): number {
+  const text = foldKey(recommended);
+  if (!text) return 0;
+  let score = 0;
+
+  const companyKeyText = foldKey(company.name);
+  if (companyKeyText && hasPhrase(text, companyKeyText)) score += 6;
+  for (const token of distinctiveTokens(company.name)) {
+    if (hasPhrase(text, token)) score += 3;
+  }
+
+  const person = company.person?.name?.trim();
+  if (person) {
+    const parts = foldKey(person).split(" ").filter(Boolean);
+    if (parts.length >= 2 && hasPhrase(text, parts.join(" "))) score += 8;
+    const last = parts[parts.length - 1];
+    if (last && last.length >= 4 && hasPhrase(text, last)) score += 5;
+  }
+
+  return score;
+}
+
+function isUntriedReachable(company: MissionCompanyRow): boolean {
+  return (
+    company.state === "reachable" &&
+    !company.lastAttempt &&
+    Boolean(company.person?.contactId) &&
+    Boolean(company.channel)
+  );
+}
+
+/**
+ * The recommended card's action must be the person/company the brief named.
+ * Only if nothing in the text matches a held company do we fall back to the
+ * first untried reachable door.
+ */
+export function pickRecommendedCompany(
+  recommended: string | null | undefined,
+  companies: readonly MissionCompanyRow[],
+): MissionCompanyRow | null {
+  const live = companies.filter((c) => !c.notForUs);
+  const text = recommended?.trim() ?? "";
+
+  if (text) {
+    let best: MissionCompanyRow | null = null;
+    let bestScore = 0;
+    for (const company of live) {
+      const score = namedScore(text, company);
+      if (score <= bestScore) continue;
+      best = company;
+      bestScore = score;
+    }
+    if (best && bestScore > 0) return best;
+  }
+
+  return live.find(isUntriedReachable) ?? null;
+}

@@ -1,5 +1,10 @@
 import "server-only";
 import { cleanEmailBody } from "./clean-email";
+import {
+  emailDomain,
+  isInternalMailbox,
+  resolveRecruiterContact,
+} from "./contact-email";
 import type { OrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +38,8 @@ export function shouldKeepBody(c: EmailClassification): boolean {
 export interface ExtractedLead {
   agencyName: string | null;
   contactName: string | null;
+  /** The recruiter to reply to — never the mailbox that received a forward. */
+  contactEmail: string | null;
   clientCompany: string | null;
   roleTitle: string;
   country: string | null;
@@ -120,9 +127,11 @@ Rules:
 - Never invent. Use null for anything not stated. Do not guess a country from an agency's office address.
 - durationMonths: integer months, or null. "12 month contract" -> 12.
 - technologies: concrete platforms only, e.g. ["PCS7","TIA Portal","Allen-Bradley","SCADA"].
+- contactEmail: the recruiter or hiring person's address, the one a reply should go to. On a forwarded message that is the original From:/Von:/mailto address in the body, NOT the envelope sender and NOT the mailbox this was forwarded into. Never use an address at the receiving mailbox's own domain.
+- contactName: that same person. On a forward, the original sender's name.
 
 Reply with JSON only, matching this shape:
-{"classification":"...","confidence":0-100,"reason":"short","lead":null or {"agencyName":...,"contactName":...,"clientCompany":...,"roleTitle":...,"country":...,"city":...,"sector":...,"technologies":[],"durationMonths":null,"startDateText":...,"rateText":...,"headcountText":...,"workMode":...,"teamPotential":0,"teamRationale":"...","requestedDocuments":[],"missingFields":[]}}`;
+{"classification":"...","confidence":0-100,"reason":"short","lead":null or {"agencyName":...,"contactName":...,"contactEmail":...,"clientCompany":...,"roleTitle":...,"country":...,"city":...,"sector":...,"technologies":[],"durationMonths":null,"startDateText":...,"rateText":...,"headcountText":...,"workMode":...,"teamPotential":0,"teamRationale":"...","requestedDocuments":[],"missingFields":[]}}`;
 }
 
 /**
@@ -160,6 +169,8 @@ export async function classifyAndExtract(params: {
   subject: string;
   senderName: string | null;
   senderEmail: string | null;
+  /** The mailbox that received this. Never used as the recruiter. */
+  recipientEmail?: string | null;
   body: string;
   bodyIsHtml?: boolean;
   model?: string;
@@ -174,11 +185,16 @@ export async function classifyAndExtract(params: {
   const cleaned = cleanEmailBody(params.body, params.bodyIsHtml ?? true);
 
   const userContent = [
-    `From: ${params.senderName ?? ""} <${params.senderEmail ?? ""}>`,
+    `Envelope From: ${params.senderName ?? ""} <${params.senderEmail ?? ""}>`,
+    params.recipientEmail
+      ? `Delivered to mailbox: ${params.recipientEmail} (this is NOT the recruiter)`
+      : null,
     `Subject: ${params.subject}`,
     "",
     cleaned.text || "(empty body)",
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -234,7 +250,12 @@ export async function classifyAndExtract(params: {
     reason: String(parsed.reason ?? ""),
     lead:
       classification === "job_opportunity"
-        ? normaliseLead(parsed.lead, params)
+        ? normaliseLead(parsed.lead, {
+            senderName: params.senderName,
+            senderEmail: params.senderEmail,
+            recipientEmail: params.recipientEmail ?? null,
+            cleanedText: cleaned.text,
+          })
         : null,
     cleanedText: cleaned.text,
     cleaning,
@@ -276,7 +297,12 @@ const VALID_MISSING = ["headcount", "rate", "location", "start_date", "duration"
 
 function normaliseLead(
   value: unknown,
-  ctx: { senderName: string | null; senderEmail: string | null },
+  ctx: {
+    senderName: string | null;
+    senderEmail: string | null;
+    recipientEmail?: string | null;
+    cleanedText: string;
+  },
 ): ExtractedLead | null {
   if (!value || typeof value !== "object") return null;
   const l = value as Record<string, unknown>;
@@ -285,9 +311,25 @@ function normaliseLead(
   // A lead with no role is not a usable lead.
   if (!roleTitle) return null;
 
+  const recruiter = resolveRecruiterContact({
+    extractedEmail: strOrNull(l.contactEmail),
+    extractedName: strOrNull(l.contactName),
+    senderEmail: ctx.senderEmail,
+    senderName: ctx.senderName,
+    recipientEmail: ctx.recipientEmail ?? null,
+    bodyText: ctx.cleanedText,
+  });
+  const agencyEmail =
+    recruiter.email && !isInternalMailbox(recruiter.email, ctx.recipientEmail)
+      ? recruiter.email
+      : !isInternalMailbox(ctx.senderEmail, ctx.recipientEmail)
+        ? ctx.senderEmail
+        : null;
+
   return {
-    agencyName: strOrNull(l.agencyName) ?? agencyFromEmail(ctx.senderEmail),
-    contactName: strOrNull(l.contactName) ?? ctx.senderName,
+    agencyName: strOrNull(l.agencyName) ?? agencyFromEmail(agencyEmail),
+    contactName: recruiter.name,
+    contactEmail: recruiter.email,
     clientCompany: strOrNull(l.clientCompany),
     roleTitle,
     country: strOrNull(l.country),
@@ -312,8 +354,8 @@ function normaliseLead(
 
 /** Fall back to the sender's domain when the model doesn't name the agency. */
 function agencyFromEmail(email: string | null): string | null {
-  if (!email || !email.includes("@")) return null;
-  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  const domain = emailDomain(email);
+  if (!domain) return null;
   const base = domain.split(".")[0] ?? "";
   if (!base) return null;
   return base.charAt(0).toUpperCase() + base.slice(1);

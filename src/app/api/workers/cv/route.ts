@@ -139,8 +139,8 @@ export async function POST(request: Request) {
   // Read it properly, here, now.
   //
   // This used to file a proposal carrying an email address and a couple of
-  // language lines, and ask a human to approve it. The card said "Nikola Kralj
-  // · Croatia" — no role, no skills, no seniority, no link to the CV. That is
+  // language lines, and ask a human to approve it. The card showed a name
+  // and a country — no role, no skills, no seniority, no link to the CV. That is
   // not a decision, it is data entry with a confirmation step, and the half
   // that would have made it worth reading was parked behind an HR agent that
   // had never once authenticated.

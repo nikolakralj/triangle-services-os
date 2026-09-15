@@ -293,7 +293,7 @@ export async function createJobLead(params: {
       inbound_email_id: params.inboundEmailId,
       agency_name: params.lead.agencyName,
       contact_name: params.lead.contactName,
-      contact_email: params.contactEmail,
+      contact_email: params.lead.contactEmail ?? params.contactEmail,
       client_company: params.lead.clientCompany,
       role_title: params.lead.roleTitle,
       country: params.lead.country,

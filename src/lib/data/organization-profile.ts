@@ -56,6 +56,53 @@ export const DEMO_ORGANIZATION_PROFILE: OrganizationOperatingProfile = {
   updatedAt: null,
 };
 
+/**
+ * Paper identity for tenant-zero documents. Worker CVs and similar letterhead
+ * read this seed rather than hardcoding it in the renderer.
+ */
+export interface OrganizationLetterhead {
+  legalName: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  registration: string | null;
+  vat: string | null;
+}
+
+export const TENANT_ZERO_LETTERHEAD: OrganizationLetterhead = {
+  legalName: "Triangle Services OOD",
+  addressLine1: "53A, Nikola Vaptzarov Blvd.",
+  addressLine2: "1407 Sofia, Bulgaria",
+  registration: "Commercial Register : 2071 39321",
+  vat: "VAT # : BG 2071 39321",
+};
+
+function sameTenantZeroName(name: string): boolean {
+  return name.trim().toLowerCase() === DEMO_ORGANIZATION_PROFILE.name.toLowerCase();
+}
+
+export function letterheadForProfile(
+  profile: Pick<OrganizationOperatingProfile, "name" | "legalName"> | null,
+): OrganizationLetterhead {
+  const name = profile?.name?.trim() ?? "";
+  if (name && sameTenantZeroName(name)) return TENANT_ZERO_LETTERHEAD;
+  const legalName = profile?.legalName?.trim() || name;
+  return {
+    legalName: legalName || "Organization",
+    addressLine1: null,
+    addressLine2: null,
+    registration: null,
+    vat: null,
+  };
+}
+
+/** Name used to sign a drafted commercial note when no person is named. */
+export function operatingTeamName(
+  profile: Pick<OrganizationOperatingProfile, "name"> | null,
+): string {
+  const name = profile?.name?.trim();
+  return name || "The team";
+}
+
 function stringOrNull(value: unknown): string | null {
   const normalized = String(value ?? "").trim();
   return normalized || null;

@@ -168,6 +168,7 @@ export async function ingestAccount(
         subject: msg.subject,
         senderName: msg.senderName,
         senderEmail: msg.senderEmail,
+        recipientEmail: msg.recipientEmail ?? account.email_address,
         body: msg.body,
         bodyIsHtml: msg.bodyIsHtml,
         houseRules,
@@ -209,7 +210,7 @@ export async function ingestAccount(
         const leadId = await createJobLead({
           orgId,
           inboundEmailId: stored.id,
-          contactEmail: msg.senderEmail,
+          contactEmail: result.lead.contactEmail,
           lead: result.lead,
         });
         if (leadId) summary.leadsCreated += 1;

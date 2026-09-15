@@ -89,7 +89,7 @@ wake-up routine.
 reasons, missing-fact chaser drafts, packet-send and supplier-registration
 records. Bob sends nothing.
 
-### DEV-005 — Known defects · `READY`
+### DEV-005 — Known defects · `DONE`
 
 **Acceptance:** the Today recommended card's action carries the person the
 recommendation names; the Köster door, whose number the source check found on
@@ -99,7 +99,17 @@ forwarded does not take Triangle's own address as the recruiter's — on
 15 September the Today card offered to email Computer Futures' Austria
 requisition to `nikola.kralj@triangle-services.com`.
 
-### DEV-006 — Tenant identity leaks · `READY`
+**Done 15 September.** Code: forwarded intake stores the recruiter from
+From:/Von:/mailto headers and never `@triangle-services.com` or the receiving
+mailbox; the mission recommended card matches the named person/company, and
+falls back to the first untried reachable only when none is named; own-domain
+contacts no longer drive Open mail. Data: SQL prepared, **not applied** —
+Nikola must run
+`supabase/data-fixes/2026-09-15-computer-futures-contact-email.sql` and
+`supabase/data-fixes/2026-09-15-koster-door-rule-out.sql` after previewing.
+Checked: 11/11 offline DEV-005 checks; DEV-002 31/31 unchanged.
+
+### DEV-006 — Tenant identity leaks · `DONE`
 
 **Why:** `npm run check:tenant-identity` fails with eight hardcoded operator
 identities (CV reader, CV PDF, next-move). The freeze allows tenant-identity
@@ -107,6 +117,11 @@ work.
 
 **Acceptance:** the check passes; commercial drafting reads the approved
 organization profile instead of hardcoded names.
+
+**Done 15 September.** Letterhead and CV defaults come from
+`organization-profile.ts` (tenant-zero seed); next-move signs as the org name
+or "The team"; comments that tripped the scanner were rewritten. Checked:
+`npm run check:tenant-identity` exits 0.
 
 ### DEV-007 — Wake on assignment follow-up · `DONE`
 

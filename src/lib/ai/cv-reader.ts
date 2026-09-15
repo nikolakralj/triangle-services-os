@@ -6,14 +6,14 @@ import { getOpenAIClient } from "@/lib/ai/openai-client";
 // Reading a CV.
 //
 // The rule this exists to satisfy: is a machine better, cheaper and more
-// capable at this than Nikola or Ralph? For working out that "PCS7, TIA Portal,
-// Sinamics" means PLC commissioning, that fifteen years of shutdowns is a
-// supervisor and not a mate, that a CV in German describes a Obermonteur — yes,
-// obviously, and it is not close. So a person never does it.
+// capable at this than a person reading CVs by hand? For working out that
+// "PCS7, TIA Portal, Sinamics" means PLC commissioning, that fifteen years of
+// shutdowns is a supervisor and not a mate, that a CV in German describes a
+// Obermonteur — yes, obviously, and it is not close. So a person never does it.
 //
 // Before this, upload extracted an email address and a few language lines by
-// regex and then asked a human to approve the result. The card said "Nikola
-// Kralj · Croatia" and nothing else: no role, no skills, no seniority, no way
+// regex and then asked a human to approve the result. The card showed a name
+// and a country and nothing else: no role, no skills, no seniority, no way
 // to see the CV it came from. Approving that is not a decision, it is data
 // entry with a confirmation step, and the reasoning half was parked behind an
 // HR agent that had never once authenticated.

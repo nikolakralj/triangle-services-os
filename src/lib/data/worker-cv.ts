@@ -1,5 +1,10 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import {
+  getOrganizationOperatingProfile,
+  letterheadForProfile,
+  type OrganizationLetterhead,
+} from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
 // The active organization's worker CV.
@@ -53,6 +58,7 @@ export interface WorkerCvDocument {
   notRecorded: string[];
   generatedAt: string;
   orgName: string;
+  letterhead: OrganizationLetterhead;
 }
 
 export async function buildWorkerCv(params: {
@@ -73,13 +79,8 @@ export async function buildWorkerCv(params: {
     .maybeSingle();
   if (!w) return null;
 
-  const { data: org } = await svc
-    .from("organizations")
-    .select("name")
-    .eq("id", params.orgId)
-    .maybeSingle();
-
-  const orgName = String(org?.name ?? "").trim();
+  const profile = await getOrganizationOperatingProfile(params.orgId);
+  const orgName = profile?.name.trim() ?? "";
   if (!orgName) return null;
 
   const list = (v: unknown) =>
@@ -150,6 +151,7 @@ export async function buildWorkerCv(params: {
     notRecorded,
     generatedAt: new Date().toISOString(),
     orgName,
+    letterhead: letterheadForProfile(profile),
   };
 }
 
