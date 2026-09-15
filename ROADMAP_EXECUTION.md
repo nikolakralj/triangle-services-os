@@ -1,4 +1,4 @@
-# Roadmap execution — what happens next
+# Roadmap execution â what happens next
 
 Updated 15 September 2026. The one place for next steps, for people and for
 coding agents. What exists is in [CURRENT_STATE](CURRENT_STATE.md), why it was
@@ -18,7 +18,7 @@ evidence or authority that is missing. Approval boundaries do not change.
 
 ## How work is picked
 
-1. Take the first `READY` item under *Development — now*.
+1. Take the first `READY` item under *Development â now*.
 2. Mark it `IN_PROGRESS` here before editing. One item in progress at a time.
 3. Build the smallest coherent slice and verify it: type check, lint, build, the
    checks the change needs, and a signed-in check wherever it shows on screen.
@@ -27,24 +27,24 @@ evidence or authority that is missing. Approval boundaries do not change.
 6. Never mark commercial evidence complete from sample data, generated
    documents or statuses. Do not rebuild a feature that already exists.
 
-`READY` may start now · `IN_PROGRESS` being built · `BLOCKED_EXTERNAL` needs a
-person, real data, a secret, a decision or a production action · `GATED` waits
-for named evidence · `DONE` built and verified.
+`READY` may start now Â· `IN_PROGRESS` being built Â· `BLOCKED_EXTERNAL` needs a
+person, real data, a secret, a decision or a production action Â· `GATED` waits
+for named evidence Â· `DONE` built and verified.
 
 Change this file when an item is done, when real use exposes a blocker, when
 management changes the order, or when the gate is met or fails.
 
-## Development — now
+## Development â now
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-### DEV-001 — Sent-message record · `DONE`
+### DEV-001 â Sent-message record Â· `DONE`
 
 **Why now:** the gate needs five human sends recorded with final content and a
 follow-up date, and nothing surfaces follow-ups.
 
-**Acceptance:** from any Triangle draft a person records a send — final text,
-recipient, channel, time — in one action; a follow-up date is always set, by
+**Acceptance:** from any Triangle draft a person records a send â final text,
+recipient, channel, time â in one action; a follow-up date is always set, by
 default so recording stays one action; due and overdue follow-ups appear on
 Today; the AI draft and the final sent text are both kept; the reply and outcome
 can be added later; Triangle sends nothing itself.
@@ -54,7 +54,7 @@ a follow-up message is recorded without its words until Bob drafts chasers
 (DEV-004), and each send is its own follow-up, so one recruiter answered about
 four roles shows four rows.
 
-### DEV-002 — Source check at filing · `DONE`
+### DEV-002 â Source check at filing Â· `DONE`
 
 **Why:** two of ten Austrian doors cited pages that do not show their channel.
 
@@ -71,7 +71,7 @@ file are not re-checked; pages that need a browser or rate-limit Triangle file
 as unchecked; a LinkedIn profile or contact form alone is no longer reachable;
 not yet exercised by a real bot filing.
 
-### DEV-003 — Hanna writes to the pool from her bot · `READY`
+### DEV-003 â Hanna writes to the pool from her bot Â· `READY`
 
 **Why:** the gate needs one package backed by people confirmed available, and
 Hanna's bot cannot yet write to the pool.
@@ -80,7 +80,7 @@ Hanna's bot cannot yet write to the pool.
 a mission through the mission API, counted by the recruiting finish line;
 availability checks are drafts a person sends; her privacy rules hold.
 
-### DEV-004 — Bob takes follow-through · `BLOCKED_EXTERNAL`
+### DEV-004 â Bob takes follow-through Â· `BLOCKED_EXTERNAL`
 
 **Needs:** the CEO's decision on a mission scope for Bob's badge, and Bob's
 wake-up routine.
@@ -89,13 +89,13 @@ wake-up routine.
 reasons, missing-fact chaser drafts, packet-send and supplier-registration
 records. Bob sends nothing.
 
-### DEV-005 — Known defects · `DONE`
+### DEV-005 â Known defects Â· `DONE`
 
 **Acceptance:** the Today recommended card's action carries the person the
-recommendation names; the Köster door, whose number the source check found on
+recommendation names; the KÃ¶ster door, whose number the source check found on
 none of its three cited pages on 15 September, is re-sourced or ruled out (the
 newest STRABAG and ANDRITZ doors pass that check); a requisition that arrived
-forwarded does not take Triangle's own address as the recruiter's — on
+forwarded does not take Triangle's own address as the recruiter's â on
 15 September the Today card offered to email Computer Futures' Austria
 requisition to `nikola.kralj@triangle-services.com`.
 
@@ -103,13 +103,13 @@ requisition to `nikola.kralj@triangle-services.com`.
 From:/Von:/mailto headers and never `@triangle-services.com` or the receiving
 mailbox; the mission recommended card matches the named person/company, and
 falls back to the first untried reachable only when none is named; own-domain
-contacts no longer drive Open mail. Data: SQL prepared, **not applied** —
+contacts no longer drive Open mail. Data: SQL prepared, **not applied** â
 Nikola must run
 `supabase/data-fixes/2026-09-15-computer-futures-contact-email.sql` and
 `supabase/data-fixes/2026-09-15-koster-door-rule-out.sql` after previewing.
 Checked: 11/11 offline DEV-005 checks; DEV-002 31/31 unchanged.
 
-### DEV-006 — Tenant identity leaks · `DONE`
+### DEV-006 â Tenant identity leaks Â· `DONE`
 
 **Why:** `npm run check:tenant-identity` fails with eight hardcoded operator
 identities (CV reader, CV PDF, next-move). The freeze allows tenant-identity
@@ -123,7 +123,7 @@ organization profile instead of hardcoded names.
 or "The team"; comments that tripped the scanner were rewritten. Checked:
 `npm run check:tenant-identity` exits 0.
 
-### DEV-007 — Wake on assignment follow-up · `DONE`
+### DEV-007 â Wake on assignment follow-up Â· `DONE`
 
 **Why:** the CEO posted in Hanna's assignment thread and the UI said the
 message was sent; Hanna never woke. Mission steps and colleague requests
@@ -139,12 +139,12 @@ until the employee answers in-thread.
 
 **Done 15 September** (`3058eb5` and docs follow). Checked: lint, production
 build, tenant-identity still the eight known failures. Could not signed-in
-check in this environment — Nikola: post a follow-up on Hanna's assignment,
+check in this environment â Nikola: post a follow-up on Hanna's assignment,
 read `constraints.wake`, and confirm the amber badge clears only after she
 answers in-thread. Limits: her Grok routine must handle `human_followup`;
 this does not send and does not widen `communicationPolicy`.
 
-### Research Agent project chat retired · `DONE`
+### Research Agent project chat retired Â· `DONE`
 
 **Why:** chatting on a project was a parallel research path beside Scout
 missions. The CEO cut it.
@@ -153,7 +153,7 @@ missions. The CEO cut it.
 no Research Agent chat; suggestions still accept onto the contractor chain
 and Approvals; `/api/research/chat` is not an operating path.
 
-**Done 15 September.** No migration — ask Nikola before adding one. Project
+**Done 15 September.** No migration â ask Nikola before adding one. Project
 page points at a Scout mission / Workforce hand-off. `/api/research/chat`
 returns 410. Suggestion accept and MCP propose tools are unchanged.
 `/api/research/run` is unused in the product UI and was left in source.
@@ -161,6 +161,29 @@ Checked: lint, production build, tenant-identity 0; GET/POST `/api/research/chat
 return 410 in demo mode. Could not signed-in check here.
 Nikola: Signal Inbox -> open a project -> no Research Agent chat; Inbox and
 Approvals still accept suggestions.
+
+### DEV-008 â Scout is bot-owned Â· `DONE`
+
+**Why:** Scout still had a special in-app OpenAI executor (`scout-executor`)
+that claimed `execution_mode: in_app` jobs and, after six hours, stalled bot
+jobs. Hanna has no such stand-in. The CEO's rule is one way of working:
+Triangle stores the work and wakes the Grok bot. A second brain bills OpenAI
+for jobs the bot is already paid to do.
+
+**Acceptance:** new Scout work is `execution_mode: bot` and wakes the Scout
+bot; the in-app OpenAI claim loop does not take Scout jobs, including stalled
+bot jobs and run-now/pulse/cron; Ask / assignment create / finding
+continuation / suggested jobs / send-back / reachability do not force
+`in_app` onto Scout.
+
+**Done 15 September** (`1f9cacc`, `93895cd`). Checked: lint, production build,
+tenant-identity still the eight known failures. Could not signed-in check in
+this environment. DEV-003 (Hanna writes to the pool) was left `READY` for
+Antigravity; this item does not change `worker.propose` or the CV queue.
+Limits: Scout's Grok routine must handle `event: assignment`; a missing or
+failed wake still queues for the next inbox check; older in_app Scout rows
+are visible in Scout's inbox but are not rewritten in the database.
+
 
 ### Only if live work stalls on it
 
@@ -171,8 +194,8 @@ Approvals still accept suggestions.
 
 ## Next, once the gate is moving
 
-- A minimal event outbox — client reply received, follow-up due, availability
-  stale — that wakes the owning employee. Assignment-thread follow-up wake is
+- A minimal event outbox â client reply received, follow-up due, availability
+  stale â that wakes the owning employee. Assignment-thread follow-up wake is
   already DEV-007; this remaining item is the other events.
 - Learning from the CEO's edits: a changed draft offers a rule in the CEO's words.
 - Budget and cost per mission.
@@ -182,11 +205,11 @@ Approvals still accept suggestions.
 Not now: a workforce registry, marketplace hiring, quality scores, autonomous
 sending.
 
-## Gated — each waits for its evidence
+## Gated â each waits for its evidence
 
 | Item | Status | Gate |
 | --- | --- | --- |
-| Agent handoffs: budget and time limits, retries, escalation (CASE-004) | Partly built 14 September: requests between employees, wake-up on the answer, messaging policy. **Evidence 15 September:** on Hanna's DACH Elektromontage mission she cited Scout-filed doors (PMS / R�sler) without source-mission or holding chips, so progress felt like a scavenger hunt across missions � lost context on a real case. Smallest later fix: mission UI chips for linked colleague requests / source mission / holdings (not a second chat inbox). | Two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context |
+| Agent handoffs: budget and time limits, retries, escalation (CASE-004) | Partly built 14 September: requests between employees, wake-up on the answer, messaging policy. **Evidence 15 September:** on Hanna's DACH Elektromontage mission she cited Scout-filed doors (PMS / Rösler) without source-mission or holding chips, so progress felt like a scavenger hunt across missions  lost context on a real case. Smallest later fix: mission UI chips for linked colleague requests / source mission / holdings (not a second chat inbox). | Two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context |
 | Outcome-backed learning (CASE-005) | `GATED` | Enough real buyer responses, placements or delivery outcomes to evaluate a playbook |
 | Truthful availability and package coverage (CORE-001) | `BLOCKED_EXTERNAL` | People confirm the real roster and one initial offer |
 | Qualified requirement, buyer and supplier routes, action ledger, orders to margin (CORE-002 to 005) | Built ahead of their gates on 31 August; untested against real use | Three real buyer or recruiter conversations; one real supplier route; five human sends and one packet; a concrete order |
@@ -218,8 +241,8 @@ package and confirm their exact role and competence, availability date and
 confidence, countries, language, rate expectation, engagement relationship,
 A1/right-to-work feasibility, certificates and expiry, travel, accommodation and
 tools, and supervisor capability and references. Reconcile the real roster with
-the database. Choose one package — a supervised electrical installation or
-fit-out crew, or a PCS7/automation/commissioning team — and define its scope,
+the database. Choose one package â a supervised electrical installation or
+fit-out crew, or a PCS7/automation/commissioning team â and define its scope,
 exclusions, headcount, supervisor, mobilization date, countries, documents,
 commercial model and client inputs. Label or correct the old 50-person and
 empty-role package records; they are not evidence of supply.
@@ -243,8 +266,8 @@ CVs and certificates go only to a justified recipient with approval. Record
 recipient, company, version, named or anonymised, sent time, follow-up and
 response.
 
-**Start one supplier or prequalification route** tied to the package — existing
-recruiter relationships, Mercury, Exyte, SPIE, Bilfinger — recording the
+**Start one supplier or prequalification route** tied to the package â existing
+recruiter relationships, Mercury, Exyte, SPIE, Bilfinger â recording the
 contracting entity, route, requirements, owner and next date. No mass
 registration and no automatic form submission.
 
@@ -294,7 +317,7 @@ mobilization is progress, not proof.
 
 ### Software after Phase 0
 
-#### P1 — After one truthful package and buyer conversations
+#### P1 â After one truthful package and buyer conversations
 
 1. human-confirmed availability and expiry;
 2. crew membership/readiness/reservation;
@@ -305,7 +328,7 @@ mobilization is progress, not proof.
 7. proposal record linked to requirement/package/terms;
 8. unified commercial action and follow-up history.
 
-#### P2 — After a concrete order or approved supplier route
+#### P2 â After a concrete order or approved supplier route
 
 1. agreements, job orders, POs, and rate/payment terms;
 2. worker reservation and conflict prevention;
@@ -315,7 +338,7 @@ mobilization is progress, not proof.
 6. invoices, payments, funding exposure, and realized margin;
 7. worker/client outcome feedback.
 
-#### P3 — After repeated delivery
+#### P3 â After repeated delivery
 
 1. outcome attribution;
 2. channel and buyer-route performance;
@@ -375,7 +398,7 @@ For every failed target, decide:
 - execution/follow-up problem;
 - software blocker.
 
-Do not default to “build more software.”
+Do not default to âbuild more software.â
 
 ## When a gate is claimed
 

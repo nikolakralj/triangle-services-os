@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { activity, appendMissionActivity } from "@/lib/data/mission-runs";
-import type { MissionRuntime } from "@/lib/data/bot-runtime";
+import { employeeRuntimeOf, type MissionRuntime } from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // One employee asking another for work — through Triangle, never around it.
@@ -81,7 +81,7 @@ async function activeEmployees(svc: Svc, orgId: string): Promise<EmployeeRow[]> 
 }
 
 function runtimeOf(row: EmployeeRow): MissionRuntime {
-  return row.config?.mission_runtime === "bot" ? "bot" : "in_app";
+  return employeeRuntimeOf(row.role_key, row.config);
 }
 
 function asColleague(row: EmployeeRow): Colleague {

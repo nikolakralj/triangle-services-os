@@ -5,6 +5,7 @@ import {
   cancelAssignment,
   listWorkforce,
 } from "@/lib/data/workforce";
+import { isScoutRole, loadEmployeeRuntime } from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // The manager's side of assignments.
@@ -69,23 +70,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Constraints were never read here, so every assignment written from a
-  // screen was stored with `constraints: {}` — and the unattended runner only
-  // claims rows whose constraints contain execution_mode in_app or bot. An
-  // empty object matches neither, so anything a human typed into the app sat
-  // queued for ever, unclaimable, while work created by accepting a finding
-  // (which sets its own constraints) ran normally. That is why the cockpit's
-  // Run Now created the job and nothing happened.
-  //
-  // A person typing into a screen and waiting is the definition of in_app, so
-  // that is the default. An explicit value still wins, for work meant for the
-  // provider bot.
-  const constraints = {
-    execution_mode: "in_app",
-    ...(body.constraints && typeof body.constraints === "object"
-      ? body.constraints
-      : {}),
-  };
+  // Constraints used to be dropped here. Scout is bot-owned: even a client
+  // that still sends in_app cannot put Scout on the retired OpenAI executor.
+  // Everyone else keeps the previous default (in_app, explicit value wins).
+  const { roleKey } = await loadEmployeeRuntime(
+    access.organizationId,
+    agentInstanceId,
+  );
+  const incoming =
+    body.constraints && typeof body.constraints === "object" ? body.constraints : {};
+  const constraints = isScoutRole(roleKey)
+    ? { ...incoming, execution_mode: "bot" }
+    : { execution_mode: "in_app", ...incoming };
 
   const dueAt = body.dueAt ? new Date(body.dueAt) : null;
   const created = await createAssignment({
@@ -109,7 +105,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-  return NextResponse.json({ assignment: created });
+  return NextResponse.json({
+    assignment: { id: created.id },
+    runtime: created.runtime,
+    wake: created.wake,
+    notice: created.notice,
+  });
 }
 
 export async function PATCH(request: Request) {

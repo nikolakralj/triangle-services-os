@@ -19,11 +19,9 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 /**
  * Where the job runs.
  *
- * `bot` hands it to the Scout already running on a provider platform — it
- * polls /api/agent/inbox, it is already paid for, and it has a real browser.
- * `in_app` gives it to Triangle's own OpenAI executor, which runs unattended
- * but bills per run. The two must not both take the same job, so the mode is
- * explicit rather than implied.
+ * Reachability is Scout's job, and Scout is bot-owned: Triangle stores the
+ * assignment and wakes the Grok bot. `in_app` used to mean Triangle's OpenAI
+ * executor; that stand-in is retired.
  */
 export type ReachabilityRuntime = "bot" | "in_app";
 
@@ -70,7 +68,9 @@ export async function queueReachabilityJob(params: {
 
   const name = (contact.full_name as string) ?? "this contact";
   const company = (contact.company_name as string) ?? null;
-  const runtime = params.runtime ?? "bot";
+  // Scout is bot-owned. An `in_app` body is ignored so a client cannot put
+  // this back on the retired OpenAI executor.
+  void params.runtime;
 
   const assignment = await createAssignment({
     orgId: params.orgId,
@@ -82,7 +82,7 @@ export async function queueReachabilityJob(params: {
       "Published contact channels with source URL, quoted evidence, and how close each one gets to the person — or a sourced statement that none is published.",
     constraints: {
       case_type: "contact_reachability",
-      execution_mode: runtime === "in_app" ? "in_app" : "bot",
+      execution_mode: "bot",
       buyer_contact_id: contact.id,
       // Lets "Work that needs doing" drop this row while it is being worked.
       suggestion_id: `reachability:${contact.id}`,

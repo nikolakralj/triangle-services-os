@@ -70,7 +70,8 @@ The database currently has three active identities:
   to attached workers/packages;
 - reports evidence-backed findings;
 - does not contact anyone or approve its own work;
-- works missions on its own Grok bot since 11 September, woken by Triangle.
+- works on its own Grok bot, woken by Triangle; there is no in-app OpenAI
+  stand-in.
 
 ### Hanna — resourcing
 
@@ -115,29 +116,29 @@ When a human accepts a promising company finding, Triangle may automatically
 queue the same employee to continue read-only qualification. That continuation
 must be idempotent, carry the company record and expected outcome, and stop at
 the human external-action boundary. The purpose is to remove page-to-page
-human coordination, not to remove consequential approval.
+human coordination, not to remove consequential approval. For Scout this is
+bot-owned work: Triangle stores it and wakes the bot.
 
-Company qualification can run through Triangle's in-app executor when the
-assignment declares `execution_mode: in_app`. The early implementation claims
-work while an authenticated manager session is open. External provider polling
-remains supported for older assignments, but provider chat is never the
-canonical conversation or report store.
+Scout (`project_researcher`) is always bot-owned. There is no in-app OpenAI
+stand-in and no stalled-job takeover onto OpenAI. Older `execution_mode:
+in_app` Scout rows stay in Scout's inbox; the retired executor does not claim
+them.
 
 A mission step runs where its employee lives. By default Triangle's own runner
 works it (`execution_mode: in_app`). An employee switched to its own bot
-(`agent_instances.config.mission_runtime = "bot"`; Scout on Grok first) gets
-its mission steps as `execution_mode: bot`: the step waits in the employee's
-inbox, and Triangle calls the bot's wake-up webhook (`BOT_WAKE_URL_<ROLE>`,
-signed with `BOT_WAKE_KEY_<ROLE>`) when the step is assigned or retried, when
-a colleague is asked or answers, and when a human posts on the assignment
-thread (`human_followup`), carrying only the event and the ids. The bot reads
-the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
+(`agent_instances.config.mission_runtime = "bot"`; Scout always, because there
+is no in-app OpenAI stand-in) gets its mission steps as `execution_mode: bot`:
+the step waits in the employee's inbox, and Triangle calls the bot's wake-up
+webhook (`BOT_WAKE_URL_<ROLE>`, signed with `BOT_WAKE_KEY_<ROLE>`) when the
+step is assigned or retried, when a colleague is asked or answers, when Scout
+is given non-mission work (`assignment`), and when a human posts on the
+assignment thread (`human_followup`), carrying only the event and the ids.
+The bot reads the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
 with its badge to `/targets`, `/activity`, `/decisions`, `/plan` and
 `/complete`. Every write is refused unless the badge's employee owns the step
 and the step is still open, and a plain inbox result cannot close a mission
-step. Triangle's runner never takes a bot's step and the stalled-job takeover
-leaves it alone; the bot's own scheduled inbox check is the backup for a
-missed wake-up.
+step. Triangle's runner never takes a bot's step. The bot's own scheduled
+inbox check is the backup for a missed wake-up.
 
 How an employee works is the CEO's to write and Triangle's to keep: standing
 instructions per employee (`agent_house_rules`, migration 046), versioned with
@@ -210,9 +211,10 @@ company operating model:
 
 The next runtime refactor, when a second in-app role is actually approved, is
 an `AgentRuntimeRegistry` keyed by `role_key` or an explicit execution handler.
-Scout's current executor is the first adapter, not a universal agent. The
-registry must dispatch role-specific context and structured outputs; it must
-not allow arbitrary agents to browse every table or write canonical facts.
+Scout does not use an in-app executor; Triangle stores Scout work and wakes
+the bot. A registry for remaining in-app roles must dispatch role-specific
+context and structured outputs; it must not allow arbitrary agents to browse
+every table or write canonical facts.
 
 Likely future roles, added only at their evidence gate:
 

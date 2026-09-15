@@ -27,6 +27,19 @@ Why:
 - suggestions and human accept are the workbench; conversational OpenAI on
   the project page is not.
 
+### 2026-09-15: Scout is bot-owned â no in-app OpenAI stand-in
+
+CEO decision: Scout, Hanna and Bob work the same way. Triangle stores the work
+and wakes the Grok bot. Scout's special in-app OpenAI executor
+(`scout-executor` claiming `execution_mode: in_app`, plus stalled-bot
+takeover) is retired so there is no second brain and no extra OpenAI bill
+when Next would otherwise run Scout itself.
+
+Scout (`project_researcher`) is always bot-owned in code, even if
+`mission_runtime` is unset. New Scout assignments are `execution_mode: bot`
+and wake the bot (`event: assignment`). The claim loop is hard-off.
+
+
 ### 2026-09-08: Test every human job for end-to-end agent ownership
 
 Management clarified that Triangle combines agents and humans, with agents
@@ -141,7 +154,7 @@ Why:
 - the software already discovers, researches, drafts, matches, and produces
   packets, but no commercial send or packet delivery is recorded
 - value is created by a buyer route, order, mobilization, delivery, payment,
-  and margin—not by agent activity
+  and marginânot by agent activity
 - this category keeps project-to-placement while adding contract, delivery,
   and economics that the old roadmap omitted
 
@@ -194,7 +207,7 @@ Why:
 
 Decision:
 
-- upgrade the “qualified project package opportunity” to a
+- upgrade the âqualified project package opportunityâ to a
   **contract-qualified crew opportunity**
 
 Why:
@@ -271,7 +284,7 @@ Decision:
 
 - the software is intended to be sold, but as a vertical contract-to-crew OS
   rather than generic HR, CRM, agent, or marketplace software
-- the first external ICP is a 2–25 person European technical contract
+- the first external ICP is a 2â25 person European technical contract
   staffing, crew-supply, or labor-subcontracting business
 - solo recruiters are a later starter tier; corporate HR, job seekers, generic
   freelancers, and large enterprises are not the first buyer
@@ -388,7 +401,7 @@ Decision:
 - make product/app development the active agent goal;
 - pause external target research, client searching, problem-interview work,
   and design-partner preparation unless management requests them explicitly;
-- interpret a generic request to “continue” as eligible Product Track B work
+- interpret a generic request to âcontinueâ as eligible Product Track B work
   only;
 - retain already prepared target/interview artifacts as dormant reference,
   not an active pipeline or required next action.
@@ -411,7 +424,7 @@ Decision:
 
 - a mission is one objective delegated to one employee; every instruction about
   that objective is a step inside it, not a new job and not a new tab;
-- a step works from the mission's state — the objective, the conversation, and
+- a step works from the mission's state â the objective, the conversation, and
   everything the mission already holds, including what the CEO ruled out and
   who was already contacted;
 - inside a mission an employee records the companies and people it finds, with
@@ -431,7 +444,7 @@ Why:
   original question and the queue filled with near-identical research jobs;
 - pressing "Add to Companies" for every sourced fact is transport work, and it
   was the only way research ever reached the Companies page;
-- one shell — tabs, worker, activity, conversation — serves market research
+- one shell â tabs, worker, activity, conversation â serves market research
   and recruiting through the existing employees, instead of separate AI
   features.
 
@@ -449,20 +462,20 @@ Decision:
 - every mission has a plan (how it gets there) and success criteria (when it
   is finished). Progress is counted from the records, never from what a worker
   reports about itself;
-- one worker runs passes — discover, research, verify, qualify, rank, prepare —
+- one worker runs passes â discover, research, verify, qualify, rank, prepare â
   before any new named agent. A pass may later be delegated without changing
   the mission the CEO sees;
 - continuation is a durable run engine: bounded, resumable, idempotent and
   retryable runs, with run and spend limits enforced in the database. A
   scheduler only wakes it; it is not the intelligence;
-- a long mission is read as condensed state — objective, criteria, CEO
-  decisions, known facts, open questions, next work — plus its records and the
+- a long mission is read as condensed state â objective, criteria, CEO
+  decisions, known facts, open questions, next work â plus its records and the
   latest conversation, not its whole history;
 - evidence-based verification and entity resolution (company, person, role,
   contact route: n of 4) come before unattended continuation. A record below
   the threshold is never presented as ready to contact;
-- autonomy has three classes, enforced where the action happens — tool
-  permissions and database guards — never by a prompt alone. The AI decides,
+- autonomy has three classes, enforced where the action happens â tool
+  permissions and database guards â never by a prompt alone. The AI decides,
   logs, and can be undone: what to search next, research depth, ranking,
   rejecting poor fits, retries, stopping when the criteria are met. The AI
   prepares and a person approves: outreach, call recommendations, proposals,
@@ -481,9 +494,9 @@ Why:
   one name; unattended hours would multiply that;
 - an instruction that says "never send email" is not a boundary.
 
-This meets the 29 August gate for durable orchestration — mission work outlives
+This meets the 29 August gate for durable orchestration â mission work outlives
 a request, needs independent retries, pauses for the CEO, and must resume after
-a crash or a deploy — and lifts the Phase 0 freeze on new orchestration for
+a crash or a deploy â and lifts the Phase 0 freeze on new orchestration for
 mission runs only: built in Postgres and Next.js, with no new workflow runtime.
 
 ### 2026-09-11: A mission can run on its employee's own bot
@@ -498,8 +511,8 @@ Decision:
   its inbox and Triangle calls the bot's wake-up webhook the moment the step is
   assigned or retried. The scheduled inbox check stays as the backup;
 - the wake-up call carries only the event and the ids. The bot reads the
-  mission from Triangle — condensed state, finish line, the CEO's decisions,
-  what the mission holds, and supply by role without anyone's name — and
+  mission from Triangle â condensed state, finish line, the CEO's decisions,
+  what the mission holds, and supply by role without anyone's name â and
   writes back with its badge: activity, the finish line, quoted decisions, the
   companies and people it found, and the finished step;
 - every write is checked where it lands: the badge's employee must own the
@@ -514,8 +527,8 @@ Decision:
 Why:
 
 - Scout on Grok found its work only by polling, so an instruction waited for
-  the next scheduled check — up to half an hour in working hours, overnight
-  outside them — and Scout's inbox could also hand it steps Triangle was
+  the next scheduled check â up to half an hour in working hours, overnight
+  outside them â and Scout's inbox could also hand it steps Triangle was
   running itself;
 - the CEO wants the Grok bot to do the mission work with its own tools and
   memory, with Triangle as the truth it reads from and writes to.
@@ -524,14 +537,14 @@ Why:
 
 Decision:
 
-- the CEO's standing instructions for an employee — how it works, every day —
+- the CEO's standing instructions for an employee â how it works, every day â
   live in Triangle, versioned, with who changed them and when. Every run reads
   them: the bot's wake-up payload, its inbox, and Triangle's own worker alike;
 - a mission decision is narrower than a standing instruction and wins where the
   two overlap;
 - an instruction is never a boundary. What an employee may do is still enforced
   by its badge scopes, the finding contract and the API;
-- the role file in this repo is the protocol — endpoints, formats, refusals —
+- the role file in this repo is the protocol â endpoints, formats, refusals â
   and changes when the software changes. How the work is done changes when the
   CEO types.
 
@@ -554,7 +567,7 @@ Decision:
 
 - Triangle is the control plane; Scout, Hanna and Bob are peers, not a
   hierarchy. Scout owns demand, Hanna owns Triangle's access to people, Bob
-  owns commercial operations — turning both into revenue and keeping work
+  owns commercial operations â turning both into revenue and keeping work
   moving. None of them is the others' boss;
 - any employee may ask any other for work. The request is an assignment under
   the work it came from, in the same mission, and the answer wakes the one who
@@ -565,7 +578,7 @@ Decision:
   CEO, or answered with a wake-up;
 - roles are outcomes, not task lists: new techniques need no migration, and a
   new employee is a new row with a badge and a wake-up, not new code;
-- external communication is a per-employee policy — auto, approval or
+- external communication is a per-employee policy â auto, approval or
   forbidden per kind of message. Today every kind is approval or forbidden, and
   a commitment is never an employee's to make. "Auto" takes effect only once
   Triangle records what was sent.
@@ -577,7 +590,7 @@ Why:
 - a mandatory manager in the middle would make one employee a serial bottleneck
   when demand and supply can be worked at the same time;
 - the end goal is employees that actually work, not ones that ask the CEO to
-  press send forever — the policy grows without a rebuild.
+  press send forever â the policy grows without a rebuild.
 
 Built on agent_assignments (migration 047) and the architecture study of
 13 September. No workforce registry, marketplace hiring or labour market yet.
@@ -597,8 +610,8 @@ Decision:
 
 Why:
 
-- next steps were spread over four files — ROADMAP_EXECUTION, the work queue,
-  HANDOFF and the docs map — that each had to be kept in step, next to a
+- next steps were spread over four files â ROADMAP_EXECUTION, the work queue,
+  HANDOFF and the docs map â that each had to be kept in step, next to a
   deployment guide that still described pushing straight to production;
 - the CEO asked for total clarity about future work and for unnecessary
   documents to be deleted or grouped.

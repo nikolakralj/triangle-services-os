@@ -23,6 +23,19 @@ import { withinBudget } from "@/lib/data/agent-budget";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
+/**
+ * 15 September 2026: Scout is bot-owned. Triangle stores the work and wakes
+ * the Grok bot. This file's OpenAI claim loop is retired — it was a second
+ * brain that billed OpenAI for jobs the bot was already paid to do, and it
+ * stole stalled bot jobs after six hours.
+ *
+ * Hard-off. Do not restore. listAvailableSupply and the types stay because
+ * the in-app mission runner (non-Scout roles) still imports them.
+ */
+function inAppScoutExecutorEnabled() {
+  return false;
+}
+
 export type ClaimedAssignment = {
   id: string;
   orgId: string;
@@ -74,6 +87,8 @@ export type ScoutWorkResult =
   | { status: "refused"; assignmentId: string; reason: string };
 
 async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | null> {
+  if (!inAppScoutExecutorEnabled()) return null;
+
   const service = createServiceSupabaseClient();
   if (!service) return null;
 
@@ -86,16 +101,9 @@ async function claimNextAssignment(orgId: string): Promise<ClaimedAssignment | n
   const scoutIds = (scouts ?? []).map((row) => row.id as string);
   if (scoutIds.length === 0) return null;
 
-  // Two kinds of queued work are claimable here.
-  //
-  // `execution_mode: in_app` is ours outright. `bot` belongs to the Scout
-  // running on a provider platform — but that Scout only ever POLLS, because
-  // Triangle cannot push to it. If nobody opens the bot, a job sits queued
-  // forever and the company simply stops, which is what "the AI should work,
-  // not the human" fails to mean in practice.
-  //
-  // So the bot gets first refusal for STALL_HOURS, and after that this
-  // executor picks the job up rather than letting it rot.
+  // Retired: this block is unreachable while inAppScoutExecutorEnabled is
+  // false. Left in place so the old claim shape is visible; do not restore
+  // it. In-app OpenAI work and stalled-bot takeover are the double-brain.
   const stalledBefore = new Date(
     Date.now() - STALL_HOURS * 60 * 60 * 1000,
   ).toISOString();
@@ -165,6 +173,8 @@ async function claimAssignmentById(
   orgId: string,
   assignmentId: string,
 ): Promise<ClaimedAssignment | null> {
+  if (!inAppScoutExecutorEnabled()) return null;
+
   const service = createServiceSupabaseClient();
   if (!service) return null;
 
@@ -310,6 +320,7 @@ async function buildAssignmentContext(assignment: ClaimedAssignment) {
 }
 
 export async function runNextScoutAssignment(orgId: string): Promise<ScoutWorkResult> {
+  if (!inAppScoutExecutorEnabled()) return { status: "idle" };
   const assignment = await claimNextAssignment(orgId);
   if (!assignment) return { status: "idle" };
   return runClaimedAssignment(assignment);
@@ -328,6 +339,7 @@ export async function runScoutAssignmentById(
   orgId: string,
   assignmentId: string,
 ): Promise<ScoutWorkResult> {
+  if (!inAppScoutExecutorEnabled()) return { status: "idle" };
   const assignment = await claimAssignmentById(orgId, assignmentId);
   if (!assignment) return { status: "idle" };
   return runClaimedAssignment(assignment);

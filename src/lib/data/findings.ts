@@ -458,8 +458,9 @@ export async function acceptFinding(params: {
 
       // Approval means "this lead is worth pursuing", not "CEO, please open
       // four more pages and manually reconstruct the research plan". Queue a
-      // safe research-only continuation for the same employee. External
-      // outreach still remains behind its separate human approval boundary.
+      // safe research-only continuation for the same employee. Scout is
+      // bot-owned: createAssignment wakes the bot. External outreach still
+      // remains behind its separate human approval boundary.
       if (finding.agent_instance_id) {
         const { createAssignment } = await import("./workforce");
         const continuation = await createAssignment({
@@ -478,7 +479,6 @@ export async function acceptFinding(params: {
             "A decision-ready qualified project package opportunity, or a clear no-go with the evidence and remaining blocker.",
           constraints: {
             case_type: "company_qualification",
-            execution_mode: "in_app",
             company_id: companyId,
             source_finding_id: params.findingId,
             no_outreach: true,

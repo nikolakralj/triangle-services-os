@@ -8,15 +8,18 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // Grok's own platform, with its own computer, tools and memory, reading and
 // writing Triangle through its badge. For a mission that runs on a bot,
 // Triangle does not think — it stores the work, applies the rules, and wakes
-// the bot. The choice is made per employee:
+// the bot. The choice is made per employee, except Scout (project_researcher),
+// who is always the bot — there is no in-app OpenAI stand-in:
 //
 //   agent_instances.config.mission_runtime = "bot"   steps go to the badge's inbox
+//   Scout (any config)                               same — always the bot
 //   anything else                                    Triangle's own runner does them
 //
 // A bot only sees work when it checks in, and Triangle cannot open a Grok chat.
 // But a Grok routine can start from a signed webhook, so Triangle calls it
-// when an instruction, retry, colleague request, returned request, or human
-// follow-up on the assignment thread is recorded:
+// when an instruction, retry, colleague request, returned request, a new
+// non-mission assignment, or a human follow-up on the assignment thread is
+// recorded:
 //
 //   BOT_WAKE_URL_<ROLE_KEY>   the routine's webhook URL
 //   BOT_WAKE_KEY_<ROLE_KEY>   its sender key, sent as a bearer token
@@ -28,26 +31,58 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 export type MissionRuntime = "bot" | "in_app";
 
+/** Scout's role_key. Always bot-owned; there is no in-app OpenAI stand-in. */
+export const SCOUT_ROLE_KEY = "project_researcher";
+
 /**
  * A bot step that has not reported for this long has stopped. A bot works at
  * its own pace on its own computer; Triangle's runner gets fifteen minutes.
  */
 export const STALE_BOT_STEP_MINUTES = 120;
 
+/**
+ * Where this employee works. Scout is always the Grok bot. Everyone else
+ * follows `agent_instances.config.mission_runtime`.
+ */
+export function employeeRuntimeOf(
+  roleKey: string | null | undefined,
+  config: Record<string, unknown> | null | undefined,
+): MissionRuntime {
+  if (roleKey === SCOUT_ROLE_KEY) return "bot";
+  return config?.mission_runtime === "bot" ? "bot" : "in_app";
+}
+
+export function isScoutRole(roleKey: string | null | undefined): boolean {
+  return roleKey === SCOUT_ROLE_KEY;
+}
+
+export async function loadEmployeeRuntime(
+  orgId: string,
+  agentInstanceId: string,
+): Promise<{ roleKey: string | null; runtime: MissionRuntime }> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return { roleKey: null, runtime: "in_app" };
+  const { data } = await svc
+    .from("agent_instances")
+    .select("role_key, config")
+    .eq("id", agentInstanceId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const roleKey = (data?.role_key as string | undefined) ?? null;
+  return {
+    roleKey,
+    runtime: employeeRuntimeOf(
+      roleKey,
+      (data?.config as Record<string, unknown> | null) ?? null,
+    ),
+  };
+}
+
 export async function employeeMissionRuntime(
   orgId: string,
   agentInstanceId: string,
 ): Promise<MissionRuntime> {
-  const svc = createServiceSupabaseClient();
-  if (!svc) return "in_app";
-  const { data } = await svc
-    .from("agent_instances")
-    .select("config")
-    .eq("id", agentInstanceId)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  const config = data?.config as Record<string, unknown> | null;
-  return config?.mission_runtime === "bot" ? "bot" : "in_app";
+  return (await loadEmployeeRuntime(orgId, agentInstanceId)).runtime;
 }
 
 /** An employee's settings: where it runs, and which messages it may send itself. */
@@ -75,7 +110,8 @@ export type WakeEvent =
   | "mission_retry"
   | "requested"
   | "request_returned"
-  | "human_followup";
+  | "human_followup"
+  | "assignment";
 
 export interface WakeResult {
   status: "sent" | "failed" | "not_configured";
@@ -84,9 +120,10 @@ export interface WakeResult {
 
 /**
  * Call the employee's wake-up webhook for one assignment (a mission step, a
- * colleague request, or a human follow-up on the thread), and write down on
- * that assignment that it was called and what came back. Never throws; a bot
- * that could not be woken still collects the work at its next scheduled check.
+ * colleague request, a new non-mission assignment, or a human follow-up on
+ * the thread), and write down on that assignment that it was called and what
+ * came back. Never throws; a bot that could not be woken still collects the
+ * work at its next scheduled check.
  *
  * `missionId` is null when the assignment is not inside a mission; the bot
  * still gets `assignmentId` and reads the thread from its inbox.
@@ -191,4 +228,10 @@ export function followUpPickupNotice(wake: WakeResult | null, reopened: boolean)
   const head = reopened ? "Reopened. Queued." : "Queued.";
   if (!wake) return `${head} Waiting for pickup.`;
   return `${head} ${botWaitingReason({ wake })}`;
+}
+
+/** What the manager sees after handing a bot employee a new assignment. */
+export function assignmentQueuedNotice(wake: WakeResult | null): string {
+  if (!wake) return "Queued. Waiting for pickup.";
+  return `Queued. ${botWaitingReason({ wake })}`;
 }

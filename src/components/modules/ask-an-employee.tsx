@@ -16,12 +16,9 @@ import { AgentReport } from "@/components/modules/agent-report";
 //
 // It was. Asking lived on one page, the answer on another, ideas on a third
 // and the evidence on a fourth, and nothing said which. One box, on the page
-// the CEO already opens every day: type it, it runs while you wait, the answer
-// appears underneath.
-//
-// The waiting is deliberate. A job that goes into a queue for a schedule to
-// notice is a request, not a delegation, and the difference is what makes this
-// feel like an employee rather than a ticket system.
+// the CEO already opens every day: type it, it is handed to the employee.
+// Scout (and any bot-runtime employee) is woken; Triangle does not run an
+// in-app OpenAI stand-in while you wait.
 // ---------------------------------------------------------------------------
 
 interface Employee {
@@ -74,18 +71,28 @@ export function AskAnEmployee({
           title: text.split("\n")[0].slice(0, 120),
           objective: text,
           priority: "high",
-          constraints: { execution_mode: "in_app" },
         }),
       });
       const createdBody = (await created.json().catch(() => ({}))) as {
         error?: string;
+        runtime?: string;
+        notice?: string;
       };
       if (!created.ok) {
         setError(createdBody.error ?? "Could not hand that out.");
         return;
       }
 
-      // Run it now rather than leaving it for a schedule that fires once a day.
+      // Bot-owned employees (Scout always) are woken by Triangle. Do not run
+      // the retired in-app OpenAI executor while the person waits.
+      if (createdBody.runtime === "bot") {
+        setOutcome(createdBody.notice ?? "Handed out. Waiting for pickup.");
+        setBrief("");
+        router.refresh();
+        return;
+      }
+
+      // Run in-app employees now rather than leaving them for a schedule.
       setStage("working");
       const ran = await fetch("/api/agents/run-now", { method: "POST" });
       const ranBody = (await ran.json().catch(() => ({}))) as {

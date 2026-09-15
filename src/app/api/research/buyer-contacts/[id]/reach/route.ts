@@ -9,7 +9,7 @@ import { requireApiAccess } from "@/lib/supabase/server";
  * the CEO decides that this contact is worth reaching, and a worker goes and
  * looks. Nothing is contacted — the job explicitly forbids it.
  *
- * Body: { runtime?: "bot" | "in_app" }
+ * Body: { runtime?: "bot" | "in_app" } — `in_app` is ignored; Scout is bot-owned.
  */
 export async function POST(
   request: Request,
