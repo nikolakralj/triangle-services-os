@@ -19,6 +19,7 @@ import {
   type TargetState,
 } from "@/lib/ai/mission-report";
 import {
+  companyCitedIn,
   hostOf,
   parseActivity,
   type ActivityEvent,
@@ -26,6 +27,9 @@ import {
   type MissionCandidate,
   type MissionChannel,
   type MissionCompanyRow,
+  type MissionContext,
+  type MissionContextHolding,
+  type MissionContextSource,
   type MissionCriterion,
   type MissionDecision,
   type MissionKind,
@@ -703,7 +707,9 @@ export async function loadMissionHoldings(
     companyIds.length
       ? svc
           .from("companies")
-          .select("id, name, city, country, website, company_type, found_by_agent_instance_id, verified_at")
+          .select(
+            "id, name, city, country, website, company_type, found_by_agent_instance_id, found_in_mission_id, verified_at",
+          )
           .eq("organization_id", orgId)
           .in("id", companyIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -744,21 +750,40 @@ export async function loadMissionHoldings(
     set.add(mission);
     elsewhere.set(company, set);
   }
-  const otherMissionIds = Array.from(new Set(Array.from(elsewhere.values()).flatMap((s) => [...s])));
+  const originIds = new Set<string>();
+  const finderIds = new Set<string>();
+  for (const c of (companiesRes.data ?? []) as Record<string, unknown>[]) {
+    const origin = c.found_in_mission_id as string | null;
+    if (origin && origin !== missionId) originIds.add(origin);
+    const finder = c.found_by_agent_instance_id as string | null;
+    if (finder) finderIds.add(finder);
+  }
+  const otherMissionIds = Array.from(
+    new Set([...Array.from(elsewhere.values()).flatMap((s) => [...s]), ...originIds]),
+  );
   const otherMissions = new Map<string, { id: string; title: string; emoji: string | null }>();
-  if (otherMissionIds.length > 0) {
-    const { data: rows } = await svc
-      .from("missions")
-      .select("id, title, emoji")
-      .eq("org_id", orgId)
-      .in("id", otherMissionIds);
-    for (const m of rows ?? []) {
-      otherMissions.set(m.id as string, {
-        id: m.id as string,
-        title: m.title as string,
-        emoji: (m.emoji as string | null) ?? null,
-      });
-    }
+  const finderNames = new Map<string, string>();
+  const [missionRows, finderRows] = await Promise.all([
+    otherMissionIds.length > 0
+      ? svc.from("missions").select("id, title, emoji").eq("org_id", orgId).in("id", otherMissionIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    finderIds.size > 0
+      ? svc
+          .from("agent_instances")
+          .select("id, display_name")
+          .eq("org_id", orgId)
+          .in("id", Array.from(finderIds))
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+  ]);
+  for (const m of missionRows.data ?? []) {
+    otherMissions.set(m.id as string, {
+      id: m.id as string,
+      title: m.title as string,
+      emoji: (m.emoji as string | null) ?? null,
+    });
+  }
+  for (const e of finderRows.data ?? []) {
+    finderNames.set(e.id as string, e.display_name as string);
   }
 
   // ── companies ──
@@ -806,6 +831,16 @@ export async function loadMissionHoldings(
       alsoIn: Array.from(elsewhere.get(companyId) ?? [])
         .map((id) => otherMissions.get(id))
         .filter((m): m is { id: string; title: string; emoji: string | null } => Boolean(m)),
+      sourceMission: (() => {
+        const origin = record.found_in_mission_id as string | null;
+        if (origin && origin !== missionId) return otherMissions.get(origin) ?? null;
+        for (const id of elsewhere.get(companyId) ?? []) {
+          const other = otherMissions.get(id);
+          if (other) return other;
+        }
+        return null;
+      })(),
+      filedBy: finderNames.get(record.found_by_agent_instance_id as string) ?? null,
       lastAttempt: contactId ? attempts.get(contactId) ?? null : null,
       reachChecked: list.some((f) => Boolean(f.payload?.reach_checked_at)),
       reachNote: state === "one_thing_missing" ? str(p, "reach_note") : null,
@@ -955,6 +990,166 @@ async function loadRunActivity(
   return out;
 }
 
+const CONTEXT_HOLDING_CAP = 12;
+
+function clipLabel(text: string, max: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+function citingText(stepViews: MissionStepView[], latest: MissionStepView["record"], messages: MissionMessage[]): string {
+  return [
+    latest?.brief.headline,
+    latest?.brief.summary,
+    latest?.brief.recommended,
+    latest?.reply,
+    ...messages.map((m) => m.body),
+    ...stepViews.flatMap((s) =>
+      s.activity
+        .filter((a) => a.kind === "found" || a.kind === "returned" || a.kind === "delegated")
+        .map((a) => a.text),
+    ),
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join("\n");
+}
+
+async function loadMissionContext(input: {
+  svc: Svc;
+  orgId: string;
+  missionId: string;
+  leadName: string | null;
+  steps: StepRow[];
+  stepViews: MissionStepView[];
+  companies: MissionCompanyRow[];
+  latest: MissionStepView["record"];
+  messages: MissionMessage[];
+  staffName: Map<string, string>;
+}): Promise<MissionContext> {
+  const { svc, orgId, missionId, leadName, steps, stepViews, companies, latest, messages, staffName } =
+    input;
+
+  const requests = steps
+    .filter((s) => s.requested_by_agent_instance_id)
+    .map((s) => {
+      const requesterId = s.requested_by_agent_instance_id as string;
+      return {
+        assignmentId: s.id,
+        title: clipLabel(s.title || s.objective, 80),
+        askedOf: staffName.get(s.agent_instance_id) ?? "a colleague",
+        askedBy: staffName.get(requesterId) ?? "A colleague",
+        status: s.status,
+        headline: parseMissionStepRecord(s.result_summary)?.brief.headline ?? null,
+      };
+    });
+
+  const citeText = citingText(stepViews, latest, messages);
+  const heldIds = new Set(companies.map((c) => c.companyId));
+  const colleagueIds = Array.from(
+    new Set(steps.filter((s) => s.requested_by_agent_instance_id).map((s) => s.agent_instance_id)),
+  );
+
+  const extra: Array<{ id: string; name: string; foundIn: string | null }> = [];
+  if (colleagueIds.length > 0 && citeText) {
+    const { data } = await svc
+      .from("companies")
+      .select("id, name, found_in_mission_id")
+      .eq("organization_id", orgId)
+      .in("found_by_agent_instance_id", colleagueIds)
+      .limit(200);
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const id = row.id as string;
+      const name = row.name as string;
+      if (!id || !name || heldIds.has(id)) continue;
+      if (!companyCitedIn(citeText, name)) continue;
+      extra.push({ id, name, foundIn: (row.found_in_mission_id as string | null) ?? null });
+    }
+  }
+
+  const holdings: MissionContextHolding[] = [];
+  const seen = new Set<string>();
+  for (const c of companies) {
+    const colleagueSourced =
+      Boolean(c.sourceMission) || (Boolean(c.filedBy) && c.filedBy !== leadName);
+    const cited = citeText ? companyCitedIn(citeText, c.name) : false;
+    if (!colleagueSourced && !cited) continue;
+    seen.add(c.companyId);
+    holdings.push({
+      companyId: c.companyId,
+      name: c.name,
+      sourceMissionId: c.sourceMission?.id ?? null,
+      onThisMission: true,
+    });
+    if (holdings.length >= CONTEXT_HOLDING_CAP) break;
+  }
+  if (holdings.length < CONTEXT_HOLDING_CAP) {
+    for (const e of extra) {
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+      holdings.push({
+        companyId: e.id,
+        name: e.name,
+        sourceMissionId: e.foundIn && e.foundIn !== missionId ? e.foundIn : null,
+        onThisMission: false,
+      });
+      if (holdings.length >= CONTEXT_HOLDING_CAP) break;
+    }
+  }
+
+  const sourceById = new Map<string, MissionContextSource>();
+  for (const c of companies) {
+    if (c.sourceMission) {
+      sourceById.set(c.sourceMission.id, {
+        missionId: c.sourceMission.id,
+        title: c.sourceMission.title,
+        emoji: c.sourceMission.emoji,
+      });
+    }
+  }
+  const missingSourceIds = Array.from(
+    new Set(
+      holdings
+        .map((h) => h.sourceMissionId)
+        .filter((id): id is string => typeof id === "string" && id !== missionId && !sourceById.has(id)),
+    ),
+  );
+  if (missingSourceIds.length > 0) {
+    const { data } = await svc
+      .from("missions")
+      .select("id, title, emoji")
+      .eq("org_id", orgId)
+      .in("id", missingSourceIds);
+    for (const m of data ?? []) {
+      sourceById.set(m.id as string, {
+        missionId: m.id as string,
+        title: m.title as string,
+        emoji: (m.emoji as string | null) ?? null,
+      });
+    }
+  }
+
+  const sourceMissions: MissionContextSource[] = [];
+  const seenSource = new Set<string>();
+  for (const h of holdings) {
+    if (!h.sourceMissionId || seenSource.has(h.sourceMissionId)) continue;
+    const src = sourceById.get(h.sourceMissionId);
+    if (!src) continue;
+    seenSource.add(h.sourceMissionId);
+    sourceMissions.push(src);
+  }
+  for (const c of companies) {
+    if (!c.sourceMission || seenSource.has(c.sourceMission.id)) continue;
+    seenSource.add(c.sourceMission.id);
+    sourceMissions.push({
+      missionId: c.sourceMission.id,
+      title: c.sourceMission.title,
+      emoji: c.sourceMission.emoji,
+    });
+  }
+
+  return { requests, sourceMissions, holdings };
+}
+
 export async function getMissionWorkspace(
   orgId: string,
   missionId: string,
@@ -1011,6 +1206,7 @@ export async function getMissionWorkspace(
   const stepViews: MissionStepView[] = steps.map((s) => ({
     id: s.id,
     status: s.status,
+    title: s.title,
     instruction: s.objective,
     createdAt: s.created_at,
     startedAt: s.started_at,
@@ -1078,6 +1274,20 @@ export async function getMissionWorkspace(
   });
 
   const leadRow = lead.data as Record<string, unknown> | null;
+  const leadName = leadRow ? (leadRow.display_name as string) : null;
+  const context = await loadMissionContext({
+    svc,
+    orgId,
+    missionId,
+    leadName,
+    steps,
+    stepViews,
+    companies: holdings.companies,
+    latest,
+    messages,
+    staffName,
+  });
+
   return {
     mission: {
       id: mission.id,
@@ -1109,6 +1319,7 @@ export async function getMissionWorkspace(
     partners,
     progress,
     decisions,
+    context,
   };
 }
 

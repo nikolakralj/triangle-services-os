@@ -186,6 +186,10 @@ export interface MissionCompanyRow {
   verified: boolean;
   /** Other missions that found the same company — the company's memory. */
   alsoIn: Array<{ id: string; title: string; emoji: string | null }>;
+  /** Mission that first recorded this door, when it is not this one. */
+  sourceMission: { id: string; title: string; emoji: string | null } | null;
+  /** Employee who filed the company, when known. */
+  filedBy: string | null;
   lastAttempt: MissionAttempt | null;
   /** Its own site has been read for the person and the door. */
   reachChecked: boolean;
@@ -241,6 +245,7 @@ export interface MissionMessage {
 export interface MissionStepView {
   id: string;
   status: string;
+  title: string;
   instruction: string;
   createdAt: string;
   startedAt: string | null;
@@ -253,6 +258,85 @@ export interface MissionStepView {
   worker: string | null;
   /** The colleague who asked for this step, when it was a request and not the CEO's instruction. */
   askedBy: string | null;
+}
+
+/**
+ * Cross-employee context on a mission: colleague requests, the mission a door
+ * was first filed in, and holding chips that open the record. Not a second
+ * inbox — the CEO should not have to scavenger-hunt across missions.
+ */
+export interface MissionContextRequest {
+  assignmentId: string;
+  title: string;
+  askedOf: string;
+  askedBy: string;
+  status: string;
+  headline: string | null;
+}
+
+export interface MissionContextSource {
+  missionId: string;
+  title: string;
+  emoji: string | null;
+}
+
+export interface MissionContextHolding {
+  companyId: string;
+  name: string;
+  /** Mission that first recorded this door, when it is not this one. */
+  sourceMissionId: string | null;
+  /** True when this mission already holds a finding for the company. */
+  onThisMission: boolean;
+}
+
+export interface MissionContext {
+  requests: MissionContextRequest[];
+  sourceMissions: MissionContextSource[];
+  holdings: MissionContextHolding[];
+}
+
+export const EMPTY_MISSION_CONTEXT: MissionContext = {
+  requests: [],
+  sourceMissions: [],
+  holdings: [],
+};
+
+export function missionHasContext(ctx: MissionContext): boolean {
+  return ctx.requests.length > 0 || ctx.sourceMissions.length > 0 || ctx.holdings.length > 0;
+}
+
+export function missionHoldingAnchor(companyId: string): string {
+  return `holding-${companyId}`;
+}
+
+export function missionStepAnchor(stepId: string): string {
+  return `step-${stepId}`;
+}
+
+export function parseMissionHoldingHash(hash: string): string | null {
+  const m = /^#?holding-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(
+    hash.trim(),
+  );
+  return m ? m[1].toLowerCase() : null;
+}
+
+export function parseMissionStepHash(hash: string): string | null {
+  const m = /^#?step-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(
+    hash.trim(),
+  );
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** Where a holding chip should go: this page, the source mission, or the company record. */
+export function holdingDeepLink(input: {
+  companyId: string;
+  sourceMissionId: string | null;
+  onThisMission: boolean;
+}): string {
+  const anchor = missionHoldingAnchor(input.companyId);
+  if (input.onThisMission) return `#${anchor}`;
+  if (input.sourceMissionId) return `/missions/${input.sourceMissionId}#${anchor}`;
+  return `/companies/${input.companyId}`;
 }
 
 export interface MissionCandidate {
@@ -399,6 +483,8 @@ export interface MissionWorkspace {
   progress: MissionProgress | null;
   /** Every decision recorded, oldest first — in force or not. */
   decisions: MissionDecision[];
+  /** Colleague requests, source missions and holding chips — empty when none. */
+  context: MissionContext;
   counts: {
     researched: number;
     qualified: number;
@@ -479,6 +565,46 @@ function hasPhrase(haystack: string, phrase: string): boolean {
   return new RegExp(`(?:^|\\s)${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|$)`).test(
     ` ${haystack} `,
   );
+}
+
+/** ö/oe, ü/ue, ä/ae so a brief that says Roesler still matches Rösler. */
+function germanFold(value: string): string {
+  return foldKey(value).replace(/oe/g, "o").replace(/ue/g, "u").replace(/ae/g, "a");
+}
+
+/**
+ * True when a brief, reply or activity line names this company. Short names
+ * like PMS count as a whole word; GmbH and similar legal endings do not.
+ */
+export function companyCitedIn(text: string, name: string): boolean {
+  const hay = foldKey(text);
+  if (!hay) return false;
+  const key = foldKey(name);
+  if (!key) return false;
+  const hayDe = germanFold(text);
+  const keyDe = germanFold(name);
+  if (hasPhrase(hay, key) || hasPhrase(hayDe, key) || hasPhrase(hayDe, keyDe)) return true;
+  const stripped = key
+    .split(" ")
+    .filter((w) => w && !NAME_NOISE.has(w))
+    .join(" ");
+  if (stripped) {
+    const strippedDe = germanFold(stripped);
+    if (
+      hasPhrase(hay, stripped) ||
+      hasPhrase(hayDe, stripped) ||
+      hasPhrase(hayDe, strippedDe)
+    ) {
+      return true;
+    }
+  }
+  for (const token of distinctiveTokens(name)) {
+    const tokenDe = germanFold(token);
+    if (hasPhrase(hay, token) || hasPhrase(hayDe, token) || hasPhrase(hayDe, tokenDe)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function namedScore(recommended: string, company: MissionCompanyRow): number {

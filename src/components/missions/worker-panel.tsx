@@ -28,6 +28,8 @@ import {
   type MissionState,
   type MissionStepView,
   type MissionWorkspace,
+  missionStepAnchor,
+  parseMissionStepHash,
 } from "@/lib/data/mission-shared";
 import { StateChip } from "@/components/missions/mission-state";
 
@@ -178,6 +180,17 @@ export function WorkerPanel({
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [steps.length, messages.length, pending, live.length]);
+
+  useEffect(() => {
+    const openStep = () => {
+      const id = parseMissionStepHash(window.location.hash);
+      if (!id) return;
+      document.getElementById(missionStepAnchor(id))?.scrollIntoView({ block: "center" });
+    };
+    openStep();
+    window.addEventListener("hashchange", openStep);
+    return () => window.removeEventListener("hashchange", openStep);
+  }, [steps.length]);
 
   async function send(text: string) {
     const question = text.trim();
@@ -423,7 +436,7 @@ function StepBlock({
   const worker = step.worker ?? name;
 
   return (
-    <div className="space-y-2">
+    <div id={missionStepAnchor(step.id)} className="scroll-mt-4 space-y-2">
       {step.askedBy ? (
         <RequestBubble from={step.askedBy} to={worker} text={instruction} at={step.createdAt} />
       ) : (

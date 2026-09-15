@@ -42,14 +42,18 @@ the record they read from and write to.
 | Wake on assignment follow-up: a human post on a bot-owned thread calls `wakeEmployee` with `human_followup` (ids only); UI says queued, not sent; amber badge stays until the employee answers in-thread | `3058eb5` | lint, build, tenant-identity still 8 known; no signed-in check here | Hanna's Grok routine must handle the event; missing/failed wake still queues for the next inbox check; does not send and does not widen `communicationPolicy` |
 | Known defects (DEV-005): forwarded intake keeps the recruiter, not the mailbox; mission recommended card matches the named person; Köster door and Computer Futures lead data-fix SQL prepared, not applied | `9929630` | 11/11 offline DEV-005; DEV-002 31/31; lint, production build, tenant-identity 0; no signed-in check here | Live rows unchanged until Nikola runs the two SQL files; Open mail on the existing Computer Futures lead stays wrong until that UPDATE |
 | Tenant identity (DEV-006): CV letterhead and next-move sign-off read the approved organization profile; scanner comments cleaned | `9929630` | `check:tenant-identity` exits 0; lint and production build | Tenant-zero paper address still lives in the approved seed file |
+| CASE-004 visibility slice: mission page chips for colleague requests, the source mission a door was first filed in, and holdings that deep-link to the record | this change | offline CASE-004 checks; lint, production build, tenant-identity 0; no signed-in check here | Still gated overall — not budget/time limits, retries or a second inbox. Nikola: open Hanna's DACH mission and confirm Scout-sourced doors/requests show as chips |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
-mission scope. Forwarded requisitions no longer take the receiving mailbox as
-the recruiter once new mail is ingested; the one live Computer Futures lead
-still needs the prepared SQL. The mission recommended card follows the named
-person. The Köster door stays on file as reachable until its data-fix SQL
-runs. Tenant-identity no longer fails on CV/next-move hardcoding.
+mission scope. A mission now shows chips for colleague requests, the source
+mission a door came from, and holdings that open the record, so a recruiting
+mission that cites Scout's doors is not a scavenger hunt. Forwarded requisitions
+no longer take the receiving mailbox as the recruiter once new mail is ingested;
+the one live Computer Futures lead still needs the prepared SQL. The mission
+recommended card follows the named person. The Köster door stays on file as
+reachable until its data-fix SQL runs. Tenant-identity no longer fails on
+CV/next-move hardcoding.
 
 Phase 0 commercial proof is still not established. The commercial ledger on
 15 September holds thirteen records, all on recruiter requisitions: eight
