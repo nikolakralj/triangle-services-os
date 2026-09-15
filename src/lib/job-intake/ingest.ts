@@ -213,7 +213,24 @@ export async function ingestAccount(
           contactEmail: result.lead.contactEmail,
           lead: result.lead,
         });
-        if (leadId) summary.leadsCreated += 1;
+        if (leadId) {
+          summary.leadsCreated += 1;
+          try {
+            const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
+            await recordClientReplyEvent({
+              orgId,
+              sourceType: "inbound_email",
+              sourceId: leadId,
+              recipientName: result.lead.contactName,
+              recipientEmail: result.lead.contactEmail,
+              recipientCompany: result.lead.clientCompany || result.lead.agencyName,
+              subject: msg.subject,
+              replySummary: result.reason,
+            });
+          } catch (err) {
+            console.error("ingestAccount: outbox dispatch failed:", err);
+          }
+        }
       }
     } catch (err) {
       summary.errors.push(

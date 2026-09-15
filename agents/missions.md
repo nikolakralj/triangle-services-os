@@ -23,6 +23,9 @@ instruction — it only tells you where to look.
 | `request_returned` | Work you asked a colleague for came back. |
 | `human_followup` | A person posted on this assignment's thread. |
 | `assignment` | New work that is not a mission step (Workforce, qualify, reach, send-back). |
+| `client_reply` | A client or recruiter replied on outreach or inbound lead. |
+| `follow_up_due` | A follow-up date has arrived for a sent message or call. |
+| `availability_stale` | A worker or partner firm's availability confirmation has expired (14-day shelf life). |
 
 Then read the work from Triangle — never from the wake-up body:
 
@@ -34,7 +37,7 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 Reading it starts the step, and the CEO sees you picked it up. The same object
 arrives as `mission` on the assignment in your inbox.
 
-On `human_followup` or `assignment`, also read your inbox. `newQuestions` on
+On `human_followup`, `assignment`, `client_reply`, `follow_up_due`, or `availability_stale`, also read your inbox. `newQuestions` on
 that assignment is what you owe a reply to; the words are not in the wake
 body. If `missionId` is null, the inbox is the only place to look. Answer
 in-thread (`POST /api/agent/inbox` with `{ assignmentId, message }`) unless

@@ -309,6 +309,14 @@ export async function markOutreachReplied(
 ): Promise<boolean> {
   const svc = createServiceSupabaseClient();
   if (!svc) return false;
+
+  const { data: draft } = await svc
+    .from("outreach_drafts")
+    .select("id, subject, recipient_name, recipient_email, recipient_company")
+    .eq("id", id)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
   const { error } = await svc
     .from("outreach_drafts")
     .update({
@@ -322,6 +330,24 @@ export async function markOutreachReplied(
     console.error("markOutreachReplied:", error);
     return false;
   }
+
+  // Wakes the owning employee via the minimal event outbox
+  try {
+    const { recordClientReplyEvent } = await import("./event-outbox");
+    await recordClientReplyEvent({
+      orgId,
+      sourceType: "outreach_draft",
+      sourceId: id,
+      recipientName: (draft?.recipient_name as string) ?? null,
+      recipientEmail: (draft?.recipient_email as string) ?? null,
+      recipientCompany: (draft?.recipient_company as string) ?? null,
+      subject: (draft?.subject as string) ?? null,
+      replySummary,
+    });
+  } catch (err) {
+    console.error("markOutreachReplied: outbox dispatch failed:", err);
+  }
+
   return true;
 }
 
