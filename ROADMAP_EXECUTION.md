@@ -54,7 +54,7 @@ a follow-up message is recorded without its words until Bob drafts chasers
 (DEV-004), and each send is its own follow-up, so one recruiter answered about
 four roles shows four rows.
 
-### DEV-002 — Source check at filing · `READY`
+### DEV-002 — Source check at filing · `DONE`
 
 **Why:** two of ten Austrian doors cited pages that do not show their channel.
 
@@ -62,6 +62,14 @@ four roles shows four rows.
 appears on a cited page Triangle can read; a finding whose page cannot be read
 is filed as unchecked and shown that way; every refusal gives the employee its
 reason.
+
+**Done 15 September** (`2024155`; started by Codex, finished here). Checked:
+31/31 offline checks; on the 38 doors already on file, reading the real pages,
+34 matched, 3 unchecked, 1 refused; signed in, Approvals shows Source unchecked
+and refuses to accept it, 3/3. Limits: it checks at filing, so doors already on
+file are not re-checked; pages that need a browser or rate-limit Triangle file
+as unchecked; a LinkedIn profile or contact form alone is no longer reachable;
+not yet exercised by a real bot filing.
 
 ### DEV-003 — Hanna writes to the pool from her bot · `READY`
 
@@ -84,10 +92,12 @@ records. Bob sends nothing.
 ### DEV-005 — Known defects · `READY`
 
 **Acceptance:** the Today recommended card's action carries the person the
-recommendation names; the STRABAG and ANDRITZ doors are re-sourced or ruled out;
-a requisition that arrived forwarded does not take Triangle's own address as the
-recruiter's — on 15 September the Today card offered to email Computer Futures'
-Austria requisition to `nikola.kralj@triangle-services.com`.
+recommendation names; the Köster door, whose number the source check found on
+none of its three cited pages on 15 September, is re-sourced or ruled out (the
+newest STRABAG and ANDRITZ doors pass that check); a requisition that arrived
+forwarded does not take Triangle's own address as the recruiter's — on
+15 September the Today card offered to email Computer Futures' Austria
+requisition to `nikola.kralj@triangle-services.com`.
 
 ### DEV-006 — Tenant identity leaks · `READY`
 
