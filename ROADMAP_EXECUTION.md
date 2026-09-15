@@ -108,7 +108,7 @@ work.
 **Acceptance:** the check passes; commercial drafting reads the approved
 organization profile instead of hardcoded names.
 
-### DEV-007 — Wake on assignment follow-up · `IN_PROGRESS`
+### DEV-007 — Wake on assignment follow-up · `DONE`
 
 **Why:** the CEO posted in Hanna's assignment thread and the UI said the
 message was sent; Hanna never woke. Mission steps and colleague requests
@@ -122,6 +122,13 @@ failed wake still stores the message and says the next scheduled check will
 pick it up; the UI does not read as instant delivery; the amber badge stays
 until the employee answers in-thread.
 
+**Done 15 September** (`3058eb5` and docs follow). Checked: lint, production
+build, tenant-identity still the eight known failures. Could not signed-in
+check in this environment — Nikola: post a follow-up on Hanna's assignment,
+read `constraints.wake`, and confirm the amber badge clears only after she
+answers in-thread. Limits: her Grok routine must handle `human_followup`;
+this does not send and does not widen `communicationPolicy`.
+
 ### Only if live work stalls on it
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues
@@ -132,7 +139,8 @@ until the employee answers in-thread.
 ## Next, once the gate is moving
 
 - A minimal event outbox — client reply received, follow-up due, availability
-  stale — that wakes the owning employee.
+  stale — that wakes the owning employee. Assignment-thread follow-up wake is
+  already DEV-007; this remaining item is the other events.
 - Learning from the CEO's edits: a changed draft offers a rule in the CEO's words.
 - Budget and cost per mission.
 - Separate research and communications computers for bots (see the
