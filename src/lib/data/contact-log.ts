@@ -88,8 +88,44 @@ const ACTION_STATUS: Record<AttemptOutcome, string> = {
   dead_end: "completed",
 };
 
-/** When a sent email or an unanswered call is worth trying again. */
-const FOLLOW_UP_AFTER_DAYS = 4;
+/**
+ * When a sent message or an unanswered call is worth looking at again.
+ *
+ * Every send gets one, without asking: the Phase 0 gate counts a send only
+ * with a follow-up date, and a date picker on every Sent button is the form
+ * this history was built to avoid. "Later" on Today moves it.
+ */
+export const FOLLOW_UP_AFTER_DAYS = 4;
+
+export function followUpDate(days = FOLLOW_UP_AFTER_DAYS, from = Date.now()): string {
+  return new Date(from + days * 86_400_000).toISOString();
+}
+
+/**
+ * The line that stands in for the words when there are none to keep.
+ *
+ * It used to be "Emailed Oliver Hall on oliver@…" whatever happened, so a
+ * reply was filed as another email from us.
+ */
+function recordOf(
+  outcome: AttemptOutcome,
+  channelKind: string,
+  name: string | null,
+  value: string,
+): string {
+  const who = name ?? "the contact";
+  if (channelKind === "phone") {
+    if (outcome === "reached") return `Called ${who} on ${value} and got through.`;
+    if (outcome === "no_answer") return `Called ${who} on ${value}. No answer.`;
+    if (outcome === "dead_end") return `Called ${who} on ${value}. Dead end.`;
+    return `Called ${who} on ${value}.`;
+  }
+  if (outcome === "reached") return `${who} replied.`;
+  if (outcome === "dead_end") return `${who} answered: not for us.`;
+  if (channelKind === "linkedin") return `Messaged ${who} on LinkedIn.`;
+  if (channelKind === "contact_form") return `Wrote to ${who} through the form at ${value}.`;
+  return `Emailed ${who} at ${value}.`;
+}
 
 export async function logContactAttempt(params: {
   orgId: string;
@@ -105,11 +141,19 @@ export async function logContactAttempt(params: {
   /** The number dialled or address written to — the record of what was used. */
   value: string;
   outcome: AttemptOutcome;
-  /** What was said, or a precise record of it. */
+  /** What went out — the words as sent, or what was said on the call. */
   content?: string | null;
+  /**
+   * The words as Triangle wrote them, before the person changed anything.
+   * Kept beside what went out so an edit is never lost; learning from the
+   * CEO's edits starts from exactly this pair.
+   */
+  draft?: string | null;
+  subject?: string | null;
   note?: string | null;
 }): Promise<
-  { ok: true; actionId: string; draftId: string } | { ok: false; error: string }
+  | { ok: true; actionId: string; draftId: string; followUpAt: string | null }
+  | { ok: false; error: string }
 > {
   const svc = createServiceSupabaseClient();
   if (!svc) return { ok: false, error: "Database unavailable." };
@@ -184,12 +228,16 @@ export async function logContactAttempt(params: {
   const now = new Date().toISOString();
   // Something went and nothing came back yet, so there is a date to look again.
   const followUpAt =
-    params.outcome === "sent" || params.outcome === "no_answer"
-      ? new Date(Date.now() + FOLLOW_UP_AFTER_DAYS * 86_400_000).toISOString()
-      : null;
+    params.outcome === "sent" || params.outcome === "no_answer" ? followUpDate() : null;
+  // The words belong to what we did: a message that went, or a call. When the
+  // event is their reply, the prepared email is not what happened, and filing
+  // it as the content would say we sent it again.
+  const ourWords = params.outcome === "sent" || params.channelKind === "phone";
   const record =
-    params.content?.trim() ||
-    `${VERB[channel] ?? "Contacted"} ${recipientName ?? "contact"} on ${params.value}.`;
+    (ourWords ? params.content?.trim() : null) ||
+    recordOf(params.outcome, params.channelKind, recipientName, params.value);
+  const aiDraft = ourWords ? params.draft?.trim() || null : null;
+  const subject = ourWords ? params.subject?.trim() || null : null;
 
   const { data: draft, error: draftError } = await svc
     .from("outreach_drafts")
@@ -202,7 +250,7 @@ export async function logContactAttempt(params: {
       // columns it always has.
       ...(personId ? { contact_id: personId } : {}),
       channel,
-      subject: null,
+      subject,
       body: record,
       status: DRAFT_STATUS[params.outcome],
       sent_at: now,
@@ -228,6 +276,8 @@ export async function logContactAttempt(params: {
     recipient_name: recipientName,
     recipient_email: recipientEmail,
     recipient_company: recipientCompany,
+    subject,
+    ai_draft: aiDraft,
     final_content: record,
     response_summary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
     outcome: params.outcome,
@@ -248,7 +298,12 @@ export async function logContactAttempt(params: {
 
   // The ids go back so the screen can say what was recorded and offer to take
   // it back. Returning only {ok:true} is why a click looked like nothing.
-  return { ok: true, actionId: action.id as string, draftId: draft.id as string };
+  return {
+    ok: true,
+    actionId: action.id as string,
+    draftId: draft.id as string,
+    followUpAt,
+  };
 }
 
 /** Everything tried on these people, newest first. */
@@ -398,4 +453,42 @@ export async function undoContactAttempt(params: {
     }
   }
   return { ok: true };
+}
+
+/**
+ * "Not yet" — look at this one again in a few days.
+ *
+ * Moves the date, never removes it: a send without a follow-up date does not
+ * count toward the gate, and a follow-up nobody can see is how a live
+ * conversation gets dropped. Anyone who may record contacts may move one; the
+ * ledger keeps who did.
+ */
+export async function postponeFollowUp(params: {
+  orgId: string;
+  userId: string;
+  actionId: string;
+  days?: number;
+}): Promise<{ ok: true; followUpAt: string } | { ok: false; error: string }> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return { ok: false, error: "Database unavailable." };
+
+  const { data: action } = await svc
+    .from("commercial_actions")
+    .select("id, follow_up_at")
+    .eq("id", params.actionId)
+    .eq("org_id", params.orgId)
+    .maybeSingle();
+  if (!action) return { ok: false, error: "That record no longer exists." };
+  if (!action.follow_up_at) {
+    return { ok: false, error: "Nothing is waiting on a follow-up for this record." };
+  }
+
+  const followUpAt = followUpDate(params.days ?? FOLLOW_UP_AFTER_DAYS);
+  const { error } = await svc
+    .from("commercial_actions")
+    .update({ follow_up_at: followUpAt, updated_by: params.userId })
+    .eq("id", params.actionId)
+    .eq("org_id", params.orgId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, followUpAt };
 }

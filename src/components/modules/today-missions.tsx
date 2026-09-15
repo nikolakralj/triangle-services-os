@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   Check,
+  Clock,
   Copy,
   Link2,
   Loader2,
@@ -17,12 +18,15 @@ import {
   X,
 } from "lucide-react";
 import { hostOf, type MissionTab, type ReadyToContact } from "@/lib/data/mission-shared";
+import type { FollowUp } from "@/lib/data/follow-ups";
 import {
+  mailtoHref,
   outcomeSentence,
   outcomesFor,
   telHref,
   type ContactOutcome,
 } from "@/lib/data/contact-channels";
+import { EditableWords } from "@/components/modules/editable-words";
 import { MissionCard } from "@/components/missions/missions-index";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { openAsk } from "@/components/missions/ask-launcher";
@@ -52,14 +56,20 @@ const WHOSE = {
 export function ReadyForYou({
   people,
   missions,
+  followUps = [],
+  moreFollowUps = 0,
 }: {
   people: ReadyToContact[];
   missions: MissionTab[];
+  /** Sends and unanswered calls whose follow-up date has come. */
+  followUps?: FollowUp[];
+  /** Due beyond the ones listed. */
+  moreFollowUps?: number;
 }) {
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
 
-  if (asking.length === 0 && people.length === 0 && !recorded) {
+  if (asking.length === 0 && people.length === 0 && followUps.length === 0 && !recorded) {
     return (
       <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
         Nothing waiting on you. When a mission makes somebody reachable, they appear here with the
@@ -106,6 +116,24 @@ export function ReadyForYou({
         </ul>
       )}
 
+      {/* Above the strangers: someone who already heard from us is worth more
+          than someone who never has. */}
+      {followUps.length > 0 && (
+        <div>
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            {followUps.map((f) => (
+              <FollowUpRow key={f.actionId} item={f} onRecorded={setRecorded} />
+            ))}
+          </ul>
+          {moreFollowUps > 0 && (
+            <p className="mt-1.5 px-1 text-[11.5px] text-slate-500">
+              {moreFollowUps} more {moreFollowUps === 1 ? "follow-up is" : "follow-ups are"} due —
+              they appear here as these are answered.
+            </p>
+          )}
+        </div>
+      )}
+
       {people.length > 0 && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {people.map((p) => (
@@ -114,6 +142,213 @@ export function ReadyForYou({
         </ul>
       )}
     </div>
+  );
+}
+
+const FOLLOW_UP_LABEL: Partial<Record<ContactOutcome, string>> = {
+  sent: "Sent a follow-up",
+};
+
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/**
+ * "Oliver Hall · g2 Recruitment — emailed 10 Sep, follow-up due 14 Sep."
+ *
+ * The same three words as everywhere else, because what happens next is one
+ * of them: they replied, it is not for us, or we wrote again. "Later" moves
+ * the date instead of recording something that did not happen.
+ */
+function FollowUpRow({
+  item,
+  onRecorded,
+}: {
+  item: FollowUp;
+  onRecorded: (r: Recorded) => void;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showSent, setShowSent] = useState(false);
+  const outcomes = outcomesFor(item.channelKind);
+  const isPhone = item.channelKind === "phone";
+  const overdue = item.daysOverdue > 0;
+  const who = [item.who, item.company].filter(Boolean).join(" · ");
+
+  async function log(outcome: ContactOutcome) {
+    setBusy(outcome);
+    setError(null);
+    try {
+      const res = await fetch("/api/outreach/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...item.target,
+          channelKind: item.channelKind,
+          value: item.value ?? (isPhone ? "the number on record" : "the address on record"),
+          outcome,
+          subject: outcome === "sent" && item.subject ? `Re: ${item.subject.replace(/^re:\s*/i, "")}` : undefined,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; actionId?: string };
+      if (!res.ok || !body.actionId) {
+        setError(body.error ?? "Could not record that.");
+        return;
+      }
+      onRecorded({
+        actionId: body.actionId,
+        sentence: FOLLOW_UP_LABEL[outcome] ?? outcomeSentence(outcome, item.channelKind),
+        who,
+      });
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function later() {
+    setBusy("later");
+    setError(null);
+    try {
+      const res = await fetch("/api/outreach/log", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: item.actionId, later: true }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Could not move it.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const verb = isPhone
+    ? item.outcome === "no_answer"
+      ? "Called, no answer"
+      : "Called"
+    : item.channelKind === "linkedin"
+      ? "Messaged"
+      : "Emailed";
+
+  // Two lines, not four: eight of these sat above the people still to reach
+  // and pushed them a screen down.
+  return (
+    <li className="flex">
+      <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
+      <div className="min-w-0 grow px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="min-w-0 grow basis-72">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+              <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
+              {item.company && item.company !== item.who ? (
+                <span className="text-slate-700">· {item.company}</span>
+              ) : null}
+              {item.about ? <span className="text-slate-500">— {item.about}</span> : null}
+            </p>
+            <p
+              className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]"
+              suppressHydrationWarning
+            >
+              <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              <span className="text-slate-600">
+                {verb} {shortDate(item.at)}
+              </span>
+              <span className={overdue ? "font-medium text-amber-800" : "text-slate-500"}>
+                {overdue
+                  ? `follow-up ${item.daysOverdue === 1 ? "a day" : `${item.daysOverdue} days`} overdue`
+                  : "follow-up due today"}
+              </span>
+              {item.value && <span className="font-mono text-slate-500">{item.value}</span>}
+              {item.sent && (
+                <button
+                  type="button"
+                  onClick={() => setShowSent((v) => !v)}
+                  aria-expanded={showSent}
+                  className="font-medium text-sky-700 transition hover:text-sky-900"
+                >
+                  {showSent ? "Hide what went out" : "What went out"}
+                </button>
+              )}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {item.value && isPhone ? (
+              <a
+                href={telHref(item.value)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Phone className="h-3 w-3" />
+                Dial
+              </a>
+            ) : item.value && item.channelKind === "email" ? (
+              <a
+                href={mailtoHref(
+                  item.value,
+                  item.subject ? `Re: ${item.subject.replace(/^re:\s*/i, "")}` : null,
+                )}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Mail className="h-3 w-3" />
+                Open mail
+              </a>
+            ) : item.value && item.channelKind === "linkedin" ? (
+              <a
+                href={item.value}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                Open profile
+                <ArrowUpRight className="h-3 w-3" />
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void later()}
+              disabled={busy !== null}
+              title="Look at this again in four days. Nothing is recorded as done."
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              {busy === "later" && <Loader2 className="h-3 w-3 animate-spin" />}
+              Later
+            </button>
+            <div className="flex overflow-hidden rounded-lg border border-slate-200">
+              {outcomes.map(({ outcome, label }, i) => (
+                <button
+                  key={outcome}
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => void log(outcome)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 ${
+                    i > 0 ? "border-l border-slate-200" : ""
+                  }`}
+                >
+                  {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {FOLLOW_UP_LABEL[outcome] ?? label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {showSent && item.sent && (
+          <pre className="mt-2 max-w-3xl whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 font-mono text-[12px] leading-[1.7] text-slate-700">
+            {item.subject ? `${item.subject}\n\n` : ""}
+            {item.sent}
+          </pre>
+        )}
+        {error && <p className="mt-2 text-[12px] text-rose-600">{error}</p>}
+      </div>
+    </li>
   );
 }
 
@@ -130,6 +365,11 @@ function ReadyPerson({
   const [error, setError] = useState<string | null>(null);
   const { channel } = person;
   const outcomes = outcomesFor(channel.kind);
+  // Written words can be changed before they go; a call opener is only read.
+  const written = channel.kind !== "phone";
+  const [editing, setEditing] = useState(false);
+  const [words, setWords] = useState(person.words ?? "");
+  const outgoing = written ? words : (person.words ?? "");
   const Icon =
     channel.kind === "phone"
       ? Phone
@@ -157,7 +397,8 @@ function ReadyPerson({
           channelKind: channel.kind,
           value: channel.value,
           outcome,
-          content: person.words ?? undefined,
+          content: outgoing.trim() || undefined,
+          draft: person.words ?? undefined,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string; actionId?: string };
@@ -222,11 +463,32 @@ function ReadyPerson({
           )}
         </p>
 
-        {person.words && (
-          <p className="mt-2 line-clamp-2 max-w-3xl font-mono text-[12px] leading-relaxed text-slate-600">
-            {person.words}
-          </p>
-        )}
+        {person.words &&
+          (written && (editing || words !== person.words) ? (
+            <div className="mt-2 max-w-3xl">
+              <EditableWords
+                value={words}
+                original={person.words}
+                onChange={setWords}
+                label={`The words to send ${person.name}`}
+              />
+            </div>
+          ) : (
+            <div className="mt-2 max-w-3xl">
+              <p className="line-clamp-2 font-mono text-[12px] leading-relaxed text-slate-600">
+                {person.words}
+              </p>
+              {written && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="mt-0.5 text-[11.5px] font-medium text-sky-700 transition hover:text-sky-900"
+                >
+                  Edit before sending
+                </button>
+              )}
+            </div>
+          ))}
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {channel.kind === "phone" ? (
@@ -239,7 +501,7 @@ function ReadyPerson({
             </a>
           ) : channel.kind === "email" ? (
             <a
-              href={`mailto:${channel.value}${person.words ? `?body=${encodeURIComponent(person.words)}` : ""}`}
+              href={mailtoHref(channel.value, null, outgoing)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
             >
               <Mail className="h-3 w-3" />
@@ -261,7 +523,7 @@ function ReadyPerson({
               type="button"
               onClick={async () => {
                 try {
-                  await navigator.clipboard.writeText(person.words ?? "");
+                  await navigator.clipboard.writeText(outgoing);
                   setCopied(true);
                   window.setTimeout(() => setCopied(false), 1800);
                 } catch {

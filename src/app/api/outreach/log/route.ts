@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   logContactAttempt,
+  postponeFollowUp,
   undoContactAttempt,
   UNDO_WINDOW_MINUTES,
 } from "@/lib/data/contact-log";
@@ -46,7 +47,11 @@ const bodySchema = z
     channelKind: z.enum(["phone", "email", "linkedin", "contact_form", "other"]),
     value: z.string().trim().min(1).max(400),
     outcome: z.enum(["sent", "reached", "no_answer", "dead_end"]),
+    // What went out, after any edit — and, beside it, the words as Triangle
+    // wrote them. Both are kept; the second is how an edit stays visible.
     content: z.string().trim().max(8_000).optional(),
+    draft: z.string().trim().max(8_000).optional(),
+    subject: z.string().trim().max(300).optional(),
     note: z.string().trim().max(1_000).optional(),
   })
   .refine((v) => Boolean(v.contactId || v.leadId || v.personId), {
@@ -120,10 +125,43 @@ export async function POST(request: Request) {
       ok: true,
       actionId: result.actionId,
       draftId: result.draftId,
+      followUpAt: result.followUpAt,
       undoWithinMinutes: UNDO_WINDOW_MINUTES,
     },
     { status: 201 },
   );
+}
+
+const laterSchema = z.object({ actionId: z.string().uuid(), later: z.literal(true) });
+
+/**
+ * "Later" on a follow-up: look again in a few days.
+ *
+ * The date moves; it is never cleared, because a send without one does not
+ * count and a follow-up with none is never seen again.
+ */
+export async function PATCH(request: Request) {
+  const access = await requireApiAccess(request);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  const refused = refuseUnlessHuman(access, "canWrite", "move a follow-up");
+  if (refused) return refused;
+
+  const parsed = laterSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Say which follow-up to move." }, { status: 400 });
+  }
+
+  const result = await postponeFollowUp({
+    orgId: access.organizationId,
+    userId: access.userId,
+    actionId: parsed.data.actionId,
+  });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 409 });
+  }
+  return NextResponse.json({ ok: true, followUpAt: result.followUpAt });
 }
 
 const undoSchema = z.object({ actionId: z.string().uuid() });

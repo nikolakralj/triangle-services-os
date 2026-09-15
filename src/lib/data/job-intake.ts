@@ -472,6 +472,9 @@ export interface LeadReplyDraft {
   jobLeadId: string;
   subject: string;
   body: string;
+  /** The reply as Triangle wrote it; body is what the person kept. Null for a draft edited before migration 048. */
+  aiSubject: string | null;
+  aiBody: string | null;
   asks: string[];
   language: string;
   status: "draft" | "sent" | "archived";
@@ -485,6 +488,8 @@ function rowToDraft(row: Record<string, unknown>): LeadReplyDraft {
     jobLeadId: String(row.job_lead_id),
     subject: String(row.subject ?? ""),
     body: String(row.body ?? ""),
+    aiSubject: (row.ai_subject as string | null) ?? null,
+    aiBody: (row.ai_body as string | null) ?? null,
     asks: Array.isArray(row.asks) ? (row.asks as string[]) : [],
     language: String(row.language ?? "en"),
     status: (row.status as LeadReplyDraft["status"]) ?? "draft",
@@ -555,6 +560,9 @@ export async function createReplyDraft(params: {
       job_lead_id: params.jobLeadId,
       subject: params.subject,
       body: params.body,
+      // Edits change subject and body only, so the send keeps both versions.
+      ai_subject: params.subject,
+      ai_body: params.body,
       asks: params.asks,
       language: params.language,
       created_by: params.userId,

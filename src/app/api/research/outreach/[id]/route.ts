@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { recordRefusal } from "@/lib/data/refusals";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import {
   archiveOutreachDraft,
   markOutreachReplied,
@@ -46,12 +47,16 @@ export async function PATCH(
   try {
     if (action === "mark_sent") {
       // Recording a real send: the ledger needs the person who confirms it,
-      // and the database refuses the row without one.
+      // and the database refuses the row without one. A userId alone did not
+      // prove a person — the static MCP key supplies one.
+      const refused = refuseUnlessHuman(access, "canWrite", "record a send");
+      if (refused) return refused;
       const result = await markOutreachSent(
         id,
         access.organizationId,
         access.userId ?? null,
-        { followUpAt: typeof body.follow_up_at === "string" ? body.follow_up_at : null },
+        // No date given means the default one, never none.
+        { followUpAt: typeof body.follow_up_at === "string" ? body.follow_up_at : undefined },
       );
       if (!result.ok) {
         await recordRefusal({

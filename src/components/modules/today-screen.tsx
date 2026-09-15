@@ -14,13 +14,16 @@ import {
 } from "lucide-react";
 import type { NextMove, NextMoveAction } from "@/lib/data/next-move";
 import type { CameBackItem } from "@/lib/data/came-back";
+import type { FollowUp } from "@/lib/data/follow-ups";
 import {
+  mailtoHref,
   outcomeSentence,
   outcomesFor,
   telHref,
   type ContactOutcome,
 } from "@/lib/data/contact-channels";
 import { AgentReport } from "@/components/modules/agent-report";
+import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
 import { MissionsZone, ReadyForYou } from "@/components/modules/today-missions";
 
@@ -76,6 +79,7 @@ export function TodayScreen({
   counts,
   missions,
   ready,
+  followUps,
 }: {
   move: NextMove;
   employees: Employee[];
@@ -85,6 +89,8 @@ export function TodayScreen({
   missions: MissionTab[];
   /** People a mission made reachable that nobody has contacted yet. */
   ready: ReadyToContact[];
+  /** Sends and unanswered calls whose follow-up date has come. */
+  followUps: { items: FollowUp[]; total: number };
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
@@ -92,6 +98,18 @@ export function TodayScreen({
   const asking = missions.filter(
     (m) => m.state === "needs_you" || m.state === "blocked",
   ).length;
+  // The person on the NOW card is already the one action; listing them again
+  // underneath is two buttons for one conversation.
+  const nowAction = move.action;
+  const due = followUps.items.filter(
+    (f) =>
+      !nowAction ||
+      !(
+        (f.target.leadId && f.target.leadId === nowAction.leadId) ||
+        (f.target.contactId && f.target.contactId === nowAction.contactId)
+      ),
+  );
+  const dueMore = Math.max(0, followUps.total - followUps.items.length);
 
   // Keyed by what the card is about, so a new move is a new card: the note box
   // and the button state start empty instead of carrying over from the last
@@ -113,16 +131,20 @@ export function TodayScreen({
         </div>
       </Zone>
 
-      {/* Only what needs a person: somebody a mission made reachable, and a
-          mission that asked something or stopped. The research itself stays
-          in its mission, one click behind each row. */}
+      {/* Only what needs a person: a mission that asked something or
+          stopped, somebody waiting to hear from us again, and somebody a
+          mission made reachable. The research itself stays in its mission,
+          one click behind each row. */}
       <Zone
         n="02"
         name="Ready for you"
         note={
-          ready.length === 0 && asking === 0
+          ready.length === 0 && asking === 0 && due.length === 0
             ? "nothing waiting"
             : [
+                due.length > 0
+                  ? `${due.length + dueMore} ${due.length + dueMore === 1 ? "follow-up" : "follow-ups"} due`
+                  : null,
                 ready.length > 0 ? `${ready.length} to reach` : null,
                 asking > 0
                   ? `${asking} ${asking === 1 ? "mission needs" : "missions need"} you`
@@ -132,7 +154,12 @@ export function TodayScreen({
                 .join(" · ")
         }
       >
-        <ReadyForYou people={ready} missions={missions} />
+        <ReadyForYou
+          people={ready}
+          missions={missions}
+          followUps={due}
+          moreFollowUps={dueMore}
+        />
       </Zone>
 
       {/* The Ask console that sat here answered one question and forgot it.
@@ -376,6 +403,10 @@ function ActionPanel({
 
   const isPhone = action.channelKind === "phone";
   const outcomes = outcomesFor(action.channelKind);
+  // A written message can be changed before it goes; what is in the box is
+  // what Copy, Open mail and Sent use. A call script is only read out.
+  const [words, setWords] = useState(action.script ?? "");
+  const outgoing = isPhone ? (action.script ?? "") : words;
 
   async function log(outcome: ContactOutcome) {
     setLogging(outcome);
@@ -390,7 +421,9 @@ function ActionPanel({
           channelKind: action.channelKind,
           value: action.value,
           outcome,
-          content: action.script ?? undefined,
+          content: outgoing.trim() || undefined,
+          draft: action.script ?? undefined,
+          subject: action.subject ?? undefined,
           note: note.trim() || undefined,
         }),
       });
@@ -441,9 +474,7 @@ function ActionPanel({
           </a>
         ) : (
           <a
-            href={`mailto:${action.value}${
-              action.subject ? `?subject=${encodeURIComponent(action.subject)}` : ""
-            }${action.script ? `&body=${encodeURIComponent(action.script)}` : ""}`}
+            href={mailtoHref(action.value, action.subject, outgoing)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
           >
             <Mail className="h-3.5 w-3.5" />
@@ -455,7 +486,7 @@ function ActionPanel({
             type="button"
             onClick={async () => {
               try {
-                await navigator.clipboard.writeText(action.script ?? "");
+                await navigator.clipboard.writeText(outgoing);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               } catch {
@@ -509,11 +540,20 @@ function ActionPanel({
         )}
 
         {/* The prepared words, set as a document rather than a paragraph. */}
-        {action.script && (
-          <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 font-mono text-[12.5px] leading-[1.75] text-slate-300">
-            {action.script}
-          </pre>
-        )}
+        {action.script &&
+          (isPhone ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-black/40 px-4 py-3.5 font-mono text-[12.5px] leading-[1.75] text-slate-300">
+              {action.script}
+            </pre>
+          ) : (
+            <EditableWords
+              value={words}
+              original={action.script}
+              onChange={setWords}
+              tone="dark"
+              label="The reply to send"
+            />
+          ))}
 
         <div className="flex flex-wrap items-center gap-2">
           <input

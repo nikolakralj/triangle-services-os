@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { followUpDate } from "@/lib/data/contact-log";
 
 export type OutreachChannel =
   | "linkedin_connect"
@@ -24,6 +25,9 @@ export interface OutreachDraftRow {
   channel: OutreachChannel;
   subject: string | null;
   body: string;
+  /** The draft as it was written, before anyone edited it (migration 048). */
+  ai_subject: string | null;
+  ai_body: string | null;
   variant_group_id: string | null;
   variant_label: string | null;
   status: OutreachStatus;
@@ -94,6 +98,9 @@ export async function createOutreachDraft(params: {
       channel: params.channel,
       subject: params.subject ?? null,
       body: params.body,
+      // Never updated by an edit, so the send can keep both versions.
+      ai_subject: params.subject ?? null,
+      ai_body: params.body,
       variant_group_id: params.variantGroupId ?? null,
       variant_label: params.variantLabel ?? null,
       created_by_agent: params.createdByAgent ?? null,
@@ -174,7 +181,7 @@ export async function markOutreachSent(
   const { data: draft, error: readError } = await svc
     .from("outreach_drafts")
     .select(
-      "id, channel, subject, body, buyer_contact_id, buyer_suggestion_id, project_package_id",
+      "id, channel, subject, body, ai_body, buyer_contact_id, buyer_suggestion_id, project_package_id",
     )
     .eq("id", id)
     .eq("org_id", orgId)
@@ -210,11 +217,13 @@ export async function markOutreachSent(
       subject: draft.subject,
       // The draft body IS the record of what went out. If the sender reworded
       // it in their mail client they are expected to edit the draft first —
-      // the panel says so.
-      ai_draft: draft.body,
+      // the panel says so. What was written before any edit is ai_body; a
+      // draft from before migration 048 that was already edited has none.
+      ai_draft: draft.ai_body ?? null,
       final_content: draft.body,
       occurred_at: now,
-      follow_up_at: opts.followUpAt ?? null,
+      // Always a date: a send with none is not counted, and nobody looks again.
+      follow_up_at: opts.followUpAt ?? followUpDate(),
       human_confirmed_at: now,
       human_confirmed_by: userId,
       created_by: userId,

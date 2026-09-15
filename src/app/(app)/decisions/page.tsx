@@ -8,6 +8,7 @@ import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { FunnelStrip } from "@/components/modules/funnel-strip";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
+import { listFollowUpsDue } from "@/lib/data/follow-ups";
 import { getSession } from "@/lib/auth/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -20,8 +21,9 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // list and a four-tab Agent Desk whose detail drawer ended in a "Done" button
 // that closed the drawer.
 //
-// Now: the next move, the people the missions made reachable, the missions
-// themselves, and whatever older reports still wait on a decision.
+// Now: the next move, the people waiting to hear from us again, the people the
+// missions made reachable, the missions themselves, and whatever older reports
+// still wait on a decision.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -51,6 +53,7 @@ export default async function DecisionsPage() {
     people,
     missions,
     ready,
+    followUps,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
@@ -62,6 +65,7 @@ export default async function DecisionsPage() {
     count(svc, "workers", "organization_id", org),
     listMissionTabs(org),
     listReadyToContact(org),
+    listFollowUpsDue(org),
   ]);
 
   // Scout first, then Hanna, then the rest — the order the router in the Ask
@@ -97,6 +101,7 @@ export default async function DecisionsPage() {
         counts={{ projects, companies, people }}
         missions={missions}
         ready={ready}
+        followUps={followUps}
       />
     </div>
   );

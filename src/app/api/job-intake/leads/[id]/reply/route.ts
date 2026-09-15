@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
+import { logContactAttempt, undoContactAttempt } from "@/lib/data/contact-log";
+import { recordRefusal } from "@/lib/data/refusals";
 import { draftLeadReply } from "@/lib/job-intake/draft-reply";
 import {
   getOrganizationOperatingProfile,
@@ -153,6 +156,10 @@ export async function PATCH(
     );
   }
 
+  if (body.status === "sent") {
+    return markReplySent(access, id, body.draftId, body);
+  }
+
   const updated = await updateReplyDraft({
     draftId: body.draftId,
     orgId: access.organizationId,
@@ -165,10 +172,93 @@ export async function PATCH(
     return NextResponse.json({ error: "Could not update the draft." }, { status: 500 });
   }
 
-  // Marking the reply sent moves the lead along with it.
-  if (body.status === "sent") {
-    await updateLeadStatus(id, access.organizationId, "replied");
+  return NextResponse.json({ draft: updated });
+}
+
+/**
+ * "I sent this" — the reply went out from the person's own mailbox.
+ *
+ * This flipped the draft to sent and nothing else, so the one kind of message
+ * Triangle's people send most — an answer to a recruiter who wrote first —
+ * never reached the ledger the Phase 0 gate counts, carried no follow-up
+ * date, and could be answered a second time from Today. It is recorded the
+ * way every other send is: final text, the words as Triangle wrote them,
+ * recipient, time, and a follow-up date.
+ */
+async function markReplySent(
+  access: Extract<Awaited<ReturnType<typeof requireApiAccess>>, { ok: true }>,
+  leadId: string,
+  draftId: string,
+  body: { subject?: string; body?: string },
+) {
+  const refused = refuseUnlessHuman(access, "canWrite", "record a sent reply");
+  if (refused) return refused;
+
+  const [lead, drafts] = await Promise.all([
+    getJobLead(leadId, access.organizationId),
+    listReplyDrafts(leadId, access.organizationId),
+  ]);
+  if (!lead) {
+    return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+  }
+  const current = drafts.find((d) => d.id === draftId);
+  if (!current) {
+    return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+  }
+  // Pressed twice, it is still one send.
+  if (current.status === "sent") {
+    return NextResponse.json({ draft: current });
   }
 
-  return NextResponse.json({ draft: updated });
+  const subject = body.subject ?? current.subject;
+  const text = body.body ?? current.body;
+
+  const logged = await logContactAttempt({
+    orgId: access.organizationId,
+    userId: access.userId,
+    leadId,
+    channelKind: "email",
+    value: lead.contactEmail ?? lead.agencyName ?? "their address",
+    outcome: "sent",
+    content: text,
+    draft: current.aiBody,
+    subject,
+  });
+  if (!logged.ok) {
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Record a sent reply",
+      reason: logged.error,
+      userId: access.userId,
+      entityType: "job_lead",
+      entityId: leadId,
+    });
+    return NextResponse.json({ error: logged.error }, { status: 409 });
+  }
+
+  const updated = await updateReplyDraft({
+    draftId,
+    orgId: access.organizationId,
+    subject: body.subject,
+    body: body.body,
+    status: "sent",
+  });
+  if (!updated) {
+    // A ledger send with the draft still unsent would be answered again.
+    await undoContactAttempt({
+      orgId: access.organizationId,
+      userId: access.userId,
+      actionId: logged.actionId,
+    });
+    return NextResponse.json({ error: "Could not update the draft." }, { status: 500 });
+  }
+
+  // Marking the reply sent moves the lead along with it.
+  await updateLeadStatus(leadId, access.organizationId, "replied");
+
+  return NextResponse.json({
+    draft: updated,
+    actionId: logged.actionId,
+    followUpAt: logged.followUpAt,
+  });
 }

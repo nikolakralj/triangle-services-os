@@ -65,7 +65,7 @@ configuration into a signed-in demo session.
 ## Database migrations — CEO approves each one
 
 Migrations live in `supabase/migrations/` and run through
-`047_assignment_delegation.sql`. Because every environment shares one database,
+`048_drafts_keep_what_triangle_wrote.sql`. Because every environment shares one database,
 a migration is applied only after the CEO approves that migration. After any
 column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
 against the live organization.

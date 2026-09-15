@@ -59,7 +59,7 @@ IMAP mailbox
 | `mail_accounts` | One row per connected mailbox. Password is AES-256-GCM encrypted in `credential_encrypted`. `credential_ref` is a legacy env-var name, still honoured. |
 | `inbound_emails` | One row per ingested message. Unique on `(org_id, provider_message_id)` — this is what makes ingestion idempotent. `body_text` is **NULL** for anything not classified `job_opportunity`. |
 | `job_leads` | The structured opportunity. `team_potential` 0–100, `missing_fields[]` drives the reply, `duplicate_of_id` links repeats. |
-| `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived — "sent" only records that a human sent it. |
+| `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived — "sent" only records that a human sent it. `ai_subject`/`ai_body` keep the draft as Triangle wrote it; edits change `subject`/`body` only (migration 048). |
 | `job_intake_rules` | One editable text block per org, injected into the classification prompt. |
 | `organizations` profile columns | Tenant business/offer model, approved positioning, sign-off, currency, and timezone used by commercial AI. |
 
@@ -192,7 +192,10 @@ opportunity bodies. This keeps the list calm while letting Nikola/Ralph work a
 lead from the dashboard without returning to Gmail or Grok.
 
 This still does **not** send email. The current workflow remains: draft → edit →
-copy/send manually → mark "I sent this".
+copy/send manually → mark "I sent this". Since 15 September that press writes the
+send to `commercial_actions` like every other send: the text as kept, Triangle's
+version beside it, the recruiter, the time and a follow-up date four days out.
+The follow-up appears on Today until something newer is recorded for that lead.
 
 ## Hard rules — do not weaken these
 

@@ -34,11 +34,13 @@ import {
   type MissionWorkspace,
 } from "@/lib/data/mission-shared";
 import {
+  mailtoHref,
   outcomeSentence,
   outcomesFor,
   telHref,
   type ContactOutcome,
 } from "@/lib/data/contact-channels";
+import { EditableWords } from "@/components/modules/editable-words";
 import { MissionTabs } from "@/components/missions/mission-tabs";
 import { MissionMark, StateChip } from "@/components/missions/mission-state";
 import { WorkerPanel } from "@/components/missions/worker-panel";
@@ -832,7 +834,11 @@ function CompanyDetail({
           <RuledOut row={row} missionId={missionId} canWrite={canWrite} />
         ) : (
           <>
-            {row.words && <Words text={row.words} />}
+            {/* Written words are edited inside the controls, where Sent records them. */}
+            {row.words &&
+              !(row.person?.contactId && row.channel && canWrite && row.channel.kind !== "phone") && (
+                <Words text={row.words} />
+              )}
             {row.person?.contactId && row.channel && canWrite ? (
               <ContactControls
                 personId={row.person.contactId}
@@ -970,7 +976,10 @@ function PersonItem({
             {row.lastAttempt && <LastAttempt attempt={row.lastAttempt} />}
           </div>
           <div className="space-y-3.5">
-            {row.words && <Words text={row.words} />}
+            {row.words &&
+              !(row.channel && canWrite && !row.notForUs && row.channel.kind !== "phone") && (
+                <Words text={row.words} />
+              )}
             {row.channel && canWrite && !row.notForUs && (
               <ContactControls
                 personId={row.contactId}
@@ -1345,7 +1354,7 @@ function ChannelButton({ channel, words }: { channel: MissionChannel; words: str
   if (channel.kind === "email") {
     return (
       <a
-        href={`mailto:${channel.value}${words ? `?body=${encodeURIComponent(words)}` : ""}`}
+        href={mailtoHref(channel.value, null, words)}
         className={`${base} bg-sky-500 text-sky-950 hover:bg-sky-400`}
       >
         <Mail className="h-3.5 w-3.5" />
@@ -1437,6 +1446,11 @@ function ContactControls({
   const [logged, setLogged] = useState<{ actionId: string; sentence: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const outcomes = outcomesFor(channel.kind);
+  // Written words are edited here, and what is in the box is what Open mail,
+  // Copy and Sent use. The employee's words go to the ledger beside it.
+  const written = channel.kind !== "phone";
+  const [text, setText] = useState(words ?? "");
+  const outgoing = written ? text : (words ?? "");
 
   async function log(outcome: ContactOutcome) {
     setBusy(outcome);
@@ -1450,7 +1464,8 @@ function ContactControls({
           channelKind: channel.kind,
           value: channel.value,
           outcome,
-          content: words ?? undefined,
+          content: outgoing.trim() || undefined,
+          draft: words ?? undefined,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string; actionId?: string };
@@ -1490,9 +1505,22 @@ function ContactControls({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
+      {written && words && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            What to send
+          </p>
+          <EditableWords
+            value={text}
+            original={words}
+            onChange={setText}
+            label={`The words to send ${personName}`}
+          />
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <ChannelButton channel={channel} words={words} />
-        {words && <CopyButton text={words} label="Copy the words" />}
+        <ChannelButton channel={channel} words={outgoing || null} />
+        {outgoing && <CopyButton text={outgoing} label="Copy the words" />}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-[11.5px] text-slate-500">

@@ -48,6 +48,8 @@ export function LeadReplyPanel({
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(existingDraft?.subject ?? "");
   const [body, setBody] = useState(existingDraft?.body ?? "");
+  /** Set once "I sent this" has written the send to the ledger. */
+  const [followUpAt, setFollowUpAt] = useState<string | null>(null);
 
   async function generate() {
     setGenerating(true);
@@ -90,6 +92,7 @@ export function LeadReplyPanel({
       });
       const data = (await res.json().catch(() => ({}))) as {
         draft?: ReplyDraft;
+        followUpAt?: string | null;
         error?: string;
       };
       if (!res.ok || !data.draft) {
@@ -97,6 +100,7 @@ export function LeadReplyPanel({
         return;
       }
       setDraft(data.draft);
+      if (data.followUpAt) setFollowUpAt(data.followUpAt);
       setEditing(false);
       router.refresh();
     } catch {
@@ -154,9 +158,19 @@ export function LeadReplyPanel({
           {open ? "Hide draft" : "Show draft"}
         </Button>
         {draft.status === "sent" ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+            suppressHydrationWarning
+          >
             <CheckCircle2 className="h-3 w-3" />
             Sent{draft.sentAt ? ` ${new Date(draft.sentAt).toLocaleDateString()}` : ""}
+            {followUpAt
+              ? ` · recorded, follow up ${new Date(followUpAt).toLocaleDateString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}`
+              : ""}
           </span>
         ) : (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
@@ -281,7 +295,8 @@ export function LeadReplyPanel({
           <p className="text-[11px] text-slate-500">
             Copy this into your own email to {contactName ?? "the recruiter"} and
             send it yourself. Triangle OS never sends mail — &ldquo;I sent
-            this&rdquo; only records that you did.
+            this&rdquo; records that you did, keeps what Triangle first wrote,
+            and puts a follow-up on Today in four days.
           </p>
         </div>
       )}

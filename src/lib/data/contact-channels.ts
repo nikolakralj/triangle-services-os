@@ -177,6 +177,20 @@ export function telHref(value: string): string {
 }
 
 /**
+ * `mailto:` with an optional subject and body.
+ *
+ * Built by hand in three places, one of which wrote `&body=` without a `?`
+ * whenever there was no subject, so the words never reached the mail program.
+ */
+export function mailtoHref(to: string, subject?: string | null, body?: string | null): string {
+  const params = [
+    subject ? `subject=${encodeURIComponent(subject)}` : null,
+    body ? `body=${encodeURIComponent(body)}` : null,
+  ].filter(Boolean);
+  return `mailto:${to}${params.length > 0 ? `?${params.join("&")}` : ""}`;
+}
+
+/**
  * The three things that can happen, in the words that fit the channel.
  *
  * The Today card offered "Got through · No answer · Dead end" under an email

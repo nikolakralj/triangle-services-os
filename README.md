@@ -76,8 +76,9 @@ npm run dev
 Configure local values from `.env.example` and the
 [deploy guide](docs/operations/DEPLOY.md). Never paste or commit secrets, and do
 not run old seed instructions against a live organization. Migrations run
-through `047_assignment_delegation.sql`; local development and production share
-one database, so a migration is applied only with the CEO's approval.
+through `048_drafts_keep_what_triangle_wrote.sql`; local development and
+production share one database, so a migration is applied only with the CEO's
+approval.
 
 The stack is Next.js 16, React 19, TypeScript, Supabase and server-side AI. Read
 the installed Next.js documentation before implementation.
