@@ -2,10 +2,8 @@ import { PageHeader } from "@/components/common/page-header";
 import { TodayScreen } from "@/components/modules/today-screen";
 import { getNextMove } from "@/lib/data/next-move";
 import { listWhatCameBack } from "@/lib/data/came-back";
-import { getFunnel } from "@/lib/data/funnel";
 import { summarizeRefusals } from "@/lib/data/refusals";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
-import { FunnelStrip } from "@/components/modules/funnel-strip";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
@@ -46,7 +44,6 @@ export default async function DecisionsPage() {
     move,
     cameBack,
     employees,
-    funnel,
     refusals,
     projects,
     companies,
@@ -58,7 +55,6 @@ export default async function DecisionsPage() {
     getNextMove(org),
     listWhatCameBack(org),
     listWorkforce(org),
-    getFunnel(org),
     summarizeRefusals(org),
     count(svc, "discovered_projects", "organization_id", org),
     count(svc, "companies", "organization_id", org),
@@ -86,10 +82,6 @@ export default async function DecisionsPage() {
         title="Today"
         description="One action to take, the people your missions made reachable, and the work in progress."
       />
-      {/* The business on one line, before the day's work. It had no data
-          representation at all: the footer wrote four unrelated numbers out
-          as a sentence. */}
-      <FunnelStrip funnel={funnel} />
       {/* What the system would not let anyone record. Moved off Overview:
           it is the most informative thing this product produces and it was
           on a page nobody had a reason to open. */}
