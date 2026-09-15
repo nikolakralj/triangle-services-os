@@ -144,7 +144,7 @@ read `constraints.wake`, and confirm the amber badge clears only after she
 answers in-thread. Limits: her Grok routine must handle `human_followup`;
 this does not send and does not widen `communicationPolicy`.
 
-### Research Agent project chat retired � `DONE`
+### Research Agent project chat retired · `DONE`
 
 **Why:** chatting on a project was a parallel research path beside Scout
 missions. The CEO cut it.
@@ -153,11 +153,13 @@ missions. The CEO cut it.
 no Research Agent chat; suggestions still accept onto the contractor chain
 and Approvals; `/api/research/chat` is not an operating path.
 
-**Done 15 September.** No migration ? ask Nikola before adding one. Project
+**Done 15 September.** No migration — ask Nikola before adding one. Project
 page points at a Scout mission / Workforce hand-off. `/api/research/chat`
 returns 410. Suggestion accept and MCP propose tools are unchanged.
 `/api/research/run` is unused in the product UI and was left in source.
-Nikola: Signal Inbox ? open a project ? no Research Agent chat; Inbox and
+Checked: lint, production build, tenant-identity 0; GET/POST `/api/research/chat`
+return 410 in demo mode. Could not signed-in check here.
+Nikola: Signal Inbox -> open a project -> no Research Agent chat; Inbox and
 Approvals still accept suggestions.
 
 ### Only if live work stalls on it
