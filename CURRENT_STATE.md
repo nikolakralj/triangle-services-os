@@ -10,7 +10,7 @@ source review follows it. Earlier sessions are preserved in the
 | --- | --- |
 | Checkout | `C:\Users\nikol\Projects\triangle-services-os` |
 | Branch | `wip-jules-2026-05-03T18-13-13-596Z` |
-| Last code commit | `3058eb5`, 15 September; the 10 September review read `c7b4174` |
+| Last code commit | `93895cd`, 15 September; the 10 September review read `c7b4174` |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |
 | Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044–048 applied to the live database 11–15 September |
@@ -40,6 +40,7 @@ the record they read from and write to.
 | Sent-message record: words editable before sending, Triangle's draft and the sent text both kept, a follow-up date on every send, due follow-ups on Today, Job Intake replies in the ledger (048) | `f9e9685` | Signed-in check 9/9 on a throwaway lead; on production 15 September, Today showing the eight overdue follow-ups | A follow-up message is recorded without its words |
 | Source check at filing: a reachable phone or email must appear on a cited page Triangle reads itself; an unreadable page files as Source unchecked | `2024155` | 31/31 offline; the 38 doors on file read live: 34 matched, 3 unchecked, 1 refused (Köster); Approvals label and refusal signed in, 3/3 | Checks at filing only; not yet on production; not yet exercised by a bot filing |
 | Wake on assignment follow-up: a human post on a bot-owned thread calls `wakeEmployee` with `human_followup` (ids only); UI says queued, not sent; amber badge stays until the employee answers in-thread | `3058eb5` | lint, build, tenant-identity still 8 known; no signed-in check here | Hanna's Grok routine must handle the event; missing/failed wake still queues for the next inbox check; does not send and does not widen `communicationPolicy` |
+| Scout is bot-owned: in-app OpenAI `scout-executor` claim loop hard-off; new Scout work is `execution_mode: bot` and wakes the bot (`assignment`); callers cannot force `in_app` onto Scout | `1f9cacc`, `93895cd` | lint, build, tenant-identity still 8 known; no signed-in check here | Scout's Grok routine must handle `assignment`; missed wake waits for the inbox check; older in_app Scout rows are visible in the inbox, not migrated; DEV-003 left for Antigravity |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
@@ -74,8 +75,8 @@ work, consent, availability for a specific order or mobilization clearance.
 | --- | --- | --- |
 | Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging | Extraction uses a model; paid/business conversion is not established by ingestion |
 | Research | Project/company evidence, two proposal stores, human review, case history | Accepted research is not a buyer-confirmed requirement |
-| Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask still claims the next Scout job; action-content and acknowledgment persistence defects remain |
-| Scout | Company qualification, contact reachability, open research; assignment constraints default to in-app | Specific-job execution, crash recovery, measured cost and uniform instructions are not fully proven |
+| Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask missions already go to the bot; the leftover Ask box no longer runs Scout on OpenAI; action-content and acknowledgment persistence defects remain |
+| Scout | Bot-owned: Triangle stores work and wakes Grok; in-app OpenAI executor does not claim Scout jobs | Specific-job execution on the bot, crash recovery, and measured cost are not fully proven; older in_app rows are not rewritten |
 | Talent | CV storage/extraction, candidate profiles, history, generated CVs, talent questions | Upload auto-acceptance, identity merging, readiness and access boundaries need correction |
 | Partner firms | `supply_partners`, create/confirm/status UI/API, capacity age checks, Scout/Hanna context | Source exists; role/actor and precise capacity-readiness checks remain incomplete |
 | Commercial | Requirements, buyer routes and commercial actions | Source exists; historic zero counts are not proof of today's live state |

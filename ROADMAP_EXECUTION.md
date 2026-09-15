@@ -129,7 +129,7 @@ read `constraints.wake`, and confirm the amber badge clears only after she
 answers in-thread. Limits: her Grok routine must handle `human_followup`;
 this does not send and does not widen `communicationPolicy`.
 
-### DEV-008 — Scout is bot-owned · `IN_PROGRESS`
+### DEV-008 — Scout is bot-owned · `DONE`
 
 **Why:** Scout still had a special in-app OpenAI executor (`scout-executor`)
 that claimed `execution_mode: in_app` jobs and, after six hours, stalled bot
@@ -142,6 +142,14 @@ bot; the in-app OpenAI claim loop does not take Scout jobs, including stalled
 bot jobs and run-now/pulse/cron; Ask / assignment create / finding
 continuation / suggested jobs / send-back / reachability do not force
 `in_app` onto Scout.
+
+**Done 15 September** (`1f9cacc`, `93895cd`). Checked: lint, production build,
+tenant-identity still the eight known failures. Could not signed-in check in
+this environment. DEV-003 (Hanna writes to the pool) was left `READY` for
+Antigravity; this item does not change `worker.propose` or the CV queue.
+Limits: Scout's Grok routine must handle `event: assignment`; a missing or
+failed wake still queues for the next inbox check; older in_app Scout rows
+are visible in Scout's inbox but are not rewritten in the database.
 
 ### Only if live work stalls on it
 
