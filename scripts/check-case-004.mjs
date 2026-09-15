@@ -49,14 +49,18 @@ const {
   holdingDeepLink,
   missionHasContext,
   missionHoldingAnchor,
+  missionHoldingsHref,
   missionStepAnchor,
+  missionStepHref,
   parseMissionHoldingHash,
   parseMissionStepHash,
+  parseMissionSurfaceTab,
 } = moduleLoader()('src/lib/data/mission-shared.ts');
 
 const PMS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ROESLER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const SCOUT_MISSION = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const HANNA_MISSION = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const HANNA_STEP = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
 test('Hanna citing Scout doors matches PMS even at three letters', () => {
@@ -79,15 +83,24 @@ test('legal endings and other companies do not false-match', () => {
   assert.equal(companyCitedIn('symptoms of a delay', 'PMS'), false);
 });
 
-test('holding chips deep-link to this mission, the source mission, or the record', () => {
+test('holding chips deep-link to this mission tab, the source mission tab, or the record', () => {
   assert.equal(missionHoldingAnchor(PMS), `holding-${PMS}`);
   assert.equal(
+    holdingDeepLink({
+      companyId: PMS,
+      sourceMissionId: SCOUT_MISSION,
+      onThisMission: true,
+      thisMissionId: HANNA_MISSION,
+    }),
+    `/missions/${HANNA_MISSION}?tab=companies#holding-${PMS}`,
+  );
+  assert.equal(
     holdingDeepLink({ companyId: PMS, sourceMissionId: SCOUT_MISSION, onThisMission: true }),
-    `#holding-${PMS}`,
+    `?tab=companies#holding-${PMS}`,
   );
   assert.equal(
     holdingDeepLink({ companyId: PMS, sourceMissionId: SCOUT_MISSION, onThisMission: false }),
-    `/missions/${SCOUT_MISSION}#holding-${PMS}`,
+    `/missions/${SCOUT_MISSION}?tab=companies#holding-${PMS}`,
   );
   assert.equal(
     holdingDeepLink({ companyId: ROESLER, sourceMissionId: null, onThisMission: false }),
@@ -131,6 +144,36 @@ test('empty context hides; Hanna DACH context shows', () => {
     }),
     true,
   );
+});
+
+test('surface tab parser and shareable holdings/step hrefs', () => {
+  assert.equal(parseMissionSurfaceTab('companies'), 'companies');
+  assert.equal(parseMissionSurfaceTab('Doors'), null);
+  assert.equal(parseMissionSurfaceTab('overview'), 'overview');
+  assert.equal(parseMissionSurfaceTab('nope'), null);
+  assert.equal(
+    missionHoldingsHref(HANNA_MISSION, PMS),
+    `/missions/${HANNA_MISSION}?tab=companies#holding-${PMS}`,
+  );
+  assert.equal(
+    missionStepHref(HANNA_MISSION, HANNA_STEP),
+    `/missions/${HANNA_MISSION}#step-${HANNA_STEP}`,
+  );
+});
+
+test('recruiting Overview click path: chips open Doors tab, not a dead hash', () => {
+  const chips = fs.readFileSync(path.resolve(root, 'src/components/missions/mission-context.tsx'), 'utf8');
+  const view = fs.readFileSync(path.resolve(root, 'src/components/missions/mission-view.tsx'), 'utf8');
+  const page = fs.readFileSync(path.resolve(root, 'src/app/(app)/missions/[id]/page.tsx'), 'utf8');
+  assert.match(chips, /onOpenHolding/);
+  assert.match(chips, /thisMissionId: missionId/);
+  assert.match(chips, /missionStepHref/);
+  assert.match(view, /parseMissionSurfaceTab/);
+  assert.match(view, /openHolding/);
+  assert.match(view, /setActive\("companies"\)/);
+  assert.match(view, /focusHoldingId/);
+  assert.match(page, /searchParams/);
+  assert.match(page, /initialTab/);
 });
 
 let failed = 0;

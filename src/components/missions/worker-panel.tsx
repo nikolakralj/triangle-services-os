@@ -77,9 +77,14 @@ function elapsed(since: string | null, now: number): string {
 export function WorkerPanel({
   workspace,
   canWrite,
+  focusStepId = null,
+  focusNonce = 0,
 }: {
   workspace: MissionWorkspace;
   canWrite: boolean;
+  /** Assignment id a context chip asked to bring into view. */
+  focusStepId?: string | null;
+  focusNonce?: number;
 }) {
   const router = useRouter();
   const { mission, lead, steps, messages, latest } = workspace;
@@ -178,19 +183,29 @@ export function WorkerPanel({
   }, [messages]);
 
   useEffect(() => {
+    if (focusStepId ?? parseMissionStepHash(window.location.hash)) return;
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [steps.length, messages.length, pending, live.length]);
+  }, [steps.length, messages.length, pending, live.length, focusStepId]);
 
   useEffect(() => {
     const openStep = () => {
-      const id = parseMissionStepHash(window.location.hash);
+      const id = focusStepId ?? parseMissionStepHash(window.location.hash);
       if (!id) return;
-      document.getElementById(missionStepAnchor(id))?.scrollIntoView({ block: "center" });
+      const el = document.getElementById(missionStepAnchor(id));
+      if (!el) {
+        // The step is not on this page. Still put the worker column on screen
+        // so a request chip is not a dead hash.
+        scroller.current?.closest("aside")?.scrollIntoView({ block: "nearest" });
+        scroller.current?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      el.scrollIntoView({ block: "center" });
+      scroller.current?.closest("aside")?.scrollIntoView({ block: "nearest" });
     };
     openStep();
     window.addEventListener("hashchange", openStep);
     return () => window.removeEventListener("hashchange", openStep);
-  }, [steps.length]);
+  }, [steps.length, focusStepId, focusNonce]);
 
   async function send(text: string) {
     const question = text.trim();

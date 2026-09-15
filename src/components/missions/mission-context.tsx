@@ -1,11 +1,12 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { Building2, Forward } from "lucide-react";
 import {
   holdingDeepLink,
   missionHasContext,
-  missionStepAnchor,
+  missionStepHref,
   type MissionContext,
 } from "@/lib/data/mission-shared";
 import { MissionMark } from "@/components/missions/mission-state";
@@ -17,6 +18,11 @@ import { MissionMark } from "@/components/missions/mission-state";
 // Scout's mission, or the records. That is a scavenger hunt, not a handoff.
 // These chips are the smallest fix: the request, the source mission, the door.
 // Not a second inbox.
+//
+// A hash-only holding chip looks clickable and does nothing on recruiting
+// Overview: the door rows live on the Doors tab and are not mounted. The href
+// carries ?tab=companies so the surface switches, the row opens, and the URL
+// is pasteable.
 // ---------------------------------------------------------------------------
 
 const REQUEST_STATUS: Record<string, string> = {
@@ -30,8 +36,17 @@ const REQUEST_STATUS: Record<string, string> = {
 
 export function MissionContextChips({
   context,
+  missionId,
+  stepIds,
+  onOpenHolding,
+  onOpenStep,
 }: {
   context: MissionContext;
+  missionId: string;
+  /** Assignment ids actually rendered in the worker panel on this page. */
+  stepIds: ReadonlySet<string>;
+  onOpenHolding: (companyId: string) => void;
+  onOpenStep: (stepId: string) => void;
 }) {
   if (!missionHasContext(context)) return null;
 
@@ -44,11 +59,19 @@ export function MissionContextChips({
         {context.requests.map((r) => {
           const status = REQUEST_STATUS[r.status] ?? r.status;
           const title = r.headline ? `${r.title} — ${r.headline}` : r.title;
+          const onPage = stepIds.has(r.assignmentId);
+          const href = onPage ? missionStepHref(missionId, r.assignmentId) : `/missions/${missionId}`;
           return (
             <li key={r.assignmentId}>
               <Link
-                href={`#${missionStepAnchor(r.assignmentId)}`}
+                href={href}
+                scroll={false}
                 title={`${r.askedBy} asked ${r.askedOf}: ${title}`}
+                onClick={(e) => {
+                  if (!onPage) return;
+                  e.preventDefault();
+                  onOpenStep(r.assignmentId);
+                }}
                 className="inline-flex max-w-[22rem] items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[12px] font-medium text-sky-800 ring-1 ring-inset ring-sky-200 transition hover:bg-sky-100"
               >
                 <Forward className="h-3 w-3 shrink-0" />
@@ -78,8 +101,14 @@ export function MissionContextChips({
         {context.holdings.map((h) => (
           <li key={h.companyId}>
             <Link
-              href={holdingDeepLink(h)}
+              href={holdingDeepLink({ ...h, thisMissionId: missionId })}
+              scroll={false}
               title={`Open ${h.name}`}
+              onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+                if (!h.onThisMission) return;
+                e.preventDefault();
+                onOpenHolding(h.companyId);
+              }}
               className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[12px] font-medium text-slate-800 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"
             >
               <Building2 className="h-3 w-3 shrink-0 text-slate-500" />

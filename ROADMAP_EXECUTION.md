@@ -250,7 +250,7 @@ sending.
 
 | Item | Status | Gate |
 | --- | --- | --- |
-| Agent handoffs: budget and time limits, retries, escalation (CASE-004) | Still `GATED`. Visibility slice **DONE 15 September**: mission page chips for linked colleague requests, the source mission a door was first filed in, and holding chips that deep-link to the record (not a second chat inbox). **Evidence 15 September:** on Hanna's DACH Elektromontage mission she cited Scout-filed doors (PMS / Rösler) without those chips, so progress felt like a scavenger hunt across missions. Remaining gate: two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context. | Two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context |
+| Agent handoffs: budget and time limits, retries, escalation (CASE-004) | Still `GATED`. Visibility slice **DONE 15 September**: mission page chips for linked colleague requests, the source mission a door was first filed in, and holding chips that deep-link to the record (not a second chat inbox). **Fix 15 September:** on a recruiting mission those holding chips now switch to the Doors tab (`?tab=companies#holding-{id}`) instead of setting a hash with no mounted row. Remaining gate: two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context. | Two employees repeatedly collaborate on the same real case and handoffs cause delay or lost context |
 
 | Outcome-backed learning (CASE-005) | `GATED` | Enough real buyer responses, placements or delivery outcomes to evaluate a playbook |
 | Truthful availability and package coverage (CORE-001) | `BLOCKED_EXTERNAL` | People confirm the real roster and one initial offer |

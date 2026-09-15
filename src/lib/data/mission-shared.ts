@@ -327,15 +327,67 @@ export function parseMissionStepHash(hash: string): string | null {
   return m ? m[1].toLowerCase() : null;
 }
 
+/**
+ * The binder tab that lists doors. Research labels it Companies; recruiting
+ * labels it Doors. Same key so a chip, a pasted URL and the tab strip agree.
+ */
+export const MISSION_HOLDINGS_TAB = "companies" as const;
+
+export const MISSION_SURFACE_TABS = [
+  "overview",
+  "companies",
+  "people",
+  "projects",
+  "sources",
+  "candidates",
+  "partners",
+] as const;
+
+export type MissionSurfaceKey = (typeof MISSION_SURFACE_TABS)[number];
+
+export function parseMissionSurfaceTab(value: string | null | undefined): MissionSurfaceKey | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  return (MISSION_SURFACE_TABS as readonly string[]).includes(v) ? (v as MissionSurfaceKey) : null;
+}
+
+export function missionSurfaceHref(input: {
+  missionId: string;
+  tab?: MissionSurfaceKey | null;
+  hash?: string | null;
+}): string {
+  const tab = input.tab && input.tab !== "overview" ? `?tab=${input.tab}` : "";
+  const raw = input.hash?.replace(/^#/, "") ?? "";
+  const hash = raw ? `#${raw}` : "";
+  return `/missions/${input.missionId}${tab}${hash}`;
+}
+
+export function missionHoldingsHref(missionId: string, companyId: string): string {
+  return missionSurfaceHref({
+    missionId,
+    tab: MISSION_HOLDINGS_TAB,
+    hash: missionHoldingAnchor(companyId),
+  });
+}
+
+export function missionStepHref(missionId: string, stepId: string): string {
+  return missionSurfaceHref({ missionId, hash: missionStepAnchor(stepId) });
+}
+
 /** Where a holding chip should go: this page, the source mission, or the company record. */
 export function holdingDeepLink(input: {
   companyId: string;
   sourceMissionId: string | null;
   onThisMission: boolean;
+  /** This mission, so an on-this-mission chip is a shareable path, not a dead hash. */
+  thisMissionId?: string | null;
 }): string {
-  const anchor = missionHoldingAnchor(input.companyId);
-  if (input.onThisMission) return `#${anchor}`;
-  if (input.sourceMissionId) return `/missions/${input.sourceMissionId}#${anchor}`;
+  if (input.onThisMission) {
+    return input.thisMissionId
+      ? missionHoldingsHref(input.thisMissionId, input.companyId)
+      : `?tab=${MISSION_HOLDINGS_TAB}#${missionHoldingAnchor(input.companyId)}`;
+  }
+  if (input.sourceMissionId) return missionHoldingsHref(input.sourceMissionId, input.companyId);
   return `/companies/${input.companyId}`;
 }
 
