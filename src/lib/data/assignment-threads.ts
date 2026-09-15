@@ -155,33 +155,33 @@ export async function addHumanMessage(params: {
   const finished = ["completed", "failed"].includes(assignment.status as string);
   const constraints =
     (assignment.constraints as Record<string, unknown> | null) ?? {};
+  const agentInstanceId = (assignment.agent_instance_id as string | null) ?? null;
+  const runtime = agentInstanceId
+    ? await employeeMissionRuntime(params.orgId, agentInstanceId)
+    : "in_app";
+  const usesBotWake = runtime === "bot" || constraints.execution_mode === "bot";
   if (finished) {
     await svc
       .from("agent_assignments")
       .update({
-        // In-app workers are push-capable: the next workforce pulse claims
-        // the reopened job. A bot-runtime owner is woken below.
-        status: constraints.execution_mode === "in_app" ? "queued" : "active",
+        // In-app workers go back to queued for Triangle's runner. A bot
+        // owner stays on the polling contract and is woken below.
+        status: usesBotWake ? "active" : "queued",
         completed_at: null,
       })
       .eq("id", params.assignmentId)
       .eq("org_id", params.orgId);
   }
 
-  const agentInstanceId = (assignment.agent_instance_id as string | null) ?? null;
   let wake: WakeResult | null = null;
-  if (agentInstanceId) {
-    const runtime = await employeeMissionRuntime(params.orgId, agentInstanceId);
-    const usesBotWake = runtime === "bot" || constraints.execution_mode === "bot";
-    if (usesBotWake) {
-      wake = await wakeEmployee({
-        orgId: params.orgId,
-        agentInstanceId,
-        stepId: params.assignmentId,
-        missionId: (assignment.mission_id as string | null) ?? null,
-        event: "human_followup",
-      });
-    }
+  if (agentInstanceId && usesBotWake) {
+    wake = await wakeEmployee({
+      orgId: params.orgId,
+      agentInstanceId,
+      stepId: params.assignmentId,
+      missionId: (assignment.mission_id as string | null) ?? null,
+      event: "human_followup",
+    });
   }
 
   return {

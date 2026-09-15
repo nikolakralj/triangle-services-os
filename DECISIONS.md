@@ -6,6 +6,18 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-15: Scout is bot-owned — no in-app OpenAI stand-in
+
+CEO decision: Scout, Hanna and Bob work the same way. Triangle stores the work
+and wakes the Grok bot. Scout's special in-app OpenAI executor
+(`scout-executor` claiming `execution_mode: in_app`, plus stalled-bot
+takeover) is retired so there is no second brain and no extra OpenAI bill
+when Next would otherwise run Scout itself.
+
+Scout (`project_researcher`) is always bot-owned in code, even if
+`mission_runtime` is unset. New Scout assignments are `execution_mode: bot`
+and wake the bot (`event: assignment`). The claim loop is hard-off.
+
 ### 2026-09-08: Test every human job for end-to-end agent ownership
 
 Management clarified that Triangle combines agents and humans, with agents

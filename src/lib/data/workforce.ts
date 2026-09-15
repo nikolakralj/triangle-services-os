@@ -6,6 +6,13 @@ import {
   countMessagesByAssignment,
   takeThreadForBot,
 } from "@/lib/data/assignment-threads";
+import {
+  assignmentQueuedNotice,
+  employeeMissionRuntime,
+  wakeEmployee,
+  type MissionRuntime,
+  type WakeResult,
+} from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // Workforce data layer (agent_instances era).
@@ -204,9 +211,22 @@ export async function createAssignment(params: {
   /** The mission this step belongs to, when it is one instruction inside one. */
   missionId?: string | null;
   userId: string | null;
-}): Promise<{ id: string } | null> {
+}): Promise<{
+  id: string;
+  runtime: MissionRuntime;
+  wake: WakeResult | null;
+  notice: string;
+} | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
+
+  const runtime = await employeeMissionRuntime(params.orgId, params.agentInstanceId);
+  const incoming = params.constraints ?? {};
+  // A bot employee owns its work. Callers that still pass execution_mode
+  // in_app (Ask, finding continuation, suggested jobs) cannot force Scout
+  // onto the retired OpenAI executor.
+  const constraints =
+    runtime === "bot" ? { ...incoming, execution_mode: "bot" } : incoming;
 
   // Approval endpoints may be retried after a network interruption. Return
   // the already-created continuation instead of producing duplicate agent
@@ -218,7 +238,14 @@ export async function createAssignment(params: {
       .eq("org_id", params.orgId)
       .eq("idempotency_key", params.idempotencyKey)
       .maybeSingle();
-    if (existing) return { id: existing.id as string };
+    if (existing) {
+      return {
+        id: existing.id as string,
+        runtime,
+        wake: null,
+        notice: assignmentQueuedNotice(null),
+      };
+    }
   }
 
   const { data, error } = await svc
@@ -230,7 +257,7 @@ export async function createAssignment(params: {
       objective: params.objective.slice(0, 8000),
       priority: params.priority ?? "normal",
       due_at: params.dueAt ?? null,
-      constraints: params.constraints ?? {},
+      constraints,
       expected_output: params.expectedOutput ?? null,
       idempotency_key: params.idempotencyKey ?? null,
       project_id: params.projectId ?? null,
@@ -262,7 +289,28 @@ export async function createAssignment(params: {
       })),
     );
   }
-  return { id: data.id as string };
+
+  // Mission steps are woken by the mission hand-off with event mission_step.
+  // Everything else a bot owns is woken here, so Ask / Workforce / finding
+  // continuation / suggested jobs / send-back / reachability / plays do not
+  // each have to remember.
+  let wake: WakeResult | null = null;
+  if (runtime === "bot" && constraints.case_type !== "mission_step") {
+    wake = await wakeEmployee({
+      orgId: params.orgId,
+      agentInstanceId: params.agentInstanceId,
+      stepId: data.id as string,
+      missionId: params.missionId ?? null,
+      event: "assignment",
+    });
+  }
+
+  return {
+    id: data.id as string,
+    runtime,
+    wake,
+    notice: assignmentQueuedNotice(wake),
+  };
 }
 
 export async function listAssignments(
@@ -416,12 +464,16 @@ export async function listOpenAssignmentsForInstance(
     .eq("agent_instance_id", agentInstanceId)
     .in("status", ["queued", "active"])
     .order("created_at");
-  // Work Triangle's own runner does is not the bot's. Handing it out anyway let
-  // the bot and the runner take the same job, and whoever finished second was
-  // told the job did not exist.
-  const rows = (data ?? []).filter(
-    (r) => (r.constraints as Record<string, unknown> | null)?.execution_mode !== "in_app",
-  );
+  // Work Triangle's own runner does is not the bot's — except that a
+  // bot-runtime employee now owns all of its open work, including older
+  // rows that were filed as in_app before Scout's OpenAI executor was
+  // retired. Those would otherwise sit queued forever: the executor no
+  // longer claims them, and this filter used to hide them from the inbox.
+  const runtime = await employeeMissionRuntime(orgId, agentInstanceId);
+  const rows = (data ?? []).filter((r) => {
+    if (runtime === "bot") return true;
+    return (r.constraints as Record<string, unknown> | null)?.execution_mode !== "in_app";
+  });
   if (rows.length === 0) return [];
 
   const queued = rows.filter((r) => r.status === "queued").map((r) => r.id as string);

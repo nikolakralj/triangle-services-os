@@ -129,6 +129,20 @@ read `constraints.wake`, and confirm the amber badge clears only after she
 answers in-thread. Limits: her Grok routine must handle `human_followup`;
 this does not send and does not widen `communicationPolicy`.
 
+### DEV-008 — Scout is bot-owned · `IN_PROGRESS`
+
+**Why:** Scout still had a special in-app OpenAI executor (`scout-executor`)
+that claimed `execution_mode: in_app` jobs and, after six hours, stalled bot
+jobs. Hanna has no such stand-in. The CEO's rule is one way of working:
+Triangle stores the work and wakes the Grok bot. A second brain bills OpenAI
+for jobs the bot is already paid to do.
+
+**Acceptance:** new Scout work is `execution_mode: bot` and wakes the Scout
+bot; the in-app OpenAI claim loop does not take Scout jobs, including stalled
+bot jobs and run-now/pulse/cron; Ask / assignment create / finding
+continuation / suggested jobs / send-back / reachability do not force
+`in_app` onto Scout.
+
 ### Only if live work stalls on it
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues

@@ -286,7 +286,6 @@ async function sendBack({ svc, kind, id, org, userId, now }: Ctx) {
     // The parent is recorded on the child, so the item can say Scout is on it
     // and the answer can be traced back to the question it answers.
     constraints: {
-      execution_mode: "in_app",
       case_type: "open_research",
       parent_kind: kind,
       parent_id: id,

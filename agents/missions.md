@@ -22,6 +22,7 @@ instruction — it only tells you where to look.
 | `requested` | A colleague asked you for work. |
 | `request_returned` | Work you asked a colleague for came back. |
 | `human_followup` | A person posted on this assignment's thread. |
+| `assignment` | New work that is not a mission step (Workforce, qualify, reach, send-back). |
 
 Then read the work from Triangle — never from the wake-up body:
 
@@ -33,11 +34,11 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 Reading it starts the step, and the CEO sees you picked it up. The same object
 arrives as `mission` on the assignment in your inbox.
 
-On `human_followup`, also read your inbox. `newQuestions` on that assignment
-is what you owe a reply to; the words are not in the wake body. If `missionId`
-is null, the inbox is the only place to look. Answer in-thread
-(`POST /api/agent/inbox` with `{ assignmentId, message }`) unless you are
-finishing the step.
+On `human_followup` or `assignment`, also read your inbox. `newQuestions` on
+that assignment is what you owe a reply to; the words are not in the wake
+body. If `missionId` is null, the inbox is the only place to look. Answer
+in-thread (`POST /api/agent/inbox` with `{ assignmentId, message }`) unless
+you are finishing a mission step.
 
 ## What you are handed
 

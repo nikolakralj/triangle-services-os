@@ -3,33 +3,19 @@ import { runNextScoutAssignment } from "@/lib/ai/scout-executor";
 import { safeEqual } from "@/lib/job-intake/credentials";
 
 // ---------------------------------------------------------------------------
-// The employees work when nobody is watching.
+// Scheduled agent work.
 //
-// Until now, queued work only ran while a manager had Triangle open in a
-// visible tab — AgentWorkPulse said as much in its own comment: "a durable
-// cloud scheduler is the next runtime layer". Close the tab and the company
-// stopped. That is the opposite of an AI workforce; it is a human driving a
-// machine that pretends to drive itself.
+// This used to claim stalled Scout jobs and run them on OpenAI — a second
+// brain, and the thing the CEO retired on 15 September 2026. Scout is
+// bot-owned: Triangle stores the work and wakes the bot; the bot's own
+// scheduled inbox check is the backup for a missed wake-up.
 //
-// Called with `Authorization: Bearer $CRON_SECRET`. It claims and runs queued
-// assignments the same way the in-app pulse does, so there is one execution
-// path and one set of database claims rather than two that can disagree.
-//
-// Vercel Hobby allows a cron only once a day, so the schedule in vercel.json is
-// a floor, not the heartbeat. The frequent caller is the provider bot's own
-// recurring routine hitting /api/agent/inbox, which costs nothing extra and
-// polls as often as it likes. This endpoint is the safety net underneath it:
-// once a day, anything the bot never collected gets done anyway.
+// The route stays so Vercel Cron does not 404. It does not claim Scout work
+// and does not call OpenAI.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
-
-/**
- * Bounded on purpose. Each run costs an OpenAI call, and an unbounded loop on
- * a schedule is how a quiet weekend turns into a bill nobody authorised.
- */
-const MAX_PER_INVOCATION = Number(process.env.AGENT_CRON_BATCH ?? 3);
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -47,29 +33,15 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured." },
-      { status: 503 },
-    );
-  }
 
-  const ran: Array<{ status: string; assignmentId?: string }> = [];
-  for (let i = 0; i < MAX_PER_INVOCATION; i++) {
-    const result = await runNextScoutAssignment(orgId);
-    if (result.status === "idle") break;
-    ran.push({
-      status: result.status,
-      assignmentId: "assignmentId" in result ? result.assignmentId : undefined,
-    });
-    // A failing employee should not burn the whole batch retrying behind it.
-    if (result.status === "failed") break;
-  }
-
+  const result = await runNextScoutAssignment(orgId);
   return NextResponse.json({
     ok: true,
-    ran: ran.length,
-    results: ran,
+    ran: 0,
+    results: [],
+    status: result.status,
+    message:
+      "Scout work is owned by the Scout bot. This cron no longer runs the in-app OpenAI executor.",
   });
 }
 

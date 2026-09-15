@@ -4,12 +4,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Development and early-production bridge: while an authenticated manager has
- * Triangle open, queued in-app employee work is claimed and executed without
- * requiring the manager to visit the provider's chat product.
- *
- * A durable cloud scheduler is the next runtime layer; the database claim is
- * already safe for both callers, so this component can later disappear.
+ * While an authenticated manager has Triangle open, this used to claim queued
+ * in-app Scout work and run it on OpenAI. Scout is bot-owned as of
+ * 15 September 2026; the pulse now gets idle and does nothing.
  */
 export function AgentWorkPulse() {
   const router = useRouter();
