@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,8 +23,13 @@ import {
   AUTONOMY_STANDARD,
   ago,
   hostOf,
+  missionHoldingsHref,
   missionHoldingAnchor,
+  missionStepAnchor,
+  missionSurfaceHref,
   parseMissionHoldingHash,
+  parseMissionStepHash,
+  parseMissionSurfaceTab,
   pickRecommendedCompany,
   type MissionAttempt,
   type MissionCandidate,
@@ -34,6 +39,7 @@ import {
   type MissionPersonRow,
   type MissionProjectRow,
   type MissionSourceRow,
+  type MissionSurfaceKey,
   type MissionWorkspace,
 } from "@/lib/data/mission-shared";
 import {
@@ -74,22 +80,95 @@ export function MissionView({
   workspace,
   canWrite,
   canSeeWorkers,
+  initialTab = null,
 }: {
   workspace: MissionWorkspace;
   canWrite: boolean;
   canSeeWorkers: boolean;
+  initialTab?: MissionSurfaceKey | null;
 }) {
+  const missionId = workspace.mission.id;
+  const [active, setActive] = useState<MissionSurfaceKey>(initialTab ?? "overview");
+  const [focusHoldingId, setFocusHoldingId] = useState<string | null>(null);
+  const [focusStepId, setFocusStepId] = useState<string | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const tab = parseMissionSurfaceTab(new URLSearchParams(window.location.search).get("tab"));
+      const holding = parseMissionHoldingHash(window.location.hash);
+      const step = parseMissionStepHash(window.location.hash);
+      if (holding) setActive("companies");
+      else if (tab) setActive(tab);
+      else setActive("overview");
+      setFocusHoldingId(holding);
+      setFocusStepId(step);
+    };
+    syncFromUrl();
+    window.addEventListener("hashchange", syncFromUrl);
+    window.addEventListener("popstate", syncFromUrl);
+    return () => {
+      window.removeEventListener("hashchange", syncFromUrl);
+      window.removeEventListener("popstate", syncFromUrl);
+    };
+  }, []);
+
+  function writeUrl(tab: MissionSurfaceKey, hash?: string | null) {
+    const url = missionSurfaceHref({ missionId, tab, hash });
+    // Same-page tab+hash. pushState keeps the URL pasteable without a Next
+    // refresh that would unmount the row we just opened. Back restores Overview.
+    window.history.pushState(window.history.state, "", url);
+  }
+
+  function selectTab(key: MissionSurfaceKey) {
+    setActive(key);
+    setFocusHoldingId(null);
+    writeUrl(key, null);
+  }
+
+  function openHolding(companyId: string) {
+    setActive("companies");
+    setFocusHoldingId(companyId);
+    setFocusStepId(null);
+    setFocusNonce((n) => n + 1);
+    writeUrl("companies", missionHoldingAnchor(companyId));
+  }
+
+  function openStep(stepId: string) {
+    setFocusStepId(stepId);
+    setFocusNonce((n) => n + 1);
+    writeUrl(active, missionStepAnchor(stepId));
+  }
+
   return (
     <div className="-mx-4 -mt-4 xl:-mx-5">
       <MissionTabs tabs={workspace.tabs} activeId={workspace.mission.id} canWrite={canWrite} />
       <div className="px-4 pb-8 pt-5 xl:px-5">
-        <MissionHeader workspace={workspace} canWrite={canWrite} />
+        <MissionHeader
+          workspace={workspace}
+          canWrite={canWrite}
+          onOpenHolding={openHolding}
+          onOpenStep={openStep}
+        />
         <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0">
-            <Surfaces workspace={workspace} canWrite={canWrite} canSeeWorkers={canSeeWorkers} />
+            <Surfaces
+              workspace={workspace}
+              canWrite={canWrite}
+              canSeeWorkers={canSeeWorkers}
+              active={active}
+              onSelectTab={selectTab}
+              focusHoldingId={focusHoldingId}
+              focusNonce={focusNonce}
+            />
           </div>
           <aside className="xl:sticky xl:top-[76px] xl:h-[calc(100vh-100px)]">
-            <WorkerPanel workspace={workspace} canWrite={canWrite} />
+            <WorkerPanel
+              workspace={workspace}
+              canWrite={canWrite}
+              focusStepId={focusStepId}
+              focusNonce={focusNonce}
+            />
           </aside>
         </div>
       </div>
@@ -99,9 +178,20 @@ export function MissionView({
 
 // ── header ──────────────────────────────────────────────────────────────────
 
-function MissionHeader({ workspace, canWrite }: { workspace: MissionWorkspace; canWrite: boolean }) {
+function MissionHeader({
+  workspace,
+  canWrite,
+  onOpenHolding,
+  onOpenStep,
+}: {
+  workspace: MissionWorkspace;
+  canWrite: boolean;
+  onOpenHolding: (companyId: string) => void;
+  onOpenStep: (stepId: string) => void;
+}) {
   const router = useRouter();
   const { mission, lead, state, steps } = workspace;
+  const stepIds = useMemo(() => new Set(steps.map((s) => s.id)), [steps]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,7 +256,13 @@ function MissionHeader({ workspace, canWrite }: { workspace: MissionWorkspace; c
             {steps.length} {steps.length === 1 ? "instruction" : "instructions"}
           </span>
         </p>
-        <MissionContextChips context={workspace.context} />
+        <MissionContextChips
+          context={workspace.context}
+          missionId={mission.id}
+          stepIds={stepIds}
+          onOpenHolding={onOpenHolding}
+          onOpenStep={onOpenStep}
+        />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AutonomyMenu leadName={lead?.name ?? "The worker"} />
@@ -362,41 +458,28 @@ function DecisionStrip({
 
 // ── surfaces ────────────────────────────────────────────────────────────────
 
-type SurfaceKey =
-  | "overview"
-  | "companies"
-  | "people"
-  | "projects"
-  | "sources"
-  | "candidates"
-  | "partners";
-
 function Surfaces({
   workspace,
   canWrite,
   canSeeWorkers,
+  active,
+  onSelectTab,
+  focusHoldingId,
+  focusNonce,
 }: {
   workspace: MissionWorkspace;
   canWrite: boolean;
   canSeeWorkers: boolean;
+  active: MissionSurfaceKey;
+  onSelectTab: (key: MissionSurfaceKey) => void;
+  focusHoldingId: string | null;
+  focusNonce: number;
 }) {
   const research = workspace.mission.kind !== "recruiting";
-  const [active, setActive] = useState<SurfaceKey>("overview");
   const [decision, setDecision] = useState<RuledOutDecision | null>(null);
   const missionId = workspace.mission.id;
 
-  useEffect(() => {
-    const openHolding = () => {
-      if (!parseMissionHoldingHash(window.location.hash)) return;
-      if (workspace.companies.length === 0) return;
-      setActive("companies");
-    };
-    openHolding();
-    window.addEventListener("hashchange", openHolding);
-    return () => window.removeEventListener("hashchange", openHolding);
-  }, [workspace.companies.length]);
-
-  const tabs: Array<{ key: SurfaceKey; label: string; count?: number }> = research
+  const tabs: Array<{ key: MissionSurfaceKey; label: string; count?: number }> = research
     ? [
         { key: "overview", label: "Overview" },
         { key: "companies", label: "Companies", count: workspace.companies.length },
@@ -423,7 +506,7 @@ function Surfaces({
             <button
               key={t.key}
               type="button"
-              onClick={() => setActive(t.key)}
+              onClick={() => onSelectTab(t.key)}
               aria-current={on ? "page" : undefined}
               className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition ${
                 on
@@ -458,12 +541,18 @@ function Surfaces({
         )}
         {active === "overview" &&
           (research ? (
-            <ResearchOverview workspace={workspace} canWrite={canWrite} onOpen={setActive} />
+            <ResearchOverview workspace={workspace} canWrite={canWrite} onOpen={onSelectTab} />
           ) : (
             <RecruitingOverview workspace={workspace} canWrite={canWrite} canSeeWorkers={canSeeWorkers} />
           ))}
         {active === "companies" && (
-          <CompanyTable rows={workspace.companies} missionId={missionId} canWrite={canWrite} />
+          <CompanyTable
+            rows={workspace.companies}
+            missionId={missionId}
+            canWrite={canWrite}
+            focusHoldingId={focusHoldingId}
+            focusNonce={focusNonce}
+          />
         )}
         {active === "people" && (
           <PeopleTable rows={workspace.people} missionId={missionId} canWrite={canWrite} />
@@ -489,7 +578,7 @@ function ResearchOverview({
 }: {
   workspace: MissionWorkspace;
   canWrite: boolean;
-  onOpen: (key: SurfaceKey) => void;
+  onOpen: (key: MissionSurfaceKey) => void;
 }) {
   const { latest, counts, companies, lead, state, steps, mission } = workspace;
   const running = state === "queued" || state === "working";
@@ -699,10 +788,14 @@ function CompanyTable({
   rows,
   missionId,
   canWrite,
+  focusHoldingId = null,
+  focusNonce = 0,
 }: {
   rows: MissionCompanyRow[];
   missionId: string;
   canWrite: boolean;
+  focusHoldingId?: string | null;
+  focusNonce?: number;
 }) {
   if (rows.length === 0) return <EmptyNote>No companies on file for this mission yet.</EmptyNote>;
   return (
@@ -718,7 +811,14 @@ function CompanyTable({
       </div>
       <ul className="divide-y divide-slate-100">
         {rows.map((row) => (
-          <CompanyItem key={row.companyId} row={row} missionId={missionId} canWrite={canWrite} />
+          <CompanyItem
+            key={row.companyId}
+            row={row}
+            missionId={missionId}
+            canWrite={canWrite}
+            focusHoldingId={focusHoldingId}
+            focusNonce={focusNonce}
+          />
         ))}
       </ul>
     </div>
@@ -729,28 +829,31 @@ function CompanyItem({
   row,
   missionId,
   canWrite,
+  focusHoldingId = null,
+  focusNonce = 0,
 }: {
   row: MissionCompanyRow;
   missionId: string;
   canWrite: boolean;
+  focusHoldingId?: string | null;
+  focusNonce?: number;
 }) {
   const [open, setOpen] = useState(false);
   const status = companyStatus(row);
 
   useEffect(() => {
-    const onHash = () => {
-      if (parseMissionHoldingHash(window.location.hash) !== row.companyId) return;
-      setOpen(true);
-      window.requestAnimationFrame(() => {
-        document.getElementById(missionHoldingAnchor(row.companyId))?.scrollIntoView({
-          block: "center",
-        });
+    const match =
+      focusHoldingId === row.companyId ||
+      parseMissionHoldingHash(window.location.hash) === row.companyId;
+    if (!match) return;
+    setOpen(true);
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(missionHoldingAnchor(row.companyId))?.scrollIntoView({
+        block: "center",
       });
-    };
-    onHash();
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, [row.companyId]);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [row.companyId, focusHoldingId, focusNonce]);
 
   return (
     <li id={missionHoldingAnchor(row.companyId)} className={`scroll-mt-24 ${row.notForUs ? "bg-slate-50/70" : ""}`}>
@@ -854,7 +957,7 @@ function CompanyDetail({
         {row.sourceMission && (
           <Fact label="Filed in">
             <Link
-              href={`/missions/${row.sourceMission.id}#${missionHoldingAnchor(row.companyId)}`}
+              href={missionHoldingsHref(row.sourceMission.id, row.companyId)}
               className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[12px] text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
             >
               <MissionMark emoji={row.sourceMission.emoji} size="sm" />
