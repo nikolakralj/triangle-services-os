@@ -152,8 +152,9 @@ Company rows stay; a case still opens from missions, Approvals and holdings.
 **Acceptance:** sidebar and Quick add have no Companies; `/companies` redirects
 to Missions with a short notice; `/companies/[id]` still works; no table drop.
 
-**Done 15 September** (`878b450`). List route redirects; detail deep links unchanged. No
-migration. Checked: lint, production build, tenant-identity 0. Could not
+**Done 15 September** (`5b913ed`). List route HTTP-redirects; detail deep links
+unchanged. No migration. Checked: lint, production build, tenant-identity 0;
+`curl -sI /companies` ? 307 to `/missions?notice=companies`. Could not
 signed-in check here. Nikola: confirm the sidebar has no Companies, then open a
 company from a mission's holdings.
 
