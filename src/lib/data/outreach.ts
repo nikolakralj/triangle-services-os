@@ -6,7 +6,8 @@ export type OutreachChannel =
   | "linkedin_connect"
   | "linkedin_message"
   | "email_cold"
-  | "email_followup";
+  | "email_followup"
+  | "phone_call";
 
 export type OutreachStatus =
   | "draft"
@@ -72,7 +73,8 @@ export async function listOutreachDrafts(
 
 export async function createOutreachDraft(params: {
   orgId: string;
-  projectId: string;
+  /** Null for pool availability checks and other conversations with no discovered project. */
+  projectId?: string | null;
   buyerContactId?: string | null;
   buyerSuggestionId?: string | null;
   projectPackageId?: string | null;
@@ -91,7 +93,7 @@ export async function createOutreachDraft(params: {
     .from("outreach_drafts")
     .insert({
       org_id: params.orgId,
-      project_id: params.projectId,
+      project_id: params.projectId ?? null,
       buyer_contact_id: params.buyerContactId ?? null,
       buyer_suggestion_id: params.buyerSuggestionId ?? null,
       project_package_id: params.projectPackageId ?? null,
@@ -256,6 +258,7 @@ const ACTION_TYPE_FOR_CHANNEL: Record<OutreachChannel, string> = {
   email_followup: "email",
   linkedin_connect: "linkedin",
   linkedin_message: "linkedin",
+  phone_call: "call",
 };
 
 /**

@@ -362,8 +362,13 @@ export async function listDecisionInbox(
   }
 
   const draftsByProject = new Map<string, typeof draftRows>();
+  const draftsWithoutProject: typeof draftRows = [];
   for (const row of draftRows) {
-    const projectId = row.project_id as string;
+    const projectId = (row.project_id as string | null) ?? null;
+    if (!projectId) {
+      draftsWithoutProject.push(row);
+      continue;
+    }
     const existing = draftsByProject.get(projectId) ?? [];
     existing.push(row);
     draftsByProject.set(projectId, existing);
@@ -440,6 +445,55 @@ export async function listDecisionInbox(
       nextHumanStep: `Open the project and compare the full draft${projectDrafts.length === 1 ? "" : " variants"}${buyerIdsForProject.length ? ` for ${buyerIdsForProject.map((id) => buyerNames.get(id) ?? "the buyer").join(", ")}` : ""}${packageIdsForProject.length ? ` against ${packageIdsForProject.map((id) => packageNames.get(id) ?? "the crew package").join(", ")}` : ""}. Copy and send only the approved version yourself.`,
       createdAt: latestCreatedAt,
       detail: subjects.slice(0, 4).join(" · ") + (subjects.length > 4 ? ` · +${subjects.length - 4} more` : ""),
+      approvalItems: [],
+    });
+  }
+
+  if (draftsWithoutProject.length > 0) {
+    const subjects = Array.from(
+      new Set(
+        draftsWithoutProject.map((row) => String(row.subject || row.channel || "Outreach draft")),
+      ),
+    );
+    const owners = Array.from(
+      new Set(
+        draftsWithoutProject
+          .map((row) => {
+            const face = faces.fromCredentialName(
+              (row.created_by_agent as string | null) ?? null,
+            );
+            return face ? `${face.emoji} ${face.name}` : null;
+          })
+          .filter(Boolean) as string[],
+      ),
+    );
+    const latestCreatedAt = draftsWithoutProject
+      .map((row) => row.created_at as string)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+    const bodies = draftsWithoutProject
+      .map((row) => String(row.body ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((body) => (body.length > 220 ? `${body.slice(0, 219)}…` : body));
+    decisions.push({
+      id: "outreach-no-project",
+      kind: "approve_commercial_action",
+      caseLabel: "External action approval",
+      title: `${draftsWithoutProject.length} outreach draft${draftsWithoutProject.length === 1 ? "" : "s"} with no project, awaiting a person to send`,
+      caseHref: "/approvals",
+      recommendation:
+        "These are drafts only. Copy the words and send them yourself. Triangle sends nothing, including availability checks Hanna drafted.",
+      businessImpact: "This message leaves Triangle and can create or damage a real relationship.",
+      unknowns: ["No discovered project is attached, so there is no hunter page for these drafts."],
+      evidenceQuality: "medium",
+      evidenceCount: 0,
+      averageConfidence: null,
+      ownerLabel: owners.length ? owners.join(", ") : "AI employee",
+      nextSafeAiStep: "AI may improve the draft from verified records but cannot send it.",
+      nextHumanStep:
+        "Open Approvals if the draft is an availability proposal; otherwise copy the words here and send them yourself. Record the send in Triangle after you send.",
+      createdAt: latestCreatedAt,
+      detail: [subjects.slice(0, 4).join(" · "), ...bodies].filter(Boolean).join("\n\n"),
       approvalItems: [],
     });
   }

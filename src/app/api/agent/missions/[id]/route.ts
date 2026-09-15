@@ -23,6 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     id,
     auth.step.id,
     auth.step.agentInstanceId,
+    auth.machine.scopes,
   );
   if (!payload) return NextResponse.json({ error: "The mission could not be read." }, { status: 404 });
   return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });

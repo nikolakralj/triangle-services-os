@@ -632,6 +632,36 @@ export async function acceptFinding(params: {
   }
 
   if (finding.finding_type === "worker") {
+    const proposal = String(payload.proposal ?? "");
+    if (proposal === "availability") {
+      const workerId = String(payload.worker_id ?? "").trim();
+      const proposed = String(payload.proposed_availability ?? "").trim();
+      const allowed = new Set(["available", "available_soon", "busy", "unknown", "do_not_use"]);
+      if (!workerId || !allowed.has(proposed)) return null;
+      const { data: worker } = await svc
+        .from("workers")
+        .select("id")
+        .eq("id", workerId)
+        .eq("organization_id", params.orgId)
+        .maybeSingle();
+      if (!worker) return null;
+      const from = payload.available_from ? String(payload.available_from).trim().slice(0, 40) : null;
+      const { error } = await svc
+        .from("workers")
+        .update({
+          availability_status: proposed,
+          ...(from ? { available_from: from } : {}),
+          updated_by: params.userId,
+        })
+        .eq("id", workerId)
+        .eq("organization_id", params.orgId);
+      if (error) {
+        console.error("acceptFinding availability:", error);
+        throw new Error(`Could not write that availability: ${error.message}`);
+      }
+      promotedTo = "worker";
+      entityId = workerId;
+    } else {
     const name = String(payload.full_name ?? payload.name ?? "").trim();
     if (!name) return null;
 
@@ -720,6 +750,7 @@ export async function acceptFinding(params: {
         .update({ linked_entity_type: "worker", linked_entity_id: entityId })
         .eq("id", String(payload.cv_document_id))
         .eq("organization_id", params.orgId);
+    }
     }
   }
 

@@ -32,6 +32,41 @@ queued in Triangle until you fetch it; do not treat the wake as the message.
 Anything sent outside Triangle follows your `communicationPolicy`; today a
 person sends it.
 
+On a mission, `pool` lists people by initials and matching facts — never a
+name, email, phone, rate or CV text. File as you go:
+
+```
+POST {TRIANGLE_URL}/api/agent/missions/{missionId}/pool
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+{ "assignmentId": "<your step>",
+  "proposals": [
+    { "kind": "candidate", "workerId": "<from pool or lookup type=worker>", "why": "PLC commissioning, German B2; tickets need checking" },
+    { "kind": "candidate", "findingId": "<pending CV from the queue>" },
+    { "kind": "availability", "workerId": "<id>",
+      "proposed": "available", "availableFrom": "2026-10-01",
+      "evidence": "Said available from October on the last recorded note",
+      "check": { "channel": "email", "subject": "Availability", "body": "the words a person will send" } }
+  ] }
+```
+
+A `candidate` with `workerId` names someone already in the pool. A `findingId`
+attaches a pending CV proposal to this mission. `fields` (the same keys as
+the CV queue) files a pending worker finding a person accepts. You still
+cannot create the worker or accept it.
+
+An `availability` proposal stays pending until a person accepts it. The
+`check` words become a draft a person sends. Triangle sends nothing, and you
+never contact the candidate. Do not look people up on LinkedIn or the open
+web.
+
+The recruiting finish line counts people you named from the pool. Available
+counts only when the worker record itself says available or available soon —
+your proposal does not move that number.
+
+Look up before you file: `GET /api/agent/lookup?q=…&type=worker`. It matches
+on the name inside Triangle and returns initials and the workerId, not the
+name or contact details.
+
 ## Every run starts here
 
 ```

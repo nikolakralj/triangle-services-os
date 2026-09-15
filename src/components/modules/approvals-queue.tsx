@@ -20,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
   note: "Research note",
   project: "New project",
   worker: "New person (from CV)",
+  worker_availability: "Availability update",
   company: "New company",
   contact: "New contact",
   other: "Other",

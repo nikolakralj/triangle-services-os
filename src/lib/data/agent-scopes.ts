@@ -39,7 +39,7 @@ export const AGENT_SCOPES: ScopeSpec[] = [
     value: "worker.propose",
     label: "Read CVs and propose people",
     description:
-      "Read uploaded CVs and enrich the proposed profile. Cannot add anyone to the Talent Pool — a human accepts in Approvals.",
+      "Read uploaded CVs and propose people and availability updates on a mission. Cannot add anyone to the Talent Pool or mark them available — a human accepts in Approvals.",
     suggestedFor: ["hr"],
   },
 ];

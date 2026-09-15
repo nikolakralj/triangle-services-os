@@ -1,5 +1,6 @@
 import "server-only";
 import { loadAgentFaces } from "@/lib/data/agent-identity";
+import { availabilityFindingCopy } from "@/lib/data/mission-pool";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -160,15 +161,17 @@ export async function listApprovals(
   for (const f of findings) {
     const p = (f.payload as Record<string, unknown>) ?? {};
     const who = f.agent_instance_id ? byId.get(f.agent_instance_id as string) : undefined;
+    const availability = availabilityFindingCopy(p, (f.evidence_text as string) ?? null);
     items.push({
       id: f.id as string,
       kind: "finding",
-      itemType: f.finding_type as string,
+      itemType: availability?.itemType ?? (f.finding_type as string),
       // A channel proposal is about the channel, not the person. Three
       // findings for Peter Östlund all rendered as "Peter Östlund" and could
       // only be told apart by reading their quotes — the CEO was being asked
       // to accept three identical-looking cards.
-      headline: p.kind && p.value
+      headline: availability?.headline
+        ?? (p.kind && p.value
         ? `${String(p.full_name ?? "Contact")} — ${String(p.value)}`
         : String(
             p.full_name ??
@@ -177,11 +180,10 @@ export async function listApprovals(
               p.name ??
               p.company ??
               f.finding_type,
-          ),
+          )),
       // Never the CV text itself — that is tens of thousands of characters and
       // belongs behind the decision, not in the queue.
-      detail:
-        [
+      detail: availability?.detail ?? ([
           (p.source_check as { status?: string } | undefined)?.status === "unchecked"
             ? String(p.missing ?? "Source unchecked: Triangle could not read the cited page.")
             : null,
@@ -203,10 +205,10 @@ export async function listApprovals(
           p.client_company,
         ]
           .filter(Boolean)
-          .join(" · ") || null,
+          .join(" · ") || null),
       confidence: (f.confidence as number) ?? null,
       sourceUrl: (f.source_url as string) ?? null,
-      evidenceText: (f.evidence_text as string) ?? null,
+      evidenceText: availability?.evidenceText ?? ((f.evidence_text as string) ?? null),
       createdAt: f.created_at as string,
       projectId: null,
       projectName: null,
