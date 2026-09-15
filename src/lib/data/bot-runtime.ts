@@ -52,22 +52,37 @@ export function employeeRuntimeOf(
   return config?.mission_runtime === "bot" ? "bot" : "in_app";
 }
 
-export async function employeeMissionRuntime(
+export function isScoutRole(roleKey: string | null | undefined): boolean {
+  return roleKey === SCOUT_ROLE_KEY;
+}
+
+export async function loadEmployeeRuntime(
   orgId: string,
   agentInstanceId: string,
-): Promise<MissionRuntime> {
+): Promise<{ roleKey: string | null; runtime: MissionRuntime }> {
   const svc = createServiceSupabaseClient();
-  if (!svc) return "in_app";
+  if (!svc) return { roleKey: null, runtime: "in_app" };
   const { data } = await svc
     .from("agent_instances")
     .select("role_key, config")
     .eq("id", agentInstanceId)
     .eq("org_id", orgId)
     .maybeSingle();
-  return employeeRuntimeOf(
-    data?.role_key as string | undefined,
-    (data?.config as Record<string, unknown> | null) ?? null,
-  );
+  const roleKey = (data?.role_key as string | undefined) ?? null;
+  return {
+    roleKey,
+    runtime: employeeRuntimeOf(
+      roleKey,
+      (data?.config as Record<string, unknown> | null) ?? null,
+    ),
+  };
+}
+
+export async function employeeMissionRuntime(
+  orgId: string,
+  agentInstanceId: string,
+): Promise<MissionRuntime> {
+  return (await loadEmployeeRuntime(orgId, agentInstanceId)).runtime;
 }
 
 /** An employee's settings: where it runs, and which messages it may send itself. */

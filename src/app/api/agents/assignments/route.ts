@@ -5,7 +5,7 @@ import {
   cancelAssignment,
   listWorkforce,
 } from "@/lib/data/workforce";
-import { employeeMissionRuntime } from "@/lib/data/bot-runtime";
+import { isScoutRole, loadEmployeeRuntime } from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // The manager's side of assignments.
@@ -70,17 +70,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Constraints used to be dropped here, so screen-created work sat queued
-  // forever. The employee decides the runtime: a bot employee (Scout always,
-  // Hanna when mission_runtime is bot) gets execution_mode bot even if the
-  // client still sends in_app. createAssignment also wakes the bot.
-  const runtime = await employeeMissionRuntime(access.organizationId, agentInstanceId);
+  // Constraints used to be dropped here. Scout is bot-owned: even a client
+  // that still sends in_app cannot put Scout on the retired OpenAI executor.
+  // Everyone else keeps the previous default (in_app, explicit value wins).
+  const { roleKey } = await loadEmployeeRuntime(
+    access.organizationId,
+    agentInstanceId,
+  );
   const incoming =
     body.constraints && typeof body.constraints === "object" ? body.constraints : {};
-  const constraints = {
-    ...incoming,
-    execution_mode: runtime,
-  };
+  const constraints = isScoutRole(roleKey)
+    ? { ...incoming, execution_mode: "bot" }
+    : { execution_mode: "in_app", ...incoming };
 
   const dueAt = body.dueAt ? new Date(body.dueAt) : null;
   const created = await createAssignment({

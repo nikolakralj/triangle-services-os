@@ -117,7 +117,7 @@ queue the same employee to continue read-only qualification. That continuation
 must be idempotent, carry the company record and expected outcome, and stop at
 the human external-action boundary. The purpose is to remove page-to-page
 human coordination, not to remove consequential approval. For Scout this is
-bot-owned work, same as Hanna: Triangle stores it and wakes the bot.
+bot-owned work: Triangle stores it and wakes the bot.
 
 Scout (`project_researcher`) is always bot-owned. There is no in-app OpenAI
 stand-in and no stalled-job takeover onto OpenAI. Older `execution_mode:
@@ -126,14 +126,14 @@ them.
 
 A mission step runs where its employee lives. By default Triangle's own runner
 works it (`execution_mode: in_app`). An employee switched to its own bot
-(`agent_instances.config.mission_runtime = "bot"`; Scout always, Hanna when
-switched) gets its mission steps as `execution_mode: bot`: the step waits in
-the employee's inbox, and Triangle calls the bot's wake-up webhook
-(`BOT_WAKE_URL_<ROLE>`, signed with `BOT_WAKE_KEY_<ROLE>`) when the step is
-assigned or retried, when a colleague is asked or answers, when a non-mission
-assignment is created (`assignment`), and when a human posts on the assignment
-thread (`human_followup`), carrying only the event and the ids. The bot reads
-the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
+(`agent_instances.config.mission_runtime = "bot"`; Scout always, because there
+is no in-app OpenAI stand-in) gets its mission steps as `execution_mode: bot`:
+the step waits in the employee's inbox, and Triangle calls the bot's wake-up
+webhook (`BOT_WAKE_URL_<ROLE>`, signed with `BOT_WAKE_KEY_<ROLE>`) when the
+step is assigned or retried, when a colleague is asked or answers, when Scout
+is given non-mission work (`assignment`), and when a human posts on the
+assignment thread (`human_followup`), carrying only the event and the ids.
+The bot reads the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
 with its badge to `/targets`, `/activity`, `/decisions`, `/plan` and
 `/complete`. Every write is refused unless the badge's employee owns the step
 and the step is still open, and a plain inbox result cannot close a mission
