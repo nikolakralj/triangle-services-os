@@ -332,7 +332,9 @@ Research is incomplete without a recommended next human action.
 ## 12A. Living case and CEO-attention rules
 
 The CEO must not be used as the transport layer between Workforce, Approvals,
-Companies, Signal Inbox, and project pages.
+Companies, Signal Inbox, and project pages. The Companies directory is not an
+operating surface: company rows stay in the database, and `/companies/[id]`
+opens from missions, Approvals and holdings.
 
 For project, company, buyer/contact, requirement, and package work:
 

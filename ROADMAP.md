@@ -236,6 +236,8 @@ observability, backups, incident response, tenant controls, and cost limits.
 - reply drafting with manual send confirmation;
 - project discovery and source-backed research;
 - contractor-chain and buyer suggestions;
+- company records on missions, Approvals and holdings (no company directory in
+  the shell);
 - one human approvals queue;
 - project packages, worker matching, document readiness, and PDF packets;
 - packet-send records and response statuses;

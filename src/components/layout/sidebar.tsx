@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Building2,
   ClipboardCheck,
   FileText,
   Cpu,
@@ -40,6 +39,10 @@ type NavGroup = {
 //
 // Tasks was removed rather than demoted. Workforce assignments are the work
 // object; a second task list beside them is two answers to one question.
+//
+// The Companies directory was removed the same way. Company rows stay in the
+// database, and `/companies/[id]` still opens from missions, Approvals and
+// holdings. A mega-list of names is not a place the CEO browses.
 const navGroups: NavGroup[] = [
   {
     label: "Every day",
@@ -54,7 +57,6 @@ const navGroups: NavGroup[] = [
     label: "What we found",
     items: [
       { href: "/hunter", label: "Signal Inbox", icon: Radar },
-      { href: "/companies", label: "Companies", icon: Building2 },
       { href: "/job-intake", label: "Job Intake", icon: Inbox, badge: "LEADS" },
     ],
   },

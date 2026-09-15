@@ -144,6 +144,18 @@ read `constraints.wake`, and confirm the amber badge clears only after she
 answers in-thread. Limits: her Grok routine must handle `human_followup`;
 this does not send and does not widen `communicationPolicy`.
 
+### Companies directory off the operating surface · `DONE`
+
+**Why:** the CEO browses Today and Missions, not a phone book of company names.
+Company rows stay; a case still opens from missions, Approvals and holdings.
+
+**Acceptance:** sidebar and Quick add have no Companies; `/companies` redirects
+to Missions with a short notice; `/companies/[id]` still works; no table drop.
+
+**Done 15 September.** List route redirects; detail deep links unchanged. No
+migration. Nikola: confirm the sidebar has no Companies, then open a company
+from a mission's holdings.
+
 ### Only if live work stalls on it
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues

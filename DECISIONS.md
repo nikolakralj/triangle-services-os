@@ -586,6 +586,25 @@ This replaces the 8 September choice to keep reference files at the root for
 stable paths; the references in agent instructions, scripts and code comments
 moved with them.
 
+### 2026-09-15: The Companies directory is not an operating surface
+
+Decision:
+
+- hide Companies from the app shell (sidebar and Quick add);
+- keep every company row; do not drop tables or wipe records;
+- keep `/companies/[id]` so missions, Approvals and holdings can still open a
+  company;
+- `/companies` (the mega-list) is not a place the CEO browses — redirect it to
+  Missions with a short notice.
+
+Why:
+
+- Triangle is not a generic CRM. A directory of names is inventory, not a
+  contract-qualified crew opportunity;
+- the 1 September decision already said the CEO view is Today and exceptions,
+  not a tour of Workforce, Approvals, Companies and Signal Inbox;
+- this is an operating-surface change, not a cosmetic navigation project.
+
 ## Operating Rules
 
 - prefer shipping modules that move from signal to placement

@@ -42,6 +42,7 @@ the record they read from and write to.
 | Wake on assignment follow-up: a human post on a bot-owned thread calls `wakeEmployee` with `human_followup` (ids only); UI says queued, not sent; amber badge stays until the employee answers in-thread | `3058eb5` | lint, build, tenant-identity still 8 known; no signed-in check here | Hanna's Grok routine must handle the event; missing/failed wake still queues for the next inbox check; does not send and does not widen `communicationPolicy` |
 | Known defects (DEV-005): forwarded intake keeps the recruiter, not the mailbox; mission recommended card matches the named person; Köster door and Computer Futures lead data-fix SQL prepared, not applied | `9929630` | 11/11 offline DEV-005; DEV-002 31/31; lint, production build, tenant-identity 0; no signed-in check here | Live rows unchanged until Nikola runs the two SQL files; Open mail on the existing Computer Futures lead stays wrong until that UPDATE |
 | Tenant identity (DEV-006): CV letterhead and next-move sign-off read the approved organization profile; scanner comments cleaned | `9929630` | `check:tenant-identity` exits 0; lint and production build | Tenant-zero paper address still lives in the approved seed file |
+| Companies directory off the shell: sidebar and Quick add no longer offer it; `/companies` redirects to Missions; `/companies/[id]` still opens from missions, Approvals and holdings; rows untouched | this PR | lint, production build, tenant-identity 0; no signed-in check here | The unused list workspace still exists in source; company create-from-directory is gone with the page |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
@@ -77,7 +78,7 @@ work, consent, availability for a specific order or mobilization clearance.
 | Area | Source implementation | Limit of the evidence |
 | --- | --- | --- |
 | Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging | Extraction uses a model; paid/business conversion is not established by ingestion |
-| Research | Project/company evidence, two proposal stores, human review, case history | Accepted research is not a buyer-confirmed requirement |
+| Research | Project/company evidence, two proposal stores, human review, case history. Company detail still opens from missions; the directory is not in the shell | Accepted research is not a buyer-confirmed requirement |
 | Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask still claims the next Scout job; action-content and acknowledgment persistence defects remain |
 | Scout | Company qualification, contact reachability, open research; assignment constraints default to in-app | Specific-job execution, crash recovery, measured cost and uniform instructions are not fully proven |
 | Talent | CV storage/extraction, candidate profiles, history, generated CVs, talent questions | Upload auto-acceptance, identity merging, readiness and access boundaries need correction |

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  Building2,
   ChevronDown,
   FileUp,
   Plus,
@@ -50,7 +49,6 @@ export function Topbar({
             </Button>
             <div className="invisible absolute right-0 top-10 w-56 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
               {[
-                { href: "/companies", label: "Add company", icon: Building2 },
                 { href: "/documents", label: "Upload document", icon: FileUp },
                 { href: "/workers", label: "Talent pool", icon: Users },
               ].map((item) => {
