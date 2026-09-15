@@ -10,7 +10,7 @@ source review follows it. Earlier sessions are preserved in the
 | --- | --- |
 | Checkout | `C:\Users\nikol\Projects\triangle-services-os` |
 | Branch | `wip-jules-2026-05-03T18-13-13-596Z` |
-| Last code commit | WIP merge 15 September: Research chat retired + Scout bot-owned + Companies directory off shell; DEV-005/006 included |
+| Last code commit | WIP merge 15 September: Research/Scout/Companies + CASE-004 visibility chips; DEV-005/006 included |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |
 | Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044â048 applied to the live database 11â15 September |
@@ -45,14 +45,19 @@ the record they read from and write to.
 | Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions ? Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox � no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
 | Scout is bot-owned: in-app OpenAI `scout-executor` claim loop hard-off; new Scout work is `execution_mode: bot` and wakes the bot (`assignment`); callers cannot force `in_app` onto Scout | `1f9cacc`, `93895cd` | lint, build, tenant-identity still 8 known; no signed-in check here | Scout's Grok routine must handle `assignment`; missed wake waits for the inbox check; older in_app Scout rows are visible in the inbox, not migrated; DEV-003 left for Antigravity |
 | Companies directory off the shell: sidebar and Quick add no longer offer it; `/companies` HTTP-redirects to Missions; `/companies/[id]` still opens from missions, Approvals and holdings; rows untouched | `5b913ed` | lint, production build, tenant-identity 0; `curl -sI /companies` ? 307 `/missions?notice=companies`; `/companies/[id]` still 200; no signed-in check here | The unused list workspace still exists in source; company create-from-directory is gone with the page |
+| CASE-004 visibility slice: mission page chips for colleague requests, the source mission a door was first filed in, and holdings that deep-link to the record | `a843060` | 6/6 offline CASE-004 checks; lint, production build, tenant-identity 0; no signed-in check here | Still gated overall — not budget/time limits, retries or a second inbox. Nikola: open Hanna's DACH mission and confirm Scout-sourced doors/requests show as chips |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
-mission scope. Forwarded requisitions no longer take the receiving mailbox as
-the recruiter once new mail is ingested; the one live Computer Futures lead
-still needs the prepared SQL. The mission recommended card follows the named
-person. The KÃ¶ster door stays on file as reachable until its data-fix SQL
-runs. Tenant-identity no longer fails on CV/next-move hardcoding.
+mission scope. A mission now shows chips for colleague requests, the source
+mission a door came from, and holdings that open the record, so a recruiting
+mission that cites Scout's doors is not a scavenger hunt. Forwarded requisitions
+no longer take the receiving mailbox as the recruiter once new mail is ingested;
+the one live Computer Futures lead still needs the prepared SQL. The mission
+recommended card follows the named person. The Köster door stays on file as
+reachable until its data-fix SQL runs. Tenant-identity no longer fails on
+CV/next-move hardcoding.
+
 
 Phase 0 commercial proof is still not established. The commercial ledger on
 15 September holds thirteen records, all on recruiter requisitions: eight

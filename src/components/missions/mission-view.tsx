@@ -23,6 +23,8 @@ import {
   AUTONOMY_STANDARD,
   ago,
   hostOf,
+  missionHoldingAnchor,
+  parseMissionHoldingHash,
   pickRecommendedCompany,
   type MissionAttempt,
   type MissionCandidate,
@@ -44,6 +46,7 @@ import {
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionTabs } from "@/components/missions/mission-tabs";
 import { MissionMark, StateChip } from "@/components/missions/mission-state";
+import { MissionContextChips } from "@/components/missions/mission-context";
 import { WorkerPanel } from "@/components/missions/worker-panel";
 import { FinishLine } from "@/components/missions/finish-line";
 import { MissionDecisions } from "@/components/missions/mission-decisions";
@@ -163,6 +166,7 @@ function MissionHeader({ workspace, canWrite }: { workspace: MissionWorkspace; c
             {steps.length} {steps.length === 1 ? "instruction" : "instructions"}
           </span>
         </p>
+        <MissionContextChips context={workspace.context} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <AutonomyMenu leadName={lead?.name ?? "The worker"} />
@@ -381,6 +385,17 @@ function Surfaces({
   const [decision, setDecision] = useState<RuledOutDecision | null>(null);
   const missionId = workspace.mission.id;
 
+  useEffect(() => {
+    const openHolding = () => {
+      if (!parseMissionHoldingHash(window.location.hash)) return;
+      if (workspace.companies.length === 0) return;
+      setActive("companies");
+    };
+    openHolding();
+    window.addEventListener("hashchange", openHolding);
+    return () => window.removeEventListener("hashchange", openHolding);
+  }, [workspace.companies.length]);
+
   const tabs: Array<{ key: SurfaceKey; label: string; count?: number }> = research
     ? [
         { key: "overview", label: "Overview" },
@@ -393,6 +408,9 @@ function Surfaces({
         { key: "overview", label: "Overview" },
         { key: "candidates", label: "Candidates", count: workspace.candidates.length },
         { key: "partners", label: "Partner firms", count: workspace.partners.length },
+        ...(workspace.companies.length > 0
+          ? [{ key: "companies" as const, label: "Doors", count: workspace.companies.length }]
+          : []),
       ];
 
   return (
@@ -718,8 +736,24 @@ function CompanyItem({
 }) {
   const [open, setOpen] = useState(false);
   const status = companyStatus(row);
+
+  useEffect(() => {
+    const onHash = () => {
+      if (parseMissionHoldingHash(window.location.hash) !== row.companyId) return;
+      setOpen(true);
+      window.requestAnimationFrame(() => {
+        document.getElementById(missionHoldingAnchor(row.companyId))?.scrollIntoView({
+          block: "center",
+        });
+      });
+    };
+    onHash();
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [row.companyId]);
+
   return (
-    <li className={row.notForUs ? "bg-slate-50/70" : ""}>
+    <li id={missionHoldingAnchor(row.companyId)} className={`scroll-mt-24 ${row.notForUs ? "bg-slate-50/70" : ""}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -736,6 +770,15 @@ function CompanyItem({
               {row.name}
             </span>
             <Provenance agentFound={row.agentFound} verified={row.verified} />
+            {row.sourceMission && (
+              <span
+                title={`Filed in ${row.sourceMission.title}${row.filedBy ? ` by ${row.filedBy}` : ""}`}
+                className="inline-flex max-w-[12rem] items-center gap-1 rounded-md bg-slate-100 px-1.5 py-px text-[10.5px] font-medium text-slate-600 ring-1 ring-inset ring-slate-200"
+              >
+                <MissionMark emoji={row.sourceMission.emoji} size="sm" />
+                <span className="truncate">{row.sourceMission.title}</span>
+              </span>
+            )}
           </span>
           <span className="mt-0.5 block truncate text-[12px] text-slate-500">
             {[row.city, row.country].filter(Boolean).join(", ") || "Location not recorded"}
@@ -808,10 +851,24 @@ function CompanyDetail({
             ) : null}
           </Fact>
         )}
-        {row.alsoIn.length > 0 && (
+        {row.sourceMission && (
+          <Fact label="Filed in">
+            <Link
+              href={`/missions/${row.sourceMission.id}#${missionHoldingAnchor(row.companyId)}`}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[12px] text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
+            >
+              <MissionMark emoji={row.sourceMission.emoji} size="sm" />
+              {row.sourceMission.title}
+              {row.filedBy ? <span className="text-slate-500"> · {row.filedBy}</span> : null}
+            </Link>
+          </Fact>
+        )}
+        {row.alsoIn.filter((m) => m.id !== row.sourceMission?.id).length > 0 && (
           <Fact label="Also found in">
             <span className="flex flex-wrap gap-1.5">
-              {row.alsoIn.map((m) => (
+              {row.alsoIn
+                .filter((m) => m.id !== row.sourceMission?.id)
+                .map((m) => (
                 <Link
                   key={m.id}
                   href={`/missions/${m.id}`}
