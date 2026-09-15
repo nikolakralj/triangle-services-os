@@ -620,6 +620,46 @@ This replaces the 8 September choice to keep reference files at the root for
 stable paths; the references in agent instructions, scripts and code comments
 moved with them.
 
+### 2026-09-15: Product surface law
+
+Decision:
+
+- agents live in complexity: missions, findings, mail, scoring, chains;
+- Nikola lives in Today and Missions;
+- classify every screen before putting it in the shell:
+  - **A primary** — daily operating surfaces (Today, Missions, Workforce);
+  - **B contextual** — opens from a case, approval, holding, or next move;
+  - **C infrastructure** — APIs, settings, diagnostics; reachable, not in
+    primary nav;
+- Job Intake is **C** for navigation. The mail pipeline stays. Bob waking on
+  commercial mail is a later DEV, not this change.
+
+Why:
+
+- the 1 September decision already said the CEO view is Today and exceptions,
+  not a tour of Workforce, Approvals, Companies, Signal Inbox, or Job Intake;
+- browsing a lead list as a CEO queue duplicates Today;
+- hiding a list is not deleting a module.
+
+### 2026-09-15: Job Intake is off primary navigation
+
+Decision:
+
+- hide Job Intake from the app shell (sidebar). Quick add never offered it;
+- keep every intake table, API, sync, scoring, reply draft, and lead row;
+- keep `/job-intake` as a hidden diagnostics/admin page with a banner that it
+  is not a daily operating surface and that commercial mail exceptions belong
+  on Today;
+- do not redirect `/job-intake` away (unlike `/companies`); bookmarks still
+  render the list;
+- do not build Bob mail-wake or mission creation in this change.
+
+Why:
+
+- Job Intake is no longer a CEO operating surface;
+- the pipeline must stay until Bob mail → Today is proven;
+- this is an operating-surface change, not a module deletion.
+
 ### 2026-09-15: The Companies directory is not an operating surface
 
 Decision:

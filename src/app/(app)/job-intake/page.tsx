@@ -104,6 +104,17 @@ export default async function JobIntakePage({
         description="Agency emails, read automatically and turned into scored opportunities. Nothing is ever sent without you clicking send."
       />
 
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <p className="text-sm font-semibold text-amber-950">
+          Diagnostics — not a daily operating surface
+        </p>
+        <p className="mt-1 text-sm text-amber-900">
+          Mail ingestion, scoring, leads, and reply history are preserved here.
+          Commercial mail exceptions should surface on Today. This page stays
+          reachable from a bookmark; it is not in primary navigation.
+        </p>
+      </div>
+
       {/* Summary */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

@@ -1,6 +1,6 @@
 # Job Intake
 
-> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision.
+> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision. The list is off primary navigation (diagnostics at `/job-intake`); mail ingest, scoring, leads, and reply drafts stay.
 
 Reads agency/recruiter email, turns it into scored opportunities, and drafts replies.
 Added 2026-08-25. Productization boundary added 2026-08-30. Read the
@@ -228,8 +228,9 @@ The follow-up appears on Today until something newer is recorded for that lead.
   becomes undefined. This had broken `EMAIL_WEBHOOK_SECRET` (repaired 2026-08-25).
 - **There are two copies of this repo.** `C:\Users\nikol\Projects\triangle-services-os`
   is live. `C:\Users\nikol\OneDrive\Documents\New project\triangle-services-os` is an
-  old copy with no `.env.local`. If the sidebar has no "Job Intake" or you see
-  "Local demo mode", you are running the wrong one.
+  old copy with no `.env.local`. If you see "Local demo mode", you are running
+  the wrong one. Job Intake is intentionally absent from the sidebar; open
+  `/job-intake` directly for the diagnostics list.
 
 ## Setup
 
