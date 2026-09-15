@@ -20,7 +20,7 @@ export async function createCompanyAction(input: CompanyInput) {
     session.userId,
     input,
   );
-  if (result.ok) revalidatePath("/companies");
+  if (result.ok) revalidatePath(`/companies/${result.id}`);
   return result;
 }
 
@@ -33,7 +33,7 @@ export async function updateCompanyAction(
     return { ok: false as const, error: "Your role does not allow writes." };
   }
   const result = await updateCompany(id, session.userId, patch);
-  if (result.ok) revalidatePath("/companies");
+  if (result.ok) revalidatePath(`/companies/${id}`);
   return result;
 }
 
@@ -43,6 +43,6 @@ export async function deleteCompanyAction(id: string) {
     return { ok: false as const, error: "Only admins can delete." };
   }
   const result = await deleteCompany(id);
-  if (result.ok) revalidatePath("/companies");
+  if (result.ok) revalidatePath(`/companies/${id}`);
   return result;
 }

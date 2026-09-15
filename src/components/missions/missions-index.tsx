@@ -43,15 +43,22 @@ export function MissionsIndex({
   tabs,
   closed,
   canWrite,
+  notice = null,
 }: {
   tabs: MissionTab[];
   closed: Array<{ id: string; title: string; emoji: string | null; closedAt: string; objective: string }>;
   canWrite: boolean;
+  notice?: string | null;
 }) {
   return (
     <div className="-mx-4 -mt-4 xl:-mx-5">
       <MissionTabs tabs={tabs} activeId={null} canWrite={canWrite} />
       <div className="px-4 pb-10 pt-6 xl:px-5">
+        {notice ? (
+          <p className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {notice}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Missions</h1>

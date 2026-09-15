@@ -10,8 +10,7 @@ source review follows it. Earlier sessions are preserved in the
 | --- | --- |
 | Checkout | `C:\Users\nikol\Projects\triangle-services-os` |
 | Branch | `wip-jules-2026-05-03T18-13-13-596Z` |
-| Last code commit | WIP merge 15 September: Research chat retired + Scout bot-owned; DEV-005/006 included |
-
+| Last code commit | WIP merge 15 September: Research chat retired + Scout bot-owned + Companies directory off shell; DEV-005/006 included |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |
 | Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044â048 applied to the live database 11â15 September |
@@ -43,9 +42,9 @@ the record they read from and write to.
 | Wake on assignment follow-up: a human post on a bot-owned thread calls `wakeEmployee` with `human_followup` (ids only); UI says queued, not sent; amber badge stays until the employee answers in-thread | `3058eb5` | lint, build, tenant-identity still 8 known; no signed-in check here | Hanna's Grok routine must handle the event; missing/failed wake still queues for the next inbox check; does not send and does not widen `communicationPolicy` |
 | Known defects (DEV-005): forwarded intake keeps the recruiter, not the mailbox; mission recommended card matches the named person; KÃ¶ster door and Computer Futures lead data-fix SQL applied on live DB 15 September | `9929630` | 11/11 offline DEV-005; DEV-002 31/31; lint, production build, tenant-identity 0; no signed-in check here | Computer Futures contact and Koster rule-out applied on the shared DB |
 | Tenant identity (DEV-006): CV letterhead and next-move sign-off read the approved organization profile; scanner comments cleaned | `9929630` | `check:tenant-identity` exits 0; lint and production build | Tenant-zero paper address still lives in the approved seed file |
-| Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions â Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox â no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
+| Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions ? Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox � no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
 | Scout is bot-owned: in-app OpenAI `scout-executor` claim loop hard-off; new Scout work is `execution_mode: bot` and wakes the bot (`assignment`); callers cannot force `in_app` onto Scout | `1f9cacc`, `93895cd` | lint, build, tenant-identity still 8 known; no signed-in check here | Scout's Grok routine must handle `assignment`; missed wake waits for the inbox check; older in_app Scout rows are visible in the inbox, not migrated; DEV-003 left for Antigravity |
-
+| Companies directory off the shell: sidebar and Quick add no longer offer it; `/companies` HTTP-redirects to Missions; `/companies/[id]` still opens from missions, Approvals and holdings; rows untouched | `5b913ed` | lint, production build, tenant-identity 0; `curl -sI /companies` ? 307 `/missions?notice=companies`; `/companies/[id]` still 200; no signed-in check here | The unused list workspace still exists in source; company create-from-directory is gone with the page |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots.
 Bob still runs the mail routine and takes mission work only once his badge has a
@@ -81,10 +80,9 @@ work, consent, availability for a specific order or mobilization clearance.
 | Area | Source implementation | Limit of the evidence |
 | --- | --- | --- |
 | Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging | Extraction uses a model; paid/business conversion is not established by ingestion |
-| Research | Project/company evidence, two proposal stores, human review, case history. Project Research Agent chat retired; Scout missions and suggestions remain | Accepted research is not a buyer-confirmed requirement |
+| Research | Project/company evidence, two proposal stores, human review, case history. Project Research Agent chat retired; Scout missions and suggestions remain. Company detail still opens from missions; the directory is not in the shell | Accepted research is not a buyer-confirmed requirement |
 | Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask missions go to the bot; leftover Ask box no longer runs Scout on OpenAI; action-content and acknowledgment persistence defects remain |
 | Scout | Bot-owned: Triangle stores work and wakes Grok; in-app OpenAI executor does not claim Scout jobs | Specific-job execution on the bot, crash recovery, and measured cost are not fully proven; older in_app rows are not rewritten |
-
 | Talent | CV storage/extraction, candidate profiles, history, generated CVs, talent questions | Upload auto-acceptance, identity merging, readiness and access boundaries need correction |
 | Partner firms | `supply_partners`, create/confirm/status UI/API, capacity age checks, Scout/Hanna context | Source exists; role/actor and precise capacity-readiness checks remain incomplete |
 | Commercial | Requirements, buyer routes and commercial actions | Source exists; historic zero counts are not proof of today's live state |
