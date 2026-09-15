@@ -1,0 +1,17 @@
+{
+  "name": "Triangle Services OS",
+  "install": "npm ci && npx playwright install --with-deps chromium",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "npm run dev",
+      "description": "Next.js 16 dev server on http://localhost:3000. With no Supabase env vars set it runs in local demo mode (seeded demo data, no login); set NEXT_PUBLIC_SUPABASE_URL/ANON_KEY + SUPABASE_SERVICE_ROLE_KEY to enable authenticated pages."
+    }
+  ],
+  "ports": [
+    {
+      "name": "web",
+      "port": 3000
+    }
+  ]
+}
