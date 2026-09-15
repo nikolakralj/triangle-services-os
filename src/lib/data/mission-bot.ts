@@ -27,6 +27,16 @@ import { loadMissionPlan, saveMissionPlan } from "@/lib/data/mission-plan";
 import { evaluateProgress, progressSentence, settlePlan } from "@/lib/data/mission-progress";
 import { loadMissionHoldings, loadMissionRunContext, touchMission } from "@/lib/data/missions";
 import {
+  fileMissionPool,
+  hasPoolWriteScope,
+  hasTargetWriteScope,
+  loadMissionPool,
+  lookupWorkers,
+  poolActivity,
+  poolForBot,
+  type PoolStep,
+} from "@/lib/data/mission-pool";
+import {
   citesASource,
   cleanTargets,
   companyKey,
@@ -94,6 +104,8 @@ export interface BotStep {
   status: string;
   title: string;
   constraints: Record<string, unknown>;
+  scopes: string[];
+  badgeName: string;
 }
 
 export type BotAuth =
@@ -102,6 +114,10 @@ export type BotAuth =
 
 export function machineMayReadMissions(machine: MachineAccess): boolean {
   return machine.scopes.includes("admin") || READ_SCOPES.some((s) => machine.scopes.includes(s));
+}
+
+export function machineMayLookupWorkers(scopes: readonly string[]): boolean {
+  return hasPoolWriteScope(scopes);
 }
 
 export async function authorizeBotStep(
@@ -164,6 +180,8 @@ export async function authorizeBotStep(
       status: data.status as string,
       title: data.title as string,
       constraints,
+      scopes: machine.scopes,
+      badgeName: machine.name,
     },
   };
 }
@@ -348,20 +366,36 @@ async function supplyCapability(svc: Svc, orgId: string) {
   };
 }
 
+async function scopesForEmployee(svc: Svc, orgId: string, agentInstanceId: string): Promise<string[]> {
+  const { data } = await svc
+    .from("machine_credentials")
+    .select("scopes, name")
+    .eq("org_id", orgId)
+    .eq("agent_instance_id", agentInstanceId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  return Array.isArray(data?.scopes) ? (data.scopes as string[]) : [];
+}
+
 export async function missionPayloadForStep(
   orgId: string,
   missionId: string,
   stepId: string,
   agentInstanceId: string,
+  scopes?: string[],
 ) {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
   const ctx = await loadMissionRunContext(orgId, missionId, stepId);
   if (!ctx) return null;
 
+  const badgeScopes = scopes?.length ? scopes : await scopesForEmployee(svc, orgId, agentInstanceId);
+  const poolWrite = hasPoolWriteScope(badgeScopes);
+  const pool = await loadMissionPool(orgId, missionId);
   const progress = evaluateProgress(ctx.criteria, ctx.plan, {
     companies: ctx.holdings.companies,
-    candidates: [],
+    candidates: pool.candidates,
     partners: [],
   });
   // How the CEO wants this employee to work. Read on every run and never
@@ -451,11 +485,26 @@ export async function missionPayloadForStep(
     })),
     lastQuestionToCeo: ctx.lastQuestion,
     supply: await supplyCapability(svc, orgId),
+    pool: poolWrite
+      ? {
+          note: "Initials and matching facts only. Names, emails, phones, rates and CV text stay in Triangle. Propose by workerId. Availability checks are drafts a person sends — never contact the candidate.",
+          people: await poolForBot(orgId),
+          named: pool.candidates.map((c) => ({
+            workerId: c.workerId,
+            initials: initialsFromCandidate(c.name),
+            role: c.role,
+            availability: c.availability,
+          })),
+        }
+      : null,
     idempotencyPrefix: `mission:${stepId}:`,
     report: {
       read: `GET ${base}?assignmentId=${stepId}`,
-      lookup: "GET /api/agent/lookup?q=<name or domain>&type=company|contact",
+      lookup: poolWrite
+        ? "GET /api/agent/lookup?q=<name or domain>&type=company|contact|worker"
+        : "GET /api/agent/lookup?q=<name or domain>&type=company|contact",
       fileTargets: `POST ${base}/targets`,
+      filePool: poolWrite ? `POST ${base}/pool` : undefined,
       activity: `POST ${base}/activity`,
       decisions: `POST ${base}/decisions`,
       finishLine: `POST ${base}/plan`,
@@ -463,6 +512,13 @@ export async function missionPayloadForStep(
       complete: `POST ${base}/complete`,
     },
   };
+}
+
+function initialsFromCandidate(name: string): string {
+  const parts = name.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return `${parts[0]!.charAt(0).toUpperCase()}.`;
+  return parts.map((p) => `${p.charAt(0).toUpperCase()}.`).join(" ");
 }
 
 export type BotMissionPayload = NonNullable<Awaited<ReturnType<typeof missionPayloadForStep>>>;
@@ -474,6 +530,8 @@ export async function botMissionForInbox(
   assignment: { id: string; title: string; missionId: string | null; constraints: Record<string, unknown> },
 ): Promise<BotMissionPayload | null> {
   if (!assignment.missionId || assignment.constraints.execution_mode !== "bot") return null;
+  const svc = createServiceSupabaseClient();
+  const scopes = svc ? await scopesForEmployee(svc, orgId, agentInstanceId) : [];
   await pickUpBotStep({
     id: assignment.id,
     orgId,
@@ -483,8 +541,10 @@ export async function botMissionForInbox(
     status: "active",
     title: assignment.title,
     constraints: assignment.constraints,
+    scopes,
+    badgeName: "",
   });
-  return missionPayloadForStep(orgId, assignment.missionId, assignment.id, agentInstanceId);
+  return missionPayloadForStep(orgId, assignment.missionId, assignment.id, agentInstanceId, scopes);
 }
 
 // ── writing ─────────────────────────────────────────────────────────────────
@@ -557,6 +617,12 @@ function knownSite(c: MissionCompanyRow): string | null {
 }
 
 export async function fileBotTargets(step: BotStep, raw: unknown) {
+  if (!hasTargetWriteScope(step.scopes ?? [])) {
+    return {
+      error:
+        "Company targets need research.suggestion.create. This badge files people through POST /api/agent/missions/{id}/pool.",
+    } as const;
+  }
   const ctx = await loadMissionRunContext(step.orgId, step.missionId, step.id);
   if (!ctx) return { error: "The mission could not be read." } as const;
   if (!Array.isArray(raw) || raw.length === 0) {
@@ -641,6 +707,33 @@ export async function fileBotTargets(step: BotStep, raw: unknown) {
     dropped: cleaned.dropped,
     invalid,
   } as const;
+}
+
+function asPoolStep(step: BotStep): PoolStep {
+  return {
+    id: step.id,
+    orgId: step.orgId,
+    missionId: step.missionId,
+    agentInstanceId: step.agentInstanceId,
+    scopes: step.scopes ?? [],
+    badgeName: step.badgeName || "triangle_hr",
+  };
+}
+
+/** Hanna names people from the pool and drafts availability checks. Never creates a worker or marks one available. */
+export async function fileBotPool(step: BotStep, raw: unknown) {
+  const result = await fileMissionPool(asPoolStep(step), raw);
+  if ("error" in result) return result;
+  const svc = createServiceSupabaseClient();
+  const runId = svc ? await openBotRun(svc, step) : null;
+  await appendMissionActivity(
+    runId,
+    result.filed.map((row) => {
+      const event = poolActivity(row);
+      return activity(event.kind, event.text);
+    }),
+  );
+  return result;
 }
 
 export async function logBotActivity(step: BotStep, raw: unknown) {
@@ -804,7 +897,7 @@ async function filedByStep(svc: Svc, step: BotStep): Promise<MissionStepRecord["
     const id = f.promoted_entity_id as string | null;
     if (!id) continue;
     if (f.finding_type === "company" && !companies.has(id)) companies.set(id, String(f.finding_state ?? ""));
-    if (f.finding_type === "contact") people.add(id);
+    if (f.finding_type === "contact" || f.finding_type === "worker") people.add(id);
   }
   const states = Array.from(companies.values());
   return {
@@ -855,6 +948,7 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
   }
   const input = parsed.data;
   const filed = await filedByStep(svc, step);
+  const pool = await loadMissionPool(step.orgId, step.missionId);
   const question = input.questionForCeo?.trim() || null;
   const record: MissionStepRecord = {
     kind: "mission_step",
@@ -868,6 +962,12 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
     questionForCeo: question,
     suggestedNext: input.suggestedNext,
     filed,
+    candidates: {
+      workerIds: pool.workerIds,
+      partnerIds: [],
+      blockers: [],
+      missing: [],
+    },
   };
 
   const posted = await addAgentMessage({
@@ -890,13 +990,14 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
   if (!completed) return { error: "The step changed before it could be reported.", status: 409 } as const;
 
   // How far the mission moved, counted from what is now on file.
-  const [planRows, holdings] = await Promise.all([
+  const [planRows, holdings, poolAfter] = await Promise.all([
     loadMissionPlan(step.orgId, step.missionId),
     loadMissionHoldings(step.orgId, step.missionId),
+    loadMissionPool(step.orgId, step.missionId),
   ]);
   const progress = evaluateProgress(planRows.criteria, planRows.plan, {
     companies: holdings.companies,
-    candidates: [],
+    candidates: poolAfter.candidates,
     partners: [],
   });
   await finishMissionRun(runId, {
@@ -930,7 +1031,12 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
 // ── looking before filing ───────────────────────────────────────────────────
 
 /** What Triangle already has under a name or a domain, so a bot does not file it twice. */
-export async function lookupRecords(orgId: string, query: string, type: "company" | "contact") {
+export async function lookupRecords(
+  orgId: string,
+  query: string,
+  type: "company" | "contact" | "worker",
+) {
+  if (type === "worker") return lookupWorkers(orgId, query);
   const svc = createServiceSupabaseClient();
   const q = query.trim().replace(/[%_,()]/g, " ").slice(0, 80).trim();
   if (!svc || q.length < 2) return [];

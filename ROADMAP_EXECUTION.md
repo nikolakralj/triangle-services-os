@@ -71,7 +71,7 @@ file are not re-checked; pages that need a browser or rate-limit Triangle file
 as unchecked; a LinkedIn profile or contact form alone is no longer reachable;
 not yet exercised by a real bot filing.
 
-### DEV-003 â Hanna writes to the pool from her bot Â· `READY`
+### DEV-003 â Hanna writes to the pool from her bot Â· `DONE`
 
 **Why:** the gate needs one package backed by people confirmed available, and
 Hanna's bot cannot yet write to the pool.
@@ -79,6 +79,14 @@ Hanna's bot cannot yet write to the pool.
 **Acceptance:** Hanna's badge can propose candidates and availability updates in
 a mission through the mission API, counted by the recruiting finish line;
 availability checks are drafts a person sends; her privacy rules hold.
+
+**Done 15 September.** `POST /api/agent/missions/{id}/pool` with `worker.propose`
+names people already in the pool, attaches a pending CV, or files a pending
+worker finding; availability updates stay pending until a person accepts;
+`check` words become an outreach draft (never sent). Recruiting finish line
+counts from those findings. Company targets still need `research.suggestion.create`.
+No migration. Checked: 13/13 offline DEV-003; lint, production build,
+tenant-identity 0. Could not signed-in check here.
 
 ### DEV-004 â Bob takes follow-through Â· `BLOCKED_EXTERNAL`
 

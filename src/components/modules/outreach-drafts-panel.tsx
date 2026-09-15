@@ -13,6 +13,7 @@ import {
   Link2,
   Mail,
   MessageSquare,
+  Phone,
   Copy,
   Check,
   Send,
@@ -63,6 +64,11 @@ const CHANNEL_META: Record<
     label: "Email follow-up",
     icon: Mail,
     color: "bg-orange-100 text-orange-800",
+  },
+  phone_call: {
+    label: "Phone call",
+    icon: Phone,
+    color: "bg-emerald-100 text-emerald-800",
   },
 };
 

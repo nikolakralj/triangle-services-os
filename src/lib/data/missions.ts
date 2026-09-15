@@ -11,6 +11,7 @@ import {
   type MissionRuntime,
 } from "@/lib/data/bot-runtime";
 import { evaluateProgress } from "@/lib/data/mission-progress";
+import { loadMissionPool } from "@/lib/data/mission-pool";
 import type { MissionNaming } from "@/lib/ai/mission-namer";
 import {
   parseMissionStepRecord,
@@ -23,7 +24,6 @@ import {
   parseActivity,
   type ActivityEvent,
   type MissionAttempt,
-  type MissionCandidate,
   type MissionChannel,
   type MissionCompanyRow,
   type MissionCriterion,
@@ -1025,40 +1025,15 @@ export async function getMissionWorkspace(
   }));
   const latest = stepViews.find((s) => s.record)?.record ?? null;
 
-  // A recruiting mission's surface is the people its employee named.
-  let candidates: MissionCandidate[] = [];
+  const extraWorkerIds = latest?.candidates?.workerIds ?? [];
+  const extraPartnerIds = new Set(latest?.candidates?.partnerIds ?? []);
+  const pool = await loadMissionPool(orgId, missionId, extraWorkerIds);
+  const candidates = pool.candidates;
   let partners: MissionPartner[] = [];
-  if (mission.kind === "recruiting" && latest?.candidates) {
-    const workerIds = latest.candidates.workerIds;
-    const partnerIds = new Set(latest.candidates.partnerIds);
-    const [workersRes, allPartners] = await Promise.all([
-      workerIds.length
-        ? svc
-            .from("workers")
-            .select("id, full_name, role, status, availability_status, available_from, city, country, certificates")
-            .eq("organization_id", orgId)
-            .in("id", workerIds)
-        : Promise.resolve({ data: [] as Record<string, unknown>[] }),
-      partnerIds.size ? listSupplyPartners(orgId) : Promise.resolve([]),
-    ]);
-    const byId = new Map(
-      ((workersRes.data ?? []) as Record<string, unknown>[]).map((w) => [w.id as string, w]),
-    );
-    candidates = workerIds
-      .map((id) => byId.get(id))
-      .filter((w): w is Record<string, unknown> => Boolean(w))
-      .map((w) => ({
-        workerId: w.id as string,
-        name: (w.full_name as string) ?? "Unnamed",
-        role: (w.role as string | null) ?? null,
-        status: (w.status as string) ?? "active",
-        availability: (w.availability_status as string | null) ?? null,
-        availableFrom: (w.available_from as string | null) ?? null,
-        based: [w.city, w.country].filter(Boolean).join(", ") || null,
-        certificates: Array.isArray(w.certificates) ? (w.certificates as unknown[]).map(String) : [],
-      }));
+  if (extraPartnerIds.size) {
+    const allPartners = await listSupplyPartners(orgId);
     partners = allPartners
-      .filter((p) => partnerIds.has(p.id))
+      .filter((p) => extraPartnerIds.has(p.id))
       .map((p) => ({
         partnerId: p.id,
         name: p.name,

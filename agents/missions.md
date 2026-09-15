@@ -62,10 +62,14 @@ you are finishing a mission step.
 Your role file describes the craft. The mechanics are the same for everyone:
 
 - **Look before you file** — `GET /api/agent/lookup?q=…` — so nothing is filed
-  twice under a second spelling.
-- **File as you go** — `POST …/targets` — each with the pages you read. Nothing
-  without a source; never a probe, a test record or an invented person,
-  address or number.
+  twice under a second spelling. Hanna looks up people with `type=worker`
+  (initials and matching facts, never a name, email, phone or CV).
+- **File as you go** — Scout: `POST …/targets` — each with the pages you read.
+  Hanna: `POST …/pool` — candidates and availability updates into the pool
+  path. She proposes; a person accepts a new worker or an availability change.
+  Availability checks are drafts a person sends. Nothing without a source;
+  never a probe, a test record or an invented person, address or number.
+  Hanna does not enrich people from the open web.
 - **Read the filing answer.** A reachable target needs a phone number or email
   address that appears on a page you cite. Triangle reads up to five of your
   cited pages itself (public HTML or text); a quote you supply is not the check.
