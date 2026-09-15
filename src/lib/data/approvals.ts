@@ -182,6 +182,9 @@ export async function listApprovals(
       // belongs behind the decision, not in the queue.
       detail:
         [
+          (p.source_check as { status?: string } | undefined)?.status === "unchecked"
+            ? String(p.missing ?? "Source unchecked: Triangle could not read the cited page.")
+            : null,
           // Whose desk this actually is. "switchboard" next to a number is
           // the difference between calling and expecting the right voice.
           p.scope

@@ -15,6 +15,7 @@ import { createFinding } from "@/lib/data/findings";
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // `contact_channel` was missing here while agents/scout.md told Scout to use
 // it. Scout filed as "contact" instead and left `intended_finding_type` in the
@@ -65,6 +66,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body) ||
+      (body.payload !== undefined && (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)))) {
+    return NextResponse.json({ error: "Send an object with an object payload." }, { status: 400 });
+  }
   const findingType = String(body.findingType ?? "").trim();
   if (!VALID_TYPES.includes(findingType)) {
     return NextResponse.json(
@@ -175,12 +180,10 @@ export async function POST(request: Request) {
       : null,
   });
 
-  if (!created) {
+  if ("refused" in created) {
     return NextResponse.json(
       {
-        error:
-          "The finding was refused. A reachable finding needs a named person and a published channel; " +
-          "one_thing_missing needs payload.missing and payload.missing_owner; dead needs payload.dead_reason.",
+        error: created.refused,
       },
       { status: 422 },
     );
@@ -190,8 +193,12 @@ export async function POST(request: Request) {
     findingId: created.id,
     duplicate: created.duplicate,
     status: "pending",
+    findingState: created.findingState ?? null,
+    sourceCheck: created.sourceCheck ?? null,
     note: created.duplicate
       ? "Already submitted — nothing changed."
-      : "Filed for human review. It becomes a real record only once approved.",
+      : created.sourceCheck?.status === "unchecked"
+        ? created.sourceCheck.reason
+        : "Filed for human review. It becomes a real record only once approved.",
   });
 }

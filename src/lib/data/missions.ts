@@ -574,6 +574,7 @@ function str(p: Record<string, unknown> | null | undefined, key: string): string
 const CHANNEL_KINDS = new Set(["phone", "email", "linkedin", "contact_form"]);
 
 function channelOf(p: Record<string, unknown> | null): MissionChannel | null {
+  if ((p?.source_check as { status?: string } | undefined)?.status === "unchecked") return null;
   const kind = str(p, "kind");
   const value = str(p, "value");
   if (!kind || !value || !CHANNEL_KINDS.has(kind)) return null;
@@ -607,7 +608,8 @@ function sourcesOf(list: FindingRow[]): Array<{ url: string; claim: string }> {
 /** Of everything filed about one record, the view worth showing. Newest first in. */
 function representative(list: FindingRow[]): FindingRow {
   const latest = list[0];
-  if (latest.finding_state === "dead") return latest;
+  if (latest.finding_state === "dead" ||
+      (latest.payload?.source_check as { status?: string } | undefined)?.status === "unchecked") return latest;
   // A later step that was about something else must not downgrade a person
   // who was already reachable back to "one thing missing".
   return list.find((f) => f.finding_state === "reachable" && f.status !== "rejected") ?? latest;
@@ -1341,19 +1343,29 @@ export async function listReadyToContact(orgId: string, limit = 6): Promise<Read
 
   const { data: findings } = await svc
     .from("agent_findings")
-    .select("mission_id, promoted_entity_id, payload, source_url, created_at")
+    .select("mission_id, promoted_entity_id, finding_state, payload, source_url, created_at")
     .eq("org_id", orgId)
     .eq("finding_type", "contact")
     .eq("status", "applied")
-    .eq("finding_state", "reachable")
     .in("mission_id", Array.from(missionById.keys()))
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(500);
 
+  // Newest first, the same rule as representative(): a newer filing whose
+  // source Triangle could not read takes the person off this list, but a later
+  // step about something else does not hide someone already reachable.
   const latestByContact = new Map<string, Record<string, unknown>>();
+  const settled = new Set<string>();
   for (const f of findings ?? []) {
     const id = f.promoted_entity_id as string | null;
-    if (id && !latestByContact.has(id)) latestByContact.set(id, f);
+    if (!id || settled.has(id)) continue;
+    const check = (f.payload as { source_check?: { status?: string } } | null)?.source_check;
+    if (check?.status === "unchecked") {
+      settled.add(id);
+    } else if (f.finding_state === "reachable") {
+      latestByContact.set(id, f);
+      settled.add(id);
+    }
   }
   const contactIds = Array.from(latestByContact.keys());
   if (contactIds.length === 0) return [];

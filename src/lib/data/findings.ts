@@ -1,4 +1,5 @@
 import "server-only";
+import { checkFindingSource, citedUrls, type SourceCheck } from "@/lib/data/finding-source-check";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -57,19 +58,37 @@ export async function createFinding(params: {
    * no buyer to be reachable about.
    */
   findingState?: "reachable" | "one_thing_missing" | "dead" | null;
-}): Promise<{ id: string; duplicate: boolean } | null> {
+}): Promise<{ id: string; duplicate: boolean; findingState?: string | null; sourceCheck?: SourceCheck | null } | { refused: string }> {
   const svc = createServiceSupabaseClient();
-  if (!svc) return null;
+  if (!svc) return { refused: "Database unavailable; the finding was not filed." };
 
   // Re-submitting the same discovery must be harmless — agents retry.
   if (params.idempotencyKey) {
     const { data: existing } = await svc
       .from("agent_findings")
-      .select("id")
+      .select("id, finding_state, payload")
       .eq("org_id", params.orgId)
       .eq("idempotency_key", params.idempotencyKey)
       .maybeSingle();
-    if (existing) return { id: existing.id as string, duplicate: true };
+    if (existing) return { id: existing.id as string, duplicate: true,
+      findingState: existing.finding_state as string | null,
+      sourceCheck: (existing.payload as Record<string, unknown>)?.source_check as SourceCheck | null };
+  }
+
+  // Server-owned evidence: a caller cannot assert that Triangle checked a source.
+  const payload = { ...params.payload };
+  delete payload.source_check;
+  params = { ...params, payload };
+  let sourceCheck: SourceCheck | null = null;
+  if (["project", "company", "contact", "contact_channel"].includes(params.findingType) && params.findingState === "reachable") {
+    sourceCheck = await checkFindingSource(payload, citedUrls(payload, params.sourceUrl));
+    if (sourceCheck.status === "refused") return { refused: sourceCheck.reason };
+    payload.source_check = sourceCheck;
+    if (sourceCheck.status === "unchecked") {
+      params.findingState = "one_thing_missing";
+      payload.missing = sourceCheck.reason;
+      payload.missing_owner = "Filing employee";
+    }
   }
 
   // Second guard, on content rather than on the key.
@@ -81,16 +100,22 @@ export async function createFinding(params: {
   const dedupeValue =
     typeof params.payload.value === "string" ? params.payload.value : null;
   if (dedupeValue) {
-    const { data: sameFact } = await svc
+    let sameFactQuery = svc
       .from("agent_findings")
-      .select("id")
+      .select("id, finding_state, payload")
       .eq("org_id", params.orgId)
       .eq("finding_type", params.findingType)
       .eq("status", "pending")
-      .contains("payload", { value: dedupeValue })
-      .limit(1);
+      .contains("payload", { value: dedupeValue });
+    // A source-unchecked filing is not the same fact as a checked one. A
+    // finding with no state keeps deduplicating on the value alone, as before.
+    if (params.findingState) {
+      sameFactQuery = sameFactQuery.eq("finding_state", params.findingState);
+    }
+    const { data: sameFact } = await sameFactQuery.limit(1);
     if (sameFact && sameFact.length > 0) {
-      return { id: sameFact[0].id as string, duplicate: true };
+      return { id: sameFact[0].id as string, duplicate: true, findingState: sameFact[0].finding_state as string | null,
+        sourceCheck: (sameFact[0].payload as Record<string, unknown>)?.source_check as SourceCheck | null };
     }
   }
 
@@ -122,9 +147,9 @@ export async function createFinding(params: {
         error.message,
       );
     }
-    return null;
+    return { refused: error?.message ?? "The database did not return a filed finding." };
   }
-  return { id: data.id as string, duplicate: false };
+  return { id: data.id as string, duplicate: false, findingState: params.findingState, sourceCheck };
 }
 
 export async function listFindings(
@@ -231,6 +256,9 @@ export async function acceptFinding(params: {
   if (!finding || finding.status !== "pending") return null;
 
   const payload = (finding.payload as Record<string, unknown>) ?? {};
+  if ((payload.source_check as { status?: string } | undefined)?.status === "unchecked") {
+    throw new Error("Source unchecked: refile with a readable page showing the phone/email before accepting this finding.");
+  }
   let promotedTo: string | null = null;
   let entityId: string | null = null;
   let continuationAssignmentId: string | null = null;

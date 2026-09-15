@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { acceptFinding, rejectFinding } from "@/lib/data/findings";
+import { recordRefusal } from "@/lib/data/refusals";
 
 // ---------------------------------------------------------------------------
 // PATCH /api/findings — a human accepts or rejects an agent's finding.
@@ -49,11 +50,27 @@ export async function PATCH(request: Request) {
         );
   }
 
-  const result = await acceptFinding({
-    findingId,
-    orgId: access.organizationId,
-    userId: access.userId,
-  });
+  // The data layer refuses by throwing — a finding whose source Triangle could
+  // not read, for one. That is the reviewer's answer, not a server fault.
+  let result: Awaited<ReturnType<typeof acceptFinding>>;
+  try {
+    result = await acceptFinding({
+      findingId,
+      orgId: access.organizationId,
+      userId: access.userId,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not accept that finding.";
+    await recordRefusal({
+      orgId: access.organizationId,
+      surface: "Accept a proposal",
+      reason: message,
+      userId: access.userId ?? null,
+      entityType: "finding",
+      entityId: findingId,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
   if (!result) {
     return NextResponse.json(
       { error: "Could not accept — it may already be reviewed, or the payload is incomplete." },

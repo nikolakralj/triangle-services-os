@@ -127,6 +127,12 @@ export function FindingsInbox({ findings }: { findings: AgentFinding[] }) {
                   </span>
                 )}
               </div>
+              {Boolean(f.payload.source_check && typeof f.payload.source_check === "object" &&
+                (f.payload.source_check as Record<string, unknown>).status === "unchecked") && (
+                <p className="mt-2 text-xs font-medium text-amber-800">
+                  {String(f.payload.missing ?? "Source unchecked: Triangle could not read the cited page.")}
+                </p>
+              )}
               <h3 className="mt-1.5 text-base font-semibold text-slate-950">
                 {title(f)}
               </h3>

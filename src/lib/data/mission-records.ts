@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { companyKey, type CleanTarget } from "@/lib/ai/mission-report";
+import { checkFindingSource, sourceReader, type PageReader, type SourceCheck } from "@/lib/data/finding-source-check";
 import { hostOf } from "@/lib/data/mission-shared";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ export interface FiledTarget {
   contactIsNew: boolean;
   /** The database's own sentence when it refused a row. */
   refused: string | null;
+  sourceCheck?: SourceCheck;
 }
 
 export async function fileMissionTargets(
@@ -74,8 +76,9 @@ export async function fileMissionTargets(
   // One after another. Two targets resolving to the same company in parallel
   // would each find nothing and create it twice.
   const out: FiledTarget[] = [];
+  const read = sourceReader();
   for (const target of targets) {
-    out.push(await fileOne(svc, ctx, target));
+    out.push(await fileOne(svc, ctx, target, read));
   }
   return out;
 }
@@ -139,7 +142,7 @@ export function placeholderReason(t: {
   return null;
 }
 
-async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<FiledTarget> {
+async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget, read: PageReader): Promise<FiledTarget> {
   const result: FiledTarget = {
     target: t,
     companyId: null,
@@ -153,6 +156,21 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
   if (placeholder) {
     result.refused = placeholder;
     return result;
+  }
+
+  // Check before any company/contact write. The bot's quote is not page evidence.
+  if (t.state === "reachable") {
+    const check = await checkFindingSource({ kind: t.channel?.kind, value: t.channel?.value }, t.sources.map((s) => s.url), read);
+    result.sourceCheck = check;
+    if (check.status === "refused") {
+      result.refused = check.reason;
+      return result;
+    }
+    if (check.status === "unchecked") {
+      t = { ...t, state: "one_thing_missing", missing: check.reason, missingOwner: ctx.agentName,
+        reachChecked: false, reachNote: check.reason };
+      result.target = t;
+    }
   }
 
   // A company the mission already holds is filed onto exactly that record.
@@ -192,7 +210,7 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
   result.companyIsNew = company.isNew;
 
   if (t.person) {
-    const contact = await upsertContact(svc, ctx, t, company.id);
+    const contact = await upsertContact(svc, ctx, result.sourceCheck?.status === "unchecked" ? { ...t, channel: null } : t, company.id);
     if ("refused" in contact) {
       result.refused = contact.refused;
     } else {
@@ -220,6 +238,7 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
     idempotency_key: `mission:${ctx.stepId}:company:${t.companyKey}:${t.state}`,
     payload: {
       source: "mission",
+      source_check: result.sourceCheck ?? null,
       company_name: t.company,
       company_id: company.id,
       website: t.website,
@@ -268,6 +287,7 @@ async function fileOne(svc: Svc, ctx: FilingContext, t: CleanTarget): Promise<Fi
       idempotency_key: `mission:${ctx.stepId}:contact:${t.companyKey}:${companyKey(t.person)}:${t.state}`,
       payload: {
         source: "mission",
+        source_check: result.sourceCheck ?? null,
         full_name: t.person,
         job_title: t.personTitle,
         company_name: t.company,

@@ -58,6 +58,14 @@ Your role file describes the craft. The mechanics are the same for everyone:
 - **File as you go** — `POST …/targets` — each with the pages you read. Nothing
   without a source; never a probe, a test record or an invented person,
   address or number.
+- **Read the filing answer.** A reachable target needs a phone number or email
+  address that appears on a page you cite. Triangle reads up to five of your
+  cited pages itself (public HTML or text); a quote you supply is not the check.
+  If it reads them and the number or address is not there, the target is refused
+  with the reason. If it cannot read them, the target is filed as
+  `one_thing_missing`, shown as **Source unchecked**, and fetching a readable page
+  is yours. A LinkedIn profile or a contact form alone is never reachable. Each
+  answer carries `sourceCheck`; only `matched` supports reachability.
 - **Say what you did** — `POST …/activity` — searches, pages read, what you
   found or could not find. Activity, not thinking.
 - **Keep the CEO's decisions** — `POST …/decisions` — only from the CEO's own

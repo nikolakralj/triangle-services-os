@@ -158,9 +158,10 @@ Up to twelve per call. Triangle enforces the rules and tells you, per target,
 what was filed and what was refused and why:
 
 - one to three sources you actually read on every target — no source, not filed;
-- **reachable** needs a named person, a channel published on a page you cite,
-  and the words; **one_thing_missing** names exactly one fact and who fetches
-  it; **dead** says why;
+- **reachable** needs a named person, a phone number or email address that
+  appears on a page you cite — Triangle reads the page and checks — and the
+  words; **one_thing_missing** names exactly one fact and who fetches it;
+  **dead** says why;
 - never invent or pattern-derive a person, an email address or a phone number.
 - never file a probe, a schema test or placeholder data — no invented company,
   person or channel, not even to check that a call works. If you want to test
@@ -552,6 +553,18 @@ Rules:
 
 A human picks one. An `agent` option becomes your next assignment; a `human`
 one becomes their next action, with your reasoning attached.
+
+## Source check when filing
+
+Triangle checks reachable phone/email claims itself at both the mission targets
+endpoint and `/api/agent/findings`. It reads up to five cited public HTML/text
+pages, including `sourceUrl` and `payload.sources[].url`. If the supplied channel
+is absent from every page it could read, the filing is refused with its reason.
+If a supporting page cannot be read, the finding is filed as `one_thing_missing`
+and shown as **Source unchecked**. A LinkedIn profile or a contact form alone is
+not reachable. The response carries `sourceCheck` and the actual stored state.
+Bring back a readable source; do not report unchecked as reachable. A match
+confirms publication, not identity or buying authority.
 
 ## Forbidden
 
