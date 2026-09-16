@@ -45,6 +45,7 @@ import {
   type PackageOpportunity,
 } from "@/lib/hunter-commercial";
 import { cn, formatCurrency } from "@/lib/utils";
+import { AskPageContext } from "@/components/missions/ask-context";
 
 export default async function DiscoveredProjectDetailPage({
   params,
@@ -154,6 +155,8 @@ export default async function DiscoveredProjectDetailPage({
 
   return (
     <div className="space-y-6">
+      {/* Ask on this page binds work to the project; the report lands in Case history. */}
+      <AskPageContext kind="record" type="project" id={project.id} label={project.projectName} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link

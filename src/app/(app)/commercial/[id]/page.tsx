@@ -17,6 +17,7 @@ import {
   getRequirementResearchCase,
 } from "@/lib/data/company-case";
 import { getCommercialWorkspace } from "@/lib/data/commercial";
+import { AskPageContext } from "@/components/missions/ask-context";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,15 @@ export default async function CommercialRequirementPage({
 
   return (
     <>
+      {/* Ask on this page binds work to the requirement and its project; the
+          report lands in the Research case below. */}
+      <AskPageContext
+        kind="record"
+        type="requirement"
+        id={requirement.id}
+        label={requirement.title}
+        projectId={requirement.discovered_project_id ?? null}
+      />
       <PageHeader
         title={requirement.title}
         description="Buyer-confirmed demand, route, package, unknowns, economics, and actual human actions in one record."

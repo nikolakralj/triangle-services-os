@@ -6,6 +6,10 @@ import { getWorkerById } from "@/lib/data/workers";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { listWorkerNotes } from "@/lib/data/worker-notes";
 import { WorkerProfile } from "@/components/modules/worker-profile";
+import { EntityCasePanel } from "@/components/modules/entity-case-panel";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { getEntityCase } from "@/lib/data/company-case";
+import { AskPageContext } from "@/components/missions/ask-context";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +27,12 @@ export default async function WorkerDetailPage({
 
   if (!row || row.organization_id !== session.organizationId) notFound();
 
-  const notes = await listWorkerNotes(id, session.organizationId);
+  const [notes, workerCase] = await Promise.all([
+    listWorkerNotes(id, session.organizationId),
+    // What an employee has done about this person, so an Ask made here has
+    // a place to report back (DEV-010).
+    getEntityCase("worker", id, session.organizationId),
+  ]);
 
   // The CV this profile was read from. Stored and attached to the person from
   // the first upload, and shown on no screen until now — so there was no way
@@ -43,6 +52,7 @@ export default async function WorkerDetailPage({
 
   return (
     <div className="space-y-4">
+      <AskPageContext kind="record" type="worker" id={row.id} label={row.full_name} />
       <Link
         href="/workers"
         className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
@@ -89,6 +99,19 @@ export default async function WorkerDetailPage({
         cvDocumentId={(cvDoc?.id as string | undefined) ?? null}
         cvFileName={(cvDoc?.file_name as string | undefined) ?? null}
       />
+
+      <Card>
+        <CardHeader
+          title="Case history"
+          description="Which employee worked on this person, what they were asked, and what they reported."
+        />
+        <CardContent>
+          <EntityCasePanel
+            snapshot={workerCase}
+            emptyHint="No employee has worked on this person yet. Ask from this page and the report will appear here."
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

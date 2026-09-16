@@ -10,6 +10,8 @@ import { addMissionInstruction, missionLeadRuntime, startMission } from "@/lib/d
 import { employeeMissionRuntime, wakeEmployee, type MissionRuntime } from "@/lib/data/bot-runtime";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { missionProvider } from "@/lib/ai/mission-models";
+import { askOnRecord } from "@/lib/data/ask-on-record";
+import { ROLE_CAPABILITIES } from "@/lib/auth/session";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — the one box.
@@ -29,9 +31,12 @@ import { missionProvider } from "@/lib/ai/mission-models";
 //        response — the CEO watches the mission fill instead of watching a
 //        spinner for forty seconds.
 //
-// 16 Sep 2026 IA (DEV-010): with page context, not-talent work is a missionless
-// assignment on that record, not a new Mission — DECISIONS.md. This file still
-// implements the old split.
+//   work, while looking at a record (DEV-010)
+//        a missionless ASSIGNMENT on that record. "Check who the MEP
+//        contractor is" said on a project page is one job on that project,
+//        not a Mission with a tab. The person stays on the page; the answer
+//        returns on the record's case. Ask Bob from a Today card was the
+//        first instance of this; `askOnRecord` is the general one.
 //
 // This replaces one assignment per question. After two days the queue held a
 // dozen near-identical research questions, each answered from scratch,
@@ -91,9 +96,19 @@ function aiNotConfigured() {
   return NextResponse.json({ error: "AI is not configured on this deployment." }, { status: 503 });
 }
 
+const contextSchema = z.object({
+  type: z.enum(["job_lead", "requirement", "company", "project", "worker", "contact"]),
+  id: z.string().uuid(),
+  label: z.string().trim().max(200).optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+  companyId: z.string().uuid().optional().nullable(),
+});
+
 const bodySchema = z.object({
   question: z.string().trim().min(2).max(8_000),
   missionId: z.string().uuid().optional(),
+  /** The record the person is looking at. Work binds to it (DEV-010). */
+  context: contextSchema.optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -108,7 +123,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Write what you need first." }, { status: 400 });
   }
-  const { question, missionId } = parsed.data;
+  const { question, missionId, context } = parsed.data;
   const orgId = access.organizationId;
 
   // ── the next instruction inside a mission ────────────────────────────────
@@ -167,6 +182,36 @@ export async function POST(request: Request) {
       blockers: result.blockers,
       missing: result.missing,
     });
+  }
+
+  // ── work on the record in view: a missionless assignment ─────────────────
+  // The CEO stays on the situation; the result returns on EntityCase. No
+  // naming call: the record already names the work.
+  if (context) {
+    const caps = ROLE_CAPABILITIES[access.role as keyof typeof ROLE_CAPABILITIES];
+    const result = await askOnRecord({
+      orgId,
+      userId: access.userId,
+      question,
+      context,
+      canSeeWorkers: Boolean(caps?.canSeeWorkers),
+    });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json(
+      {
+        kind: "assignment",
+        assignmentId: result.assignmentId,
+        alreadyOut: result.alreadyOut,
+        lead: result.lead.name,
+        emoji: result.lead.emoji,
+        label: result.label,
+        context: { type: context.type, id: context.id },
+        notice: result.notice,
+      },
+      { status: result.alreadyOut ? 200 : 201 },
+    );
   }
 
   // ── work: a mission ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { requireSession, capabilities } from "@/lib/auth/session";
 import { getMissionWorkspace } from "@/lib/data/missions";
 import { parseMissionSurfaceTab } from "@/lib/data/mission-shared";
 import { MissionView } from "@/components/missions/mission-view";
+import { AskPageContext } from "@/components/missions/ask-context";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +34,15 @@ export default async function MissionPage({
   );
 
   return (
-    <MissionView
-      workspace={visible}
-      canWrite={caps.canWrite}
-      canSeeWorkers={caps.canSeeWorkers}
-      initialTab={initialTab}
-    />
+    <>
+      {/* Ask on this page defaults to this mission: the next instruction, not a new one. */}
+      <AskPageContext kind="mission" missionId={id} />
+      <MissionView
+        workspace={visible}
+        canWrite={caps.canWrite}
+        canSeeWorkers={caps.canSeeWorkers}
+        initialTab={initialTab}
+      />
+    </>
   );
 }

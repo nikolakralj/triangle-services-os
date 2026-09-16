@@ -2,6 +2,7 @@ import "server-only";
 import { loadAgentFaces } from "@/lib/data/agent-identity";
 import { countMessagesByAssignment } from "@/lib/data/assignment-threads";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { ASK_ON_RECORD_SOURCE } from "@/lib/data/ask-on-record";
 
 export interface CaseAssignment {
   id: string;
@@ -256,7 +257,7 @@ export async function getEntityCase(
     svc
       .from("agent_assignments")
       .select(
-        "id,agent_instance_id,title,objective,status,result_summary,created_at,completed_at",
+        "id,agent_instance_id,title,objective,status,result_summary,created_at,completed_at,constraints",
       )
       .eq("org_id", orgId)
       .in("id", assignmentIds)
@@ -285,10 +286,14 @@ export async function getEntityCase(
       .filter(Boolean)
       .map((value) => String(value).toLowerCase()),
   );
+  // An Ask made on this record's page (DEV-010) is dedicated to it by
+  // construction, whatever its title says.
   const dedicatedAssignmentIds = new Set(
     (assignmentsResult.data ?? [])
-      .filter((row) =>
-        row.title?.toLowerCase().startsWith(config.dedicatedTitlePrefix),
+      .filter(
+        (row) =>
+          row.title?.toLowerCase().startsWith(config.dedicatedTitlePrefix) ||
+          (row.constraints as Record<string, unknown> | null)?.source === ASK_ON_RECORD_SOURCE,
       )
       .map((row) => row.id as string),
   );
