@@ -5,6 +5,7 @@ import {
   ChevronDown,
   FileUp,
   Plus,
+  Target,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,13 @@ export function Topbar({
               <ChevronDown className="h-4 w-4" />
             </Button>
             <div className="invisible absolute right-0 top-10 w-56 rounded-lg border border-slate-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
+              {/* Same three destinations as the menu (DEV-011). Uploads live
+                  on the Compliance tab of Talent; the Documents page is not
+                  a place to browse. */}
               {[
-                { href: "/documents", label: "Upload document", icon: FileUp },
+                { href: "/missions", label: "Missions", icon: Target },
                 { href: "/workers", label: "Talent pool", icon: Users },
+                { href: "/workers?tab=compliance", label: "Upload document", icon: FileUp },
               ].map((item) => {
                 const Icon = item.icon;
                 return (

@@ -27,6 +27,8 @@ import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
 import type { DoneItem } from "@/lib/data/today-in-progress";
 import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
+import { CertExceptions } from "@/components/modules/today-certs";
+import type { CertAlertRow } from "@/lib/data/worker-documents";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
 import {
@@ -95,6 +97,7 @@ export function TodayScreen({
   followUps,
   waits,
   done,
+  certs = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -109,6 +112,8 @@ export function TodayScreen({
   waits: InProgressWait[];
   /** Work outside missions finished in the last day. */
   done: DoneItem[];
+  /** Worker certificates expired or expiring within 30 days (DEV-011). */
+  certs?: CertAlertRow[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
@@ -148,7 +153,8 @@ export function TodayScreen({
     asking.length +
     dueOpen.length +
     (dueOpen.length > 0 ? dueMore : 0) +
-    reachableOpen.length;
+    reachableOpen.length +
+    certs.length;
   const finishedMissions = missions.filter((m) => m.state === "ready");
   const cameBackCount = decisions.length + older.length;
 
@@ -206,6 +212,11 @@ export function TodayScreen({
             waits={waits}
           />
         </div>
+        {certs.length > 0 && (
+          <div className="mt-3">
+            <CertExceptions certs={certs} />
+          </div>
+        )}
       </Zone>
 
       <Zone
