@@ -6,6 +6,39 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: Refusal ledger is diagnostics, not CEO work (DEV-016)
+
+Locked by Nikola. Today / Workforce showing "The system refused N attempts…"
+with Postgres finding-contract prose is engineer noise, not CEO work. If an
+employee gave a CEO this panel, the process is wrong.
+
+Law:
+
+1. The CEO manages business situations on Today (**Needs you | In progress |
+   Missions**). Context-preserving handoff (DEV-015) remains the CEO path.
+2. System refusals, tenant walls, and finding-contract sentences are
+   **diagnostics**. Hide them from the Workforce primary UI and from primary
+   nav — same class as the 15 September Job Intake hide: keep the data,
+   demote the surface.
+3. Do **not** put the refusal ledger under Needs you.
+4. Do **not** invent research landings for commercial follow-through. The Ask
+   Bob noise was a missing `case_type` (new creates already set
+   `commercial_follow_through`; backfill SQL is prepared at
+   `supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql` —
+   Nikola applies). Migration 041 still defaults a missing case_type to
+   `open_research`.
+5. Next **code** after this docs lock is DEV-016 (hide/demote the panel),
+   **before** beautifying Team (DEV-012).
+
+Current surface: `src/app/(app)/decisions/page.tsx` renders `RefusalLedger`
+above Today. Component: `src/components/modules/refusal-ledger.tsx`. Data:
+`src/lib/data/refusals.ts`. Keep those records.
+
+This change is **docs only**. No panel move, no nav code, no .env.
+
+Why: a finding-contract 409 is a system check, not a business situation. The
+CEO's job is the case (company / person / requirement), not Postgres prose.
+
 ### 2026-09-16: Handoff changes the owner of the work, not where it lives (DEV-015)
 
 Locked by Nikola. Ask Bob / Hand to Bob from a Today mail card (e.g. Veronika ·
@@ -66,6 +99,9 @@ Everything else is contextual (B) or infrastructure (C) — not a place the CEO
 patrols.
 
 Already hidden, stay hidden: Companies list, Job Intake (diagnostics).
+The refusal ledger is the same class (DEV-016): keep the records, demote the
+surface from Today / Workforce primary and from primary nav. Do not put it
+under Needs you.
 
 **Signal Inbox / Hunter** — withdraw the earlier “keep it thin in the shell”
 idea. Plan: **leave primary nav**. Scout consumes signals; tables, routes, and
