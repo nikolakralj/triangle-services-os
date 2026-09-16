@@ -22,9 +22,19 @@ export interface AskBobContext {
   value?: string | null;
 }
 
+export function isBobRole(roleKey: string | null | undefined): boolean {
+  return Boolean(roleKey && BOB_ROLE_KEYS.has(roleKey));
+}
+
 export function isBobEmployee(employee: { roleKey: string; displayName: string }): boolean {
   const name = employee.displayName.trim().toLowerCase();
-  return BOB_ROLE_KEYS.has(employee.roleKey) || name === "bob";
+  return isBobRole(employee.roleKey) || name === "bob";
+}
+
+/** Wake-up env names for a role key. Live Bob is inbox_coordinator. */
+export function bobWakeEnvNames(roleKey: string): { url: string; key: string } {
+  const suffix = roleKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  return { url: `BOT_WAKE_URL_${suffix}`, key: `BOT_WAKE_KEY_${suffix}` };
 }
 
 /**

@@ -8,6 +8,7 @@ import {
 } from "@/lib/data/assignment-threads";
 import {
   assignmentQueuedNotice,
+  isBobRole,
   isScoutRole,
   loadEmployeeRuntime,
   wakeEmployee,
@@ -226,11 +227,11 @@ export async function createAssignment(params: {
     params.agentInstanceId,
   );
   const incoming = params.constraints ?? {};
-  // Scout is bot-owned. Callers that still pass execution_mode in_app cannot
-  // put Scout on the retired OpenAI executor. Other employees keep the
-  // constraints they were given — Hanna's pool work is not rewritten here.
-  const scoutOwned = isScoutRole(roleKey);
-  const constraints = scoutOwned ? { ...incoming, execution_mode: "bot" } : incoming;
+  // Scout and Bob are bot-owned. Callers that still pass execution_mode in_app
+  // cannot put them on an in-app executor. Hanna's pool work is not rewritten
+  // here unless her runtime is already bot.
+  const botOwned = isScoutRole(roleKey) || isBobRole(roleKey);
+  const constraints = botOwned ? { ...incoming, execution_mode: "bot" } : incoming;
 
   // Approval endpoints may be retried after a network interruption. Return
   // the already-created continuation instead of producing duplicate agent
@@ -295,11 +296,11 @@ export async function createAssignment(params: {
   }
 
   // Mission steps are woken by the mission hand-off with event mission_step.
-  // Non-mission Scout work is woken here so Ask / Workforce / finding
+  // Non-mission Scout and Bob work is woken here so Ask / Workforce / finding
   // continuation / suggested jobs / send-back / reachability / plays do not
-  // each have to remember. Hanna and Bob are left to their own hand-off paths.
+  // each have to remember. Hanna is left to her own hand-off path.
   let wake: WakeResult | null = null;
-  if (scoutOwned && constraints.case_type !== "mission_step") {
+  if (botOwned && constraints.case_type !== "mission_step") {
     wake = await wakeEmployee({
       orgId: params.orgId,
       agentInstanceId: params.agentInstanceId,
@@ -468,12 +469,12 @@ export async function listOpenAssignmentsForInstance(
     .eq("agent_instance_id", agentInstanceId)
     .in("status", ["queued", "active"])
     .order("created_at");
-  // Work Triangle's own runner does is not the bot's. Scout is the exception:
-  // older in_app rows must still reach its inbox now that the OpenAI executor
-  // no longer claims them. Other employees keep the previous filter.
+  // Work Triangle's own runner does is not the bot's. Scout and Bob are the
+  // exception: older in_app rows must still reach the inbox now that there is
+  // no in-app stand-in. Other employees keep the previous filter.
   const { roleKey } = await loadEmployeeRuntime(orgId, agentInstanceId);
   const rows = (data ?? []).filter((r) => {
-    if (isScoutRole(roleKey)) return true;
+    if (isScoutRole(roleKey) || isBobRole(roleKey)) return true;
     return (r.constraints as Record<string, unknown> | null)?.execution_mode !== "in_app";
   });
   if (rows.length === 0) return [];

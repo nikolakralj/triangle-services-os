@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createAssignment, listWorkforce, nextAttemptKey } from "@/lib/data/workforce";
-import { assignmentQueuedNotice, loadEmployeeRuntime, wakeEmployee } from "@/lib/data/bot-runtime";
+import { loadEmployeeRuntime } from "@/lib/data/bot-runtime";
 import {
   askBobObjective,
   askBobTitle,
@@ -153,21 +153,13 @@ export async function askBob(params: {
     });
   }
 
-  // createAssignment only wakes Scout for non-mission work. Bob is woken here
-  // when the gate has already confirmed he runs on a bot.
-  const wake = await wakeEmployee({
-    orgId: params.orgId,
-    agentInstanceId: bob.id,
-    stepId: created.id,
-    missionId: params.context.missionId ?? null,
-    event: "assignment",
-  });
-
+  // createAssignment forces execution_mode bot for Bob and wakes him the same
+  // way it wakes Scout. Do not wake twice.
   return {
     ok: true,
     assignmentId: created.id,
     alreadyOut: false,
     bobName: bob.name,
-    notice: assignmentQueuedNotice(wake),
+    notice: created.notice,
   };
 }

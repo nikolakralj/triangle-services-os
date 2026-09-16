@@ -6,8 +6,8 @@
 //   node scripts/create-machine-credential.mjs <name> <scope>[,scope...]
 //
 // Examples:
-//   node scripts/create-machine-credential.mjs triangle_bob_nikola job_intake.ingest
-//   node scripts/create-machine-credential.mjs triangle_bob_ralph  job_intake.ingest
+//   node scripts/create-machine-credential.mjs triangle_bob_nikola job_intake.ingest,mission.work
+//   node scripts/create-machine-credential.mjs triangle_bob_ralph  job_intake.ingest,mission.work
 //   node scripts/create-machine-credential.mjs triangle_scout     research.suggestion.create
 //
 // Revoke one:

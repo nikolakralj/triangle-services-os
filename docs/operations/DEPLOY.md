@@ -55,7 +55,7 @@ chat with any AI.
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Default AI. Optional overrides: `OPENAI_RESEARCH_MODEL`, `OPENAI_OUTREACH_MODEL`, `OPENAI_SCOUT_MODEL`, `OPENAI_SUMMARY_MODEL`. |
 | `XAI_API_KEY`, `XAI_MISSION_MODEL` | When the key is set, mission steps run inside Triangle use Grok (default `grok-4.6`) instead of OpenAI. Employees on their own bots do not use it. |
 | `CRON_SECRET`, `CRON_ORGANIZATION_ID` | The scheduled jobs in `vercel.json`: mailbox sync at 06:00 UTC and the employee runner at 07:00 UTC. Optional tuning: `AGENT_CRON_BATCH` (default 3), `AGENT_STALL_HOURS` (default 6). |
-| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna. |
+| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna, `INBOX_COORDINATOR` for Bob. Live Bob: `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`. |
 | `MCP_API_KEY`, `MCP_ORGANIZATION_ID`, `MCP_USER_ID` | Legacy static key for the MCP route. It borrows a user id, so it must never count as a person. |
 | `IMPORT_API_SECRET`, `EMAIL_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY`, `SCOUT_SEARCH_COUNTRY`, `SCOUT_SEARCH_TIMEZONE` | Legacy or optional. |
 
@@ -107,20 +107,25 @@ Login email setup is in [SMTP_SETUP](SMTP_SETUP.md).
 
 ## Putting an employee on its own bot
 
-Scout and Hanna run on their Grok bots; Bob does not yet (DEV-004 in
-[ROADMAP_EXECUTION](../../ROADMAP_EXECUTION.md)).
+Scout, Hanna and Bob run on their Grok bots. Bob's code path is bot-owned
+(DEV-004); live badges still need the data-fix SQL and these wake env vars.
 
 1. On the bot platform, create the bot's webhook routine and copy its URL and key.
 2. **CEO:** add `BOT_WAKE_URL_<ROLE>` and `BOT_WAKE_KEY_<ROLE>` in Vercel for
-   Production and Preview, then redeploy.
+   Production and Preview, then redeploy. For live Bob (`inbox_coordinator`)
+   that is `BOT_WAKE_URL_INBOX_COORDINATOR` and `BOT_WAKE_KEY_INBOX_COORDINATOR`.
+   Do not invent a URL — only set what the Grok routine actually issued.
 3. **CEO:** mint the badge with `mission.work` plus the role's own scopes, and put
    it in the bot. Give the bot its role file from `agents/`; Triangle sends the
    [mission protocol](../../agents/missions.md), house rules and messaging policy
-   with every job.
-4. With the CEO's approval, switch the employee to its bot: set
-   `mission_runtime` to `bot` in that employee's `agent_instances.config`.
-5. Assign a mission step and check the step's wake record (`constraints.wake`):
-   status `sent`, and the bot starts a run.
+   with every job. Existing Bob badges: run
+   `supabase/data-fixes/2026-09-16-bob-mission-work-scope.sql` after previewing
+   (local and production share one database).
+4. Scout and Bob are always bot-owned in code. Hanna still needs
+   `mission_runtime` set to `bot` in `agent_instances.config`.
+5. Assign a mission step (or Ask Bob on Today) and check the step's wake record
+   (`constraints.wake`): status `sent`, and the bot starts a run. Bob sends
+   nothing.
 
 How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
 
