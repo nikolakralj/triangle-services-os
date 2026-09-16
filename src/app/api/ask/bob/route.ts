@@ -23,6 +23,7 @@ const bodySchema = z.object({
   leadId: uuid.optional(),
   contactId: uuid.optional(),
   personId: uuid.optional(),
+  companyId: uuid.optional(),
   missionId: uuid.optional(),
   channelKind: z.string().trim().max(40).optional(),
   value: z.string().trim().max(400).optional(),
