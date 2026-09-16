@@ -71,6 +71,17 @@ Why:
 - the live site runs `ed9d3a6` from `cursor/event-outbox-wake-14fb`, a commit
   that was never merged.
 
+Nikola's answers, 16 September:
+
+- **Mailbox.** Signed in as Nikola, he replies from `nikola.kralj86@gmail.com`,
+  the mailbox already connected. Ralph connects his own in Settings. Mailbox
+  observation starts from each person's connected mailbox.
+- **Programming bot.** Moved out of the workforce account.
+- **Ralph's Today.** He may get his own: Needs you filtered to what he owns.
+  Later, once work carries a human owner consistently; not in DEV-017.
+- **Talent.** Nikola stays in Talent as a candidate, so Today may put him
+  forward.
+
 ### 2026-09-16: Refusal ledger is diagnostics, not CEO work (DEV-016)
 
 Locked by Nikola. Today / Workforce showing "The system refused N attempts…"

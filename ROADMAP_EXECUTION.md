@@ -534,8 +534,9 @@ task ("DEV-004 smoke…") sat in Bob's In progress, and production ran
 `ed9d3a6` from an unmerged bot branch.
 
 **Needs Nikola:**
-1. Move the programming bot to its own Grok / Cursor account, so it shares no
-   computer or context with Scout, Hanna and Bob.
+1. ~~Move the programming bot to its own Grok / Cursor account, so it shares
+   no computer or context with Scout, Hanna and Bob.~~ Done by Nikola,
+   16 September.
 2. Apply `supabase/data-fixes/2026-09-16-engineering-out-of-the-workforce.sql`
    after reading its preview.
 3. Promote only commits merged into the working branch.
@@ -561,6 +562,12 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
 - Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
 - Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons.
+  Start from each person's connected mailbox: Nikola replies from
+  `nikola.kralj86@gmail.com` (connected); Ralph connects his own in Settings.
+  On 16 September no stored message in the last 14 days was a reply, so check
+  first that replies and the Sent folder reach Triangle.
+- A Today per person: Needs you filtered to the cases each person owns (Ralph
+  may get his own), once work carries a human owner consistently.
 - Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent
   (DEV-014, after DEV-010). Do not fake Scout buttons on the mail card before
   that router exists.
