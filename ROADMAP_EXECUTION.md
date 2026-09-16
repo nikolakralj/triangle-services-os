@@ -509,7 +509,7 @@ to a record.
 (DEV-014). Team in Settings (DEV-012). The menu (DEV-011). Today as one inbox
 (DEV-017). Refusal-ledger hide is DEV-016, not this Ask rewrite.
 
-### DEV-011 - Menu: Today · Missions · Talent - `READY` (after DEV-012)
+### DEV-011 - Menu: Today · Missions · Talent - `DONE` (code on branch `cursor/dev-011-menu-d3bd`; signed-in check on the Preview still owed)
 
 **Why:** the 16 September IA withdrew "keep Signal Inbox thin in the shell",
 and the operating-shell decision leaves three primary surfaces. Scout consumes
@@ -523,6 +523,29 @@ from missions, Today and EntityCase. Cert Alerts → certificate exceptions on
 Today plus a filter in Talent. Compliance → a tab in Talent. Setup Readiness
 and Data Imports → Settings. Tables, APIs, suggestions and contractor-chain
 accept stay; no migration; no page deleted; Talent is not hidden.
+
+**Done 16 September (code).** The sidebar is Today · Missions · Talent ·
+Settings, one list, no groups; Quick add offers Missions, Talent pool and
+Upload document (the Compliance tab). Signal Inbox: `/hunter` keeps its list
+under a Job Intake-style diagnostics banner and opens from Settings →
+Diagnostics → Hidden pages; `/hunter/[id]` is unchanged. Cert Alerts: expired
+and expiring-within-30-days worker certificates are a **Renew** card in Needs
+you on Today (`src/components/modules/today-certs.tsx`, counted in the pulse,
+five shown, the rest behind the full list) and a **Certs need attention**
+filter in Talent (`?certs=attention`). Compliance: a **Compliance** tab in
+Talent (`?tab=compliance`) rendering `ComplianceOverview`, which `/documents`
+also renders, so the two cannot drift. Setup Readiness and Data Imports:
+Settings → Setup & data. Job Intake and the certificate expiry list are also
+listed under Hidden pages. No table, API, suggestion or contractor-chain path
+changed; no migration; no page deleted; Talent is not hidden.
+
+Checked: `check:dev-011` 9/9 offline; lint 0; type check 0; tenant-identity 0;
+production build 0; `check:dev-015` 15/15, `check:today-slim` 12/12,
+`check:dev-004` 13/13. **Not yet:** the signed-in check on the Vercel preview.
+To test: menu has four entries; `/hunter` shows the banner and still lists
+projects; Talent shows the two tabs and the certificate filter; Today shows a
+Renew card only if a worker certificate is expired or within 30 days; Settings
+→ Setup & data opens readiness and imports; Diagnostics lists the hidden pages.
 
 ### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (code on branches; slice B awaits signed-in check on the Preview)
 
