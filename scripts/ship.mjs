@@ -20,7 +20,7 @@
 import { execSync } from "node:child_process";
 
 const PROD = "https://triangle-services-os.vercel.app";
-const BRANCH = "wip-jules-2026-05-03T18-13-13-596Z";
+const BRANCH = "main";
 const DEPLOY_TIMEOUT_MS = 5 * 60_000;
 const POLL_INTERVAL_MS = 10_000;
 

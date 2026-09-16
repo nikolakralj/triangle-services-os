@@ -3,9 +3,10 @@
 Updated 15 September 2026. Steps marked **CEO** need a person with the accounts
 or the secrets. An AI assistant never does them and never sees the values.
 
-Production: https://triangle-services-os.vercel.app · branch
-`wip-jules-2026-05-03T18-13-13-596Z` · one Supabase database shared by local
-development, previews and production.
+Production: https://triangle-services-os.vercel.app · branch `main` (the
+one long-lived branch; Vercel → Settings → Git → Production Branch must say
+`main`) · one Supabase database shared by local development, previews and
+production.
 
 ## How a change reaches production
 
