@@ -524,7 +524,45 @@ Today plus a filter in Talent. Compliance → a tab in Talent. Setup Readiness
 and Data Imports → Settings. Tables, APIs, suggestions and contractor-chain
 accept stay; no migration; no page deleted; Talent is not hidden.
 
-### DEV-012 - Team in Settings (Workforce leaves the menu) - `READY` (after DEV-017)
+### DEV-012 - Team in Settings (Workforce leaves the menu) - `IN_PROGRESS` (Claude, branch `claude/team-in-settings`)
+
+**Slices, so another agent can continue:** A — a Team section in Settings with
+each employee's ownership, health, runtime and wake-up, load by state,
+permissions, standing rules, refusals this week, and Activity (recent tasks with
+results, opening the thread drawer). B — Workforce leaves the sidebar, `/agents`
+redirects to Settings → Team, the humans board becomes Settings → Members, the
+work log moves to Diagnostics, and the hand-out console, handed-out list and
+quick notes are removed.
+
+**Slice A — DONE on the branch (not merged).** Settings opens on Team: per
+employee, health (on duty / off duty / never started, last seen), what it runs
+on and whether this server can wake it ("wake-up not set — waits for its
+scheduled check" otherwise), load (working, queued, stale, needs you, failed
+this week), permissions from its active badge in words, refusals this week
+(linking Diagnostics), standing rules (the existing editor, admin and partner
+only), and Activity — all open work first, then the latest twelve finished
+tasks, each with its result line and a Thread button that opens the existing
+drawer. **Stale** is derived, not stored: queued or active work whose newest
+sign of life (created, picked up, a thread message, or run activity) is older
+than 24 hours. Waiting on a person is Needs you, never stale. Data:
+`src/lib/data/team.ts` (`listTeam`); UI: `src/components/modules/team-settings.tsx`.
+Workforce still exists until slice B.
+
+**Slice B — NOT STARTED (handoff notes).** Sidebar entry:
+`src/components/layout/sidebar.tsx` (`/agents` "Workforce", drop the `Cpu`
+import). Redirect `src/app/(app)/agents/page.tsx` to Settings → Team with a
+short notice. `AgentConsole` (`src/components/modules/agent-console.tsx`) is
+imported only by that page: move the Board (`listHumans`) to Settings →
+Members, `HireEmployee` under Team for admins, and the Work log
+(`listAgentRuns` + `describeRun`) to Diagnostics, then delete the console.
+Links still pointing at `/agents`: `src/components/modules/ask-an-employee.tsx`
+("All of it"), `src/components/modules/decision-inbox-workspace.tsx` ("AI
+workforce"), `src/components/modules/research-path-pointer.tsx` (button and
+copy), `src/lib/data/decision-inbox.ts` (fallback caseHref), `src/lib/data/next-move.ts`,
+`src/app/api/research/chat/route.ts` (retired message), and copy naming
+Workforce in `src/app/(app)/hunter/[id]/page.tsx` and
+`src/components/modules/today-email-actions.tsx`. Leave API routes in place.
+Check with the signed-in script pattern used for slice A.
 
 **Why:** amended by the operating-shell decision. On Preview 76c42d4 only the
 three employee cards on Workforce were useful; the rest was a hand-out console
