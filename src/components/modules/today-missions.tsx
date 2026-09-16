@@ -29,7 +29,7 @@ import {
 } from "@/lib/data/contact-channels";
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
-import { EmailCardActions } from "@/components/modules/today-email-actions";
+import { EMAIL_CARD_NOTE, EmailCardActions } from "@/components/modules/today-email-actions";
 import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
@@ -47,6 +47,18 @@ interface Recorded {
   actionId: string;
   sentence: string;
   who: string;
+}
+
+/**
+ * What kind of decision a Needs you card asks for, in the same place on every
+ * card: Reply, Follow up, Call, Write, Decide. The first piece of one card shape.
+ */
+function KindChip({ kind }: { kind: string }) {
+  return (
+    <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+      {kind}
+    </span>
+  );
 }
 
 const WHOSE = {
@@ -101,6 +113,7 @@ export function ReadyForYou({
                 <StateGlyph state={m.state} className="mt-1" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
+                    <KindChip kind={m.state === "needs_you" ? "Decide" : "Stopped"} />
                     <MissionMark emoji={m.emoji} size="sm" />
                     {m.title}
                   </span>
@@ -212,7 +225,8 @@ function FollowUpGroup({
       <div className="min-w-0 grow">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-1 pt-2.5">
           <div className="min-w-0 grow basis-72">
-            <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+            <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
+              <KindChip kind="Follow up" />
               <span className="font-semibold tracking-[-0.01em] text-slate-900">{first.who}</span>
               {first.company && first.company !== first.who ? (
                 <span className="text-slate-700">· {first.company}</span>
@@ -260,6 +274,9 @@ function FollowUpGroup({
             />
           ))}
         </ul>
+        {isEmail && (
+          <p className="px-4 pb-2.5 pt-1 text-[11px] text-slate-500">{EMAIL_CARD_NOTE}</p>
+        )}
       </div>
     </li>
   );
@@ -371,7 +388,8 @@ function FollowUpRow({
                 {item.about ?? item.subject ?? "Follow-up"}
               </p>
             ) : (
-              <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+              <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
+                <KindChip kind="Follow up" />
                 <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
                 {item.company && item.company !== item.who ? (
                   <span className="text-slate-700">· {item.company}</span>
@@ -488,6 +506,7 @@ function FollowUpRow({
                 draft: item.sent,
               }}
               onRecorded={onRecorded}
+              hideNote={compact}
               alreadyWith={findWait(waits, {
                 leadId: item.target.leadId,
                 contactId: item.target.contactId,
@@ -581,7 +600,8 @@ function ReadyPerson({
     <li className="flex">
       <span aria-hidden className="w-[3px] shrink-0 bg-emerald-500" />
       <div className="min-w-0 grow px-4 py-3.5">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <KindChip kind={channel.kind === "phone" ? "Call" : "Write"} />
           <p className="text-[14px] font-semibold tracking-[-0.01em] text-slate-900">{person.name}</p>
           {person.title ? <p className="text-[13px] text-slate-500">{person.title}</p> : null}
           {person.companyName ? <p className="text-[13px] text-slate-700">· {person.companyName}</p> : null}
@@ -824,7 +844,8 @@ function RecordedLine({ recorded, onClear }: { recorded: Recorded; onClear: () =
 
 /**
  * Quiet In progress: Bob / Scout / Hanna still working. Needs you stays for
- * human decisions only.
+ * human decisions only. Take back lives in the thread, next to what the
+ * employee has done so far, so nobody takes work back without reading it.
  */
 export function InProgressWaits({
   waits,
@@ -834,32 +855,7 @@ export function InProgressWaits({
   /** Inside an employee's group: no frame of its own and no empty message. */
   embedded?: boolean;
 }) {
-  const router = useRouter();
   const handoff = useTodayHandoff();
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function takeBack(assignmentId: string) {
-    setBusyId(assignmentId);
-    setError(null);
-    try {
-      const res = await fetch("/api/agents/assignments", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(body.error ?? "Could not take it back.");
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError("Network error.");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   if (waits.length === 0) {
     return embedded ? null : (
@@ -907,24 +903,10 @@ export function InProgressWaits({
                 <MessageSquare className="h-3.5 w-3.5" />
                 Open thread
               </button>
-              <button
-                type="button"
-                disabled={busyId === wait.assignmentId}
-                onClick={() => void takeBack(wait.assignmentId)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-              >
-                {busyId === wait.assignmentId ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Undo2 className="h-3 w-3" />
-                )}
-                Take back
-              </button>
             </div>
           </li>
         ))}
       </ul>
-      {error && <p className="mt-2 text-[12px] text-rose-600">{error}</p>}
     </div>
   );
 }

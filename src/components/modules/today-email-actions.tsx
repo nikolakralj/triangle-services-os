@@ -85,6 +85,9 @@ const TONE = {
   },
 } as const;
 
+export const EMAIL_CARD_NOTE =
+  "Open mail sends nothing. Sent and They replied come off this rail until the mailbox can observe them. Recorded outside Triangle is under Dismiss if you already handled this.";
+
 function defaultAsk(target: EmailCardTarget): string {
   const who = target.who.trim() || "this person";
   if (target.about) return `Follow up with ${who} about ${target.about}.`;
@@ -96,11 +99,14 @@ export function EmailCardActions({
   tone = "light",
   onRecorded,
   alreadyWith = null,
+  hideNote = false,
 }: {
   target: EmailCardTarget;
   tone?: keyof typeof TONE;
   onRecorded: (recorded: Recorded) => void;
   alreadyWith?: InProgressWait | null;
+  /** The card around these actions says it once for all of its lines. */
+  hideNote?: boolean;
 }) {
   const router = useRouter();
   const handoff = useTodayHandoff();
@@ -395,11 +401,13 @@ export function EmailCardActions({
           )}
         </>
       )}
-      <p className={t.note}>
-        {withBob
-          ? "Bob has this case. Open thread stays here — it does not go to Workforce."
-          : "Open mail sends nothing. Sent and They replied come off this rail until the mailbox can observe them. Recorded outside Triangle is under Dismiss if you already handled this."}
-      </p>
+      {!hideNote && (
+        <p className={t.note}>
+          {withBob
+            ? "Bob has this case. Open thread stays here — it does not go to Workforce."
+            : EMAIL_CARD_NOTE}
+        </p>
+      )}
       {error && <p className={t.error}>{error}</p>}
     </div>
   );

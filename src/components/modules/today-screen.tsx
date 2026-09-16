@@ -281,7 +281,11 @@ export function TodayScreen({
           </button>
         </div>
       )}
-      <AssignmentThreadDrawer thread={thread} onClose={() => setThread(null)} />
+      <AssignmentThreadDrawer
+        key={thread?.assignmentId ?? "closed"}
+        thread={thread}
+        onClose={() => setThread(null)}
+      />
     </div>
     </TodayHandoffProvider>
   );
@@ -478,7 +482,7 @@ function NowCard({
     <div className="overflow-hidden rounded-2xl bg-slate-950 shadow-lg shadow-slate-900/10 ring-1 ring-slate-900/5">
       <div className="px-6 pt-6">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
-          Highest commercial leverage
+          {move.action.channelKind === "phone" ? "Call" : "Reply"} · highest commercial leverage
         </p>
         {/* The one piece of large type on the page. */}
         <h3 className="mt-2.5 max-w-2xl text-[22px] font-semibold leading-[1.2] tracking-[-0.02em] text-white">

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, Undo2, X } from "lucide-react";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
 import type { ThreadTarget } from "@/components/modules/today-handoff-context";
 
 // Right-side drawer on Today. Open thread stays on the card's page; it does
-// not navigate to Workforce / What you handed out.
+// not navigate to Workforce / What you handed out. Take back sits here, beside
+// what the employee has already done, for work that is still open.
 
 export function AssignmentThreadDrawer({
   thread,
@@ -15,6 +17,10 @@ export function AssignmentThreadDrawer({
   thread: ThreadTarget | null;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [taking, setTaking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!thread) return;
     function onKey(event: KeyboardEvent) {
@@ -25,6 +31,29 @@ export function AssignmentThreadDrawer({
   }, [thread, onClose]);
 
   if (!thread) return null;
+
+  async function takeBack(assignmentId: string) {
+    setTaking(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/agents/assignments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignmentId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Could not take it back.");
+        return;
+      }
+      onClose();
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setTaking(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -54,7 +83,20 @@ export function AssignmentThreadDrawer({
             <p className="mt-0.5 text-[12px] text-slate-500">
               {thread.agentName} · stays on this case
             </p>
+            {error && <p className="mt-1 text-[12px] text-rose-600">{error}</p>}
           </div>
+          {!thread.finished && (
+            <button
+              type="button"
+              disabled={taking}
+              onClick={() => void takeBack(thread.assignmentId)}
+              title={`Stop ${thread.agentName} working on this. The thread stays.`}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              {taking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3" />}
+              Take back
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
