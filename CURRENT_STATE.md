@@ -93,6 +93,7 @@ External software-customer discovery remains paused under the 4 September decisi
 **16 September IA lock** (nav hide and AskLauncher rewrite still later):
 primary surfaces are Today, Missions, Talent, Team. Today is Needs you |
 In progress | Missions… Handoff changes the owner, not the place (DEV-015).
+Refusal ledger on Today is diagnostics (DEV-016), not Needs you.
 Signal Inbox leaves primary nav (DEV-011). Ask on a situation is a
 missionless assignment, not a new Mission (DEV-010). Human-approved Send from
 Triangle is allowed (DEV-013); the button is not built. See `DECISIONS.md`.
@@ -107,7 +108,7 @@ work, consent, availability for a specific order or mobilization clearance.
 | --- | --- | --- |
 | Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging. The list is off primary nav; `/job-intake` remains diagnostics until Bob mail ? Today is proven | Extraction uses a model; paid/business conversion is not established by ingestion; Bob waking on commercial mail is not built |
 | Research | Project/company evidence, two proposal stores, human review, case history. Project Research Agent chat retired; Scout missions and suggestions remain. Company detail still opens from missions; the directory is not in the shell | Accepted research is not a buyer-confirmed requirement |
-| Today screen | Needs you, In progress (Bob/Scout/Hanna waits + Open thread drawer), missions, older reports. Hand to Bob stays on the case | AskLauncher still starts Missions (DEV-010). Live Ask Bob rows need the commercial_follow_through data-fix SQL |
+| Today screen | Needs you, In progress (Bob/Scout/Hanna waits + Open thread drawer), missions, older reports. Hand to Bob stays on the case | AskLauncher still starts Missions (DEV-010). Live Ask Bob rows need the commercial_follow_through data-fix SQL. `RefusalLedger` still renders above the rails (`src/app/(app)/decisions/page.tsx`) — DEV-016 will demote it |
 | Scout | Bot-owned: Triangle stores work and wakes Grok; in-app OpenAI executor does not claim Scout jobs | Specific-job execution on the bot, crash recovery, and measured cost are not fully proven; older in_app rows are not rewritten |
 | Talent | CV storage/extraction, candidate profiles, history, generated CVs, talent questions | Upload auto-acceptance, identity merging, readiness and access boundaries need correction |
 | Partner firms | `supply_partners`, create/confirm/status UI/API, capacity age checks, Scout/Hanna context | Source exists; role/actor and precise capacity-readiness checks remain incomplete |

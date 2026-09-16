@@ -38,11 +38,13 @@ management changes the order, or when the gate is met or fails.
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-**16 September IA (docs lock):** first `READY` item after DEV-015 is **DEV-010**
-(context-aware Ask). DEV-009 (Today slim) and DEV-015 (context-preserving
-handoff + Ask Bob `case_type`) are `DONE` and did not rename Team or add Send.
-Do not invent Work Items. Do not implement the Send button unless you are on
-DEV-013.
+**16 September IA (docs lock):** first `READY` item after this refusal-ledger
+docs lock is **DEV-016** (hide the refusal ledger from Workforce / Today
+primary). Then **DEV-010** (context-aware Ask). DEV-009 (Today slim) and
+DEV-015 (context-preserving handoff + Ask Bob `case_type`) are `DONE` and
+did not rename Team or add Send. Do not invent Work Items. Do not beautify
+Team (DEV-012) while the refusal panel is still on the CEO surface. Do not
+implement the Send button unless you are on DEV-013.
 
 ### DEV-001 â Sent-message record Â· `DONE`
 
@@ -370,9 +372,35 @@ Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
 Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
 Bob ? Open thread drawer ? the card is in In progress, not Workforce.
 
+### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `READY`
+
+**Why now:** Today / Workforce shows "The system refused N attempts..." with
+Postgres finding-contract sentences (Ask Bob completes mis-classified as
+`open_research`). That is engineer diagnostics, not CEO work. Nikola: if an
+employee gave a CEO this panel, the process is wrong.
+
+**Do before DEV-012.** Context-preserving handoff (DEV-015) remains the CEO
+path. Do not put the ledger under Needs you. Do not invent research
+landings for commercial follow-through.
+
+**Acceptance:**
+1. `RefusalLedger` is not on Today primary
+   (`src/app/(app)/decisions/page.tsx`) and not on Workforce primary or in
+   primary nav.
+2. The data stays: `src/lib/data/refusals.ts`, the component
+   `src/components/modules/refusal-ledger.tsx`, and the refusal records.
+   Same class as Job Intake hide (`/job-intake` kept as diagnostics).
+3. Do not relocate the panel under Needs you, In progress, or Missions.
+4. No .env, no production promote, no Team rename, no Send button, nothing
+   sends email. Ask Bob `case_type` law is DEV-015, already locked; new
+   creates are fixed; Nikola applies
+   `supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql`.
+
+This item is **docs-locked** in this change. Code is the next slice.
+
 ### DEV-010 - Context-aware AskLauncher / `/api/ask` - `READY`
 
-**Why now (smallest, first):** the 16 September IA. Current Ask treats
+**Why now (smallest Ask slice):** the 16 September IA. Current Ask treats
 anything that is not a talent-pool question as a new Mission. That fills
 Missions with Scout pokes that belong on the email / requirement / company /
 project / person the human was looking at. Do this **before inventing new UI
@@ -398,6 +426,7 @@ to a record.
 
 **Not this item:** Scout / Hanna / Bob intent routing on cards or voice
 (DEV-014). Workforce -> Team (DEV-012). Signal Inbox hide (DEV-011).
+Refusal-ledger hide is DEV-016, not this Ask rewrite.
 
 ### DEV-011 - Hide Signal Inbox from primary nav - `READY`
 
@@ -422,7 +451,9 @@ still in the same shell pass; do not hide Talent.
 health, and load - not a hand-out-jobs console. Ask context (DEV-010) must
 exist first so handing out work is not the Team page's job.
 
-**Do after DEV-010.**
+**Do after DEV-010 and DEV-016.** Hide the refusal ledger from the CEO
+surface before shrinking / renaming Team. Do not beautify Workforce while
+Postgres finding-contract sentences are still on Today.
 
 **Acceptance:** primary nav label is Team (or Workforce still, with Team copy
 on the page if a rename is staged); the page shows the three employees,
@@ -637,8 +668,8 @@ Until Phase 0 exits, do not build:
   policy, audit, and recorded-send path). Human-approved Send from Triangle
   is DEV-013, not this freeze;
 - cosmetic dashboard/navigation projects (IA-authorized surface hides in
-  DEV-011 / Cert Alerts are operating-surface work, like Job Intake, not
-  polish);
+  DEV-011 / DEV-016 / Cert Alerts are operating-surface work, like Job
+  Intake, not polish);
 - broad Hunter expansion;
 - more sectors/countries;
 - generic marketplace;

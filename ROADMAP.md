@@ -33,7 +33,10 @@ Team. Today is **Needs you | In progress | Missions…**. Handoff changes the
 owner of the work; it does not change where the work lives (DEV-015, ahead of
 the Team redesign). Open thread is a drawer on Today. Ask Bob assignments use
 `case_type: commercial_follow_through` so commercial complete is not judged as
-a research finding.
+a research finding. System refusals, tenant walls, and finding-contract
+sentences are **diagnostics**, not CEO work — hide them from Workforce
+primary and from primary nav (DEV-016, same class as the Job Intake hide).
+Do not put the refusal ledger under Needs you.
 
 It is not:
 
