@@ -479,7 +479,7 @@ team". The operating-shell decision makes Today one inbox.
 7. No new table, no navigation change, no send path, no change to what any
    button records. Signed-in check on the Preview.
 
-### DEV-010 - Context-aware AskLauncher / `/api/ask` - `READY`
+### DEV-010 - Context-aware AskLauncher / `/api/ask` - `DONE` (code on branch `cursor/dev-010-context-ask-d3bd`; signed-in check on the Preview still owed)
 
 **Why now (smallest Ask slice):** the 16 September IA. Current Ask treats
 anything that is not a talent-pool question as a new Mission. That fills
@@ -508,6 +508,36 @@ to a record.
 **Not this item:** Scout / Hanna / Bob intent routing on cards or voice
 (DEV-014). Team in Settings (DEV-012). The menu (DEV-011). Today as one inbox
 (DEV-017). Refusal-ledger hide is DEV-016, not this Ask rewrite.
+
+**Done 16 September (code).** A record page — project (`/hunter/[id]`),
+company, requirement (`/commercial/[id]`), person (`/workers/[id]`) — mounts
+`AskPageContext` (`src/components/missions/ask-context.tsx`); the Ask box
+reads it and opens on **On {record}**. A substantial Ask there posts
+`context` to `/api/ask`, which calls `askOnRecord`
+(`src/lib/data/ask-on-record.ts`): one missionless assignment
+(`mission_id null`) bound through `agent_assignment_entities` to the record
+(a requirement as `other` plus its project — the entity_type check constraint
+has no `requirement`), lead by rule (person or plainly-our-people wording ->
+Hanna, otherwise Scout; no naming call), one open job per record per day,
+the question as the first human message. The box stays open on the page
+("{lead} has it — on {record}. You stay here."), refreshes the page, and the
+job shows under the record's case at once; `getEntityCase` treats an
+`ask_on_record` job as dedicated so its findings show there too. The person
+page gained a Case history card so the answer has a place. Inside a mission
+the box defaults to that mission; "Start a mission" is explicit (`missionId:
+null`). No context and substantial work still starts a Mission; a pool
+question still answers inline before any of this. No table, no nav change,
+no send path, no AI call added. Email cards keep Ask Bob; `job_lead` and
+`contact` are accepted by the API but no page mounts them yet.
+
+Checked: `npm run check:dev-010` 14/14; lint 0; type check 0;
+tenant-identity 0; production build 0. Could not signed-in check here.
+Nikola, on the Preview: open a project, Ctrl+K, see "On {project}" selected,
+ask "Scout, who is the MEP contractor here?" -> the box says Scout has it,
+you are still on the project, Case history shows the job queued, Missions
+gained nothing; then on a mission page Ctrl+K defaults to that mission; on
+Today with nothing in view a substantial Ask still opens a Mission; "who is
+free in October" still answers inline.
 
 ### DEV-011 - Menu: Today · Missions · Talent - `READY` (after DEV-012)
 
