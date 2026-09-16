@@ -66,7 +66,8 @@ configuration into a signed-in demo session.
 ## Database migrations — CEO approves each one
 
 Migrations live in `supabase/migrations/` and run through
-`048_drafts_keep_what_triangle_wrote.sql`. Because every environment shares one database,
+`049_send_from_triangle.sql` (048 is the last one applied; 049 waits for the
+CEO). Because every environment shares one database,
 a migration is applied only after the CEO approves that migration. After any
 column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
 against the live organization.
@@ -138,6 +139,24 @@ How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
   `ENCRYPTION_KEY`.
 - The changed screen or route works signed in.
 - After a bot change, a new mission step wakes its bot.
+
+## Send from Triangle — CEO turns it on per mailbox
+
+A person may review, edit and press Send in Triangle (DEV-013). Nothing is
+sent until two things are done, both by the CEO:
+
+1. Approve and apply `049_send_from_triangle.sql` (adds `mail_accounts.can_send`,
+   default false, and `sent_via` / `mail_account_id` / `outbound_rfc822_id` on
+   `outreach_drafts`; changes no rows), then `NOTIFY pgrst, 'reload schema';`.
+2. Settings → Mailboxes → on **your own** mailbox tick "Let me send from Triangle".
+   Only the owner sees the switch; a colleague's mailbox is never a sender.
+
+The message leaves over SMTP with implicit TLS (port 465) using the password
+already stored for reading: Gmail and Microsoft accept the same app password on
+`smtp.gmail.com` / `smtp.office365.com`; other domains use `mail.<domain>`. A
+refused send is written to the refusal ledger and shown as "Not sent. <reason>";
+it is never recorded as sent. Employees (AI) have no path to this: `/api/mail/send`
+refuses every badge and the MCP key before reading the body.
 
 ## Mail from a bot into Job Intake
 

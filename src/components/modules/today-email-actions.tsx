@@ -86,7 +86,7 @@ const TONE = {
 } as const;
 
 export const EMAIL_CARD_NOTE =
-  "Open mail sends nothing. Sent and They replied come off this rail until the mailbox can observe them. Recorded outside Triangle is under Dismiss if you already handled this.";
+  "Open mail sends nothing. Send from Triangle leaves from your own mailbox and records itself. They replied comes off this rail until the mailbox can observe it. Recorded outside Triangle is under Dismiss if you already handled this.";
 
 function defaultAsk(target: EmailCardTarget): string {
   const who = target.who.trim() || "this person";

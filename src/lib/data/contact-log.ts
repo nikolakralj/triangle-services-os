@@ -157,6 +157,13 @@ export async function logContactAttempt(params: {
    * date. Not a Sent record.
    */
   defer?: boolean;
+  /**
+   * Set only by Send from Triangle (DEV-013), after the mailbox's server
+   * accepted the message: which mailbox, and the Message-ID it left with.
+   * Written only when present, so a database without migration 049 keeps
+   * recording every other kind of contact.
+   */
+  sentFromTriangle?: { mailAccountId: string; rfc822Id: string } | null;
 }): Promise<
   | { ok: true; actionId: string; draftId: string; followUpAt: string | null }
   | { ok: false; error: string }
@@ -270,6 +277,13 @@ export async function logContactAttempt(params: {
       replied_at: params.outcome === "reached" && !defer ? now : null,
       reply_summary: summary,
       created_by_user_id: params.userId,
+      ...(params.sentFromTriangle
+        ? {
+            sent_via: "triangle",
+            mail_account_id: params.sentFromTriangle.mailAccountId,
+            outbound_rfc822_id: params.sentFromTriangle.rfc822Id,
+          }
+        : {}),
     })
     .select("id")
     .single();

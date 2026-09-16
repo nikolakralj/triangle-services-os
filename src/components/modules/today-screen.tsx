@@ -30,6 +30,10 @@ import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modul
 import { CertExceptions } from "@/components/modules/today-certs";
 import type { CertAlertRow } from "@/lib/data/worker-documents";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
+import {
+  SendFromTriangleButton,
+  SendFromTriangleReview,
+} from "@/components/modules/send-from-triangle";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
 import {
   TodayHandoffProvider,
@@ -98,6 +102,7 @@ export function TodayScreen({
   waits,
   done,
   certs = [],
+  sender = null,
 }: {
   move: NextMove;
   employees: Employee[];
@@ -114,6 +119,8 @@ export function TodayScreen({
   done: DoneItem[];
   /** Worker certificates expired or expiring within 30 days (DEV-011). */
   certs?: CertAlertRow[];
+  /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
+  sender?: { id: string; emailAddress: string } | null;
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
@@ -189,7 +196,7 @@ export function TodayScreen({
             />
           )}
           {nowNeedsYou ? (
-            <NowCard key={cardKey} move={move} onLogged={setLogged} waits={waits} />
+            <NowCard key={cardKey} move={move} onLogged={setLogged} waits={waits} sender={sender} />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
               <p className="text-base font-semibold text-slate-900">
@@ -476,10 +483,12 @@ function NowCard({
   move,
   onLogged,
   waits,
+  sender,
 }: {
   move: NextMove;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  sender: { id: string; emailAddress: string } | null;
 }) {
   if (move.clear || !move.action) {
     return (
@@ -503,7 +512,7 @@ function NowCard({
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} onLogged={onLogged} waits={waits} />
+      <ActionPanel action={move.action} onLogged={onLogged} waits={waits} sender={sender} />
     </div>
   );
 }
@@ -526,13 +535,17 @@ function ActionPanel({
   action,
   onLogged,
   waits,
+  sender,
 }: {
   action: NextMoveAction;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
+  sender: { id: string; emailAddress: string } | null;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [logging, setLogging] = useState<ContactOutcome | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -543,6 +556,18 @@ function ActionPanel({
   // what Copy, Open mail and Sent use. A call script is only read out.
   const [words, setWords] = useState(action.script ?? "");
   const outgoing = isPhone ? (action.script ?? "") : words;
+  const about = [action.personRole, action.country ? `in ${action.country}` : null]
+    .filter(Boolean)
+    .join(" ");
+  const sendTarget = {
+    to: action.value,
+    subject: action.subject,
+    body: outgoing,
+    draft: action.script,
+    who: action.personName,
+    leadId: action.leadId,
+    contactId: action.contactId || undefined,
+  };
 
   async function log(outcome: ContactOutcome) {
     setLogging(outcome);
@@ -609,13 +634,26 @@ function ActionPanel({
             Dial
           </a>
         ) : (
-          <a
-            href={mailtoHref(action.value, action.subject, outgoing)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Open mail
-          </a>
+          <>
+            {/* Review / edit / Send in Triangle (DEV-013). Only for a person
+                whose own mailbox has sending on; Open mail stays regardless. */}
+            <SendFromTriangleButton
+              target={sendTarget}
+              sender={sender}
+              open={reviewing}
+              onOpen={() => {
+                setReviewing(true);
+                setError(null);
+              }}
+            />
+            <a
+              href={mailtoHref(action.value, action.subject, outgoing)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Open mail
+            </a>
+          </>
         )}
         {action.script && (
           <button
@@ -673,6 +711,19 @@ function ActionPanel({
               </ul>
             )}
           </div>
+        )}
+
+        {reviewing && sender && !isPhone && (
+          <SendFromTriangleReview
+            target={sendTarget}
+            sender={sender}
+            onCancel={() => setReviewing(false)}
+            onSent={(sent) => {
+              setReviewing(false);
+              onLogged({ actionId: sent.actionId, sentence: sent.sentence, who: sent.who, about });
+              router.refresh();
+            }}
+          />
         )}
 
         {/* The prepared words, set as a document rather than a paragraph. */}

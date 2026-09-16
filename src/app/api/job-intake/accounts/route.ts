@@ -5,6 +5,8 @@ import {
   isEncryptionConfigured,
 } from "@/lib/job-intake/credentials";
 import { ImapMailSource, defaultImapHost } from "@/lib/job-intake/mail-source";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
+import { SEND_NOT_YOURS } from "@/lib/mail/send-policy";
 
 // ---------------------------------------------------------------------------
 // GET    /api/job-intake/accounts   — list connected mailboxes
@@ -109,7 +111,7 @@ export async function GET(request: Request) {
   const { data } = await svc
     .from("mail_accounts")
     .select(
-      "id, email_address, display_name, provider, watch_label, status, last_synced_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host",
+      "id, email_address, display_name, provider, watch_label, status, last_synced_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host, owner_user_id, can_send",
     )
     .eq("org_id", access.organizationId)
     .order("created_at", { ascending: true });
@@ -130,6 +132,9 @@ export async function GET(request: Request) {
         (a.credential_ref && process.env[a.credential_ref as string]),
     ),
     usesLegacyEnvVar: Boolean(!a.credential_encrypted && a.credential_ref),
+    // Send from Triangle (DEV-013): opt-in, and only the owner may use it.
+    isMine: a.owner_user_id === access.userId,
+    canSend: Boolean(a.can_send),
   }));
 
   return NextResponse.json({
@@ -253,6 +258,62 @@ export async function POST(request: Request) {
   return NextResponse.json({
     account: { id: data.id, emailAddress: data.email_address, connected: true },
   });
+}
+
+/**
+ * Turn Send from Triangle on or off for one mailbox (DEV-013).
+ *
+ * Only the mailbox owner, and only a signed-in person: a badge cannot grant
+ * itself a sender. Off by default; nothing about ingest changes.
+ */
+export async function PATCH(request: Request) {
+  const access = await requireApiAccess(request);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+  const refused = refuseUnlessHuman(access, "canWrite", "change who may send from a mailbox");
+  if (refused) return refused;
+
+  let body: { accountId?: string; canSend?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const accountId = String(body.accountId ?? "").trim();
+  if (!accountId || typeof body.canSend !== "boolean") {
+    return NextResponse.json({ error: "Say which mailbox, and on or off." }, { status: 400 });
+  }
+
+  const svc = createServiceSupabaseClient();
+  if (!svc) {
+    return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
+  }
+  const { data: account } = await svc
+    .from("mail_accounts")
+    .select("id, owner_user_id, email_address")
+    .eq("id", accountId)
+    .eq("org_id", access.organizationId)
+    .maybeSingle();
+  if (!account) {
+    return NextResponse.json({ error: "No such mailbox." }, { status: 404 });
+  }
+  if (account.owner_user_id !== access.userId) {
+    return NextResponse.json({ error: SEND_NOT_YOURS }, { status: 403 });
+  }
+
+  const { error } = await svc
+    .from("mail_accounts")
+    .update({ can_send: body.canSend })
+    .eq("id", accountId)
+    .eq("org_id", access.organizationId);
+  if (error) {
+    return NextResponse.json(
+      { error: "Could not change it. Has migration 049 been applied?" },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ ok: true, accountId, canSend: body.canSend });
 }
 
 export async function DELETE(request: Request) {

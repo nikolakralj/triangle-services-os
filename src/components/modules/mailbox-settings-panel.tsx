@@ -24,6 +24,9 @@ interface MailAccount {
   credentialSetAt: string | null;
   connected: boolean;
   usesLegacyEnvVar: boolean;
+  /** Send from Triangle (DEV-013): the owner may press Send from this address. */
+  isMine: boolean;
+  canSend: boolean;
 }
 
 const EMPTY_FORM = {
@@ -44,6 +47,7 @@ export function MailboxSettingsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -98,6 +102,28 @@ export function MailboxSettingsPanel() {
       if (res.ok) await load();
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function setCanSend(id: string, canSend: boolean) {
+    setTogglingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/job-intake/accounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: id, canSend }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Could not change that.");
+        return;
+      }
+      await load();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -167,6 +193,30 @@ node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&
                     password encrypted instead.
                   </p>
                 )}
+                {/* Reading is what a connected mailbox is for. Sending from
+                    Triangle is a second, opt-in permission, and only the
+                    owner sees the switch (DEV-013). */}
+                {a.isMine ? (
+                  <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-3.5 w-3.5 accent-slate-900"
+                      checked={a.canSend}
+                      disabled={togglingId === a.id || !a.connected}
+                      onChange={(e) => void setCanSend(a.id, e.target.checked)}
+                    />
+                    <span>
+                      <span className="font-medium">Let me send from Triangle</span>
+                      <span className="block text-slate-500">
+                        Review, edit and press Send on a drafted reply; it leaves from this
+                        address over SMTP and is recorded with its follow-up. Only you can
+                        press it. Employees (AI) never send.
+                      </span>
+                    </span>
+                  </label>
+                ) : a.canSend ? (
+                  <p className="mt-1 text-xs text-slate-500">Its owner may send from Triangle.</p>
+                ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {a.connected ? (

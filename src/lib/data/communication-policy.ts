@@ -41,7 +41,14 @@ const DEFAULTS: Record<CommunicationClass, CommunicationMode> = {
   commitment: "forbidden",
 };
 
-/** Whether Triangle can record a message an employee sent itself. Not yet. */
+/**
+ * Whether Triangle can record a message an employee sent itself. Not yet.
+ *
+ * Since DEV-013 a person can press Send in Triangle and that send is
+ * recorded (commercial_actions, outreach_drafts.sent_via = triangle). That is
+ * a human send: it does not flip this flag, because the flag is about an
+ * employee sending on its own, and the freeze on autonomous outbound holds.
+ */
 export const SENT_MESSAGES_RECORDED = false;
 
 export interface CommunicationPolicy {
