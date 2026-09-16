@@ -128,9 +128,18 @@ export function ReadyForYou({
       {due.length > 0 && (
         <div>
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {due.map((f) => (
-              <FollowUpRow key={f.actionId} item={f} onRecorded={setRecorded} waits={waits} />
-            ))}
+            {groupByPerson(due).map((group) =>
+              group.length === 1 ? (
+                <FollowUpRow key={group[0].actionId} item={group[0]} onRecorded={setRecorded} waits={waits} />
+              ) : (
+                <FollowUpGroup
+                  key={group[0].actionId}
+                  items={group}
+                  onRecorded={setRecorded}
+                  waits={waits}
+                />
+              ),
+            )}
           </ul>
           {moreFollowUps > 0 && (
             <p className="mt-1.5 px-1 text-[11.5px] text-slate-500">
@@ -161,6 +170,102 @@ function shortDate(iso: string): string {
 }
 
 /**
+ * Follow-ups for the same person, together.
+ *
+ * A recruiter who sent four roles got four replies, and Today showed the same
+ * name four times with four mail buttons for one mailbox. Grouped by the
+ * address the follow-up would go to (or, without one, the name and company),
+ * in the order Today already sorts them: most overdue first.
+ */
+function groupByPerson(items: FollowUp[]): FollowUp[][] {
+  const groups = new Map<string, FollowUp[]>();
+  for (const item of items) {
+    const key =
+      (item.value ?? "").trim().toLowerCase() ||
+      `${item.who}|${item.company ?? ""}`.toLowerCase();
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  return Array.from(groups.values());
+}
+
+/** One card per person: who, where, one channel button, then a line per role. */
+function FollowUpGroup({
+  items,
+  onRecorded,
+  waits,
+}: {
+  items: FollowUp[];
+  onRecorded: (r: Recorded) => void;
+  waits: InProgressWait[];
+}) {
+  const first = items[0];
+  const mostOverdue = Math.max(...items.map((i) => i.daysOverdue));
+  const overdue = mostOverdue > 0;
+  const isPhone = first.channelKind === "phone";
+  const isEmail = first.channelKind === "email";
+
+  return (
+    <li className="flex">
+      <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
+      <div className="min-w-0 grow">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-1 pt-2.5">
+          <div className="min-w-0 grow basis-72">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+              <span className="font-semibold tracking-[-0.01em] text-slate-900">{first.who}</span>
+              {first.company && first.company !== first.who ? (
+                <span className="text-slate-700">· {first.company}</span>
+              ) : null}
+              <span className="text-slate-500">— {items.length} roles to follow up</span>
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]">
+              <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              <span className={overdue ? "font-medium text-amber-800" : "text-slate-500"}>
+                {overdue
+                  ? `oldest follow-up ${mostOverdue === 1 ? "a day" : `${mostOverdue} days`} overdue`
+                  : "follow-ups due today"}
+              </span>
+              {first.value && <span className="font-mono text-slate-500">{first.value}</span>}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {first.value && isPhone ? (
+              <a
+                href={telHref(first.value)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Phone className="h-3 w-3" />
+                Dial
+              </a>
+            ) : first.value && isEmail ? (
+              <a
+                href={mailtoHref(first.value)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Mail className="h-3 w-3" />
+                Open mail
+              </a>
+            ) : null}
+          </div>
+        </div>
+        <ul className="divide-y divide-slate-100">
+          {items.map((item) => (
+            <FollowUpRow
+              key={item.actionId}
+              item={item}
+              onRecorded={onRecorded}
+              waits={waits}
+              compact
+            />
+          ))}
+        </ul>
+      </div>
+    </li>
+  );
+}
+
+/**
  * A follow-up due. Email cards hand the chase to Bob; phone stays a human
  * call until the mailbox covers voice.
  */
@@ -168,10 +273,13 @@ function FollowUpRow({
   item,
   onRecorded,
   waits,
+  compact = false,
 }: {
   item: FollowUp;
   onRecorded: (r: Recorded) => void;
   waits: InProgressWait[];
+  /** One role inside a person's card: the person, address and mail button live on the card. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
@@ -251,23 +359,33 @@ function FollowUpRow({
   // Two lines, not four: eight of these sat above the people still to reach
   // and pushed them a screen down.
   return (
-    <li className="flex">
-      <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
-      <div className="min-w-0 grow px-4 py-2.5">
+    <li className={compact ? "flex pl-4" : "flex"}>
+      {!compact && (
+        <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
+      )}
+      <div className={`min-w-0 grow px-4 ${compact ? "py-2" : "py-2.5"}`}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-0 grow basis-72">
-            <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
-              <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
-              {item.company && item.company !== item.who ? (
-                <span className="text-slate-700">· {item.company}</span>
-              ) : null}
-              {item.about ? <span className="text-slate-500">— {item.about}</span> : null}
-            </p>
+            {compact ? (
+              <p className="text-[13px] font-medium text-slate-800">
+                {item.about ?? item.subject ?? "Follow-up"}
+              </p>
+            ) : (
+              <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
+                <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
+                {item.company && item.company !== item.who ? (
+                  <span className="text-slate-700">· {item.company}</span>
+                ) : null}
+                {item.about ? <span className="text-slate-500">— {item.about}</span> : null}
+              </p>
+            )}
             <p
               className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]"
               suppressHydrationWarning
             >
-              <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              {!compact && (
+                <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              )}
               <span className="text-slate-600">
                 {verb} {shortDate(item.at)}
               </span>
@@ -276,7 +394,7 @@ function FollowUpRow({
                   ? `follow-up ${item.daysOverdue === 1 ? "a day" : `${item.daysOverdue} days`} overdue`
                   : "follow-up due today"}
               </span>
-              {item.value && <span className="font-mono text-slate-500">{item.value}</span>}
+              {item.value && !compact && <span className="font-mono text-slate-500">{item.value}</span>}
               {item.sent && !item.lookAgain && (
                 <button
                   type="button"
@@ -291,7 +409,7 @@ function FollowUpRow({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-            {item.value && isPhone ? (
+            {compact ? null : item.value && isPhone ? (
               <a
                 href={telHref(item.value)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"

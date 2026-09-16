@@ -425,6 +425,16 @@ Checked signed in on localhost, 8/8; `check:dev-015` 15/15 and
 `check:today-slim` 12/12 still pass; type check and lint pass.
 **Next: slice B**, then C.
 
+**Slice B done 16 September** (branch `claude/today-one-inbox`). Follow-ups for
+the same person are one card, grouped by the address the follow-up goes to (or
+name and company without one): the person, the oldest overdue date, the address
+and one Open mail or Dial on the card, then one line per role with its own Ask
+Bob or thread and Dismiss. A single follow-up still renders as before. Checked
+signed in on localhost, 4/4: Nicolas Preckler's two roles are one card with one
+Open mail and two Ask Bob actions, and his name appears once in Needs you.
+**Next: slice C.** Known: the "Open mail sends nothing" note repeats on each role
+line; one card shape should say it once.
+
 **Why:** on Preview 76c42d4 Today mixed four card designs, listed the same
 recruiter once per role, kept a mission grid and a second Ask box under the
 inbox, and carried 11 old reports and 19 older items under "Back from the
