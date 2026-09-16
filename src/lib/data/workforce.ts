@@ -566,6 +566,26 @@ export async function listOpenAssignmentsForInstance(
       contacts.set(contact.id as string, contact as Record<string, unknown>);
     }
   }
+  const leadIds = Array.from(
+    new Set(
+      (ents ?? [])
+        .filter((e) => e.entity_type === "job_lead")
+        .map((e) => e.entity_id as string),
+    ),
+  );
+  const leads = new Map<string, Record<string, unknown>>();
+  if (leadIds.length > 0) {
+    const { data: rows } = await svc
+      .from("job_leads")
+      .select(
+        "id,agency_name,contact_name,contact_email,client_company,role_title,country,city,start_date_text,rate_text,headcount_text,team_potential,missing_fields,status",
+      )
+      .eq("org_id", orgId)
+      .in("id", leadIds);
+    for (const lead of rows ?? []) {
+      leads.set(lead.id as string, lead as Record<string, unknown>);
+    }
+  }
 
   const entitiesByAssignment = new Map<
     string,
@@ -578,7 +598,9 @@ export async function listOpenAssignmentsForInstance(
         ? companies.get(entity.entity_id as string)
         : entity.entity_type === "contact"
           ? contacts.get(entity.entity_id as string)
-          : { id: entity.entity_id as string };
+          : entity.entity_type === "job_lead"
+            ? leads.get(entity.entity_id as string)
+            : { id: entity.entity_id as string };
     if (!record) continue;
     const assignmentId = entity.assignment_id as string;
     if (!entitiesByAssignment.has(assignmentId)) {

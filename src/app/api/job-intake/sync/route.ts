@@ -83,9 +83,17 @@ export async function POST(request: Request) {
       leadsCreated: acc.leadsCreated + s.leadsCreated,
       noiseDiscarded: acc.noiseDiscarded + s.noiseDiscarded,
       alreadySeen: acc.alreadySeen + s.alreadySeen,
+      repliesMatched: acc.repliesMatched + s.repliesMatched,
       errors: acc.errors + s.errors.length,
     }),
-    { fetched: 0, leadsCreated: 0, noiseDiscarded: 0, alreadySeen: 0, errors: 0 },
+    {
+      fetched: 0,
+      leadsCreated: 0,
+      noiseDiscarded: 0,
+      alreadySeen: 0,
+      repliesMatched: 0,
+      errors: 0,
+    },
   );
 
   // The IMAP fallback shows up in the same activity feed as the bots.

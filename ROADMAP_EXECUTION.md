@@ -281,6 +281,38 @@ in the route table. Could not signed-in check here. Nikola: confirm the
 sidebar has no Job Intake, then open `/job-intake` from a bookmark and read
 the diagnostics banner.
 
+### Contextual agent work + mailbox send/reply · `DONE`
+
+**Why:** one-off agent work was creating Missions, and Job Intake asked the
+human to mark Sent / They replied / Sent a follow-up. Mail intelligence stays;
+the inbox workflow does not. An assignment can exist without a Mission.
+
+**Acceptance:**
+1. Ask Triangle on a commercial item (`/now/lead/[id]`) creates a missionless
+   `agent_assignments` row attached to that `job_lead`, routed to Scout / Hanna
+   / Bob by name or a small keyword rule.
+2. Parallel assignments on the same item are allowed; results stay on that
+   context as a human brief (what changed / why / recommend / need / evidence).
+3. Scout may suggest a Mission; Triangle does not create one unless asked.
+4. Triangle can send a draft from the connected mailbox over SMTP and store
+   the RFC822 id (migration 049). IMAP ingest matches In-Reply-To or
+   sender+subject and sets `job_leads.reply_received_at`.
+5. Today email rows have one primary action (Review & send / Review reply);
+   Later is behind ···; ?Not this request? dismisses only that item.
+6. Job Intake stays off the sidebar. No Cases page.
+
+**Limits / gaps:** there is no Gmail API send. SMTP uses the stored IMAP app
+password on port 465. If SMTP is refused, the draft stays unsent. Outlook
+send is only a host guess, not OAuth. Voice is not built. Automatic Bob
+triage of every inbound message is not built ? a human (or an explicit
+assign) still starts contextual work. Migration 049 is not applied to
+production.
+
+**Checked:** offline `scripts/check-contextual-work.mjs`; lint, production
+build, tenant-identity. Could not signed-in check here. Nikola: open a
+commercial item, ask Scout to investigate (no Mission), send a draft from
+Triangle, then confirm a reply updates without clicking They replied.
+
 
 ### Only if live work stalls on it
 

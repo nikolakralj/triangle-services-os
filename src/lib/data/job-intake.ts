@@ -29,6 +29,8 @@ export interface JobLead {
   requestedDocuments: string[];
   missingFields: string[];
   status: "new" | "reviewing" | "replied" | "qualified" | "rejected" | "archived";
+  /** Set when mailbox sync recognised a reply to a Triangle-sent draft. */
+  replyReceivedAt: string | null;
   duplicateOfId: string | null;
   discoveredProjectId: string | null;
   notes: string | null;
@@ -82,6 +84,7 @@ function rowToLead(
     missingFields: Array.isArray(row.missing_fields)
       ? (row.missing_fields as string[]) : [],
     status: (row.status as JobLead["status"]) ?? "new",
+    replyReceivedAt: (row.reply_received_at as string | null) ?? null,
     duplicateOfId: (row.duplicate_of_id as string) ?? null,
     discoveredProjectId: (row.discovered_project_id as string) ?? null,
     notes: (row.notes as string) ?? null,
@@ -479,6 +482,7 @@ export interface LeadReplyDraft {
   language: string;
   status: "draft" | "sent" | "archived";
   sentAt: string | null;
+  outboundRfc822Id: string | null;
   createdAt: string;
 }
 
@@ -494,6 +498,7 @@ function rowToDraft(row: Record<string, unknown>): LeadReplyDraft {
     language: String(row.language ?? "en"),
     status: (row.status as LeadReplyDraft["status"]) ?? "draft",
     sentAt: (row.sent_at as string) ?? null,
+    outboundRfc822Id: (row.outbound_rfc822_id as string | null) ?? null,
     createdAt: String(row.created_at ?? ""),
   };
 }
@@ -574,8 +579,7 @@ export async function createReplyDraft(params: {
 }
 
 /**
- * Update a draft: edit its text, or mark it sent. "Sent" is recorded because
- * the user sent it from their own mail client — this app never sends.
+ * Update a draft: edit its text, or record that Triangle itself sent it.
  */
 export async function updateReplyDraft(params: {
   draftId: string;
@@ -583,6 +587,8 @@ export async function updateReplyDraft(params: {
   subject?: string;
   body?: string;
   status?: LeadReplyDraft["status"];
+  outboundRfc822Id?: string | null;
+  mailAccountId?: string | null;
 }): Promise<LeadReplyDraft | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -590,6 +596,10 @@ export async function updateReplyDraft(params: {
   const patch: Record<string, unknown> = {};
   if (params.subject !== undefined) patch.subject = params.subject;
   if (params.body !== undefined) patch.body = params.body;
+  if (params.outboundRfc822Id !== undefined) {
+    patch.outbound_rfc822_id = params.outboundRfc822Id;
+  }
+  if (params.mailAccountId !== undefined) patch.mail_account_id = params.mailAccountId;
   if (params.status !== undefined) {
     patch.status = params.status;
     if (params.status === "sent") patch.sent_at = new Date().toISOString();
@@ -612,13 +622,84 @@ export async function updateLeadStatus(
   leadId: string,
   orgId: string,
   status: JobLead["status"],
+  extra: { replyReceivedAt?: string | null } = {},
 ): Promise<boolean> {
   const svc = createServiceSupabaseClient();
   if (!svc) return false;
+  const patch: Record<string, unknown> = { status };
+  if (extra.replyReceivedAt !== undefined) {
+    patch.reply_received_at = extra.replyReceivedAt;
+  }
   const { error } = await svc
     .from("job_leads")
-    .update({ status })
+    .update(patch)
     .eq("id", leadId)
     .eq("org_id", orgId);
   return !error;
+}
+
+function normalizeSubject(subject: string | null | undefined): string {
+  return (subject ?? "")
+    .replace(/^(re|fwd|fw|aw|sv)\s*:\s*/gi, "")
+    .trim()
+    .toLowerCase();
+}
+
+function emailsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  return Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
+}
+
+/**
+ * An inbound message that is a reply to a Triangle-sent draft.
+ * Used by IMAP ingest so the human never clicks "They replied".
+ */
+export async function matchInboundReply(params: {
+  orgId: string;
+  senderEmail: string | null;
+  subject: string | null;
+  inReplyTo?: string | null;
+}): Promise<{ leadId: string; draftId: string } | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+
+  const { data: drafts } = await svc
+    .from("lead_reply_drafts")
+    .select("id, job_lead_id, subject, outbound_rfc822_id")
+    .eq("org_id", params.orgId)
+    .eq("status", "sent")
+    .order("sent_at", { ascending: false })
+    .limit(80);
+
+  if (!drafts?.length) return null;
+
+  const inReply = (params.inReplyTo ?? "").trim();
+  if (inReply) {
+    const byId = drafts.find(
+      (d) => d.outbound_rfc822_id && inReply.includes(String(d.outbound_rfc822_id)),
+    );
+    if (byId) {
+      return { leadId: byId.job_lead_id as string, draftId: byId.id as string };
+    }
+  }
+
+  const incomingSubject = normalizeSubject(params.subject);
+  const leadIds = drafts.map((d) => d.job_lead_id as string);
+  const { data: leads } = await svc
+    .from("job_leads")
+    .select("id, contact_email")
+    .eq("org_id", params.orgId)
+    .in("id", leadIds);
+
+  const emailByLead = new Map(
+    (leads ?? []).map((l) => [l.id as string, (l.contact_email as string | null) ?? null]),
+  );
+
+  for (const draft of drafts) {
+    const leadId = draft.job_lead_id as string;
+    if (!emailsEqual(params.senderEmail, emailByLead.get(leadId))) continue;
+    if (incomingSubject && incomingSubject === normalizeSubject(draft.subject as string)) {
+      return { leadId, draftId: draft.id as string };
+    }
+  }
+  return null;
 }

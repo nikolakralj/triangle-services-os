@@ -132,7 +132,11 @@ export async function POST(request: Request) {
   );
 }
 
-const laterSchema = z.object({ actionId: z.string().uuid(), later: z.literal(true) });
+const laterSchema = z.object({
+  actionId: z.string().uuid(),
+  later: z.literal(true),
+  days: z.number().int().min(1).max(30).optional(),
+});
 
 /**
  * "Later" on a follow-up: look again in a few days.
@@ -157,6 +161,7 @@ export async function PATCH(request: Request) {
     orgId: access.organizationId,
     userId: access.userId,
     actionId: parsed.data.actionId,
+    days: parsed.data.days,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 409 });

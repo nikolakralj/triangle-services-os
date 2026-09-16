@@ -38,6 +38,8 @@ export interface LeadMatch {
   rateText: string | null;
   headcountText: string | null;
   receivedAt: string;
+  /** True when mailbox sync saw a reply to a Triangle-sent draft. */
+  replyReceived: boolean;
   /**
    * How many requisitions this card stands for. g2 sent one Ireland
    * commissioning role four times; answering one produced its twin, so the
@@ -114,7 +116,7 @@ export async function matchOpenLeads(
     svc
       .from("job_leads")
       .select(
-        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at",
+        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, reply_received_at, created_at",
       )
       .eq("org_id", orgId)
       .in("status", ["new", "reviewing"])
@@ -272,6 +274,7 @@ export async function matchOpenLeads(
       rateText: (lead.rate_text as string | null) ?? null,
       headcountText: (lead.headcount_text as string | null) ?? null,
       receivedAt: lead.created_at as string,
+      replyReceived: Boolean(lead.reply_received_at),
       candidates: candidates.slice(0, 3),
       copies: 1,
     };

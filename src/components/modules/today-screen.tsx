@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
@@ -67,7 +68,7 @@ interface Employee {
 /** What was just recorded from the NOW card, so it can be seen and taken back. */
 interface LoggedAttempt {
   actionId: string;
-  /** "Sent", "No answer", "They replied". */
+  /** What was just recorded — “Got through”, “No answer”, “Not this request”. */
   sentence: string;
   who: string;
   about: string;
@@ -369,7 +370,7 @@ function NowCard({
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} onLogged={onLogged} />
+      <ActionPanel action={move.action} cta={move.cta} onLogged={onLogged} />
     </div>
   );
 }
@@ -390,9 +391,11 @@ const TONE: Record<"good" | "neutral" | "bad", string> = {
  */
 function ActionPanel({
   action,
+  cta,
   onLogged,
 }: {
   action: NextMoveAction;
+  cta: string;
   onLogged: (logged: LoggedAttempt) => void;
 }) {
   const router = useRouter();
@@ -472,6 +475,14 @@ function ActionPanel({
             <Phone className="h-3.5 w-3.5" />
             Dial
           </a>
+        ) : action.leadId ? (
+          <Link
+            href={`/now/lead/${action.leadId}`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            {cta}
+          </Link>
         ) : (
           <a
             href={mailtoHref(action.value, action.subject, outgoing)}
@@ -564,7 +575,10 @@ function ActionPanel({
           />
           {/* One segmented control, not three loose buttons. */}
           <div className="flex overflow-hidden rounded-lg border border-white/15">
-            {outcomes.map(({ outcome, label, tone }, i) => (
+            {(action.leadId && !isPhone
+              ? outcomes.filter((o) => o.outcome === "dead_end")
+              : outcomes
+            ).map(({ outcome, label, tone }, i) => (
               <button
                 key={outcome}
                 type="button"
@@ -575,20 +589,22 @@ function ActionPanel({
                 }`}
               >
                 {logging === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-                {label}
+                {action.leadId && outcome === "dead_end" ? "Not this request" : label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Open mail hands the words to your mail program and sends nothing.
-            Saying so here is what stops "Sent" being pressed for an email
-            that is still sitting in a draft. */}
-        {!isPhone && (
+        {!isPhone && action.leadId && (
           <p className="text-[11px] text-slate-500">
-            Open mail sends nothing by itself — press{" "}
-            <span className="text-slate-300">Sent</span> once the email has actually
-            gone.
+            Send from the request — Triangle records the send. “Not this request”
+            dismisses only this item.
+          </p>
+        )}
+        {!isPhone && !action.leadId && (
+          <p className="text-[11px] text-slate-500">
+            Open mail still hands the words to your mail program. Prefer Review &
+            send when this is an inbound request.
           </p>
         )}
 

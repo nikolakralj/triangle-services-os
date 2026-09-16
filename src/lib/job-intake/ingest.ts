@@ -40,6 +40,7 @@ export interface IngestSummary {
   opportunities: number;
   noiseDiscarded: number;
   leadsCreated: number;
+  repliesMatched: number;
   errors: string[];
 }
 
@@ -136,6 +137,7 @@ export async function ingestAccount(
     opportunities: 0,
     noiseDiscarded: 0,
     leadsCreated: 0,
+    repliesMatched: 0,
     errors: [],
   };
 
@@ -175,7 +177,17 @@ export async function ingestAccount(
         organization,
       });
 
-      const keepBody = shouldKeepBody(result.classification);
+      const { matchInboundReply, updateLeadStatus } = await import(
+        "@/lib/data/job-intake"
+      );
+      const replyMatch = await matchInboundReply({
+        orgId,
+        senderEmail: msg.senderEmail,
+        subject: msg.subject,
+        inReplyTo: msg.inReplyTo,
+      });
+
+      const keepBody = shouldKeepBody(result.classification) || Boolean(replyMatch);
       if (!keepBody) summary.noiseDiscarded += 1;
 
       const stored = await recordInboundEmail({
@@ -202,6 +214,29 @@ export async function ingestAccount(
       }
       if (stored.alreadyExisted) {
         summary.alreadySeen += 1;
+        continue;
+      }
+
+      if (replyMatch) {
+        summary.repliesMatched += 1;
+        // They answered — bring the item back as attention, not "we sent".
+        await updateLeadStatus(replyMatch.leadId, orgId, "reviewing", {
+          replyReceivedAt: new Date().toISOString(),
+        });
+        try {
+          const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
+          await recordClientReplyEvent({
+            orgId,
+            sourceType: "inbound_email",
+            sourceId: replyMatch.leadId,
+            recipientName: msg.senderName,
+            recipientEmail: msg.senderEmail,
+            subject: msg.subject,
+            replySummary: result.reason,
+          });
+        } catch (err) {
+          console.error("ingestAccount: reply outbox dispatch failed:", err);
+        }
         continue;
       }
 

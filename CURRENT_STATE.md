@@ -13,7 +13,7 @@ source review follows it. Earlier sessions are preserved in the
 | Last code commit | WIP merge 15 September: #8 DEV-003 + #9 Job Intake hide + #10 holding-chip Doors fix |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |
-| Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044ÃÂ¢Ãâ¬Ãâ048 applied to the live database 11ÃÂ¢Ãâ¬Ãâ15 September |
+| Repository schema | Migrations through `049_contextual_outbound.sql` in source; 044–048 applied to the live database 11–15 September; **049 not applied** |
 | Production version | `11397dc` (includes `f9e9685`), promoted and confirmed through `/api/version` on 15 September |
 | Live commercial counts | Commercial ledger queried 15 September (below); other snapshots are dated evidence only |
 | Verification | Per change, listed with each change below; the 10 September review itself reran no signed-in business test |
@@ -56,6 +56,7 @@ the record they read from and write to.
 | Minimal event outbox: `client_reply`, `follow_up_due`, and `availability_stale` wake Bob and Hanna; idempotent dispatch in `agent_assignments`; morning cron sweep; `/api/agents/outbox` | `c27187b` | 4/4 offline checks pass (`scripts/check-event-outbox.mjs`); lint, production build, tenant-identity 0; live on production 15 September | Grok routines must handle the event; missing/failed wake queues for next inbox check; no migration |
 | Funnel strip removed from Today: 'Two ways to an order' removed from `/decisions`; page focuses on actionable next move and work in progress | pending | lint 0, production build 0, tenant-identity 0; no signed-in check here | Component left in source if needed later; `getFunnel` query removed from Today SSR |
 | Learning from CEO edits: editing an AI draft in `LeadReplyPanel` or `OutreachDraftsPanel` offers `LearnRulePrompt` to append a standing house rule in the user's words; `POST /api/agents/house-rules` | pending | 3/3 offline checks pass (`scripts/check-ceo-learning.mjs`); lint 0, production build 0, tenant-identity 0; no signed-in check here | Appends to existing versioned `agent_house_rules`; travels with future work; no migration |
+| Contextual agent work + mailbox send/reply: `/api/ask` with context creates a missionless assignment; `/now/lead/[id]` shows thread, draft, send, and agent results; SMTP send stores RFC822 id; IMAP matches replies; Today drops Sent / They replied | pending | offline `scripts/check-contextual-work.mjs`; lint, production build, tenant-identity; no signed-in check here | Migration 049 not applied; SMTP unverified live; no Gmail API thread confirmation; Job Intake remains diagnostics-only |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots. Hanna files people on a recruiting mission through `POST /api/agent/missions/{id}/pool` Ã¢â¬â she proposes candidates and availability; a person accepts new workers and availability, and sends availability-check drafts; no CV data leaves Triangle in the bot payload.
 Bob still runs the mail routine and takes mission work only once his badge has a
@@ -94,7 +95,7 @@ work, consent, availability for a specific order or mobilization clearance.
 
 | Area | Source implementation | Limit of the evidence |
 | --- | --- | --- |
-| Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging. The list is off primary nav; `/job-intake` remains diagnostics until Bob mail ? Today is proven | Extraction uses a model; paid/business conversion is not established by ingestion; Bob waking on commercial mail is not built |
+| Intake | Mail ingestion, classification/scoring, leads, draft replies, SMTP send from Triangle, IMAP reply matching. Human workflow is `/now/lead/[id]`; `/job-intake` remains diagnostics | Extraction uses a model; SMTP send is unproven live; Gmail API send does not exist; Bob does not auto-triage every inbound message |
 | Research | Project/company evidence, two proposal stores, human review, case history. Project Research Agent chat retired; Scout missions and suggestions remain. Company detail still opens from missions; the directory is not in the shell | Accepted research is not a buyer-confirmed requirement |
 | Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask missions go to the bot; leftover Ask box no longer runs Scout on OpenAI; action-content and acknowledgment persistence defects remain |
 | Scout | Bot-owned: Triangle stores work and wakes Grok; in-app OpenAI executor does not claim Scout jobs | Specific-job execution on the bot, crash recovery, and measured cost are not fully proven; older in_app rows are not rewritten |

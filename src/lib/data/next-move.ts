@@ -186,8 +186,8 @@ export async function getNextMove(
       ]
         .filter(Boolean)
         .join(" "),
-      href: "/job-intake",
-      cta: "Open Job Intake",
+      href: `/now/lead/${best.leadId}`,
+      cta: best.replyReceived ? "Review reply" : "Review & send",
       clear: false,
       action: {
         contactId: "",

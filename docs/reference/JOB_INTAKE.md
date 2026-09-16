@@ -1,6 +1,6 @@
 # Job Intake
 
-> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision. The list is off primary navigation (diagnostics at `/job-intake`); mail ingest, scoring, leads, and reply drafts stay.
+> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision. The list is off primary navigation (diagnostics at `/job-intake`); mail ingest, scoring, leads, and reply drafts stay. Human review and send now happen on the contextual request surface (`/now/lead/[id]`), not as a Job Intake inbox. Triangle can send a draft over SMTP from the connected mailbox; inbound replies are matched from IMAP, not from a “They replied” click.
 
 Reads agency/recruiter email, turns it into scored opportunities, and drafts replies.
 Added 2026-08-25. Productization boundary added 2026-08-30. Read the
@@ -49,7 +49,9 @@ IMAP mailbox
   → LLM: classify + extract + score
   → store (bodies kept ONLY for opportunities)
   → dedupe (same agency + role within 14 days)
-  → user reads, drafts reply, sends it themselves
+  → commercial item on /now/lead/[id]
+  → draft in Triangle; send via mailbox SMTP
+  → IMAP matches the reply (In-Reply-To or sender+subject)
 ```
 
 ## Data model
@@ -59,7 +61,8 @@ IMAP mailbox
 | `mail_accounts` | One row per connected mailbox. Password is AES-256-GCM encrypted in `credential_encrypted`. `credential_ref` is a legacy env-var name, still honoured. |
 | `inbound_emails` | One row per ingested message. Unique on `(org_id, provider_message_id)` — this is what makes ingestion idempotent. `body_text` is **NULL** for anything not classified `job_opportunity`. |
 | `job_leads` | The structured opportunity. `team_potential` 0–100, `missing_fields[]` drives the reply, `duplicate_of_id` links repeats. |
-| `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived — "sent" only records that a human sent it. `ai_subject`/`ai_body` keep the draft as Triangle wrote it; edits change `subject`/`body` only (migration 048). |
+| `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived. `outbound_rfc822_id` is stored when Triangle itself sends (migration 049) so IMAP can recognise a reply. `ai_subject`/`ai_body` keep the draft as Triangle wrote it; edits change `subject`/`body` only (migration 048). |
+| `job_leads.reply_received_at` | Set when mailbox sync matches a reply to a Triangle-sent draft. |
 | `job_intake_rules` | One editable text block per org, injected into the classification prompt. |
 | `organizations` profile columns | Tenant business/offer model, approved positioning, sign-off, currency, and timezone used by commercial AI. |
 
@@ -93,6 +96,7 @@ src/app/api/job-intake/
   rules/            GET/PUT — the org's own scoring rules.
   export/           GET — CSV, honours current filter + sort.
   leads/[id]/reply/ GET/POST/PATCH — draft, edit, mark sent.
+  leads/[id]/send/  POST — Triangle sends the draft via the connected mailbox.
   ../settings/organization-profile/ GET/PUT — tenant identity and positioning.
 ```
 

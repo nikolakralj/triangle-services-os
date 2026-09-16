@@ -10,6 +10,7 @@ import { addMissionInstruction, missionLeadRuntime, startMission } from "@/lib/d
 import { employeeMissionRuntime, wakeEmployee, type MissionRuntime } from "@/lib/data/bot-runtime";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 import { missionProvider } from "@/lib/ai/mission-models";
+import { createContextualAssignment, type ContextualType } from "@/lib/data/contextual-work";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — the one box.
@@ -90,6 +91,12 @@ function aiNotConfigured() {
 const bodySchema = z.object({
   question: z.string().trim().min(2).max(8_000),
   missionId: z.string().uuid().optional(),
+  context: z
+    .object({
+      type: z.enum(["job_lead", "company", "contact", "project", "worker"]),
+      id: z.string().uuid(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -104,8 +111,34 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Write what you need first." }, { status: 400 });
   }
-  const { question, missionId } = parsed.data;
+  const { question, missionId, context } = parsed.data;
   const orgId = access.organizationId;
+
+  // Contextual work is not a Mission. "Scout, investigate this email" stays
+  // attached to the email/opportunity and never opens a new objective.
+  if (context && !missionId) {
+    const created = await createContextualAssignment({
+      orgId,
+      userId: access.userId,
+      instruction: question,
+      contextType: context.type as ContextualType,
+      contextId: context.id,
+    });
+    if ("error" in created) {
+      return NextResponse.json({ error: created.error }, { status: 400 });
+    }
+    return NextResponse.json(
+      {
+        kind: "contextual",
+        assignmentId: created.assignmentId,
+        employeeName: created.employeeName,
+        employeeRole: created.employeeRole,
+        missionCreated: false,
+        notice: created.notice,
+      },
+      { status: 201 },
+    );
+  }
 
   // ── the next instruction inside a mission ────────────────────────────────
   // Short is fine here: "electrical first" answers the question Scout asked.

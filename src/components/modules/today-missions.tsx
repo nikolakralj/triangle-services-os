@@ -156,9 +156,8 @@ function shortDate(iso: string): string {
 /**
  * "Oliver Hall · g2 Recruitment — emailed 10 Sep, follow-up due 14 Sep."
  *
- * The same three words as everywhere else, because what happens next is one
- * of them: they replied, it is not for us, or we wrote again. "Later" moves
- * the date instead of recording something that did not happen.
+ * Email follow-ups no longer ask the human to mark sent or replied — the
+ * mailbox knows. The primary action is Review. Snooze lives behind ···.
  */
 function FollowUpRow({
   item,
@@ -171,6 +170,7 @@ function FollowUpRow({
   const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSent, setShowSent] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const outcomes = outcomesFor(item.channelKind);
   const isPhone = item.channelKind === "phone";
   const overdue = item.daysOverdue > 0;
@@ -209,14 +209,15 @@ function FollowUpRow({
     }
   }
 
-  async function later() {
+  async function later(days?: number) {
     setBusy("later");
     setError(null);
+    setMoreOpen(false);
     try {
       const res = await fetch("/api/outreach/log", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionId: item.actionId, later: true }),
+        body: JSON.stringify({ actionId: item.actionId, later: true, days }),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -290,6 +291,14 @@ function FollowUpRow({
                 <Phone className="h-3 w-3" />
                 Dial
               </a>
+            ) : item.target.leadId ? (
+              <Link
+                href={`/now/lead/${item.target.leadId}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Mail className="h-3 w-3" />
+                Review
+              </Link>
             ) : item.value && item.channelKind === "email" ? (
               <a
                 href={mailtoHref(
@@ -312,18 +321,52 @@ function FollowUpRow({
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             ) : null}
-            <button
-              type="button"
-              onClick={() => void later()}
-              disabled={busy !== null}
-              title="Look at this again in four days. Nothing is recorded as done."
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
-            >
-              {busy === "later" && <Loader2 className="h-3 w-3 animate-spin" />}
-              Later
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                disabled={busy !== null}
+                aria-expanded={moreOpen}
+                aria-label="More actions"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                {busy === "later" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <span className="text-base leading-none">···</span>
+                )}
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 z-10 mt-1 min-w-[9rem] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-md">
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-1.5 text-left text-[12.5px] text-slate-700 hover:bg-slate-50"
+                    onClick={() => void later()}
+                  >
+                    Snooze
+                  </button>
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-1.5 text-left text-[12.5px] text-slate-700 hover:bg-slate-50"
+                    onClick={() => void later(1)}
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-1.5 text-left text-[12.5px] text-slate-700 hover:bg-slate-50"
+                    onClick={() => void later(7)}
+                  >
+                    Next week
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="flex overflow-hidden rounded-lg border border-slate-200">
-              {outcomes.map(({ outcome, label }, i) => (
+              {(item.channelKind === "email"
+                ? outcomes.filter((o) => o.outcome === "dead_end")
+                : outcomes
+              ).map(({ outcome, label }, i) => (
                 <button
                   key={outcome}
                   type="button"
@@ -334,7 +377,9 @@ function FollowUpRow({
                   }`}
                 >
                   {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-                  {FOLLOW_UP_LABEL[outcome] ?? label}
+                  {item.channelKind === "email" && outcome === "dead_end"
+                    ? "Not this request"
+                    : (FOLLOW_UP_LABEL[outcome] ?? label)}
                 </button>
               ))}
             </div>

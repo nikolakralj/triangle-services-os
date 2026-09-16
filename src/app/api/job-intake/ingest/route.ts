@@ -7,6 +7,8 @@ import {
   recordInboundEmail,
   createJobLead,
   getIntakeRules,
+  matchInboundReply,
+  updateLeadStatus,
 } from "@/lib/data/job-intake";
 import { logAgentRun } from "@/lib/data/agents";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
@@ -39,6 +41,7 @@ const MAX_MESSAGES = 50;
 interface IncomingMessage {
   messageId?: string;
   threadId?: string;
+  inReplyTo?: string;
   from?: string;
   fromName?: string;
   to?: string;
@@ -158,6 +161,7 @@ export async function POST(request: Request) {
     opportunities: 0,
     leadsCreated: 0,
     noiseDiscarded: 0,
+    repliesMatched: 0,
     skipped: [] as Array<{ index: number; reason: string }>,
     errors: [] as string[],
   };
@@ -200,7 +204,14 @@ export async function POST(request: Request) {
         organization,
       });
 
-      const keepBody = shouldKeepBody(extraction.classification);
+      const replyMatch = await matchInboundReply({
+        orgId: organizationId,
+        senderEmail: msg.from ?? null,
+        subject,
+        inReplyTo: msg.inReplyTo ?? null,
+      });
+
+      const keepBody = shouldKeepBody(extraction.classification) || Boolean(replyMatch);
       if (!keepBody) result.noiseDiscarded += 1;
 
       const stored = await recordInboundEmail({
@@ -229,6 +240,28 @@ export async function POST(request: Request) {
         continue;
       }
       result.stored += 1;
+
+      if (replyMatch) {
+        result.repliesMatched += 1;
+        await updateLeadStatus(replyMatch.leadId, organizationId, "reviewing", {
+          replyReceivedAt: new Date().toISOString(),
+        });
+        try {
+          const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
+          await recordClientReplyEvent({
+            orgId: organizationId,
+            sourceType: "inbound_email",
+            sourceId: replyMatch.leadId,
+            recipientName: msg.fromName ?? null,
+            recipientEmail: msg.from ?? null,
+            subject,
+            replySummary: extraction.reason,
+          });
+        } catch (err) {
+          console.error("ingest: reply outbox dispatch failed:", err);
+        }
+        continue;
+      }
 
       if (extraction.classification === "job_opportunity" && extraction.lead) {
         result.opportunities += 1;
@@ -260,6 +293,7 @@ export async function POST(request: Request) {
       opportunities: result.opportunities,
       leadsCreated: result.leadsCreated,
       noiseDiscarded: result.noiseDiscarded,
+      repliesMatched: result.repliesMatched,
       errors: result.errors.length,
     },
   });
