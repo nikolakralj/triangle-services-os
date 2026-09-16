@@ -548,6 +548,22 @@ than 24 hours. Waiting on a person is Needs you, never stale. Data:
 `src/lib/data/team.ts` (`listTeam`); UI: `src/components/modules/team-settings.tsx`.
 Workforce still exists until slice B.
 
+**Slice B — NOT STARTED (handoff notes).** Sidebar entry:
+`src/components/layout/sidebar.tsx` (`/agents` "Workforce", drop the `Cpu`
+import). Redirect `src/app/(app)/agents/page.tsx` to Settings → Team with a
+short notice. `AgentConsole` (`src/components/modules/agent-console.tsx`) is
+imported only by that page: move the Board (`listHumans`) to Settings →
+Members, `HireEmployee` under Team for admins, and the Work log
+(`listAgentRuns` + `describeRun`) to Diagnostics, then delete the console.
+Links still pointing at `/agents`: `src/components/modules/ask-an-employee.tsx`
+("All of it"), `src/components/modules/decision-inbox-workspace.tsx` ("AI
+workforce"), `src/components/modules/research-path-pointer.tsx` (button and
+copy), `src/lib/data/decision-inbox.ts` (fallback caseHref), `src/lib/data/next-move.ts`,
+`src/app/api/research/chat/route.ts` (retired message), and copy naming
+Workforce in `src/app/(app)/hunter/[id]/page.tsx` and
+`src/components/modules/today-email-actions.tsx`. Leave API routes in place.
+Check with the signed-in script pattern used for slice A.
+
 **Why:** amended by the operating-shell decision. On Preview 76c42d4 only the
 three employee cards on Workforce were useful; the rest was a hand-out console
 built on old research gaps, a handed-out list that Today already shows, a chat
