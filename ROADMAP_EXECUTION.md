@@ -405,7 +405,13 @@ partners, with the same ledger. Records, component and `summarizeRefusals` are
 unchanged; Workforce never rendered the ledger. Checked signed in on localhost,
 3/3; type check and lint pass. Not merged or on production yet.
 
-### DEV-017 - Today: one inbox - `READY` (after DEV-016)
+### DEV-017 - Today: one inbox - `IN_PROGRESS` (Claude, branch `claude/today-one-inbox`)
+
+**Slices, so another agent can continue:** A — structure: pulse line, In
+progress grouped per employee, Done since you looked, Missions zone and "on
+file" counts off Today, old reports folded under Done. B — group Needs you
+cards by person or case. C — one card shape for every Needs you card; Take back
+moves into the thread drawer. Status per slice is recorded below as each lands.
 
 **Why:** on Preview 76c42d4 Today mixed four card designs, listed the same
 recruiter once per role, kept a mission grid and a second Ask box under the
