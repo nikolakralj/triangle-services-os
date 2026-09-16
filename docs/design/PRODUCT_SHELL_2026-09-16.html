@@ -1,0 +1,693 @@
+<title>Triangle Operating Shell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #f5f7fa;
+    --surface: #ffffff;
+    --sunken: #edf1f6;
+    --ink: #0f172a;
+    --ink-2: #334155;
+    --muted: #64748b;
+    --line: #dce3ec;
+    --accent: #0369a1;
+    --accent-soft: #e0f2fe;
+    --need: #a4500c;
+    --need-soft: #fdf1dc;
+    --work: #0369a1;
+    --work-soft: #e3f2fb;
+    --done: #04714f;
+    --done-soft: #dcf5ea;
+    --fail: #b4123a;
+    --fail-soft: #fde6ea;
+    --stale: #5b6b80;
+    --stale-soft: #e6ebf2;
+    --night: #0c1322;
+    --night-ink: #e6ebf3;
+    --night-muted: #93a1b5;
+    --night-line: #243149;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 24px -12px rgba(15, 23, 42, .18);
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #090e17;
+      --surface: #101826;
+      --sunken: #0c1320;
+      --ink: #e6ebf3;
+      --ink-2: #c3ccd9;
+      --muted: #8d9bb0;
+      --line: #223049;
+      --accent: #5cc4f5;
+      --accent-soft: #0d2a3c;
+      --need: #f5b451;
+      --need-soft: #33240b;
+      --work: #5cc4f5;
+      --work-soft: #0d2a3c;
+      --done: #4fd6a4;
+      --done-soft: #0b2c21;
+      --fail: #f7879b;
+      --fail-soft: #3a111c;
+      --stale: #9aa7ba;
+      --stale-soft: #1b2536;
+      --night: #060a12;
+      --night-ink: #e6ebf3;
+      --night-muted: #8d9bb0;
+      --night-line: #1f2b40;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -14px rgba(0, 0, 0, .7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #090e17;
+    --surface: #101826;
+    --sunken: #0c1320;
+    --ink: #e6ebf3;
+    --ink-2: #c3ccd9;
+    --muted: #8d9bb0;
+    --line: #223049;
+    --accent: #5cc4f5;
+    --accent-soft: #0d2a3c;
+    --need: #f5b451;
+    --need-soft: #33240b;
+    --work: #5cc4f5;
+    --work-soft: #0d2a3c;
+    --done: #4fd6a4;
+    --done-soft: #0b2c21;
+    --fail: #f7879b;
+    --fail-soft: #3a111c;
+    --stale: #9aa7ba;
+    --stale-soft: #1b2536;
+    --night: #060a12;
+    --night-ink: #e6ebf3;
+    --night-muted: #8d9bb0;
+    --night-line: #1f2b40;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -14px rgba(0, 0, 0, .7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 88px; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .lede { font-size: 18px; line-height: 1.55; color: var(--ink-2); max-width: 64ch; }
+  .prose { max-width: 68ch; color: var(--ink-2); }
+  .prose + .prose { margin-top: 10px; }
+  .mono { font-family: var(--mono); }
+
+  header.top { display: grid; gap: 14px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 650; line-height: 1.08; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 13px; }
+
+  section { padding-top: 52px; display: grid; gap: 18px; }
+  section > h2 { font-size: 24px; font-weight: 650; }
+  section > h2 .n { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--muted); margin-right: 10px; letter-spacing: 0; vertical-align: 3px; }
+  h3 { font-size: 16px; font-weight: 600; }
+
+  /* ── the picture ─────────────────────────────────────────── */
+  .layers { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .layer { display: grid; grid-template-columns: minmax(150px, 220px) 1fr auto; gap: 16px; align-items: center; padding: 18px 20px; }
+  .layer + .layer { border-top: 1px dashed var(--line); }
+  .layer .who { font-weight: 650; font-size: 15px; }
+  .layer .who small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .layer .does { color: var(--ink-2); font-size: 14px; }
+  .layer .io { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: right; line-height: 1.5; }
+  .layer.you { background: var(--need-soft); }
+  .layer.triangle { background: var(--sunken); }
+  .layer.world { background: var(--surface); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+    border-radius: 999px; padding: 2px 10px; font-size: 12.5px; white-space: nowrap;
+  }
+
+  /* ── change list ─────────────────────────────────────────── */
+  .changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; }
+  .change { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
+  .change h3 { font-size: 15px; }
+  .change p { color: var(--ink-2); font-size: 14px; }
+
+  /* ── states ──────────────────────────────────────────────── */
+  .state { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px 2px 8px; font-size: 12.5px; font-weight: 550; white-space: nowrap; }
+  .state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .s-need { color: var(--need); background: var(--need-soft); }
+  .s-work { color: var(--work); background: var(--work-soft); }
+  .s-done { color: var(--done); background: var(--done-soft); }
+  .s-fail { color: var(--fail); background: var(--fail-soft); }
+  .s-stale { color: var(--stale); background: var(--stale-soft); }
+  .s-queued { color: var(--muted); background: var(--sunken); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-weight: 500; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+  tr:last-child td { border-bottom: 0; }
+  td .mono { font-size: 12.5px; color: var(--muted); }
+
+  .anatomy { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .anatomy div { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; }
+  .anatomy .k { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .anatomy .v { font-size: 14px; color: var(--ink); }
+
+  /* ── menu before / after ─────────────────────────────────── */
+  .nav-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .navcol { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; align-content: start; }
+  .navcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .navcol li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .navcol li:last-child { border-bottom: 0; }
+  .navcol li span:last-child { color: var(--muted); font-size: 12.5px; text-align: right; }
+  .navcol li.gone span:first-child { color: var(--muted); text-decoration: line-through; }
+  .navcol li.keep span:first-child { font-weight: 600; }
+
+  /* ── mockup frame ────────────────────────────────────────── */
+  .frame { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--paper); box-shadow: var(--shadow); }
+  .frame-bar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--surface); border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+  .frame-body { display: grid; grid-template-columns: 170px 1fr; min-height: 0; }
+  .side { background: var(--surface); border-right: 1px solid var(--line); padding: 16px 12px; display: grid; gap: 4px; align-content: start; }
+  .side .brand { font-weight: 700; font-size: 15px; padding: 0 8px 12px; letter-spacing: -0.02em; }
+  .side .brand b { color: var(--accent); font-weight: 700; }
+  .side a { display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: var(--ink-2); font-size: 13.5px; padding: 7px 10px; border-radius: 8px; }
+  .side a.on { background: var(--sunken); color: var(--ink); font-weight: 600; }
+  .side a .badge { background: var(--need); color: var(--surface); font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 7px; line-height: 18px; }
+  .side .sep { height: 1px; background: var(--line); margin: 10px 4px; }
+  .canvas { padding: 20px 22px 26px; display: grid; gap: 18px; min-width: 0; }
+  .canvas h3.page-title { font-size: 22px; font-weight: 650; }
+  .pulse { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .zone { display: grid; gap: 10px; }
+  .zone-head { display: flex; align-items: baseline; gap: 10px; }
+  .zone-head h4 { margin: 0; font-size: 12px; font-family: var(--mono); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .zone-head .rule { flex: 1; height: 1px; background: var(--line); }
+  .zone-head small { color: var(--muted); font-size: 12px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; }
+  .card.lead { background: var(--night); border-color: var(--night-line); color: var(--night-ink); }
+  .card.lead .why, .card.lead .ev { color: var(--night-muted); }
+  .card-top { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .kind { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; border-radius: 6px; padding: 1px 7px; background: var(--need-soft); color: var(--need); }
+  .card.lead .kind { background: rgba(245, 180, 81, .16); color: #f5b451; }
+  .case { font-size: 12.5px; color: var(--muted); }
+  .card.lead .case { color: var(--night-muted); }
+  .title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.35; }
+  .why { font-size: 13.5px; color: var(--ink-2); }
+  .ev { font-size: 12.5px; color: var(--muted); }
+  .draft { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; border-radius: 10px; padding: 10px 12px; border: 1px solid var(--night-line); background: rgba(255, 255, 255, .03); color: var(--night-ink); }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .btn { font: inherit; font-size: 13px; font-weight: 550; border-radius: 8px; padding: 5px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: default; white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .card.lead .btn { background: transparent; border-color: var(--night-line); color: var(--night-ink); }
+  .card.lead .btn.primary { background: #5cc4f5; border-color: #5cc4f5; color: #06121f; }
+  .btn .dev { font-family: var(--mono); font-size: 10.5px; opacity: .7; margin-left: 4px; }
+  .spacer { flex: 1; }
+
+  .progress { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .prow { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; }
+  .prow + .prow { border-top: 1px solid var(--line); }
+  .prow .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); font-size: 14px; }
+  .prow .t { font-size: 14px; }
+  .prow .t small { display: block; color: var(--muted); font-size: 12.5px; }
+  .prow .more { font-size: 12.5px; color: var(--accent); white-space: nowrap; }
+
+  .gone-list { display: grid; gap: 6px; background: var(--sunken); border: 1px dashed var(--line); border-radius: 12px; padding: 12px 14px; }
+  .gone-list div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-2); }
+  .gone-list div span:first-child { text-decoration: line-through; color: var(--muted); }
+  .gone-list div span:last-child { text-align: right; }
+
+  .team { display: grid; gap: 10px; }
+  .emp { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(170px, 1fr) minmax(200px, 1.4fr); gap: 14px 18px; }
+  .emp .name { display: flex; gap: 10px; align-items: flex-start; }
+  .emp .name .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); font-size: 17px; flex: none; }
+  .emp .name b { font-size: 15px; }
+  .emp .name small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+  .facts { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); align-content: start; }
+  .facts .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .facts .k { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; min-width: 72px; }
+  .rules { font-size: 13px; color: var(--ink-2); display: grid; gap: 6px; align-content: start; }
+  .rules q { display: block; quotes: none; border-left: 2px solid var(--line); padding-left: 10px; color: var(--ink-2); font-style: normal; }
+  .rules small { color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.on { background: var(--done); }
+  .dot.off { background: var(--stale); }
+
+  /* ── flows ───────────────────────────────────────────────── */
+  .flows { display: grid; gap: 10px; }
+  .flow { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: minmax(150px, 210px) 1fr; gap: 12px 18px; align-items: start; }
+  .flow h3 { font-size: 14.5px; }
+  .flow h3 small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  .steps .st { background: var(--sunken); border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; }
+  .steps .ar { color: var(--muted); font-family: var(--mono); }
+  .flow .note { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+
+  /* ── evidence and order ─────────────────────────────────── */
+  .finding { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--fail); border-radius: 10px; padding: 12px 16px; display: grid; gap: 4px; }
+  .finding h3 { font-size: 14.5px; }
+  .finding p { font-size: 13.5px; color: var(--ink-2); }
+  .finding .fix { font-size: 13px; color: var(--ink); }
+  .findings { display: grid; gap: 10px; }
+
+  ol.order { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  ol.order li { counter-increment: step; display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: start; padding: 12px 16px; }
+  ol.order li + li { border-top: 1px solid var(--line); }
+  ol.order li::before { content: counter(step); font-family: var(--mono); font-size: 13px; color: var(--muted); padding-top: 1px; }
+  ol.order b { font-weight: 600; }
+  ol.order p { font-size: 13.5px; color: var(--ink-2); }
+  ol.order .id { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; padding-top: 2px; }
+
+  .questions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .question { background: var(--need-soft); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+  .question b { font-size: 14px; }
+  .question p { font-size: 13px; color: var(--ink-2); }
+
+  .sources { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+
+  @media (max-width: 760px) {
+    .layer { grid-template-columns: 1fr; gap: 6px; }
+    .layer .io { text-align: left; }
+    .frame-body { grid-template-columns: 1fr; }
+    .side { display: flex; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px; gap: 4px; }
+    .side .brand, .side .sep { display: none; }
+    .canvas { padding: 16px 14px 20px; }
+    .emp { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; }
+    .flow .note { grid-column: 1; }
+    ol.order li { grid-template-columns: 30px 1fr; }
+    ol.order .id { grid-column: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="page">
+
+  <header class="top">
+    <p class="eyebrow">Proposal · 16 September 2026 · locked when Nikola merges the pull request</p>
+    <h1>Triangle Operating Shell</h1>
+    <p class="lede">Where the product is going: one inbox where you make the decisions only a person can make, three employees who do the work on their own bots, and one record underneath that both sides trust.</p>
+    <div class="meta">
+      <span>Builds on the 14 and 16 September decisions in <span class="mono">DECISIONS.md</span></span>
+      <span>Checked against Preview <span class="mono">76c42d4</span> and live data on 16 September</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="n">The picture</span>Four layers, and what moves between them</h2>
+    <p class="prose">Everything in Triangle is one of these layers. You never work in the employees' layer, and they never make your decisions. Triangle in the middle is the only place work lives: a Grok chat, a mailbox or a webhook are ways in and out, not places to keep anything.</p>
+    <div class="layers" role="list">
+      <div class="layer you" role="listitem">
+        <div class="who">You<small>Nikola · Ralph</small></div>
+        <div class="does">Decide, approve, send, and give direction. Everything you need arrives on <b>Today</b>.</div>
+        <div class="io">in: needs you<br>out: answers, sends, asks</div>
+      </div>
+      <div class="layer triangle" role="listitem">
+        <div class="who">Triangle<small>the record</small></div>
+        <div class="does">Cases (company, person, lead, requirement), the tasks on them, evidence, the send ledger, standing rules and permissions.</div>
+        <div class="io">in: tasks, findings, events<br>out: wake-ups, context</div>
+      </div>
+      <div class="layer" role="listitem">
+        <div class="who">Employees<small>Grok bots</small></div>
+        <div class="does"><b>Scout</b> finds demand and the buyer's door · <b>Hanna</b> keeps the people truthful · <b>Bob</b> runs commercial follow-through. Peers, no boss among them.</div>
+        <div class="io">in: tasks<br>out: results, drafts, questions</div>
+      </div>
+      <div class="layer world" role="listitem">
+        <div class="who">The world<small>outside Triangle</small></div>
+        <div class="does">Mailboxes, the web, recruiters, buyers, candidates. Machines observe it; people judge what it means.</div>
+        <div class="io">in: sent messages<br>out: replies, signals</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">What changes</span>Five decisions in this proposal</h2>
+    <div class="changes">
+      <div class="change">
+        <h3>The menu becomes Today · Missions · Talent</h3>
+        <p>Workforce leaves the menu. The employees move to <b>Settings → Team</b>. Signal Inbox, Cert Alerts, Compliance, Setup Readiness and Data Imports go into Talent or Settings.</p>
+      </div>
+      <div class="change">
+        <h3>Today is one inbox</h3>
+        <p><b>Needs you</b>, a quiet <b>In progress</b> line and <b>Done since you looked</b>. No system errors, no mission grid, no second Ask box, no history backlog.</p>
+      </div>
+      <div class="change">
+        <h3>All delegated work is a task on a case</h3>
+        <p>Each task has a case, an owner (you), an employee, a state and a thread. The same six states appear everywhere, modelled on the open A2A standard.</p>
+      </div>
+      <div class="change">
+        <h3>Employees talk inside the case</h3>
+        <p>When Hanna asks Scout for buyers, it shows in that case's thread. It reaches you only if someone needs a human answer.</p>
+      </div>
+      <div class="change">
+        <h3>Engineering stays out of the company</h3>
+        <p>The programming bot gets its own account, test data never goes into the live company, and only merged code is published.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">The unit of work</span>A task on a case</h2>
+    <p class="prose">This is the idea everything else follows. It is already how DEV-015 works ("handoff changes the owner, not where the work lives"); this makes it the rule for every screen. Linear and GitHub work the same way: you delegate the work item to an agent, you stay the accountable owner, and the agent's activity lives inside that item, not on an agent page.</p>
+    <div class="anatomy">
+      <div><span class="k">Case</span><span class="v">Oliver Hall · g2 Recruitment · PLC engineer, USA</span></div>
+      <div><span class="k">Owner</span><span class="v">Nikola — accountable</span></div>
+      <div><span class="k">Employee</span><span class="v">📥 Bob — doing it</span></div>
+      <div><span class="k">State</span><span class="v"><span class="state s-work">Working</span></span></div>
+      <div><span class="k">Thread</span><span class="v">What was asked, what Bob did, what came back</span></div>
+      <div><span class="k">Result</span><span class="v">Lands on the case, never on a separate list</span></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>State</th><th>Means</th><th>Where you see it</th><th>Today in the database</th><th>A2A · Linear</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="state s-queued">Queued</span></td><td>Handed out, employee not started</td><td>In progress, quiet</td><td><span class="mono">queued</span></td><td>submitted · pending</td></tr>
+          <tr><td><span class="state s-work">Working</span></td><td>Employee is on it</td><td>In progress, quiet</td><td><span class="mono">active</span></td><td>working · active</td></tr>
+          <tr><td><span class="state s-need">Needs you</span></td><td>Only a person can take the next step</td><td>Needs you, top of Today</td><td><span class="mono">waiting_review</span>, or a step's question for the CEO</td><td>input-required · awaitingInput</td></tr>
+          <tr><td><span class="state s-done">Done</span></td><td>Result is on the case</td><td>Done since you looked, then only on the case</td><td><span class="mono">completed</span></td><td>completed · complete</td></tr>
+          <tr><td><span class="state s-fail">Failed</span></td><td>Employee could not do it, and says why</td><td>Needs you if it blocks a case; Team health otherwise</td><td><span class="mono">failed</span></td><td>failed · error</td></tr>
+          <tr><td><span class="state s-stale">Stale</span></td><td>No activity for too long</td><td>Team health; Needs you if the case is urgent</td><td>not stored yet</td><td>— · stale</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">Tasks come from five places: Ask with the page you are on (DEV-010), Ask Bob on a card, an instruction inside a mission, an event Triangle observes (a reply arrived, a follow-up is due, availability went stale), or a colleague's request. They all end the same way: on the case.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">The menu</span>Ten places become three</h2>
+    <div class="nav-compare">
+      <div class="navcol">
+        <p class="eyebrow">Preview, 16 September</p>
+        <ul>
+          <li class="keep"><span>Today</span><span>stays</span></li>
+          <li class="keep"><span>Missions</span><span>stays</span></li>
+          <li class="gone"><span>Workforce</span><span>→ Settings · Team</span></li>
+          <li class="gone"><span>Signal Inbox</span><span>→ Settings · Diagnostics (Scout reads it)</span></li>
+          <li class="keep"><span>Talent Pool</span><span>stays as Talent</span></li>
+          <li class="gone"><span>Cert Alerts</span><span>→ exceptions on Today, filter in Talent</span></li>
+          <li class="gone"><span>Compliance</span><span>→ a tab in Talent</span></li>
+          <li class="gone"><span>Setup Readiness</span><span>→ Settings</span></li>
+          <li class="gone"><span>Data Imports</span><span>→ Settings, and Import in Talent</span></li>
+          <li class="keep"><span>Settings</span><span>grows Team and Diagnostics</span></li>
+        </ul>
+      </div>
+      <div class="navcol">
+        <p class="eyebrow">Proposed</p>
+        <ul>
+          <li class="keep"><span>Today</span><span>what needs you</span></li>
+          <li class="keep"><span>Missions</span><span>big objectives</span></li>
+          <li class="keep"><span>Talent</span><span>people and partner firms</span></li>
+          <li><span>Settings</span><span>Team · Members · Mailboxes · Organization · Imports · Setup · Diagnostics</span></li>
+        </ul>
+        <p class="eyebrow" style="margin-top:8px">Opened from a card, never patrolled</p>
+        <div class="chips">
+          <span class="chip">Company</span><span class="chip">Person</span><span class="chip">Project</span><span class="chip">Requirement</span><span class="chip">Lead</span>
+        </div>
+        <p class="eyebrow" style="margin-top:8px">Diagnostics, for engineers</p>
+        <div class="chips">
+          <span class="chip">Refusal log</span><span class="chip">Work log</span><span class="chip">Signal Inbox</span><span class="chip">Job Intake</span><span class="chip">Companies list</span>
+        </div>
+      </div>
+    </div>
+    <p class="prose">This changes one thing in the 16 September decision: Team moves into Settings instead of staying in the menu. The standing rules you write still sit one click away, and Triangle already suggests a rule when you correct a draft, so rules are edited where the work happens.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">Today</span>One inbox, then quiet</h2>
+    <p class="prose">A mockup with Preview data from 16 September. Every card in Needs you uses the same shape: what kind of decision, which case, the situation in one line, why now, the evidence, and the same few actions. This follows the pattern of LangChain's Agent Inbox and AG-UI interrupts: accept, edit, respond or ignore.</p>
+
+    <div class="frame" aria-label="Mockup of the proposed Today page">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span>triangle · today</span></div>
+      <div class="frame-body">
+        <nav class="side" aria-label="Mockup menu">
+          <div class="brand">Triangle<b>OS</b></div>
+          <a class="on" href="#today">Today <span class="badge">3</span></a>
+          <a href="#missions">Missions</a>
+          <a href="#talent">Talent</a>
+          <div class="sep"></div>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div class="canvas">
+          <div style="display:grid;gap:8px">
+            <h3 class="page-title">Today</h3>
+            <div class="pulse">
+              <span class="state s-need">3 need you</span>
+              <span class="state s-work">📥 Bob working on 7</span>
+              <span class="state s-work">👤 Hanna 2</span>
+              <span class="state s-queued">🔍 Scout idle</span>
+              <span class="state s-done">1 done since you looked</span>
+            </div>
+          </div>
+
+          <div class="zone">
+            <div class="zone-head"><h4>Needs you</h4><span class="rule"></span><small>decisions only a person can make</small></div>
+
+            <article class="card lead">
+              <div class="card-top"><span class="kind">Reply</span><span class="case">g2 Recruitment · Oliver Hall</span></div>
+              <p class="title">Oliver Hall asked for a PLC commissioning engineer in the USA</p>
+              <p class="why">The reply is drafted and someone on the books fits. Four more open roles wait behind this one.</p>
+              <div class="draft">Hi Oliver,
+On the Automation Engineer – PLC commissioning engineer in USA — we have an Automation Engineer available who fits it. …</div>
+              <div class="actions">
+                <span class="btn primary">Send <span class="dev">DEV-013</span></span>
+                <span class="btn">Open mail</span>
+                <span class="btn">Ask Bob ▾</span>
+                <span class="spacer"></span>
+                <span class="btn">Dismiss ▾</span>
+              </div>
+              <p class="ev">Evidence: the requisition · who we would put forward · why they fit</p>
+            </article>
+
+            <article class="card">
+              <div class="card-top"><span class="kind">Decide</span><span class="case">Mission · HVAC Subcontractors · 🔍 Scout</span></div>
+              <p class="title">Stay DACH-only for HVAC subcontractors, or also open Benelux and the Nordics next?</p>
+              <div class="actions">
+                <span class="btn primary">DACH only</span>
+                <span class="btn">Add Benelux and Nordics</span>
+                <span class="btn">Answer in my words</span>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-top"><span class="kind">Call</span><span class="case">ENGIE Deutschland · filed by Scout, 15 Sep</span></div>
+              <p class="title">Stephan Ziegert, Head of Building Technologies — reachable, nobody has called</p>
+              <p class="ev"><span class="mono">+49 89 74641-080</span> · his own · number found on the cited page</p>
+              <div class="actions">
+                <span class="btn primary">Dial</span>
+                <span class="btn">Copy the words</span>
+                <span class="spacer"></span>
+                <span class="btn">Got through</span><span class="btn">No answer</span><span class="btn">Dead end</span>
+              </div>
+            </article>
+          </div>
+
+          <div class="zone">
+            <div class="zone-head"><h4>In progress</h4><span class="rule"></span><small>quiet — open only if you want to</small></div>
+            <div class="progress">
+              <div class="prow"><span class="av">📥</span><span class="t">Bob — follow-ups with 4 recruiters<small>Oliver Hall ×3 · Nicolas Preckler · Veronika Igić · Tom Stocks · 1 question from you</small></span><span class="more">Open ▾</span></div>
+              <div class="prow"><span class="av">👤</span><span class="t">Hanna — Markus Leopold at PMS<small>NU capacity on voestalpine EAF Linz</small></span><span class="more">Open ▾</span></div>
+            </div>
+          </div>
+
+          <div class="zone">
+            <div class="zone-head"><h4>Done since you looked</h4><span class="rule"></span><small>clears once seen</small></div>
+            <div class="progress">
+              <div class="prow"><span class="av">🔍</span><span class="t">Scout filed 12 EU HVAC labour buyers<small>Mission HVAC EPC EU · best first dial: Stephan Ziegert, ENGIE (above)</small></span><span class="more">Open the case</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gone-list" aria-label="Removed from Today">
+      <div><span>“The system refused 5 attempts in 7 days”</span><span>Diagnostics (DEV-016, already decided)</span></div>
+      <div><span>Mission cards and a second Ask box</span><span>Missions page · Ask is Ctrl K everywhere</span></div>
+      <div><span>Back from the team — 11 reports and 19 older items</span><span>One clean-up, then gone</span></div>
+      <div><span>A card per role for the same person</span><span>One card per person or case</span></div>
+      <div><span>Take back on every row</span><span>In the thread drawer's menu</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">Team</span>Settings → Team, one screen</h2>
+    <p class="prose">Microsoft Agent 365 and Linear both keep agents in an admin area: identity, permissions, health, activity. Nobody hands out work from an agent directory; you hand it out from the case. Mockup with Workforce data from the 16 September Preview.</p>
+
+    <div class="frame" aria-label="Mockup of Settings, Team">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span><span>triangle · settings · team</span></div>
+      <div class="frame-body">
+        <nav class="side" aria-label="Mockup settings menu">
+          <div class="brand">Settings</div>
+          <a class="on" href="#team">Team</a>
+          <a href="#members">Members</a>
+          <a href="#mailboxes">Mailboxes</a>
+          <a href="#org">Organization</a>
+          <a href="#imports">Imports</a>
+          <a href="#diag">Diagnostics</a>
+        </nav>
+        <div class="canvas">
+          <h3 class="page-title">Team</h3>
+          <div class="team">
+            <div class="emp">
+              <div class="name"><span class="av">🔍</span><div><b>Scout</b><small>Demand — finds projects, the company that buys the labour, and a door to it</small></div></div>
+              <div class="facts">
+                <div class="row"><span class="k">Health</span><span class="dot on"></span> on duty · seen today 13:25</div>
+                <div class="row"><span class="k">Load</span><span class="state s-work">0 working</span><span class="state s-need">1 needs you</span></div>
+                <div class="row"><span class="k">Runs on</span>Grok bot · wake-up set</div>
+                <div class="row"><span class="k">May</span>work missions · file findings</div>
+              </div>
+              <div class="rules">
+                <span class="k eyebrow">How Scout works · v1 · 4 days ago</span>
+                <q>For now don't focus so much on research based on our talent pool… in 2–3 months we will have [people], so just do your best to find best results.</q>
+                <small>Edit · Activity · Refusals this week</small>
+              </div>
+            </div>
+            <div class="emp">
+              <div class="name"><span class="av">👤</span><div><b>Hanna</b><small>People — reads CVs, keeps availability true, never contacts a candidate</small></div></div>
+              <div class="facts">
+                <div class="row"><span class="k">Health</span><span class="dot off"></span> off duty · seen yesterday 13:14</div>
+                <div class="row"><span class="k">Load</span><span class="state s-work">2 working</span></div>
+                <div class="row"><span class="k">Runs on</span>Grok bot · wake-up set</div>
+                <div class="row"><span class="k">May</span>work missions · propose people</div>
+              </div>
+              <div class="rules">
+                <span class="k eyebrow">How Hanna works</span>
+                <small>No standing rules yet. Write them, or accept one Triangle suggests after you correct her work.</small>
+                <small>Edit · Activity · Refusals this week</small>
+              </div>
+            </div>
+            <div class="emp">
+              <div class="name"><span class="av">📥</span><div><b>Bob</b><small>Commercial operations — reads recruiter mail, follows up, keeps work moving</small></div></div>
+              <div class="facts">
+                <div class="row"><span class="k">Health</span><span class="dot on"></span> on duty · seen today 13:20</div>
+                <div class="row"><span class="k">Load</span><span class="state s-work">7 working</span></div>
+                <div class="row"><span class="k">Runs on</span>Grok bot · wake-up to confirm</div>
+                <div class="row"><span class="k">May</span>read mail · missions once the DEV-004 fix is applied · sends nothing</div>
+              </div>
+              <div class="rules">
+                <span class="k eyebrow">How Bob works</span>
+                <small>No standing rules yet.</small>
+                <small>Edit · Activity · Refusals this week</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gone-list" aria-label="Removed from Workforce">
+      <div><span>Work that needs doing — 10 × Hand it out</span><span>Gone: old research gaps; Scout finds gaps inside missions</span></div>
+      <div><span>What you handed out — about 40 rows</span><span>Gone: the same tasks are on Today and on each case</span></div>
+      <div><span>Quick notes, a chat with Bob</span><span>Gone: Ask with the page you are on</span></div>
+      <div><span>Work log — “status completed, missionId …”</span><span>Diagnostics, and per employee under Activity</span></div>
+      <div><span>Board of humans</span><span>Settings → Members</span></div>
+      <div><span>Hire an AI employee</span><span>Frozen until Phase 0 ends; admin-only later</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">Communication</span>Four paths, one record</h2>
+    <p class="prose">What passes between people, employees and the world. Each path writes to the same task and thread, so there is nothing to copy between screens. Most of this is built; the labels say what is not.</p>
+    <div class="flows">
+      <div class="flow">
+        <h3>You → an employee<small>built; page context is DEV-010</small></h3>
+        <div class="steps"><span class="st">Ask on the page you are on</span><span class="ar">→</span><span class="st">task on that case</span><span class="ar">→</span><span class="st">bot woken</span><span class="ar">→</span><span class="st">activity in the thread</span><span class="ar">→</span><span class="st">result on the case, or Needs you</span></div>
+      </div>
+      <div class="flow">
+        <h3>Employee → employee<small>built 14 September</small></h3>
+        <div class="steps"><span class="st">Hanna asks Scout for buyers</span><span class="ar">→</span><span class="st">child task on the same case</span><span class="ar">→</span><span class="st">Scout answers</span><span class="ar">→</span><span class="st">Hanna is woken</span></div>
+        <p class="note">You see it in the thread. It reaches you only as Needs you.</p>
+      </div>
+      <div class="flow">
+        <h3>The world → an employee<small>outbox built 16 September; mailbox observation next</small></h3>
+        <div class="steps"><span class="st">reply arrives · follow-up due · availability stale</span><span class="ar">→</span><span class="st">task for the owner</span><span class="ar">→</span><span class="st">employee handles it</span><span class="ar">→</span><span class="st">Needs you only for a judgment</span></div>
+        <p class="note">Machines observe, humans judge: no buttons for things the mailbox can see. Needs the mailbox you reply from connected (question 1).</p>
+      </div>
+      <div class="flow">
+        <h3>Triangle → the world<small>Send is DEV-013</small></h3>
+        <div class="steps"><span class="st">employee drafts</span><span class="ar">→</span><span class="st">you edit and press Send</span><span class="ar">→</span><span class="st">ledger keeps draft, final text, time, follow-up</span></div>
+        <p class="note">Employees send nothing on their own unless a message kind is set to automatic. Prices, rates, dates, headcount and contracts are never an employee's to commit.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Industry standard</th><th>What it is</th><th>In Triangle</th></tr></thead>
+        <tbody>
+          <tr><td>MCP</td><td>How an agent uses tools and data</td><td>The badge API the bots call: missions, findings, requests</td></tr>
+          <tr><td>A2A</td><td>Agent-to-agent tasks with a shared lifecycle</td><td>Tasks and their six states; the badge plus role file is the agent card</td></tr>
+          <tr><td>Agent Inbox · AG-UI interrupts</td><td>A human answers an agent that stopped for input</td><td>Needs you, one card shape</td></tr>
+          <tr><td>Linear · GitHub delegation</td><td>Delegate a work item; the human stays the owner</td><td>Task on a case; the owner never changes when an employee takes it</td></tr>
+          <tr><td>Microsoft Agent 365</td><td>Admin registry: identity, access, health</td><td>Settings → Team</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">Found today</span>What leaked into the company</h2>
+    <div class="findings">
+      <div class="finding">
+        <h3>An engineering question inside a business mission</h3>
+        <p>Scout's step in mission <b>HVAC EPC EU</b> finished with “Promote Eng Preview c57ec57 to Production, or hold on live outbox c27187b?” as its question for you, so it sits in Needs you. Scout's real result was 12 EU HVAC buyers. The likely cause is that the programming bot and Scout share one Grok account, and bots in one account share a computer and its context.</p>
+        <p class="fix">Fix: the programming bot moves to its own account; the question is cleared from that step (data fix in this PR, you apply it).</p>
+      </div>
+      <div class="finding">
+        <h3>A test task in the live company</h3>
+        <p>“DEV-004 smoke: draft a short next step for this thread; do not send.” is an open task in Bob's In progress on Today.</p>
+        <p class="fix">Fix: cancel it (same data fix). Tests use throwaway rows that are deleted afterwards.</p>
+      </div>
+      <div class="finding">
+        <h3>Production runs code that was never merged</h3>
+        <p>The live site reports <span class="mono">ed9d3a6</span> from branch <span class="mono">cursor/event-outbox-wake-14fb</span>, while the merged branch is at <span class="mono">80b38b7</span>.</p>
+        <p class="fix">Fix: promote only merged commits, so production always matches GitHub.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">Build order</span>Smallest clarity first</h2>
+    <ol class="order">
+      <li><div><b>Refusal ledger off Today</b><p>Already decided in pull request #17. Keeps the records, moves the panel to Diagnostics.</p></div><span class="id">DEV-016</span></li>
+      <li><div><b>Today — one inbox</b><p>One card shape, grouped by case; In progress as one quiet line per employee; Done since you looked; mission grid, second Ask box and the old backlog removed.</p></div><span class="id">DEV-017</span></li>
+      <li><div><b>Team in Settings</b><p>Workforce leaves the menu and <span class="mono">/agents</span> opens Settings → Team; the hand-out console, handed-out list, quick notes and work log go.</p></div><span class="id">DEV-012</span></li>
+      <li><div><b>The menu: Today · Missions · Talent</b><p>Signal Inbox, Cert Alerts, Compliance, Setup Readiness and Data Imports move into Talent or Settings. Nothing is deleted.</p></div><span class="id">DEV-011</span></li>
+      <li><div><b>Ask knows what you are looking at</b><p>A question asked from a case becomes a task on that case, not a new mission.</p></div><span class="id">DEV-010</span></li>
+      <li><div><b>Triangle observes the mailbox</b><p>Sent and replied come from the mailbox you actually use, not from buttons.</p></div><span class="id">next</span></li>
+      <li><div><b>Send from Triangle</b><p>Edit the draft, press Send; the ledger keeps both versions.</p></div><span class="id">DEV-013</span></li>
+    </ol>
+    <p class="prose">In parallel, for you: <b>DEV-018</b> — the programming bot in its own account, and the data fix in <span class="mono">supabase/data-fixes/2026-09-16-engineering-out-of-the-workforce.sql</span>.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">Your decisions</span>Four questions only you can answer</h2>
+    <div class="questions">
+      <div class="question"><b>1 · Which mailbox do you reply from?</b><p>Your replies seem to go out from nikola.kralj@triangle-services.com, which is not connected. Connecting it lets Triangle record sends and replies itself.</p></div>
+      <div class="question"><b>2 · A separate account for the programming bot?</b><p>Recommended. It keeps engineering questions, code and keys away from Scout, Hanna and Bob.</p></div>
+      <div class="question"><b>3 · Does Ralph share your Today?</b><p>One inbox for both of you, or each person sees only the cases they own.</p></div>
+      <div class="question"><b>4 · Are you in Talent as a candidate?</b><p>Today puts “Nikola Kralj, Automation Engineer” forward for Oliver Hall's USA role. Keep it only if you are available for that work.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Sources: <a href="https://linear.app/docs/agents-in-linear">Linear — AI agents</a> · <a href="https://linear.app/developers/agent-best-practices">Linear — agent interaction best practices</a> · <a href="https://a2a-protocol.org/latest/specification/">A2A specification</a> · <a href="https://github.com/langchain-ai/agent-inbox">LangChain Agent Inbox</a> · <a href="https://docs.ag-ui.com/concepts/interrupts">AG-UI interrupts</a> · <a href="https://www.microsoft.com/en-us/microsoft-365/blog/2025/11/18/microsoft-agent-365-the-control-plane-for-ai-agents/">Microsoft Agent 365</a></p>
+    <p>Repository copy: <span class="mono">docs/design/PRODUCT_SHELL_2026-09-16.html</span>. The decision is in <span class="mono">DECISIONS.md</span>; the work items are in <span class="mono">ROADMAP_EXECUTION.md</span>.</p>
+  </footer>
+</div>

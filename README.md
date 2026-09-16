@@ -19,6 +19,7 @@ One file answers each question. Update that file and link to it from others.
 | What exists and is live? | [CURRENT_STATE](CURRENT_STATE.md) |
 | Why was a direction chosen? | [DECISIONS](DECISIONS.md) |
 | What are we building? | [VISION](VISION.md) |
+| What will the product look like? | [Operating shell design](docs/design/PRODUCT_SHELL_2026-09-16.html) — menu, Today, Team, how people and employees communicate |
 | What counts as truth, success or an authorized action? | [PRODUCT_OPERATING_RULES](PRODUCT_OPERATING_RULES.md) |
 | What is the long-term sequence? | [ROADMAP](ROADMAP.md) |
 | How should a coding agent work? | [AGENTS](AGENTS.md), [SOFTWARE_AGENT_INSTRUCTIONS](SOFTWARE_AGENT_INSTRUCTIONS.md), [CLAUDE](CLAUDE.md) |
@@ -26,6 +27,10 @@ One file answers each question. Update that file and link to it from others.
 
 The files under `agents/` keep their paths: Triangle serves them to the
 employees' bots at runtime.
+
+### Design — where the product is going
+
+- [Operating shell, 16 September](docs/design/PRODUCT_SHELL_2026-09-16.html): three menu items, Today as one inbox, Team in Settings, all delegated work as a task on a case. The decision is "The operating shell" in DECISIONS.
 
 ### Reference — how a module works
 

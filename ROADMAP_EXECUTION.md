@@ -38,13 +38,14 @@ management changes the order, or when the gate is met or fails.
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-**16 September IA (docs lock):** first `READY` item after this refusal-ledger
-docs lock is **DEV-016** (hide the refusal ledger from Workforce / Today
-primary). Then **DEV-010** (context-aware Ask). DEV-009 (Today slim) and
-DEV-015 (context-preserving handoff + Ask Bob `case_type`) are `DONE` and
-did not rename Team or add Send. Do not invent Work Items. Do not beautify
-Team (DEV-012) while the refusal panel is still on the CEO surface. Do not
-implement the Send button unless you are on DEV-013.
+**Operating shell (16 September; locked when Nikola merges its pull request):**
+build in this order — **DEV-016** refusal ledger off Today → **DEV-017** Today
+as one inbox → **DEV-012** Team in Settings → **DEV-011** menu Today · Missions
+· Talent → **DEV-010** context-aware Ask → mailbox observed (Next) →
+**DEV-013** Send from Triangle. **DEV-018** is Nikola's, in parallel. DEV-009
+and DEV-015 are `DONE`. Do not invent Work Items. Do not implement the Send
+button unless you are on DEV-013. Decision: "The operating shell" in
+`DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html`.
 
 ### DEV-001 â Sent-message record Â· `DONE`
 
@@ -157,7 +158,7 @@ organization profile instead of hardcoded names.
 or "The team"; comments that tripped the scanner were rewritten. Checked:
 `npm run check:tenant-identity` exits 0.
 
-### Learning from the CEO's edits ? a changed draft offers a rule in the CEO's words � `DONE`
+### Learning from the CEO's edits ? a changed draft offers a rule in the CEO's words � `DONE`
 
 **Why:** when a human edits an AI-generated draft before sending, that correction
 is the clearest signal of how the employee should behave. Without learning,
@@ -178,7 +179,7 @@ the user re-edits the same phrases repeatedly.
 **Done 15 September.** Checked: 3/3 offline checks pass (`scripts/check-ceo-learning.mjs`);
 `npm run lint` 0 errors/warnings; `npm run build` succeeds; `npm run check:tenant-identity` exits 0.
 
-### Minimal event outbox ? client reply, follow-up due, availability stale � `DONE`
+### Minimal event outbox ? client reply, follow-up due, availability stale � `DONE`
 
 **Why:** when a client or recruiter replied on outreach or inbound email, a
 scheduled follow-up date arrived without an answer, or a worker/partner's
@@ -275,7 +276,7 @@ failed wake still queues for the next inbox check; older in_app Scout rows
 are visible in Scout's inbox but are not rewritten in the database.
 
 
-### Companies directory off the operating surface � `DONE`
+### Companies directory off the operating surface � `DONE`
 
 **Why:** the CEO browses Today and Missions, not a phone book of company names.
 Company rows stay; a case still opens from missions, Approvals and holdings.
@@ -289,7 +290,7 @@ unchanged. No migration. Checked: lint, production build, tenant-identity 0;
 signed-in check here. Nikola: confirm the sidebar has no Companies, then open a
 company from a mission's holdings.
 
-### Job Intake off primary navigation � `DONE`
+### Job Intake off primary navigation � `DONE`
 
 **Why:** Job Intake is no longer a CEO operating surface. Mail still has to
 land, score, and keep reply history until Bob waking on commercial mail is
@@ -345,7 +346,7 @@ nothing" here is this slice, not the standing send-from-Triangle law.
 DEV-015 (context-preserving handoff) is the Today destination for Hand to Bob.
 Ask context and intent routing are DEV-010 and DEV-014.
 
-### DEV-015 � Context-preserving handoff � `DONE` (code; live Ask Bob SQL still Nikola)
+### DEV-015 � Context-preserving handoff � `DONE` (code; live Ask Bob SQL still Nikola)
 
 **Why now:** Hand to Bob dismissed the Today card into Workforce / "What you
 handed out". Bob then 409ed completing `{assignmentId, result}` because
@@ -357,7 +358,7 @@ migration 041 treated a missing `case_type` as `open_research`.
    commercial complete is not a research finding. Data-fix SQL prepared, not
    applied.
 3. After Hand to Bob the same Today card is With Bob (Open thread + Take
-   back); toast "Handed to Bob � Open thread"; no Workforce navigation.
+   back); toast "Handed to Bob � Open thread"; no Workforce navigation.
 4. Open thread is a right-side drawer on Today (AssignmentThread).
 5. Quiet In progress lists active Bob / Scout / Hanna waits. Needs you stays
    for human decisions.
@@ -398,6 +399,37 @@ landings for commercial follow-through.
 
 This item is **docs-locked** in this change. Code is the next slice.
 
+### DEV-017 - Today: one inbox - `READY` (after DEV-016)
+
+**Why:** on Preview 76c42d4 Today mixed four card designs, listed the same
+recruiter once per role, kept a mission grid and a second Ask box under the
+inbox, and carried 11 old reports and 19 older items under "Back from the
+team". The operating-shell decision makes Today one inbox.
+
+**Acceptance:**
+1. Zones in this order: **Needs you**, **In progress**, **Done since you
+   looked**, under a one-line pulse: how many need you, and each employee's
+   working count.
+2. Every Needs you card has one shape: kind (Reply, Decide, Call, Approve,
+   Exception), a case line, the situation in one sentence, why now, an evidence
+   link, one primary action, Ask the employee, Dismiss. Existing behaviour is
+   kept: Open mail, Ask Bob, the Dismiss scopes, phone outcomes, mission
+   answers, Recorded outside Triangle.
+3. Cards are grouped by person or case: several requisitions from one recruiter
+   are one card that lists the roles.
+4. In progress is one collapsed row per employee (count and cases), expanding
+   to rows that open the existing thread drawer; Take back moves into the
+   drawer.
+5. Done since you looked lists work completed since the viewer's last visit,
+   using the seen markers that exist (a mission's `last_seen_at`; for other
+   work, the last 24 hours), each opening its case or mission.
+6. Leave Today: the Missions zone (mission cards and its Ask box; Ask stays in
+   the header and Ctrl K), the "on file" counts, and "Back from the team" as a
+   zone (its reports stay reachable from a collapsed "Older reports" link under
+   Done). Nothing is deleted.
+7. No new table, no navigation change, no send path, no change to what any
+   button records. Signed-in check on the Preview.
+
 ### DEV-010 - Context-aware AskLauncher / `/api/ask` - `READY`
 
 **Why now (smallest Ask slice):** the 16 September IA. Current Ask treats
@@ -425,41 +457,50 @@ to a record.
 5. No new table, no Work Items IA, no nav change, no send path.
 
 **Not this item:** Scout / Hanna / Bob intent routing on cards or voice
-(DEV-014). Workforce -> Team (DEV-012). Signal Inbox hide (DEV-011).
-Refusal-ledger hide is DEV-016, not this Ask rewrite.
+(DEV-014). Team in Settings (DEV-012). The menu (DEV-011). Today as one inbox
+(DEV-017). Refusal-ledger hide is DEV-016, not this Ask rewrite.
 
-### DEV-011 - Hide Signal Inbox from primary nav - `READY`
+### DEV-011 - Menu: Today · Missions · Talent - `READY` (after DEV-012)
 
-**Why:** 16 September IA withdraws "keep Signal Inbox thin in the shell."
-Scout consumes signals; the CEO does not patrol Hunter. Same pattern as Job
-Intake / Companies: hide the list, keep the data.
+**Why:** the 16 September IA withdrew "keep Signal Inbox thin in the shell",
+and the operating-shell decision leaves three primary surfaces. Scout consumes
+signals; the CEO does not patrol Hunter. Same pattern as Job Intake /
+Companies: hide the list, keep the data.
 
-**Do after or in parallel with DEV-010, not instead of it.** Ask context
-matters more than the sidebar.
+**Acceptance:** the sidebar shows Today, Missions, Talent and Settings only,
+and Quick add follows the same list. Signal Inbox → Settings → Diagnostics,
+keeping `/hunter` with a Job Intake-style banner; `/hunter/[id]` still opens
+from missions, Today and EntityCase. Cert Alerts → certificate exceptions on
+Today plus a filter in Talent. Compliance → a tab in Talent. Setup Readiness
+and Data Imports → Settings. Tables, APIs, suggestions and contractor-chain
+accept stay; no migration; no page deleted; Talent is not hidden.
 
-**Acceptance:** sidebar and Quick add have no Signal Inbox / Hunter; `/hunter`
-may stay as diagnostics (bookmark) or redirect with a short notice - pick the
-Job Intake pattern (keep page + banner) unless a redirect is clearly better;
-`/hunter/[id]` still opens from missions, Today, and EntityCase; tables, APIs,
-suggestions, and contractor-chain accept stay; no migration; no module
-deletion. Cert Alerts also leave primary nav (exceptions -> Today) if they are
-still in the same shell pass; do not hide Talent.
+### DEV-012 - Team in Settings (Workforce leaves the menu) - `READY` (after DEV-017)
 
-### DEV-012 - Workforce -> Team shrink - `READY`
+**Why:** amended by the operating-shell decision. On Preview 76c42d4 only the
+three employee cards on Workforce were useful; the rest was a hand-out console
+built on old research gaps, a handed-out list that Today already shows, a chat
+box that duplicates Ask, and a raw log of ids. Handing out work already happens
+from the case (Ask, Ask Bob, mission instructions), so this no longer waits for
+DEV-010.
 
-**Why:** Team is Scout / Hanna / Bob roles, standing rules, permissions,
-health, and load - not a hand-out-jobs console. Ask context (DEV-010) must
-exist first so handing out work is not the Team page's job.
-
-**Do after DEV-010 and DEV-016.** Hide the refusal ledger from the CEO
-surface before shrinking / renaming Team. Do not beautify Workforce while
-Postgres finding-contract sentences are still on Today.
-
-**Acceptance:** primary nav label is Team (or Workforce still, with Team copy
-on the page if a rename is staged); the page shows the three employees,
-rules, badges, health, load; it is not the place to file a new research job
-(that is Ask, with or without a mission); no marketplace, no Hire Employee
-expansion, no new agent roles.
+**Acceptance:**
+1. Settings has a Team section: one row per employee with what they own,
+   health (on duty, last seen, wake-up configured), load by task state
+   (Queued, Working, Needs you, Failed), permissions in plain words, standing
+   rules (the existing editor), and links to that employee's Activity and
+   refusals.
+2. Each employee's Activity lists their tasks with results, so work handed out
+   before today keeps a home.
+3. `/agents` redirects to Settings → Team with a short notice; Workforce leaves
+   the sidebar.
+4. Removed: "Work that needs doing" (Hand it out), "What you handed out", Quick
+   notes, and the global Work log (moved to Settings → Diagnostics); the humans
+   board moves to Settings → Members. Hire an AI employee stays admin-only and
+   frozen.
+5. Nothing is handed out from Team. The thread drawer, Ask and Ask Bob keep
+   working from Today and cases. No data deleted, no new table, no new agent
+   roles. Signed-in check on the Preview.
 
 ### DEV-013 - Human-approved Send from Triangle - `READY`
 
@@ -484,6 +525,24 @@ outbound still holds.
 **Not READY.** After DEV-010. Typed / voice Ask Triangle routes by intent
 ("investigate the end client" -> Scout) without fake Scout buttons on the
 Today mail card. Do not start this to avoid doing DEV-010.
+
+### DEV-018 - Engineering out of the workforce - `BLOCKED_EXTERNAL` (Nikola)
+
+**Why:** on 16 September Scout's HVAC EPC EU step asked the CEO "Promote Eng
+Preview c57ec57 to Production, or hold on live outbox c27187b?", a smoke-test
+task ("DEV-004 smoke…") sat in Bob's In progress, and production ran
+`ed9d3a6` from an unmerged bot branch.
+
+**Needs Nikola:**
+1. Move the programming bot to its own Grok / Cursor account, so it shares no
+   computer or context with Scout, Hanna and Bob.
+2. Apply `supabase/data-fixes/2026-09-16-engineering-out-of-the-workforce.sql`
+   after reading its preview.
+3. Promote only commits merged into the working branch.
+
+**Acceptance:** Today shows no engineering question and no test task; Scout's
+HVAC EPC EU step keeps its 12-buyer result without the deploy question; the
+smoke task is cancelled; production's `/api/version` reports a merged commit.
 
 ### Only if live work stalls on it
 

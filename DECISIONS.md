@@ -6,6 +6,71 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: The operating shell — three menu items, one inbox, tasks on cases
+
+Proposed by Claude on 16 September at Nikola's request ("Workforce is useless";
+"I need to understand where the project is going"). Locked when Nikola merges
+the pull request that adds it. Visual design:
+`docs/design/PRODUCT_SHELL_2026-09-16.html`.
+
+This **amends** the 16 September IA lock in one place: Team leaves the primary
+menu and lives in Settings. Everything else in that lock stands — Today as the
+exception inbox, context-aware Ask (DEV-010), send-from-Triangle (DEV-013), and
+the refusal ledger as diagnostics (DEV-016).
+
+Law:
+
+1. **Four layers.** People decide on Today; Triangle holds the record (cases,
+   tasks, evidence, the send ledger, standing rules, permissions); employees
+   (Scout demand, Hanna people, Bob commercial operations) work on their bots;
+   the world is observed through mailboxes and the web. A Grok chat, a mailbox
+   or a webhook is a way in or out, never where work lives.
+2. **All delegated work is a task on a case.** Case, owner (the accountable
+   human), employee, state, thread, result. The result lands on the case, never
+   on a separate list. This generalises DEV-015 to every surface.
+3. **One set of task states everywhere:** Queued (`queued`), Working (`active`),
+   Needs you (`waiting_review`, or a step's question for the CEO), Done
+   (`completed`), Failed (`failed`), Stale (not stored yet). Modelled on the A2A
+   task lifecycle and Linear agent sessions.
+4. **Menu: Today · Missions · Talent**, and Settings. Settings holds Team,
+   Members, Mailboxes, Organization, Imports, Setup and Diagnostics. Company,
+   person, project, requirement and lead pages open from a card and are never
+   patrolled. Diagnostics hold the refusal log, the work log, Signal Inbox, Job
+   Intake and the companies list. Nothing is deleted.
+5. **Today is one inbox:** Needs you, then In progress as one quiet line per
+   employee, then Done since you looked. Every Needs you card has one shape —
+   kind, case, the situation in one line, why now, evidence, one primary
+   action, Ask the employee, Dismiss — and cards are grouped by person or case.
+   Today carries no system errors, no mission grid, no second Ask box and no
+   history backlog.
+6. **Team is admin, not a console.** One screen: each employee's ownership,
+   health (on duty, last seen, wake-up), load by state, permissions, standing
+   rules, activity and refusals. No hand-out suggestions, no handed-out list, no
+   chat, no global work log. Work is handed out from the case (Ask, Ask Bob, a
+   mission instruction), as in Linear and GitHub, and managed in admin, as in
+   Microsoft Agent 365.
+7. **Employees talk inside the case.** A request between employees (14
+   September) is a child task in that case's thread and reaches a person only
+   as Needs you.
+8. **Engineering stays out of the company.** The programming bot runs in its
+   own account, test data never lives in the live organization, and only merged
+   commits are promoted.
+
+Why:
+
+- Workforce on Preview 76c42d4 was 7,777 pixels: ten "Hand it out" suggestions
+  from old research gaps, about forty handed-out rows that Today already shows,
+  a chat box that duplicates Ask, and a raw log of mission and assignment ids.
+  Only the three employee cards were useful;
+- Today put a system-refusal panel first, a deploy question inside a business
+  mission in Needs you, a smoke-test task in In progress, four card designs and
+  the same recruiter several times;
+- Scout's HVAC EPC EU step asked the CEO to promote an engineering preview —
+  engineering context crossed into the workforce, most likely through the Grok
+  account the programming bot shares with Scout;
+- the live site runs `ed9d3a6` from `cursor/event-outbox-wake-14fb`, a commit
+  that was never merged.
+
 ### 2026-09-16: Refusal ledger is diagnostics, not CEO work (DEV-016)
 
 Locked by Nikola. Today / Workforce showing "The system refused N attempts…"
@@ -92,6 +157,9 @@ Only four human primary surfaces:
 2. **Missions**
 3. **Talent** (today's Talent Pool)
 4. **Team** — rename Workforce later; shrink what the page is for (DEV-012)
+
+Amended the same day by "The operating shell": Team leaves the menu and lives
+in Settings, so the primary surfaces are **Today, Missions, Talent**.
 
 **Settings** is admin (C), not a fifth patrol queue.
 
@@ -914,7 +982,8 @@ Decision:
 - classify every screen before putting it in the shell:
   - **A primary** — daily operating surfaces. Destinations amended
     16 September to **Today, Missions, Talent, Team** (Workforce renamed
-    later); Settings stays admin/C. See that day's IA lock;
+    later), then the same day to **Today, Missions, Talent** with Team in
+    Settings (the operating-shell decision); Settings stays admin/C;
   - **B contextual** — opens from a case, approval, holding, or next move;
   - **C infrastructure** — APIs, settings, diagnostics; reachable, not in
     primary nav;
