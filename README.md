@@ -70,8 +70,8 @@ commit or environment, and never turn a dated count into an undated fact.
 ## Local development
 
 Use this checkout: `C:\Users\nikol\Projects\triangle-services-os`, branch
-`wip-jules-2026-05-03T18-13-13-596Z`. Inspect the branch and working tree before
-editing; do not substitute the old main/master snapshot.
+`main` (one project, one branch — see `SOFTWARE_AGENT_INSTRUCTIONS.md` §18).
+Inspect the branch and working tree before editing.
 
 ```sh
 npm install

@@ -9,7 +9,7 @@ source review follows it. Earlier sessions are preserved in the
 | Evidence | Observed state |
 | --- | --- |
 | Checkout | `C:\Users\nikol\Projects\triangle-services-os` |
-| Branch | `wip-jules-2026-05-03T18-13-13-596Z` |
+| Branch | `main` (one project, one branch; renamed from `wip-jules-2026-05-03T18-13-13-596Z` on 16 September) |
 | Last code commit | WIP merge 15 September: #8 DEV-003 + #9 Job Intake hide + #10 holding-chip Doors fix |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |

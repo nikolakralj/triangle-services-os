@@ -506,10 +506,16 @@ A product change is done only when all relevant items are true:
 ## 18. Git, branch, and deployment discipline
 
 - Work in the exact local project the user placed in scope.
-- The active branch at adoption is
-  `wip-jules-2026-05-03T18-13-13-596Z`, not `main`.
+- **One project, one branch.** `main` is the only long-lived branch (renamed
+  from `wip-jules-2026-05-03T18-13-13-596Z` on 16 September 2026; the old
+  `main`/`master` snapshots were behind it and are gone). Every task is one
+  short branch off `main`, one pull request into `main`, merged as soon as it
+  is checked, and the branch deleted on merge. No stacked branches unless the
+  agent says in the PR why a stack is needed and which PR merges first.
 - Do not switch, merge, rebase, push, deploy, or change the default branch
   unless the user requests it.
+- Do not open a second branch for the same task; if a task grows, add a
+  commit, not a branch.
 - Never destroy or overwrite unrelated user changes.
 - Keep edits coherent and reviewable.
 - Do not use destructive Git recovery commands without explicit authorization.
