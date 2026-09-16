@@ -2,8 +2,6 @@ import { PageHeader } from "@/components/common/page-header";
 import { TodayScreen } from "@/components/modules/today-screen";
 import { getNextMove } from "@/lib/data/next-move";
 import { listWhatCameBack } from "@/lib/data/came-back";
-import { summarizeRefusals } from "@/lib/data/refusals";
-import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
@@ -45,7 +43,6 @@ export default async function DecisionsPage() {
     move,
     cameBack,
     employees,
-    refusals,
     projects,
     companies,
     people,
@@ -57,7 +54,6 @@ export default async function DecisionsPage() {
     getNextMove(org),
     listWhatCameBack(org),
     listWorkforce(org),
-    summarizeRefusals(org),
     count(svc, "discovered_projects", "organization_id", org),
     count(svc, "companies", "organization_id", org),
     count(svc, "workers", "organization_id", org),
@@ -85,10 +81,9 @@ export default async function DecisionsPage() {
         title="Today"
         description="Needs you, work in progress, and missions. Handoff changes the owner — the case stays here."
       />
-      {/* What the system would not let anyone record. Moved off Overview:
-          it is the most informative thing this product produces and it was
-          on a page nobody had a reason to open. */}
-      <RefusalLedger summary={refusals} />
+      {/* The refusal ledger used to open this page. A refused record is a
+          check working, not a decision for the CEO, so it lives under
+          Settings → Diagnostics (DEV-016). */}
       <TodayScreen
         move={move}
         employees={roster}

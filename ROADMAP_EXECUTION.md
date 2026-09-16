@@ -373,7 +373,7 @@ Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
 Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
 Bob ? Open thread drawer ? the card is in In progress, not Workforce.
 
-### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `IN_PROGRESS` (Claude, branch `claude/today-one-inbox`)
+### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `DONE` (branch `claude/today-one-inbox`)
 
 **Why now:** Today / Workforce shows "The system refused N attempts..." with
 Postgres finding-contract sentences (Ask Bob completes mis-classified as
@@ -398,6 +398,12 @@ landings for commercial follow-through.
    `supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql`.
 
 This item is **docs-locked** in this change. Code is the next slice.
+
+**Done 16 September** on branch `claude/today-one-inbox`. Today no longer
+renders `RefusalLedger`; Settings has a Diagnostics section, shown to admins and
+partners, with the same ledger. Records, component and `summarizeRefusals` are
+unchanged; Workforce never rendered the ledger. Checked signed in on localhost,
+3/3; type check and lint pass. Not merged or on production yet.
 
 ### DEV-017 - Today: one inbox - `READY` (after DEV-016)
 
