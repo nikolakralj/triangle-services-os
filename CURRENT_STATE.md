@@ -13,7 +13,7 @@ source review follows it. Earlier sessions are preserved in the
 | Last code commit | WIP merge 15 September: #8 DEV-003 + #9 Job Intake hide + #10 holding-chip Doors fix |
 | Initial GitHub snapshot | `f63afb51e3f48d3384e5c8047bea49e89d0d7da6`; September 8 review reached c8795b9; September 10 inspected five subsequent commits |
 | Existing product work | Committed; nothing from this week is left uncommitted |
-| Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044ÃÂ¢Ãâ¬Ãâ048 applied to the live database 11ÃÂ¢Ãâ¬Ãâ15 September |
+| Repository schema | Migrations through `048_drafts_keep_what_triangle_wrote.sql`; 044–048 applied to the live database 11–15 September |
 | Production version | `11397dc` (includes `f9e9685`), promoted and confirmed through `/api/version` on 15 September |
 | Live commercial counts | Commercial ledger queried 15 September (below); other snapshots are dated evidence only |
 | Verification | Per change, listed with each change below; the 10 September review itself reran no signed-in business test |
@@ -21,7 +21,7 @@ source review follows it. Earlier sessions are preserved in the
 Do not infer deployment or applied migrations from committed source. Earlier
 claims of passing builds or live smoke tests describe their original snapshots.
 
-## This week ÃÂ¢Ãâ¬Ãâ 10 to 15 September
+## This week — 10 to 15 September
 
 Delegated work is now a **mission**: one objective, every instruction a step
 inside it. Employees can work missions on their own Grok bots, with Triangle as
@@ -29,7 +29,7 @@ the record they read from and write to.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
-| Missions: one objective, instructions as steps, state derived from steps | `db76c88` | Signed-in checks, 10 September | ÃÂ¢Ãâ¬Ãâ |
+| Missions: one objective, instructions as steps, state derived from steps | `db76c88` | Signed-in checks, 10 September | — |
 | Finish line and plan per mission, counted from records (migration 044) | `745e903` | Austria mission reached its finish line from one instruction, 12 September | Counts companies and doors, not deals |
 | Mission memory: the CEO's decisions kept with exact quotes (045) | `32b53c6` | Decision checks 18/18 | A decision binds one mission |
 | Missions on an employee's own bot, woken by webhook; badge-only mission API | `d5c679b` | Scout's Austria mission, 12 September; Hanna switched 14 September | A wake-up starts a background run, not the chat |
@@ -38,11 +38,11 @@ the record they read from and write to.
 | Messaging policy per employee: approval or forbidden for every kind of message | `6aa4968` | Carried in every payload | No sending path, so "auto" cannot take effect yet |
 | Fixes: finish-line under-count; reply authors, Ask pool label, placeholder refusal | `0a9ee6c`, `ad72085` | Checked on production, 14 September | Placeholder refusal not yet triggered by a real filing |
 | Sent-message record: words editable before sending, Triangle's draft and the sent text both kept, a follow-up date on every send, due follow-ups on Today, Job Intake replies in the ledger (048) | `f9e9685` | Signed-in check 9/9 on a throwaway lead; on production 15 September, Today showing the eight overdue follow-ups | A follow-up message is recorded without its words |
-| Source check at filing: a reachable phone or email must appear on a cited page Triangle reads itself; an unreadable page files as Source unchecked | `2024155` | 31/31 offline; the 38 doors on file read live: 34 matched, 3 unchecked, 1 refused (KÃÆÃÂ¶ster); Approvals label and refusal signed in, 3/3 | Checks at filing only; not yet on production; not yet exercised by a bot filing |
+| Source check at filing: a reachable phone or email must appear on a cited page Triangle reads itself; an unreadable page files as Source unchecked | `2024155` | 31/31 offline; the 38 doors on file read live: 34 matched, 3 unchecked, 1 refused (Köster); Approvals label and refusal signed in, 3/3 | Checks at filing only; not yet on production; not yet exercised by a bot filing |
 | Wake on assignment follow-up: a human post on a bot-owned thread calls `wakeEmployee` with `human_followup` (ids only); UI says queued, not sent; amber badge stays until the employee answers in-thread | `3058eb5` | lint, build, tenant-identity still 8 known; no signed-in check here | Hanna's Grok routine must handle the event; missing/failed wake still queues for the next inbox check; does not send and does not widen `communicationPolicy` |
-| Known defects (DEV-005): forwarded intake keeps the recruiter, not the mailbox; mission recommended card matches the named person; KÃÆÃÂ¶ster door and Computer Futures lead data-fix SQL applied on live DB 15 September | `9929630` | 11/11 offline DEV-005; DEV-002 31/31; lint, production build, tenant-identity 0; no signed-in check here | Computer Futures contact and Koster rule-out applied on the shared DB |
+| Known defects (DEV-005): forwarded intake keeps the recruiter, not the mailbox; mission recommended card matches the named person; Köster door and Computer Futures lead data-fix SQL applied on live DB 15 September | `9929630` | 11/11 offline DEV-005; DEV-002 31/31; lint, production build, tenant-identity 0; no signed-in check here | Computer Futures contact and Koster rule-out applied on the shared DB |
 | Tenant identity (DEV-006): CV letterhead and next-move sign-off read the approved organization profile; scanner comments cleaned | `9929630` | `check:tenant-identity` exits 0; lint and production build | Tenant-zero paper address still lives in the approved seed file |
-| Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions ? Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox â no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
+| Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions ? Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox — no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
 | Scout is bot-owned: in-app OpenAI `scout-executor` claim loop hard-off; new Scout work is `execution_mode: bot` and wakes the bot (`assignment`); callers cannot force `in_app` onto Scout | `1f9cacc`, `93895cd` | lint, build, tenant-identity still 8 known; no signed-in check here | Scout's Grok routine must handle `assignment`; missed wake waits for the inbox check; older in_app Scout rows are visible in the inbox, not migrated; DEV-003 landed as Hanna /pool on WIP |
 | Research Agent project chat retired: Signal Inbox stays a list; project page has no chat; `/api/research/chat` returns 410; suggestions ? Approvals / contractor-chain accept remain | `eeb6086` | lint, production build, tenant-identity 0; GET/POST `/api/research/chat` 410 in demo mode; no signed-in check here | Nikola: open a project from Signal Inbox  no Research Agent chat; Inbox/Approvals still accept. `/api/research/run` unused in product UI. No migration |
 | Scout is bot-owned: in-app OpenAI `scout-executor` claim loop hard-off; new Scout work is `execution_mode: bot` and wakes the bot (`assignment`); callers cannot force `in_app` onto Scout | `1f9cacc`, `93895cd` | lint, build, tenant-identity still 8 known; no signed-in check here | Scout's Grok routine must handle `assignment`; missed wake waits for the inbox check; older in_app Scout rows are visible in the inbox, not migrated; DEV-003 left for Antigravity |
@@ -64,8 +64,9 @@ the record they read from and write to.
 | Today as one inbox, slice B (DEV-017): follow-ups for the same person are one card with one Open mail or Dial and a line per role that keeps its own Ask Bob and Dismiss | branch `claude/today-one-inbox` | Signed in on localhost, 4/4 (Nicolas Preckler's two roles); type check and lint | The "Open mail sends nothing" note still repeats per role; one card shape is slice C |
 | Today as one inbox, slice C (DEV-017): kind labels in the same place on every Needs you card; the grouped card's note once; Take back moved from In progress rows into the thread drawer for open work | branch `claude/today-one-inbox` | Signed in on localhost, 6/6, without pressing Take back; `check:dev-015` 15/15; `check:today-slim` 12/12; type check and lint | Phone cards keep their three outcomes and mission questions are answered on the mission page, so card internals still differ |
 | Team in Settings, slice A (DEV-012): Settings opens on Team — each AI employee's health, runtime and wake-up, load (working, queued, stale, needs you, failed this week), badge permissions in words, refusals this week, standing rules, and Activity (open work first, then the last twelve finished, each opening the thread drawer). Stale = open work with no sign of life for 24 hours, derived from pickup, thread messages and run activity | branch `claude/team-in-settings` | Signed in on localhost, 23/23 (drawer opened, no rules edited, nothing taken back; no sideways scroll at 390 px); type check and lint | Workforce is still in the menu with its console until slice B. On localhost no wake-up URL is set, so every bot reads "wake-up not set"; the line reflects the server the page runs on. Live data shows Hanna holding two stale mission steps that ask her to dial PMS — calls are human work |
+| Team in Settings, slice B (DEV-012): Workforce left the menu; `/agents` redirects to Settings → Team with "Workforce moved here. Work is handed out from the case."; Settings → Members lists the humans; Hire stays under Team for admins; the Work log sits under Diagnostics; `agent-console.tsx` deleted (hand-out console, What you handed out, Quick notes gone); every remaining `/agents` link points at `/settings#team` | branch `cursor/dev-012-slice-b-d3bd` (stacked on `claude/team-in-settings`) | lint 0; tenant-identity 0; production build 0; `check:dev-015` 15/15, `check:dev-004` 13/13, `check:today-slim` 12/12; no signed-in check here | Signed-in check on the Vercel preview still owed: `/agents` → notice, no Workforce in the menu, Members, Hire (admin only), Work log. API routes untouched; no migration; no data deleted |
 
-Scout (demand) and Hanna (access to people) work missions on their Grok bots. Hanna files people on a recruiting mission through `POST /api/agent/missions/{id}/pool` Ã¢â¬â she proposes candidates and availability; a person accepts new workers and availability, and sends availability-check drafts; no CV data leaves Triangle in the bot payload.
+Scout (demand) and Hanna (access to people) work missions on their Grok bots. Hanna files people on a recruiting mission through `POST /api/agent/missions/{id}/pool` — she proposes candidates and availability; a person accepts new workers and availability, and sends availability-check drafts; no CV data leaves Triangle in the bot payload.
 Bob is bot-owned for commercial follow-through in code (`mission.work` plus
 mail ingest). Live badges still need the data-fix SQL and wake env; until
 then Ask Bob fails honestly. Bob sends nothing. A mission now shows chips for colleague requests, the source
@@ -73,7 +74,7 @@ mission a door came from, and holdings that open the record, so a recruiting
 mission that cites Scout's doors is not a scavenger hunt. Forwarded requisitions
 no longer take the receiving mailbox as the recruiter once new mail is ingested;
 the one live Computer Futures lead still needs the prepared SQL. The mission
-recommended card follows the named person. The KÃÂ¶ster door stays on file as
+recommended card follows the named person. The Köster door stays on file as
 reachable until its data-fix SQL runs. Tenant-identity no longer fails on
 CV/next-move hardcoding.
 
