@@ -384,8 +384,8 @@ export async function getNextMove(
     headline: "Nothing needs you",
     because:
       "Everyone reachable has been contacted, nothing is unsent, and no evidence is waiting. Your employees continue within their authority.",
-    href: "/agents",
-    cta: "See what they are working on",
+    href: "/settings#team",
+    cta: "See what the team is working on",
     clear: true,
   };
 }

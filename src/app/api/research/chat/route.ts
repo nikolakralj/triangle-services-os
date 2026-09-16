@@ -3,7 +3,7 @@
  *
  * Retired operating path (CEO, 15 September 2026). Project Research Agent
  * chat is not how Triangle researches a signal. Start a Scout mission or
- * Workforce hand-off instead. Research suggestions, Approvals accept, and
+ * Ask from the case instead. Research suggestions, Approvals accept, and
  * contractor-chain writes are unchanged.
  *
  * Conversation tables and `src/lib/data/research-chat.ts` remain; this
@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
 
 export const RESEARCH_CHAT_RETIRED_MESSAGE =
-  "Project Research Agent chat is retired. Start a Scout mission from Missions or hand the work to Workforce. Research suggestions still go to Approvals.";
+  "Project Research Agent chat is retired. Start a Scout mission from Missions or hand the work to Scout with Ask from the case. Research suggestions still go to Approvals.";
 
 function retiredResponse() {
   return NextResponse.json(
@@ -23,7 +23,7 @@ function retiredResponse() {
       retired: true,
       use: {
         missions: "/missions",
-        workforce: "/agents",
+        team: "/settings#team",
         approvals: "/approvals",
       },
     },

@@ -322,7 +322,9 @@ export async function listDecisionInbox(
       ? `/companies/${company.id}`
       : projectId
         ? `/hunter/${projectId}`
-        : "/agents";
+        : // No company or project to open: the assignment's own thread lives
+          // under that employee's Activity in Settings → Team (DEV-012).
+          "/settings#team";
     const entityTitle = company
       ? companyNames.get(company.id)
       : projectId
@@ -352,8 +354,8 @@ export async function listDecisionInbox(
       nextSafeAiStep: failed
         ? "Do not retry or expand scope until a human supplies direction."
         : "Wait for the human decision, then continue only the authorized internal work.",
-      nextHumanStep: caseHref === "/agents"
-        ? "Open Workforce and review the assignment conversation."
+      nextHumanStep: caseHref === "/settings#team"
+        ? "Open the employee's Activity in Settings → Team and review the assignment thread."
         : "Open the living case, read the result and answer in its persistent thread.",
       createdAt: row.created_at as string,
       detail: (row.result_summary as string | null) ?? (row.objective as string),

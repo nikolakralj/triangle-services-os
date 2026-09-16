@@ -283,7 +283,7 @@ export default async function DiscoveredProjectDetailPage({
         >
           <EntityCasePanel
             snapshot={projectCase}
-            emptyHint="No employee has been assigned to this project yet. Assign one from Workforce and its report will appear here."
+            emptyHint="No employee has worked this project yet. Hand it to Scout with Ask, or from a mission, and the report will appear here."
           />
         </PersistedCollapsible>
 
