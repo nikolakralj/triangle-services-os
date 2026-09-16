@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { isBobRole } from "@/lib/data/ask-bob-policy";
 
 // ---------------------------------------------------------------------------
 // Who does a mission's work, and how to wake them.
@@ -8,11 +9,13 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // Grok's own platform, with its own computer, tools and memory, reading and
 // writing Triangle through its badge. For a mission that runs on a bot,
 // Triangle does not think — it stores the work, applies the rules, and wakes
-// the bot. The choice is made per employee, except Scout (project_researcher),
-// who is always the bot — there is no in-app OpenAI stand-in:
+// the bot. The choice is made per employee, except Scout (project_researcher)
+// and Bob (inbox_coordinator / commercial_ops / inbox_courier), who are always
+// the bot — there is no in-app OpenAI stand-in:
 //
 //   agent_instances.config.mission_runtime = "bot"   steps go to the badge's inbox
 //   Scout (any config)                               same — always the bot
+//   Bob (commercial-ops roles, any config)           same — always the bot (DEV-004)
 //   anything else                                    Triangle's own runner does them
 //
 // A bot only sees work when it checks in, and Triangle cannot open a Grok chat.
@@ -41,19 +44,31 @@ export const SCOUT_ROLE_KEY = "project_researcher";
 export const STALE_BOT_STEP_MINUTES = 120;
 
 /**
- * Where this employee works. Scout is always the Grok bot. Everyone else
- * follows `agent_instances.config.mission_runtime`.
+ * Where this employee works. Scout and Bob are always the Grok bot. Everyone
+ * else follows `agent_instances.config.mission_runtime`.
  */
 export function employeeRuntimeOf(
   roleKey: string | null | undefined,
   config: Record<string, unknown> | null | undefined,
 ): MissionRuntime {
   if (roleKey === SCOUT_ROLE_KEY) return "bot";
+  if (isBobRole(roleKey)) return "bot";
   return config?.mission_runtime === "bot" ? "bot" : "in_app";
 }
 
 export function isScoutRole(roleKey: string | null | undefined): boolean {
   return roleKey === SCOUT_ROLE_KEY;
+}
+
+export { isBobRole };
+
+/** Env names Triangle reads to wake this role. Does not invent URLs. */
+export function wakeEnvNames(roleKey: string): { url: string; key: string } {
+  const suffix = roleKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  return {
+    url: `BOT_WAKE_URL_${suffix}`,
+    key: `BOT_WAKE_KEY_${suffix}`,
+  };
 }
 
 export async function loadEmployeeRuntime(
@@ -101,10 +116,6 @@ export async function employeeConfig(
   return (data?.config as Record<string, unknown> | null) ?? null;
 }
 
-function settingName(prefix: string, roleKey: string): string {
-  return `${prefix}_${roleKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
-}
-
 export type WakeEvent =
   | "mission_step"
   | "mission_retry"
@@ -149,8 +160,9 @@ export async function wakeEmployee(params: {
     .eq("org_id", params.orgId)
     .maybeSingle();
   const roleKey = (employee?.role_key as string | undefined) ?? "";
-  const url = roleKey ? process.env[settingName("BOT_WAKE_URL", roleKey)] : undefined;
-  const key = roleKey ? process.env[settingName("BOT_WAKE_KEY", roleKey)] : undefined;
+  const envNames = roleKey ? wakeEnvNames(roleKey) : { url: "", key: "" };
+  const url = envNames.url ? process.env[envNames.url] : undefined;
+  const key = envNames.key ? process.env[envNames.key] : undefined;
 
   let result: WakeResult;
   if (!url || !key) {

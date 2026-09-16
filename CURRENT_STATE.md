@@ -57,10 +57,12 @@ the record they read from and write to.
 | Funnel strip removed from Today: 'Two ways to an order' removed from `/decisions`; page focuses on actionable next move and work in progress | pending | lint 0, production build 0, tenant-identity 0; no signed-in check here | Component left in source if needed later; `getFunnel` query removed from Today SSR |
 | Learning from CEO edits: editing an AI draft in `LeadReplyPanel` or `OutreachDraftsPanel` offers `LearnRulePrompt` to append a standing house rule in the user's words; `POST /api/agents/house-rules` | pending | 3/3 offline checks pass (`scripts/check-ceo-learning.mjs`); lint 0, production build 0, tenant-identity 0; no signed-in check here | Appends to existing versioned `agent_house_rules`; travels with future work; no migration |
 | Today email cards slim (DEV-009): Open mail · Ask Bob · scoped Dismiss; Sent / They replied / Sent a follow-up off the primary rail; Recorded outside Triangle under Dismiss; phone cards unchanged | this PR | 12/12 offline (`check:today-slim`); lint 0; production build 0; tenant-identity 0; no signed-in check here | Ask Bob is a real assignment + wake and fails honestly if DEV-004; no Gmail draft, no Scout/Hanna routing, no mailbox-derived sent/replied; overdue-list rewrite still NEXT |
+| Bob takes follow-through (DEV-004): `mission.work` in the catalog; Bob hire preset is mail ingest + mission work; Ask Bob / assignments force `execution_mode: bot` and wake like Scout | this PR | 13/13 offline (`check:dev-004`); lint 0; production build 0; tenant-identity 0; no signed-in check here | SQL not applied — Nikola must preview then run `supabase/data-fixes/2026-09-16-bob-mission-work-scope.sql` (shared live DB). Wake env `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR` must be set if the Grok routine exists. Bob sends nothing |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots. Hanna files people on a recruiting mission through `POST /api/agent/missions/{id}/pool` Ã¢â¬â she proposes candidates and availability; a person accepts new workers and availability, and sends availability-check drafts; no CV data leaves Triangle in the bot payload.
-Bob still runs the mail routine and takes mission work only once his badge has a
-mission scope. A mission now shows chips for colleague requests, the source
+Bob is bot-owned for commercial follow-through in code (`mission.work` plus
+mail ingest). Live badges still need the data-fix SQL and wake env; until
+then Ask Bob fails honestly. Bob sends nothing. A mission now shows chips for colleague requests, the source
 mission a door came from, and holdings that open the record, so a recruiting
 mission that cites Scout's doors is not a scavenger hunt. Forwarded requisitions
 no longer take the receiving mailbox as the recruiter once new mail is ingested;

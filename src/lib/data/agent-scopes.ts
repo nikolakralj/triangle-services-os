@@ -36,6 +36,13 @@ export const AGENT_SCOPES: ScopeSpec[] = [
     suggestedFor: ["inbox"],
   },
   {
+    value: "mission.work",
+    label: "Work own mission and assignment steps",
+    description:
+      "Pick up and finish the employee's own mission steps and assignments: draft the next commercial move, file what Triangle already knows, ask a colleague, report back. Cannot send external mail by itself — a person still sends.",
+    suggestedFor: ["inbox"],
+  },
+  {
     value: "worker.propose",
     label: "Read CVs and propose people",
     description:
@@ -76,9 +83,10 @@ export const ROLE_PRESETS: Array<{
   {
     key: "inbox",
     displayName: "Bob",
-    roleTitle: "Operations · inbox coordinator",
+    roleTitle: "Commercial Operations · follow-through and mail ingest",
     emoji: "📥",
-    scopes: ["job_intake.ingest"],
-    description: "Reads recruiter mail each morning and files new job opportunities.",
+    scopes: ["job_intake.ingest", "mission.work"],
+    description:
+      "Turns intelligence into the next commercial move, keeps work moving, and files recruiter mail. Drafts only — cannot send mail.",
   },
 ];

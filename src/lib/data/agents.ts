@@ -34,6 +34,7 @@ export interface AgentInfo {
 
 const SCOPE_LABEL: Record<string, string> = {
   "job_intake.ingest": "process incoming job emails",
+  "mission.work": "work own mission and assignment steps",
   "research.suggestion.create": "propose research findings for review",
   admin: "full access",
 };

@@ -36,6 +36,8 @@ const ROLE_ALIASES: Record<string, string> = {
   triangle_hr: "hanna",
   hr: "hanna",
   inbox_courier: "bob",
+  inbox_coordinator: "bob",
+  commercial_ops: "bob",
 };
 
 function roleFileFor(roleKey: string): string {

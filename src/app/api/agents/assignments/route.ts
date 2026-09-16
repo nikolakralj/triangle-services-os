@@ -5,7 +5,7 @@ import {
   cancelAssignment,
   listWorkforce,
 } from "@/lib/data/workforce";
-import { isScoutRole, loadEmployeeRuntime } from "@/lib/data/bot-runtime";
+import { isBobRole, isScoutRole, loadEmployeeRuntime } from "@/lib/data/bot-runtime";
 
 // ---------------------------------------------------------------------------
 // The manager's side of assignments.
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Constraints used to be dropped here. Scout is bot-owned: even a client
-  // that still sends in_app cannot put Scout on the retired OpenAI executor.
+  // Constraints used to be dropped here. Scout and Bob are bot-owned: even a
+  // client that still sends in_app cannot put them on an in-app executor.
   // Everyone else keeps the previous default (in_app, explicit value wins).
   const { roleKey } = await loadEmployeeRuntime(
     access.organizationId,
@@ -79,9 +79,10 @@ export async function POST(request: Request) {
   );
   const incoming =
     body.constraints && typeof body.constraints === "object" ? body.constraints : {};
-  const constraints = isScoutRole(roleKey)
-    ? { ...incoming, execution_mode: "bot" }
-    : { execution_mode: "in_app", ...incoming };
+  const constraints =
+    isScoutRole(roleKey) || isBobRole(roleKey)
+      ? { ...incoming, execution_mode: "bot" }
+      : { execution_mode: "in_app", ...incoming };
 
   const dueAt = body.dueAt ? new Date(body.dueAt) : null;
   const created = await createAssignment({

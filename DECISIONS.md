@@ -6,6 +6,27 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: Bob takes commercial follow-through (DEV-004)
+
+CEO unlocked DEV-004 (was BLOCKED_EXTERNAL). Bob's product role is Commercial
+Operations: turn intelligence into action, keep work moving, draft next moves,
+surface decisions. Peer under Triangle; may ask Scout or Hanna through
+Triangle; not their boss. Sends nothing until policy/human allow.
+
+Decision:
+
+- `mission.work` is a first-class badge scope: work the employee's own
+  mission/assignment steps. It does not grant sending external mail.
+- Bob's normal hire preset is `job_intake.ingest` + `mission.work`.
+- Ask Bob and other Bob assignments are bot-owned (`execution_mode: bot`) and
+  wake like Scout/Hanna. Callers cannot force `in_app` onto Bob.
+- Live badges are updated with a previewable data-fix SQL, not a migration
+  that rewrites every org. Nikola applies it; local and production share one
+  database. This agent does not apply it.
+- Wake URLs are not invented. Live Bob (`inbox_coordinator`) uses
+  `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR` when the
+  Grok routine exists.
+
 ### 2026-09-16: Machines observe; humans judge — Today cards slim
 
 Agreed 15–16 September 2026 (CEO + external expert + Triangle Engineer).

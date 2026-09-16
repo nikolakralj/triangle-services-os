@@ -60,8 +60,9 @@ The database currently has three active identities:
 - moves raw inbox messages into Triangle;
 - does not classify, score, reply, archive, or contact anyone;
 - value: reliable, idempotent transport into the shared pipeline;
-- direction since 14 September: commercial operations (`agents/bob.md`). Mission
-  work waits for a mission scope on his badge and a wake-up routine.
+- direction since 14 September: commercial operations (`agents/bob.md`). Badge
+  scope `mission.work` plus mail ingest; bot-owned like Scout. Live badges still
+  need the data-fix SQL and wake env (DEV-004). Sends nothing.
 
 ### Scout — Project Researcher
 

@@ -88,14 +88,32 @@ counts from those findings. Company targets still need `research.suggestion.crea
 No migration. Checked: 13/13 offline DEV-003; lint, production build,
 tenant-identity 0. Could not signed-in check here.
 
-### DEV-004 â Bob takes follow-through Â· `BLOCKED_EXTERNAL`
+### DEV-004 — Bob takes follow-through · `DONE` (code; live SQL + wake still Nikola)
 
-**Needs:** the CEO's decision on a mission scope for Bob's badge, and Bob's
-wake-up routine.
+**Why now:** Today Ask Bob already creates a real assignment, then fails
+honestly without `mission.work` on Bob's badge or a bot runtime. The CEO
+unlocked the scope decision.
 
 **Acceptance:** Bob works mission steps and requests on his bot: lead triage with
 reasons, missing-fact chaser drafts, packet-send and supplier-registration
 records. Bob sends nothing.
+
+**Done 16 September (code).** `mission.work` is in the scope catalog. Bob's hire
+preset is `job_intake.ingest` + `mission.work`. Ask Bob / Workforce assignments
+force `execution_mode: bot` and wake like Scout. Data-fix SQL prepared, **not
+applied** — Nikola must preview then run
+`supabase/data-fixes/2026-09-16-bob-mission-work-scope.sql` (local and
+production share one database). Wake env, if the Grok routine exists:
+`BOT_WAKE_URL_INBOX_COORDINATOR` and `BOT_WAKE_KEY_INBOX_COORDINATOR`. Do not
+invent a URL.
+
+**Limit:** until that SQL runs, Ask Bob still says the badge needs a mission
+scope. Until the wake env is set, a created assignment records
+`constraints.wake.status = not_configured` and waits for the next inbox check.
+Bob still sends nothing. Not Scout's or Hanna's boss.
+
+Checked: 13/13 offline (`npm run check:dev-004`); lint 0; production build 0;
+tenant-identity 0. Could not signed-in check here.
 
 ### DEV-005 â Known defects Â· `DONE`
 
