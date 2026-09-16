@@ -479,7 +479,7 @@ team". The operating-shell decision makes Today one inbox.
 7. No new table, no navigation change, no send path, no change to what any
    button records. Signed-in check on the Preview.
 
-### DEV-010 - Context-aware AskLauncher / `/api/ask` - `DONE` (code on branch `cursor/dev-010-context-ask-d3bd`; signed-in check on the Preview still owed)
+### DEV-010 - Context-aware AskLauncher / `/api/ask` - `DONE` (on `main`; signed-in check on the Preview still owed)
 
 **Why now (smallest Ask slice):** the 16 September IA. Current Ask treats
 anything that is not a talent-pool question as a new Mission. That fills
@@ -539,7 +539,7 @@ gained nothing; then on a mission page Ctrl+K defaults to that mission; on
 Today with nothing in view a substantial Ask still opens a Mission; "who is
 free in October" still answers inline.
 
-### DEV-011 - Menu: Today · Missions · Talent - `DONE` (code on branch `cursor/dev-011-menu-d3bd`; signed-in check on the Preview still owed)
+### DEV-011 - Menu: Today · Missions · Talent - `DONE` (on `main`; signed-in check on the Preview still owed)
 
 **Why:** the 16 September IA withdrew "keep Signal Inbox thin in the shell",
 and the operating-shell decision leaves three primary surfaces. Scout consumes
@@ -583,7 +583,7 @@ document row. Not this item; a follow-up: skip or fold duplicate uploads (same
 worker, same category, same file name and size) at upload time and on the
 list. No row is deleted until a person says so.
 
-### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (code on branches; slice B awaits signed-in check on the Preview)
+### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (on `main`; slice B awaits signed-in check on the Preview)
 
 **Slices, so another agent can continue:** A — a Team section in Settings with
 each employee's ownership, health, runtime and wake-up, load by state,
@@ -656,7 +656,7 @@ DEV-010.
    working from Today and cases. No data deleted, no new table, no new agent
    roles. Signed-in check on the Preview.
 
-### DEV-013 - Human-approved Send from Triangle - `READY`
+### DEV-013 - Human-approved Send from Triangle - `DONE` (code; migration 049 and the mailbox switch still Nikola; signed-in check on the Preview owed)
 
 **Why:** 16 September sending policy. Review / edit / press Send in Triangle
 is allowed. Agent-autonomous sending remains AUTO / APPROVAL / FORBIDDEN.
@@ -673,6 +673,42 @@ follow-up are recorded; Open mail / record-outside remain until mailbox sync;
 no agent-autonomous send; `communicationPolicy` unchanged except that a
 human Send is a first-class recorded action. Freeze on **autonomous**
 outbound still holds.
+
+**Done 16 September (code).** On the Today reply card, a person whose own
+mailbox has sending turned on sees **Send from Triangle** beside Open mail.
+It opens a review — To, From, Subject (editable), the text as it stands in
+the editor — and **Send now**. `POST /api/mail/send` (human only; the MCP
+key and every badge are refused before the body is read) calls
+`sendFromTriangle` (`src/lib/data/mail-send.ts`): picks the person's own
+mailbox (`pickSendableMailbox`, `src/lib/mail/send-policy.ts` — owner only,
+`can_send` on, never a colleague's box), sends over SMTP with implicit TLS
+using the mailbox's stored app password (`src/lib/mail/smtp-send.ts`; Gmail
+and Microsoft hosts by domain, `mail.<domain>` otherwise), and **only after
+the server accepted it** writes the DEV-001 record through
+`logContactAttempt`: `commercial_actions` with `ai_draft` beside
+`final_content`, recipient, time, channel, follow-up date; the
+`outreach_drafts` row carries `sent_via = triangle`, `mail_account_id` and
+the Message-ID for a later mailbox sync. A server refusal is a `truth`
+refusal in the ledger and "Not sent. <reason>" on the card — nothing is
+recorded as sent. Sending is opt-in per mailbox: Settings → Mailboxes shows
+the owner a switch "Let me send from Triangle" (`PATCH
+/api/job-intake/accounts`); default off. Open mail, Copy pitch and
+Recorded outside Triangle remain. `communicationPolicy` is unchanged and
+`SENT_MESSAGES_RECORDED` stays `false`: a human send does not make an
+employee's own sending recorded, and the freeze on autonomous outbound holds.
+Migration `049_send_from_triangle.sql` (idempotent, changes no rows) is
+written, **not applied**.
+
+Checked: `npm run check:dev-013` 18/18 (policy, MIME and dot-stuffing,
+transport stub, end to end against a fake database, route guards, only one
+module reaches SMTP); lint 0; type check 0; tenant-identity 0; production
+build 0. Could not signed-in check here. Nikola: approve and apply 049;
+Settings → Mailboxes → tick "Let me send from Triangle" on your mailbox
+(Gmail: the stored password must be the app password); on Today open the
+Oliver Hall reply → Send from Triangle → review → Send now → the card shows
+"Sent to … from …", the message is in your Sent folder and the recipient's
+inbox, and the follow-up appears on Today in three days. Then press it on a
+mailbox with sending off to see the refusal.
 
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 
