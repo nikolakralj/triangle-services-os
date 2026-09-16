@@ -25,7 +25,8 @@ import {
 import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
-import { MissionsZone, ReadyForYou, InProgressWaits } from "@/components/modules/today-missions";
+import type { DoneItem } from "@/lib/data/today-in-progress";
+import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
 import {
@@ -35,12 +36,16 @@ import {
 import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
-// One screen. Needs you, then In progress, then Missions.
+// One inbox. Needs you, then In progress, then Done since you looked.
 //
+//   pulse        one line: how much needs you, who is working on what
 //   01  NEEDS YOU    human decisions only — the hero card and the rest
-//   02  IN PROGRESS  quiet waits with Bob / Scout / Hanna; Open thread here
-//   03  MISSIONS     large objectives
-//   04  BACK         older reports, a tight list with a state rail
+//   02  IN PROGRESS  one quiet line per employee; the rows open on demand
+//   03  DONE         what came back since you looked; older reports folded
+//
+// Missions live on the Missions page; the ones that ask something are already
+// in Needs you. The operating-shell decision (16 September) took the mission
+// grid, the second Ask box and the "on file" counts off this page.
 //
 // Handoff changes the owner of the work. It does not change where it lives.
 //
@@ -85,16 +90,15 @@ interface LoggedAttempt {
 export function TodayScreen({
   move,
   cameBack,
-  counts,
   missions,
   ready,
   followUps,
   waits,
+  done,
 }: {
   move: NextMove;
   employees: Employee[];
   cameBack: CameBackItem[];
-  counts: { projects: number; companies: number; people: number };
   /** Open missions, as their tabs show them. */
   missions: MissionTab[];
   /** People a mission made reachable that nobody has contacted yet. */
@@ -103,6 +107,8 @@ export function TodayScreen({
   followUps: { items: FollowUp[]; total: number };
   /** Open Bob / Scout / Hanna waits — quiet In progress, not Needs you. */
   waits: InProgressWait[];
+  /** Work outside missions finished in the last day. */
+  done: DoneItem[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
@@ -124,6 +130,28 @@ export function TodayScreen({
   );
   const dueMore = Math.max(0, followUps.total - followUps.items.length);
 
+  // The same filters Needs you applies, so the pulse counts what is shown.
+  const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
+  const dueOpen = due.filter(
+    (f) =>
+      !findWait(waits, {
+        leadId: f.target.leadId,
+        contactId: f.target.contactId,
+        personId: f.target.personId,
+      }),
+  );
+  const reachableOpen = ready.filter(
+    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+  );
+  const needsYou =
+    (nowNeedsYou ? 1 : 0) +
+    asking.length +
+    dueOpen.length +
+    (dueOpen.length > 0 ? dueMore : 0) +
+    reachableOpen.length;
+  const finishedMissions = missions.filter((m) => m.state === "ready");
+  const cameBackCount = decisions.length + older.length;
+
   const cardKey = move.action?.leadId || move.action?.contactId || move.headline;
 
   return (
@@ -140,6 +168,11 @@ export function TodayScreen({
       }}
     >
     <div className="space-y-7">
+      <Pulse
+        needsYou={needsYou}
+        waits={waits}
+        doneCount={finishedMissions.length + done.length}
+      />
       <Zone n="01" name="Needs you" note="human decisions only">
         <div className="space-y-2">
           {logged && (
@@ -178,61 +211,46 @@ export function TodayScreen({
       <Zone
         n="02"
         name="In progress"
-        note={waits.length === 0 ? "nothing with the team" : `${waits.length} with the team`}
+        note={waits.length === 0 ? "nothing with the team" : "quiet — open a line if you want to"}
       >
-        <InProgressWaits waits={waits} />
+        <InProgressByEmployee waits={waits} />
       </Zone>
 
       <Zone
         n="03"
-        name="Missions"
-        note={missions.length === 0 ? "none open" : `${missions.length} open`}
+        name="Done since you looked"
+        note={
+          finishedMissions.length + done.length === 0
+            ? "nothing new"
+            : "a mission leaves once opened"
+        }
       >
-        <MissionsZone missions={missions} />
+        <DoneSince missions={finishedMissions} done={done}>
+          {/* Reports filed before missions existed. They can still carry a
+              decision, so they stay reachable — folded under what came back,
+              not a zone of their own. */}
+          {cameBackCount > 0 && (
+            <details className="group rounded-2xl border border-slate-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-[13px] text-slate-600 transition hover:bg-slate-50">
+                <span className="font-mono text-[11px] text-slate-400 transition group-open:rotate-90">
+                  ▸
+                </span>
+                <span>
+                  Older reports from before missions:{" "}
+                  <span className="font-semibold text-slate-900">{decisions.length}</span>{" "}
+                  {decisions.length === 1 ? "waits" : "wait"} for a decision
+                  {older.length > 0
+                    ? `, ${older.length} older ${older.length === 1 ? "item" : "items"}`
+                    : ""}
+                </span>
+              </summary>
+              <div className="border-t border-slate-100 p-2.5">
+                <CameBackList decisions={decisions} older={older} />
+              </div>
+            </details>
+          )}
+        </DoneSince>
       </Zone>
-
-      {/* Reports filed before missions existed. They still carry decisions,
-          so they stay until decided — below the work that replaced them. */}
-      {cameBack.length > 0 && (
-        <Zone
-          n="04"
-          name="Back from the team"
-          note={
-            decisions.length === 0
-              ? "nothing to decide"
-              : `${decisions.length} to decide`
-          }
-        >
-          {/* Folded: these are the one-question jobs missions replaced, and
-              opened by default they ran Today to four thousand pixels of
-              history under the work that matters. */}
-          <details className="group rounded-2xl border border-slate-200 bg-white">
-            <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-[13px] text-slate-600 transition hover:bg-slate-50">
-              <span className="font-mono text-[11px] text-slate-400 transition group-open:rotate-90">
-                ▸
-              </span>
-              <span>
-                <span className="font-semibold text-slate-900">{decisions.length}</span>{" "}
-                {decisions.length === 1 ? "report" : "reports"} from before missions still
-                {decisions.length === 1 ? " waits" : " wait"} for a decision
-                {older.length > 0 ? `, and ${older.length} older ${older.length === 1 ? "item" : "items"}` : ""}
-              </span>
-            </summary>
-            <div className="border-t border-slate-100 p-2.5">
-              <CameBackList decisions={decisions} older={older} />
-            </div>
-          </details>
-        </Zone>
-      )}
-
-      {/* What is on file but not on the path to an order. Requisitions are
-          deliberately not repeated here — the strip above already draws them,
-          and printing the same number twice in two idioms is how the old
-          screen ended up saying everything four times. */}
-      <p className="border-t border-slate-200/80 pt-3 font-mono text-[11px] tracking-wide text-slate-400">
-        on file · {counts.people} people · {counts.projects} projects ·{" "}
-        {counts.companies} companies
-      </p>
       {toast && (
         <div
           role="status"
@@ -357,6 +375,54 @@ function RecordedStrip({
         <X className="h-3.5 w-3.5" />
       </button>
       {error && <p className="w-full text-[12px] text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
+const PULSE_TONE = {
+  need: "bg-amber-50 text-amber-900 ring-amber-200",
+  calm: "bg-white text-slate-600 ring-slate-200",
+  work: "bg-sky-50 text-sky-900 ring-sky-200",
+  done: "bg-emerald-50 text-emerald-900 ring-emerald-200",
+} as const;
+
+/**
+ * Today in one line, before any card: how much needs you, who is busy, and
+ * whether anything came back. Counted from what the zones below show.
+ */
+function Pulse({
+  needsYou,
+  waits,
+  doneCount,
+}: {
+  needsYou: number;
+  waits: InProgressWait[];
+  doneCount: number;
+}) {
+  const employees: Array<{ name: string; emoji: string; count: number }> = [];
+  for (const wait of waits) {
+    const known = employees.find((e) => e.name === wait.agentName);
+    if (known) known.count += 1;
+    else employees.push({ name: wait.agentName, emoji: wait.agentEmoji, count: 1 });
+  }
+  const chip = "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium ring-1 ring-inset";
+
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-label="Today at a glance">
+      <span className={`${chip} ${needsYou > 0 ? PULSE_TONE.need : PULSE_TONE.calm}`}>
+        {needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "needs" : "need"} you`}
+      </span>
+      {employees.map((e) => (
+        <span key={e.name} className={`${chip} ${PULSE_TONE.work}`}>
+          <span aria-hidden>{e.emoji}</span>
+          {e.name} on {e.count}
+        </span>
+      ))}
+      {doneCount > 0 && (
+        <span className={`${chip} ${PULSE_TONE.done}`}>
+          {doneCount} done since you looked
+        </span>
+      )}
     </div>
   );
 }

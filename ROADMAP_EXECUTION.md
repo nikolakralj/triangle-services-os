@@ -413,6 +413,18 @@ file" counts off Today, old reports folded under Done. B — group Needs you
 cards by person or case. C — one card shape for every Needs you card; Take back
 moves into the thread drawer. Status per slice is recorded below as each lands.
 
+**Slice A done 16 September** (branch `claude/today-one-inbox`). Today opens
+with a pulse line ("11 need you · Bob on 8 · Hanna on 2" on the day it
+landed), then Needs you (unchanged cards), In progress as one collapsed line
+per employee whose rows keep Open thread and Take back, and Done since you
+looked: missions finished since last opened (state `ready`) plus missionless
+work completed in the last 24 hours (`listDoneSince`), each opening its
+mission or thread. Old reports sit folded under Done. The mission grid, its Ask
+box, the "on file" counts and their three count queries are gone from Today.
+Checked signed in on localhost, 8/8; `check:dev-015` 15/15 and
+`check:today-slim` 12/12 still pass; type check and lint pass.
+**Next: slice B**, then C.
+
 **Why:** on Preview 76c42d4 Today mixed four card designs, listed the same
 recruiter once per role, kept a mission grid and a second Ask box under the
 inbox, and carried 11 old reports and 19 older items under "Back from the

@@ -5,9 +5,8 @@ import { listWhatCameBack } from "@/lib/data/came-back";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
-import { listInProgressWaits } from "@/lib/data/today-in-progress";
+import { listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
 import { getSession } from "@/lib/auth/session";
-import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
 // The one screen.
@@ -18,9 +17,9 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 // list and a four-tab Agent Desk whose detail drawer ended in a "Done" button
 // that closed the drawer.
 //
-// Now: the next move, the people waiting to hear from us again, the people the
-// missions made reachable, the missions themselves, and whatever older reports
-// still wait on a decision.
+// Now: what needs a person (the next move, follow-ups due, people a mission
+// made reachable, missions that asked), what the team is working on, and what
+// came back since you looked, with older reports folded underneath.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -36,31 +35,26 @@ export default async function DecisionsPage() {
     );
   }
 
-  const svc = createServiceSupabaseClient();
   const org = session.organizationId;
 
   const [
     move,
     cameBack,
     employees,
-    projects,
-    companies,
-    people,
     missions,
     ready,
     followUps,
     waits,
+    done,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
     listWorkforce(org),
-    count(svc, "discovered_projects", "organization_id", org),
-    count(svc, "companies", "organization_id", org),
-    count(svc, "workers", "organization_id", org),
     listMissionTabs(org),
     listReadyToContact(org),
     listFollowUpsDue(org),
     listInProgressWaits(org),
+    listDoneSince(org),
   ]);
 
   // Scout first, then Hanna, then the rest — the order the router in the Ask
@@ -79,7 +73,7 @@ export default async function DecisionsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Today"
-        description="Needs you, work in progress, and missions. Handoff changes the owner — the case stays here."
+        description="What needs you, what the team is working on, and what came back. Handoff changes the owner — the case stays here."
       />
       {/* The refusal ledger used to open this page. A refused record is a
           check working, not a decision for the CEO, so it lives under
@@ -88,11 +82,11 @@ export default async function DecisionsPage() {
         move={move}
         employees={roster}
         cameBack={cameBack}
-        counts={{ projects, companies, people }}
         missions={missions}
         ready={ready}
         followUps={followUps}
         waits={waits}
+        done={done}
       />
     </div>
   );
@@ -102,18 +96,4 @@ function rank(roleKey: string): number {
   if (roleKey === "project_researcher") return 0;
   if (roleKey === "hr" || roleKey === "triangle_hr") return 1;
   return 2;
-}
-
-async function count(
-  svc: ReturnType<typeof createServiceSupabaseClient>,
-  table: string,
-  orgColumn: string,
-  org: string,
-): Promise<number> {
-  if (!svc) return 0;
-  const { count: n } = await svc
-    .from(table)
-    .select("id", { count: "exact", head: true })
-    .eq(orgColumn, org);
-  return n ?? 0;
 }
