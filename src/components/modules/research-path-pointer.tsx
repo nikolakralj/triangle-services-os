@@ -6,7 +6,8 @@ import { openAsk } from "@/components/missions/ask-launcher";
 
 /**
  * Replaces the retired project Research Agent chat. Research is a Scout
- * mission / Workforce hand-off; suggestions still land here and on Approvals.
+ * mission or an Ask from the case; suggestions still land here and on
+ * Approvals. Nothing is handed out from Settings → Team (DEV-012).
  */
 export function ResearchPathPointer({ projectName }: { projectName?: string }) {
   const askText = projectName
@@ -24,9 +25,9 @@ export function ResearchPathPointer({ projectName }: { projectName?: string }) {
             Research is a Scout mission, not a chat on this page
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Hand this signal to Scout from Missions or Workforce. Pending
-            suggestions stay in Inbox below and on Approvals — accept them
-            there onto the contractor chain.
+            Hand this signal to Scout with Ask, or start a mission from
+            Missions. Pending suggestions stay in Inbox below and on Approvals
+            — accept them there onto the contractor chain.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -41,13 +42,6 @@ export function ResearchPathPointer({ projectName }: { projectName?: string }) {
               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               Missions
-              <ArrowUpRight className="h-3 w-3" />
-            </Link>
-            <Link
-              href="/agents"
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Workforce
               <ArrowUpRight className="h-3 w-3" />
             </Link>
             <Link

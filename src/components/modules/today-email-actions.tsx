@@ -404,7 +404,7 @@ export function EmailCardActions({
       {!hideNote && (
         <p className={t.note}>
           {withBob
-            ? "Bob has this case. Open thread stays here — it does not go to Workforce."
+            ? "Bob has this case. Open thread stays here, on the case."
             : EMAIL_CARD_NOTE}
         </p>
       )}

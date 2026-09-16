@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   ClipboardCheck,
   FileText,
-  Cpu,
   Radar,
   Settings,
   ShieldAlert,
@@ -36,8 +35,12 @@ type NavGroup = {
 // two screens that answer "what needs me" and "where does the company stop"
 // come first and everything else is filed under what it is: reference.
 //
-// Tasks was removed rather than demoted. Workforce assignments are the work
-// object; a second task list beside them is two answers to one question.
+// Tasks was removed rather than demoted. Assignments are the work object; a
+// second task list beside them is two answers to one question.
+//
+// Workforce left the menu the same way (DEV-012). Work is handed out from the
+// case — Ask, Ask Bob, an instruction inside a mission — and the AI employees
+// are an admin matter, so they live in Settings → Team. `/agents` redirects.
 //
 // The Companies directory was removed the same way. Company rows stay in the
 // database, and `/companies/[id]` still opens from missions, Approvals and
@@ -53,7 +56,6 @@ const navGroups: NavGroup[] = [
       { href: "/decisions", label: "Today", icon: ClipboardCheck },
       // One objective each, and every instruction given inside it.
       { href: "/missions", label: "Missions", icon: Target },
-      { href: "/agents", label: "Workforce", icon: Cpu },
     ],
   },
   {

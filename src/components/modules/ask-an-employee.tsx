@@ -160,7 +160,8 @@ export function AskAnEmployee({
         {error && <p className="text-sm text-rose-600">{error}</p>}
       </form>
 
-      {/* What came back. It was on the Workforce page, below everything else. */}
+      {/* What came back. It used to sit at the bottom of Workforce; the full
+          history per employee is now Activity in Settings → Team. */}
       {recent.length > 0 && (
         <div className="mt-3 border-t border-slate-100 pt-3">
           <div className="flex items-baseline justify-between gap-2">
@@ -168,7 +169,7 @@ export function AskAnEmployee({
               What came back
             </p>
             <Link
-              href="/agents"
+              href="/settings#team"
               className="text-xs font-medium text-sky-700 hover:text-sky-900"
             >
               All of it

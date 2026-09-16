@@ -50,7 +50,7 @@ export async function loadHouseRules(
   return rules.body.trim() ? rules : null;
 }
 
-/** The rules in force for several employees at once, for the Workforce page. */
+/** The rules in force for several employees at once, for Settings → Team. */
 export async function loadHouseRulesByEmployee(
   orgId: string,
   agentInstanceIds: string[],

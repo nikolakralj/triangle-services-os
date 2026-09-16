@@ -226,8 +226,8 @@ export function DecisionInboxWorkspace({ snapshot }: { snapshot: DecisionInboxSn
           <Link href="/approvals" className="inline-flex items-center gap-1 font-semibold text-sky-700 hover:underline">
             Evidence history <FileCheck2 className="h-3.5 w-3.5" />
           </Link>
-          <Link href="/agents" className="inline-flex items-center gap-1 font-semibold text-sky-700 hover:underline">
-            AI workforce <Sparkles className="h-3.5 w-3.5" />
+          <Link href="/settings#team" className="inline-flex items-center gap-1 font-semibold text-sky-700 hover:underline">
+            Team <Sparkles className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>

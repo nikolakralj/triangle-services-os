@@ -218,11 +218,18 @@ test('docs lock the handoff rule and commercial_follow_through', () => {
   assert.match(execution, /commercial_follow_through/);
 });
 
-test('Workforce is not redesigned; What you handed out is noted for later demotion', () => {
-  const workforce = read('src/components/modules/agent-console.tsx');
-  assert.match(workforce, /What you handed out/);
-  assert.match(workforce, /will be demoted/);
-  assert.doesNotMatch(workforce, /Team marketplace/);
+test('Workforce console is gone (DEV-012 slice B); Team hands nothing out', () => {
+  assert.equal(
+    fs.existsSync(path.resolve(root, 'src/components/modules/agent-console.tsx')),
+    false,
+  );
+  const agentsPage = read('src/app/(app)/agents/page.tsx');
+  assert.match(agentsPage, /redirect\("\/settings\?notice=workforce#team"\)/);
+  const teamSettings = read('src/components/modules/team-settings.tsx');
+  assert.match(teamSettings, /Nothing is handed out from here/);
+  assert.doesNotMatch(teamSettings, /Team marketplace/);
+  const sidebar = read('src/components/layout/sidebar.tsx');
+  assert.doesNotMatch(sidebar, /href: "\/agents"/);
 });
 
 let failed = 0;

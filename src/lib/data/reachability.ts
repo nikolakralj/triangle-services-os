@@ -53,7 +53,7 @@ export async function queueReachabilityJob(params: {
     return {
       ok: false,
       error:
-        "No active project researcher to give this to. Hire one in Workforce first.",
+        "No active project researcher to give this to. Hire one in Settings → Team first.",
     };
   }
 
