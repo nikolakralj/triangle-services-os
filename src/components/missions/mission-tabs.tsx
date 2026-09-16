@@ -103,7 +103,7 @@ export function MissionTabs({
       {canWrite && (
         <button
           type="button"
-          onClick={() => openAsk({})}
+          onClick={() => openAsk({ missionId: null })}
           aria-label="Start a mission"
           title="Start a mission"
           className="mb-1 ml-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-slate-900"
