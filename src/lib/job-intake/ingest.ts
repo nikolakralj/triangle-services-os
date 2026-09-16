@@ -31,6 +31,8 @@ export interface MailAccountRow {
   watch_label: string | null;
   status: string;
   last_synced_at: string | null;
+  owner_user_id?: string | null;
+  can_send?: boolean;
 }
 
 export interface IngestSummary {

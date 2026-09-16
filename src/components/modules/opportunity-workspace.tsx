@@ -35,10 +35,12 @@ export function OpportunityWorkspace({
   lead,
   drafts,
   assignments,
+  canSend = false,
 }: {
   lead: LeadView;
   drafts: DraftView[];
   assignments: ContextualAssignmentView[];
+  canSend?: boolean;
 }) {
   const draft = drafts[0] ?? null;
   const [subject, setSubject] = useState(draft?.subject ?? "");
@@ -157,7 +159,7 @@ export function OpportunityWorkspace({
               rows={10}
               className="w-full resize-y rounded-md border border-slate-200 px-2.5 py-2 text-sm leading-relaxed text-slate-800 disabled:bg-slate-50"
             />
-            {!sentId && (
+            {!sentId && canSend && (
               <Button
                 variant="primary"
                 className="h-8 px-3 text-xs"
@@ -167,6 +169,11 @@ export function OpportunityWorkspace({
                 {busy === "send" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                 Send
               </Button>
+            )}
+            {!sentId && !canSend && (
+              <p className="text-xs text-slate-500">
+                Sending from Triangle is limited. Copy the draft or open the original mailbox.
+              </p>
             )}
           </div>
         ) : (

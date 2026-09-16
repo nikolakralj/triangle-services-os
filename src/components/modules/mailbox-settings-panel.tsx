@@ -24,6 +24,8 @@ interface MailAccount {
   credentialSetAt: string | null;
   connected: boolean;
   usesLegacyEnvVar: boolean;
+  canSend?: boolean;
+  ownedByMe?: boolean;
 }
 
 const EMPTY_FORM = {
@@ -110,7 +112,8 @@ export function MailboxSettingsPanel() {
         <p className="mt-1 text-sm text-slate-600">
           Each person connects their own mailbox. Your password is encrypted before
           it is saved and is never shown again — not to your colleagues, and not to
-          the AI.
+          the AI. Sending from Triangle is opt-in per mailbox and only the owner
+          of that mailbox may use it. Other mailboxes stay ingest-only.
         </p>
       </div>
 
@@ -151,6 +154,11 @@ node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&
                 <p className="mt-0.5 text-xs text-slate-500">
                   {a.imapHost}
                   {a.watchLabel ? ` · folder: ${a.watchLabel}` : ""}
+                  {a.canSend
+                    ? a.ownedByMe
+                      ? " · can send from Triangle"
+                      : " · send enabled for its owner"
+                    : " · ingest only"}
                   {a.lastSyncedAt
                     ? ` · last read ${new Date(a.lastSyncedAt).toLocaleString()}`
                     : " · never read"}

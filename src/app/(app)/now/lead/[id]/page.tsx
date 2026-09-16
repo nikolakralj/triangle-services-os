@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { listReplyDrafts } from "@/lib/data/job-intake";
 import { loadLeadWorkspace } from "@/lib/data/contextual-work";
+import { userCanSendFromTriangle } from "@/lib/data/lead-send";
 import { OpportunityWorkspace, OpenOriginalLink } from "@/components/modules/opportunity-workspace";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function LeadNowPage({
   if (!workspace?.lead) notFound();
 
   const drafts = await listReplyDrafts(id, session.organizationId);
+  const canSend = await userCanSendFromTriangle(session.organizationId, session.userId);
   const lead = workspace.lead;
 
   return (
@@ -36,6 +38,7 @@ export default async function LeadNowPage({
         lead={lead}
         drafts={drafts}
         assignments={workspace.assignments}
+        canSend={canSend}
       />
     </div>
   );

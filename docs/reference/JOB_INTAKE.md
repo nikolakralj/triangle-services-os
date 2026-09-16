@@ -1,6 +1,6 @@
 # Job Intake
 
-> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision. The list is off primary navigation (diagnostics at `/job-intake`); mail ingest, scoring, leads, and reply drafts stay. Human review and send now happen on the contextual request surface (`/now/lead/[id]`), not as a Job Intake inbox. Triangle can send a draft over SMTP from the connected mailbox; inbound replies are matched from IMAP, not from a “They replied” click.
+> Current scope comes from ROADMAP_EXECUTION. Counts below are historical; extraction uses a model and `team_potential` is the numeric opportunity score. Reliability work is not blocked on sending old leads. Model extraction is neither free nor a human qualification decision. The list is off primary navigation (diagnostics at `/job-intake`); mail ingest, scoring, leads, and reply drafts stay. Human review and send now happen on the contextual request surface (`/now/lead/[id]`), not as a Job Intake inbox. Triangle can send a draft over SMTP from an **approved mailbox the signed-in person owns** (`mail_accounts.can_send`); other connected mailboxes stay ingest-only. Inbound replies are matched from IMAP, not from a “They replied” click.
 
 Reads agency/recruiter email, turns it into scored opportunities, and drafts replies.
 Added 2026-08-25. Productization boundary added 2026-08-30. Read the

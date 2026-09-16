@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
-import { sendLeadReplyFromTriangle } from "@/lib/data/lead-send";
+import { sendLeadReplyFromTriangle, userCanSendFromTriangle } from "@/lib/data/lead-send";
+import { SEND_FORBIDDEN } from "@/lib/mail/send-policy";
 
 // ---------------------------------------------------------------------------
 // POST /api/job-intake/leads/[id]/send
@@ -29,6 +30,9 @@ export async function POST(
       { error: "Sending is not available in demo mode." },
       { status: 403 },
     );
+  }
+  if (!(await userCanSendFromTriangle(access.organizationId, access.userId))) {
+    return NextResponse.json({ error: SEND_FORBIDDEN }, { status: 403 });
   }
 
   const { id } = await params;

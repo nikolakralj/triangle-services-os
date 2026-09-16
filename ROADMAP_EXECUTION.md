@@ -305,8 +305,11 @@ the inbox workflow does not. An assignment can exist without a Mission.
 password on port 465. If SMTP is refused, the draft stays unsent. Outlook
 send is only a host guess, not OAuth. Voice is not built. Automatic Bob
 triage of every inbound message is not built ? a human (or an explicit
-assign) still starts contextual work. Migration 049 is not applied to
-production.
+assign) still starts contextual work. Migrations 049?050 are not applied
+to production. In-app send is limited to a mailbox the signed-in person
+owns with `can_send`; enable the CEO mailbox with
+`supabase/data-fixes/2026-09-16-enable-ceo-mailbox-send.sql`. Other
+connected mailboxes stay ingest-only.
 
 **Checked:** offline `scripts/check-contextual-work.mjs`; lint, production
 build, tenant-identity. Could not signed-in check here. Nikola: open a

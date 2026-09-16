@@ -70,6 +70,24 @@ test("human brief and mission suggestion parse from a result", () => {
   assert.equal(parseSuggestMission("SUGGEST MISSION: none"), null);
 });
 
+test("send is limited to a mailbox the user owns that may send", () => {
+  const { pickSendableMailbox, userMaySendFromApp } = load("src/lib/mail/send-policy.ts");
+  const ceo = {
+    email_address: "ceo@example.com",
+    owner_user_id: "user-ceo",
+    can_send: true,
+  };
+  const colleague = {
+    email_address: "colleague@example.com",
+    owner_user_id: "user-other",
+    can_send: false,
+  };
+  assert.equal(userMaySendFromApp([ceo, colleague], "user-ceo"), true);
+  assert.equal(userMaySendFromApp([ceo, colleague], "user-other"), false);
+  assert.equal(pickSendableMailbox([ceo, colleague], "user-ceo", colleague.email_address)?.email_address, ceo.email_address);
+  assert.equal(pickSendableMailbox([ceo, colleague], "user-other", colleague.email_address), null);
+});
+
 test("SMTP host is provider-aware", () => {
   const { defaultSmtpHost } = load("src/lib/mail/smtp-send.ts", {
     "@/lib/job-intake/credentials": { resolveMailboxPassword: () => "x" },
@@ -112,6 +130,10 @@ test("IMAP ingest matches In-Reply-To and sync totals count replies", () => {
   assert(sync.includes("repliesMatched"));
   const send = fs.readFileSync(path.resolve(root, "src/lib/data/lead-send.ts"), "utf8");
   assert(send.includes("sendViaMailbox"));
+  assert(send.includes("pickSendableMailbox"));
+  const workspace = fs.readFileSync(path.resolve(root, "src/components/modules/opportunity-workspace.tsx"), "utf8");
+  assert(workspace.includes("canSend"));
+  assert(workspace.includes("Sending from Triangle is limited"));
 });
 
 let failed = 0;

@@ -106,13 +106,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
   }
 
-  const { data } = await svc
+  const baseCols =
+    "id, email_address, display_name, provider, watch_label, status, last_synced_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host, owner_user_id";
+  let { data } = await svc
     .from("mail_accounts")
-    .select(
-      "id, email_address, display_name, provider, watch_label, status, last_synced_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host",
-    )
+    .select(`${baseCols}, can_send`)
     .eq("org_id", access.organizationId)
     .order("created_at", { ascending: true });
+  if (!data) {
+    const fallback = await svc
+      .from("mail_accounts")
+      .select(baseCols)
+      .eq("org_id", access.organizationId)
+      .order("created_at", { ascending: true });
+    data = (fallback.data ?? []).map((row) => ({ ...row, can_send: false }));
+  }
 
   const accounts = (data ?? []).map((a) => ({
     id: a.id,
@@ -130,6 +138,8 @@ export async function GET(request: Request) {
         (a.credential_ref && process.env[a.credential_ref as string]),
     ),
     usesLegacyEnvVar: Boolean(!a.credential_encrypted && a.credential_ref),
+    canSend: Boolean(a.can_send),
+    ownedByMe: a.owner_user_id === access.userId,
   }));
 
   return NextResponse.json({
