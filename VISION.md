@@ -36,8 +36,10 @@ should not be the integration layer between those steps.
 Each manual handoff must identify missing integration/data, unproven
 reliability, missing authority or an actual human/physical responsibility.
 Use deterministic software where it is sufficient. Current external-action,
-personal-data and final-record approval rules remain unchanged until explicitly
-revised and tested. See the 8 September clarification in
+personal-data and final-record approval rules remain until explicitly
+revised. Human-approved Send from Triangle was accepted 16 September 2026
+(button is DEV-013). Agent-autonomous sending remains policy-controlled.
+See `DECISIONS.md` and the 8 September clarification in
 `docs/archive/audits/PRODUCT_AND_GROWTH_AUDIT_2026-09-07.md`.
 
 Triangle owns:

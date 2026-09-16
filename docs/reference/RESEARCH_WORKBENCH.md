@@ -35,11 +35,12 @@ Implemented in code:
 
 **Project Research Agent chat is retired** (CEO, 15 September 2026). Do not
 treat `/api/research/chat` as an operating path — it returns 410. Do not put a
-chat panel back on the project page. New research is a Scout mission or
-Workforce hand-off. Signal Inbox remains the project/signal list; suggestions
-still accept onto the contractor chain and Approvals. `/api/research/run` is
-one-shot plumbing and is not mounted in the product UI. No migration; ask
-Nikola before adding one.
+chat panel back on the project page. New research is a Scout mission, or a
+missionless assignment on that project (16 September IA — DEV-010). Signal
+Inbox remains the project/signal **data**; from 16 September it is not a
+primary nav destination (DEV-011). Suggestions still accept onto the
+contractor chain and Approvals. `/api/research/run` is one-shot plumbing and
+is not mounted in the product UI. No migration; ask Nikola before adding one.
 
 The MCP route is authenticated, org-scoped, Zod-validated, rate-limited, and logs tool calls to `ai_tool_calls`.
 

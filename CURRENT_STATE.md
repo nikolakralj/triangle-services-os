@@ -1,6 +1,6 @@
 # Current state
 
-Updated 15 September 2026. This week's development comes first; the 10 September
+Updated 16 September 2026. This week's development comes first; the 10 September
 source review follows it. Earlier sessions are preserved in the
 [history archive](docs/archive/2026-09-08/CURRENT_STATE.md).
 
@@ -86,6 +86,12 @@ Agents should own permitted jobs and continuation; humans decide consequences,
 resolve genuine exceptions and provide real-world evidence. The 8 September
 clarification changes ambition, not external-action or final-record authority.
 External software-customer discovery remains paused under the 4 September decision.
+
+**16 September IA lock** (docs only; nav and Ask code are unchanged): primary
+surfaces are Today, Missions, Talent, Team. Signal Inbox leaves primary nav
+(DEV-011). Ask on a situation is a missionless assignment, not a new Mission
+(DEV-010). Human-approved Send from Triangle is allowed (DEV-013); the button
+is not built. See `DECISIONS.md`.
 
 Supply includes individual people and partner firms with recently human-confirmed
 capacity. A partner firm is not evidence of each worker's certificates, right to

@@ -29,6 +29,10 @@ import { missionProvider } from "@/lib/ai/mission-models";
 //        response — the CEO watches the mission fill instead of watching a
 //        spinner for forty seconds.
 //
+// 16 Sep 2026 IA (DEV-010): with page context, not-talent work is a missionless
+// assignment on that record, not a new Mission — DECISIONS.md. This file still
+// implements the old split.
+//
 // This replaces one assignment per question. After two days the queue held a
 // dozen near-identical research questions, each answered from scratch,
 // because a follow-up had nowhere to go but a new job.

@@ -663,7 +663,8 @@ target account
 ```text
 draft
 -> human reviewed
--> sent outside Triangle by a human
+-> human-approved send (from Triangle when DEV-013 exists; otherwise recorded
+   if sent outside)
 -> response / no response
 -> follow-up
 -> qualified outcome / closed reason

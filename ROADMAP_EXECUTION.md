@@ -1,6 +1,6 @@
 # Roadmap execution â what happens next
 
-Updated 15 September 2026. The one place for next steps, for people and for
+Updated 16 September 2026. The one place for next steps, for people and for
 coding agents. What exists is in [CURRENT_STATE](CURRENT_STATE.md), why it was
 decided is in [DECISIONS](DECISIONS.md), and the long-term phases are in
 [ROADMAP](ROADMAP.md). The earlier, longer version of this file, the old work
@@ -37,6 +37,11 @@ management changes the order, or when the gate is met or fails.
 ## Development â now
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
+
+**16 September IA (docs lock):** first `READY` item is **DEV-010** (context-aware
+Ask). DEV-009 (Today slim: Open mail / Ask Bob / Dismiss) is `DONE` and did
+not change Ask, Signal Inbox, Team, or Send. Do not invent Work Items. Do not
+implement the Send button unless you are on DEV-013.
 
 ### DEV-001 â Sent-message record Â· `DONE`
 
@@ -309,9 +314,100 @@ Checked: 12/12 offline (`npm run check:today-slim`); lint 0; production
 build 0; tenant-identity 0. Could not signed-in check here. Nikola: on Today,
 an email follow-up should show Open mail · Ask Bob · Dismiss, not Sent.
 
+**What this already did vs what is next (16 September IA lock):** DEV-009
+slims Today email cards (no Sent / They replied on the primary rail). It did
+**not** change AskLauncher, hide Signal Inbox, rename Workforce, or add a
+Send button. Those are DEV-010 onwards, ordered below. "Triangle still sends
+nothing" here is this slice, not the standing send-from-Triangle law.
+
 **NEXT (not this item):** provider createDraft; mailbox-derived sent/replied;
-Ask Triangle that routes Scout/Hanna/Bob by intent; Today copy "Bob handling
-N; 1 needs you" as a full overdue-list rewrite.
+Today copy "Bob handling N; 1 needs you" as a full overdue-list rewrite.
+Ask context and intent routing are DEV-010 and DEV-014, not a second Today
+chrome pass.
+
+### DEV-010 - Context-aware AskLauncher / `/api/ask` - `READY`
+
+**Why now (smallest, first):** the 16 September IA. Current Ask treats
+anything that is not a talent-pool question as a new Mission. That fills
+Missions with Scout pokes that belong on the email / requirement / company /
+project / person the human was looking at. Do this **before inventing new UI
+concepts**. Do not invent a Work Items product.
+
+**Depends on:** assignment protocol already allows `mission_id` omitted and
+entity refs (`createAssignment`, `event: assignment`). Ask Bob (DEV-009) is
+the special case to generalize. EntityCase already loads assignments linked
+to a record.
+
+**Acceptance:**
+1. With page context (email, requirement, company, project, person) a
+   substantial Ask ("Scout, investigate...") creates a **missionless**
+   assignment (`mission_id = null`) bound to that record; the CEO stays on
+   the situation; the result returns on **EntityCase**, not `/missions/{id}`
+   and not a Scout chat.
+2. Inside an existing mission, Ask still adds an instruction to **that**
+   mission.
+3. No page context and a substantial objective still starts a new Mission.
+4. A simple pool/availability question still answers inline with no
+   assignment.
+5. No new table, no Work Items IA, no nav change, no send path.
+
+**Not this item:** Scout / Hanna / Bob intent routing on cards or voice
+(DEV-014). Workforce -> Team (DEV-012). Signal Inbox hide (DEV-011).
+
+### DEV-011 - Hide Signal Inbox from primary nav - `READY`
+
+**Why:** 16 September IA withdraws "keep Signal Inbox thin in the shell."
+Scout consumes signals; the CEO does not patrol Hunter. Same pattern as Job
+Intake / Companies: hide the list, keep the data.
+
+**Do after or in parallel with DEV-010, not instead of it.** Ask context
+matters more than the sidebar.
+
+**Acceptance:** sidebar and Quick add have no Signal Inbox / Hunter; `/hunter`
+may stay as diagnostics (bookmark) or redirect with a short notice - pick the
+Job Intake pattern (keep page + banner) unless a redirect is clearly better;
+`/hunter/[id]` still opens from missions, Today, and EntityCase; tables, APIs,
+suggestions, and contractor-chain accept stay; no migration; no module
+deletion. Cert Alerts also leave primary nav (exceptions -> Today) if they are
+still in the same shell pass; do not hide Talent.
+
+### DEV-012 - Workforce -> Team shrink - `READY`
+
+**Why:** Team is Scout / Hanna / Bob roles, standing rules, permissions,
+health, and load - not a hand-out-jobs console. Ask context (DEV-010) must
+exist first so handing out work is not the Team page's job.
+
+**Do after DEV-010.**
+
+**Acceptance:** primary nav label is Team (or Workforce still, with Team copy
+on the page if a rename is staged); the page shows the three employees,
+rules, badges, health, load; it is not the place to file a new research job
+(that is Ask, with or without a mission); no marketplace, no Hire Employee
+expansion, no new agent roles.
+
+### DEV-013 - Human-approved Send from Triangle - `READY`
+
+**Why:** 16 September sending policy. Review / edit / press Send in Triangle
+is allowed. Agent-autonomous sending remains AUTO / APPROVAL / FORBIDDEN.
+Policy is decided; the button is not built yet.
+
+**When ready:** after Ask context is honest, and preferably once a real draft
+is waiting on a situation. Not a drive-by. Legal/privacy, deliverability,
+audit, and `SENT_MESSAGES_RECORDED` must move together so AUTO can stay
+honest.
+
+**Acceptance:** from a reviewed draft a human can press Send in Triangle;
+AI draft and final sent text are both kept; recipient, time, channel,
+follow-up are recorded; Open mail / record-outside remain until mailbox sync;
+no agent-autonomous send; `communicationPolicy` unchanged except that a
+human Send is a first-class recorded action. Freeze on **autonomous**
+outbound still holds.
+
+### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
+
+**Not READY.** After DEV-010. Typed / voice Ask Triangle routes by intent
+("investigate the end client" -> Scout) without fake Scout buttons on the
+Today mail card. Do not start this to avoid doing DEV-010.
 
 ### Only if live work stalls on it
 
@@ -330,11 +426,13 @@ N; 1 needs you" as a full overdue-list rewrite.
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
 - Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
 - Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons.
-- Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent. Do not
-  fake Scout buttons on the mail card before that router exists.
+- Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent
+  (DEV-014, after DEV-010). Do not fake Scout buttons on the mail card before
+  that router exists.
 
-Not now: a workforce registry, marketplace hiring, quality scores, autonomous
-sending.
+Not now: a workforce registry, marketplace hiring, quality scores,
+**agent-autonomous** sending. Human-approved Send from Triangle is policy
+(DEV-013), not a freeze violation.
 
 ## Gated â each waits for its evidence
 
@@ -490,13 +588,17 @@ Until Phase 0 exits, do not build:
 - new agent roles;
 - elaborate Hire Employee flows;
 - agent/provider cost dashboard;
-- autonomous email or LinkedIn sending;
+- autonomous email or LinkedIn sending (agent AUTO without the 16 September
+  policy, audit, and recorded-send path). Human-approved Send from Triangle
+  is DEV-013, not this freeze;
+- cosmetic dashboard/navigation projects (IA-authorized surface hides in
+  DEV-011 / Cert Alerts are operating-surface work, like Job Intake, not
+  polish);
 - broad Hunter expansion;
 - more sectors/countries;
 - generic marketplace;
 - SSO, billing, or speculative ATS integrations;
-- new orchestration/event infrastructure;
-- cosmetic dashboard/navigation projects.
+- new orchestration/event infrastructure.
 
 Keep existing workforce architecture; do not delete useful foundations.
 

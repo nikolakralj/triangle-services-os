@@ -6,6 +6,133 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
+
+CEO accepted the external expert amendment on 16 September 2026. Direction is
+locked here. **Docs and roadmap only in this change** — no nav code, no
+AskLauncher behaviour change, no send button.
+
+This **amends** the 15 September surface-law **A destination list**. The A / B
+/ C classification itself stays: A is daily operating surfaces, B is
+contextual truth, C is infrastructure. Do not treat this as permission to
+invent Opportunity / Email / Search as peer nav, or a Work Items product.
+
+#### Shell — four primary destinations (A)
+
+Only four human primary surfaces:
+
+1. **Today**
+2. **Missions**
+3. **Talent** (today's Talent Pool)
+4. **Team** — rename Workforce later; shrink what the page is for (DEV-012)
+
+**Settings** is admin (C), not a fifth patrol queue.
+
+Everything else is contextual (B) or infrastructure (C) — not a place the CEO
+patrols.
+
+Already hidden, stay hidden: Companies list, Job Intake (diagnostics).
+
+**Signal Inbox / Hunter** — withdraw the earlier “keep it thin in the shell”
+idea. Plan: **leave primary nav**. Scout consumes signals; tables, routes, and
+project detail stay as C diagnostics and as B when a case opens them. Cert
+Alerts leave primary nav; certificate exceptions surface on Today.
+
+Commercial requirements, company detail, and project detail are **contextual
+truth records** (B), not sidebar CRM.
+
+Withdraw the earlier brainstorm of Opportunity, Email, and Search as peer nav
+items.
+
+#### Ask Triangle (critical — current code is the wrong law)
+
+`AskLauncher` and `POST /api/ask` today treat anything that is not a talent-pool
+question as a **new Mission**. That is wrong for the product.
+
+Correct behaviour:
+
+- Looking at an email, requirement, company, project, or person and asking
+  “Scout, investigate…” → a **missionless assignment** (`mission_id = null`)
+  bound to that context (`agent_assignment_entities`). The result returns
+  **on that situation** (`EntityCase` / the record the human was looking at),
+  not a new Mission and not a Scout chat.
+- Inside an existing mission → add the instruction to **that** mission (already
+  true).
+- No page context and a substantial objective → a new Mission.
+- A simple database question (talent availability) → answer inline, no
+  assignment.
+
+Do **not** invent a Work Items product. The assignment protocol already
+supports non-mission work (`event: assignment`, omitted `mission_id`, entity
+refs). Ask Bob on Today cards (DEV-009) is a special case of this pattern;
+generalize it, do not add a parallel object.
+
+Implement as DEV-010 **before** inventing new UI concepts.
+
+#### Today
+
+Today is the **exception inbox**: needs you, important agent results, a
+multi-agent status strip. It is not Sent / They replied administration (DEV-009
+already started that cut). It is not an agent activity map as the main job.
+
+#### Missions
+
+Missions are **large objectives** only — not every Scout poke from an email.
+A poke on a situation is a missionless assignment on that record.
+
+#### Team
+
+Workforce shrinks to Scout / Hanna / Bob: roles, standing rules, permissions,
+health, and load. It is not a hand-out-jobs console. Rename and shrink after
+Ask context exists (DEV-012 after DEV-010).
+
+#### Sending policy — reconcile the contradiction
+
+The 29 August rule “Triangle never sends; a human sends outside and records”
+is **outdated** against CEO intent. Human control remains; the channel does
+not have to be an external mailbox.
+
+**New standing law:**
+
+- **Human-approved Send from Triangle is allowed** — review, edit, then press
+  Send in the product.
+- **Agent-autonomous sending** stays policy-controlled per
+  `communicationPolicy`: AUTO / APPROVAL / FORBIDDEN by message class. A
+  commitment (price, rate, date, headcount, contract) is never an employee's
+  to make. AUTO still takes effect only once Triangle records what was sent.
+- Do **not** implement the Send button in this docs lock (DEV-013 when ready).
+
+DEV-009's “Triangle still sends nothing” describes **that slice's
+implementation**, not the standing product law. Do not use it to revert
+human-approved in-app send.
+
+Living operating-rules files updated in the same lock so agents do not “fix”
+direct-send back out:
+
+- `PRODUCT_OPERATING_RULES.md` — External-action rules
+- `SOFTWARE_AGENT_INSTRUCTIONS.md` — §10 External communication
+- `ROADMAP.md` — External action workflow
+
+These still describe **current code**, not the standing law — leave them until
+DEV-013; do not treat them as a reason to remove in-app Send:
+
+- DEV-001 / DEV-003 / DEV-009 acceptance text (“Triangle sends nothing”)
+- `src/lib/data/communication-policy.ts` (`SENT_MESSAGES_RECORDED = false`)
+- Today / Job Intake “Open mail sends nothing” copy
+- `agents/hanna.md` / `agents/bob.md` (“today a person sends”)
+
+The 14 September AUTO / APPROVAL / FORBIDDEN graph is unchanged. This decision
+only says the human approval path may complete **inside Triangle**.
+
+Why:
+
+- the CEO was touring Signal Inbox, Workforce, and mail administration as if
+  they were the job; they are not;
+- creating a Mission for every Scout poke from an email fills Missions with
+  work that belongs on the situation;
+- “never send from Triangle” fought the 14 September communication policy and
+  the intent that a reviewed draft can leave from the same screen.
+
 ### 2026-09-16: Machines observe; humans judge — Today cards slim
 
 Agreed 15–16 September 2026 (CEO + external expert + Triangle Engineer).
@@ -36,7 +163,10 @@ Decision:
 - Ask Bob creates a real assignment for Bob with the card’s entity ids. If
   Bob’s mission scope (DEV-004) is not on his badge, or his wake-up routine
   is not on, the UI fails honestly and does not pretend the work was taken.
-- Do not widen `communicationPolicy`. Triangle still sends nothing.
+- Do not widen `communicationPolicy` in this slice. The card chrome still
+  sends nothing (Open mail / Ask Bob / Dismiss). Standing product law for
+  human-approved Send **from Triangle** is the 16 September IA lock, not this
+  slice.
 
 NEXT (not this slice — do not fake the buttons):
 
@@ -45,7 +175,9 @@ NEXT (not this slice — do not fake the buttons):
   clicked;
 - typed / voice **Ask Triangle** that routes Scout / Hanna / Bob by intent
   (e.g. “investigate the end client from this email” → Scout). No Scout
-  buttons on the Today mail card until that router exists.
+  buttons on the Today mail card until that router exists. Context-aware
+  Ask (missionless assignment + EntityCase return) is **DEV-010 first**;
+  card/voice intent routing is later. Do not invent a Work Items product.
 
 Why:
 
@@ -62,8 +194,9 @@ Decision:
   detail; `/api/research/chat` is not an operating path;
 - research a signal through a Scout mission or Workforce hand-off, not by
   chatting on the project page;
-- keep Signal Inbox as the project/signal list; keep research suggestions,
-  Approvals, and contractor-chain accept;
+- keep Signal Inbox as the project/signal **data** (list, suggestions,
+  Approvals, contractor-chain accept). From 16 September it is not a primary
+  nav destination — see that day's IA lock;
 - do not add a migration for this cut; ask Nikola before any migration.
 
 This supersedes the project-conversation half of the 1 September case-memory
@@ -285,6 +418,11 @@ Decision:
 - keep email, packet submission, supplier registration, commercial
   commitments, and personal-data sharing human-controlled
 - preserve AI draft and final sent content separately
+
+**Amended 16 September:** human control remains. Human-approved Send **from
+Triangle** is allowed; “send outside and record” is no longer the only legal
+channel. Agent-autonomous sending stays AUTO / APPROVAL / FORBIDDEN. See the
+16 September IA lock. Do not read this entry as “Triangle must never send.”
 
 Why:
 
@@ -675,12 +813,16 @@ Decision:
 - agents live in complexity: missions, findings, mail, scoring, chains;
 - Nikola lives in Today and Missions;
 - classify every screen before putting it in the shell:
-  - **A primary** — daily operating surfaces (Today, Missions, Workforce);
+  - **A primary** — daily operating surfaces. Destinations amended
+    16 September to **Today, Missions, Talent, Team** (Workforce renamed
+    later); Settings stays admin/C. See that day's IA lock;
   - **B contextual** — opens from a case, approval, holding, or next move;
   - **C infrastructure** — APIs, settings, diagnostics; reachable, not in
     primary nav;
 - Job Intake is **C** for navigation. The mail pipeline stays. Bob waking on
   commercial mail is a later DEV, not this change.
+- Signal Inbox / Hunter is **C** for navigation (16 September IA). The
+  project/signal data stays; Scout consumes it. Not a CEO patrol queue.
 
 Why:
 

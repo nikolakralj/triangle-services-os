@@ -14,6 +14,8 @@ import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 // need. A question about Triangle's own people is answered right here; any
 // other thing is work, so it becomes a mission — or goes into the mission you
 // point it at — and you land on that mission while the worker starts.
+// 16 Sep 2026 IA (DEV-010): with page context, that work is a missionless
+// assignment whose result returns on EntityCase, not a new Mission — DECISIONS.md.
 //
 // There is no employee to pick. The first command bar made the CEO choose
 // Scout or Hanna from a dropdown before typing, which asks him to know the

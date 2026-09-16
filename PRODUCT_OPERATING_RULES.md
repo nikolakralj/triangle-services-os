@@ -14,7 +14,8 @@ rework. Use deterministic automation when sufficient.
 
 This direction does not expand runtime permissions. External-action,
 personal-data, final-record and consequential-decision approval rules below
-remain binding. Preparation is not authority to execute or declare a claim true.
+remain binding (human-approved Send from Triangle is allowed — 16 September;
+agent AUTO is not implied). Preparation is not authority to execute or declare a claim true.
 
 Every serious product change must help Triangle:
 
@@ -243,14 +244,23 @@ Every material external claim must have a source or human owner.
 ## External-action rules
 
 Nothing in the current product automatically sends email or submits a packet.
+**Agent-autonomous** sending stays `communicationPolicy` per class (AUTO /
+APPROVAL / FORBIDDEN). A commitment is never an employee's to make.
 
 AI may draft. A human:
 
 - reviews;
 - edits;
 - chooses the recipient;
-- sends/submits outside Triangle;
-- records the real action and next date.
+- **presses Send in Triangle** when that path exists (16 September 2026 —
+  policy decided, button is DEV-013, not yet built);
+- or sends/submits outside Triangle and records the real action until in-app
+  Send or mailbox sync is live;
+- sets the next date.
+
+Do not read older “send outside and record” copy as a ban on human-approved
+Send from Triangle. Do not “fix” a future Send button back into mailto-only
+without reversing the 16 September decision in `DECISIONS.md`.
 
 Named CVs, certificates, or personal data are shared only for a justified
 purpose and appropriate recipient. Use anonymized capability first when
@@ -301,6 +311,14 @@ binding claim, or contact a third party without explicit authority.
 11. Delegated work is measured by how few instructions it needs before it comes
     back ready for a decision. Progress is counted from records, never from
     what an agent says about itself.
+12. Primary human surfaces (A) are **Today, Missions, Talent, Team**. Settings
+    is admin. Signal Inbox, Job Intake, Companies list, Cert Alerts, and
+    commercial/company/project detail are not patrol queues — see the
+    16 September IA lock in `DECISIONS.md`. Do not add Opportunity, Email, or
+    Search as peer nav.
+13. Ask on a situation creates a missionless assignment whose result returns
+    on that record. Ask without context and with a substantial objective
+    creates a Mission. Do not invent a Work Items product.
 
 ## Build rules
 
@@ -321,7 +339,8 @@ Do not build:
 - duplicate functionality already present;
 - agent theater or provider dashboards without enough outcome data;
 - new orchestration because it is fashionable;
-- autonomous outbound;
+- autonomous outbound (agent AUTO without policy, audit, and recorded-send;
+  human-approved Send from Triangle is DEV-013);
 - generic marketplace/network features without liquidity;
 - speculative enterprise features without a design-partner requirement;
 - cosmetic redesign while real commercial action is blocked by process, not UI.
@@ -349,8 +368,10 @@ current labor-buyer or procurement attack point.
 Useful when suggestions are sourced, reviewed, and connected to a next human
 action. Accepted research without action is stored knowledge, not conversion.
 Project Research Agent chat is retired: research a signal through a Scout
-mission or Workforce hand-off. Signal Inbox stays a project/signal list;
-suggestions still go to Approvals and contractor-chain accept.
+mission or a missionless assignment on that project, not a Workforce
+hand-out-jobs console. Signal Inbox is project/signal **data** (C for
+navigation from 16 September); suggestions still go to Approvals and
+contractor-chain accept.
 
 ### Package/matching
 
@@ -363,10 +384,12 @@ computed.
 Useful when an appropriate version reaches a real recipient, follow-up is set,
 and response/outcome is recorded.
 
-### Workforce/agents
+### Workforce/agents (Team)
 
 Useful when scoped agents reliably reduce time or increase quality in a real
 commercial/delivery workflow without increasing hidden risk or review burden.
+The Team surface is roles, rules, permissions, health, and load — not a
+console for handing out every Scout poke.
 
 ### Opportunity/pipeline
 

@@ -175,11 +175,15 @@ Until its gate is met:
 - do not refactor Triangle into a generic hybrid work OS;
 - do not add agent roles because they are exciting;
 - do not build agent-performance or provider-comparison dashboards;
-- do not add autonomous sending;
+- do not add autonomous sending (human-approved Send from Triangle is
+  DEV-013 under the 16 September IA lock — not this freeze, and not a
+  drive-by);
 - do not add new signal collectors unless the current channels are exhausted
   and the package/buyer route is already truthful;
 - do not replace current architecture with a workflow/orchestration platform;
-- do not polish navigation while real sends and follow-ups remain at zero.
+- do not polish navigation while real sends and follow-ups remain at zero
+  (IA-authorized hides listed as READY in ROADMAP_EXECUTION are
+  operating-surface work, like Job Intake, not polish).
 
 Allowed work is a verified bug fix or friction removal directly blocking the
 current commercial actions, plus the narrow tenant-identity, permission, and
@@ -249,10 +253,17 @@ safe deterministic ingestion path for raw material.
 
 ## 10. External communication rules
 
-The standing rule is manual external action.
+Humans approve consequential external action. **Human-approved Send from
+Triangle is allowed** (16 September 2026): review, edit, press Send. The
+button is DEV-013 — do not implement it in a drive-by, and do not revert it
+to “mailto only” by citing this file's older wording.
 
-- Nothing in Triangle sends email automatically.
-- “I sent this” records a human action; it is not a send endpoint.
+- Nothing in Triangle sends email **automatically** unless that class is AUTO
+  under `communicationPolicy` and Triangle records the sent message.
+- Agent-autonomous sending is AUTO / APPROVAL / FORBIDDEN by class. A
+  commitment is never an employee's to make.
+- Until DEV-013, “I sent this” / Open mail still records a human action
+  outside Triangle; that is current code, not a ban on in-app Send.
 - Preserve the AI draft and final human-edited version separately.
 - Record recipient, sender, time, channel, follow-up, response, and outcome.
 - Do not make the user believe a draft or generated packet reached anyone.
@@ -263,10 +274,10 @@ The standing rule is manual external action.
 - No agent may send, publish, delete, archive, accept terms, register a
   supplier, or make a binding claim without explicit authority.
 
-Any proposal to automate external sending requires a new decision in
-`DECISIONS.md`, legal/privacy review, deliverability controls, recipient and
-rate limits, suppression/unsubscribe handling where applicable, approval
-design, audit, rollback/kill switch, and proven manual conversion.
+Any proposal to turn a class to AUTO still requires the existing
+deliverability, approval, audit, kill-switch, and recorded-send path. Do not
+treat the 16 September human-Send decision as authorization for autonomous
+outbound.
 
 ## 11. Runtime agent design rules
 
