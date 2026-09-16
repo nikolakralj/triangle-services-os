@@ -534,6 +534,20 @@ redirects to Settings → Team, the humans board becomes Settings → Members, t
 work log moves to Diagnostics, and the hand-out console, handed-out list and
 quick notes are removed.
 
+**Slice A — DONE on the branch (not merged).** Settings opens on Team: per
+employee, health (on duty / off duty / never started, last seen), what it runs
+on and whether this server can wake it ("wake-up not set — waits for its
+scheduled check" otherwise), load (working, queued, stale, needs you, failed
+this week), permissions from its active badge in words, refusals this week
+(linking Diagnostics), standing rules (the existing editor, admin and partner
+only), and Activity — all open work first, then the latest twelve finished
+tasks, each with its result line and a Thread button that opens the existing
+drawer. **Stale** is derived, not stored: queued or active work whose newest
+sign of life (created, picked up, a thread message, or run activity) is older
+than 24 hours. Waiting on a person is Needs you, never stale. Data:
+`src/lib/data/team.ts` (`listTeam`); UI: `src/components/modules/team-settings.tsx`.
+Workforce still exists until slice B.
+
 **Why:** amended by the operating-shell decision. On Preview 76c42d4 only the
 three employee cards on Workforce were useful; the rest was a hand-out console
 built on old research gaps, a handed-out list that Today already shows, a chat

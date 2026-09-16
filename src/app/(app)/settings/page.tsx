@@ -7,8 +7,10 @@ import { ReplyStylePanel } from "@/components/modules/reply-style-panel";
 import { ChangePasswordPanel } from "@/components/modules/change-password-panel";
 import { OrganizationProfilePanel } from "@/components/modules/organization-profile-panel";
 import { RefusalLedger } from "@/components/modules/refusal-ledger";
+import { TeamSettings } from "@/components/modules/team-settings";
 import { getSession } from "@/lib/auth/session";
 import { summarizeRefusals } from "@/lib/data/refusals";
+import { listTeam } from "@/lib/data/team";
 import {
   COMPANY_TYPES,
   COUNTRIES,
@@ -25,12 +27,18 @@ export default async function SettingsPage() {
   const canSeeDiagnostics =
     Boolean(session?.organizationId) &&
     (session?.role === "admin" || session?.role === "partner");
-  const refusals =
+  const canWriteRules = session?.role === "admin" || session?.role === "partner";
+  // The AI employees live here, not in the menu: work is handed out from the
+  // case, and this is where an admin sees who carries what (DEV-012).
+  const [refusals, team] = await Promise.all([
     canSeeDiagnostics && session?.organizationId
-      ? await summarizeRefusals(session.organizationId)
-      : null;
+      ? summarizeRefusals(session.organizationId)
+      : Promise.resolve(null),
+    session?.organizationId ? listTeam(session.organizationId) : Promise.resolve([]),
+  ]);
 
   const sections = [
+    { label: "Team", href: "#team" },
     { label: "Your account", href: "#account" },
     { label: "Job Intake mailboxes", href: "#mailboxes" },
     { label: "What the agent looks for", href: "#intake-rules" },
@@ -61,6 +69,15 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
+          <Card id="team" className="scroll-mt-20">
+            <CardHeader
+              title="Team"
+              description="Your AI employees: whether they are awake, what they carry, what their badge allows, how they are told to work, and what they did lately."
+            />
+            <CardContent>
+              <TeamSettings members={team} canWriteRules={canWriteRules} />
+            </CardContent>
+          </Card>
           <Card id="account" className="scroll-mt-20">
             <CardHeader
               title="Your account"
