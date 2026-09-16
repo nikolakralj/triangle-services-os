@@ -373,7 +373,7 @@ Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
 Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
 Bob ? Open thread drawer ? the card is in In progress, not Workforce.
 
-### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `READY`
+### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `IN_PROGRESS` (Claude, branch `claude/today-one-inbox`)
 
 **Why now:** Today / Workforce shows "The system refused N attempts..." with
 Postgres finding-contract sentences (Ask Bob completes mis-classified as
