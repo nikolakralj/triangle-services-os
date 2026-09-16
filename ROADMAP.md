@@ -28,8 +28,10 @@ gap behind each human handoff. Agents own continuation as well as preparation.
 Measure net human effort removed without weakening quality. Current
 external-action permissions and roadmap evidence gates remain unchanged.
 
-**Current operating surfaces (16 September 2026):** Today, Missions, Talent,
-Team. Today is **Needs you | In progress | Missions…**. Handoff changes the
+**Current operating surfaces (16 September 2026):** Today, Missions, Talent;
+Team lives in Settings (operating-shell decision, design in
+`docs/design/PRODUCT_SHELL_2026-09-16.html`). Today becomes **Needs you | In
+progress | Done since you looked** (DEV-017). Handoff changes the
 owner of the work; it does not change where the work lives (DEV-015, ahead of
 the Team redesign). Open thread is a drawer on Today. Ask Bob assignments use
 `case_type: commercial_follow_through` so commercial complete is not judged as

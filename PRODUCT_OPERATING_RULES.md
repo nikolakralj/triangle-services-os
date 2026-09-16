@@ -311,11 +311,12 @@ binding claim, or contact a third party without explicit authority.
 11. Delegated work is measured by how few instructions it needs before it comes
     back ready for a decision. Progress is counted from records, never from
     what an agent says about itself.
-12. Primary human surfaces (A) are **Today, Missions, Talent, Team**. Settings
-    is admin. Signal Inbox, Job Intake, Companies list, Cert Alerts, and
-    commercial/company/project detail are not patrol queues — see the
-    16 September IA lock in `DECISIONS.md`. Do not add Opportunity, Email, or
-    Search as peer nav.
+12. Primary human surfaces (A) are **Today, Missions, Talent**. Settings is
+    admin and holds Team. Signal Inbox, Job Intake, Companies list, Cert
+    Alerts, and commercial/company/project detail are not patrol queues — see
+    the 16 September IA lock and the operating-shell decision in
+    `DECISIONS.md`. Do not add Opportunity, Email, or Search as peer nav.
+    Delegated work is a task on a case; its result lands on the case.
 13. Ask on a situation creates a missionless assignment whose result returns
     on that record. Ask without context and with a substantial objective
     creates a Mission. Do not invent a Work Items product.
