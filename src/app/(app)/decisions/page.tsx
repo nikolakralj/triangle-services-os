@@ -8,6 +8,7 @@ import { listFollowUpsDue } from "@/lib/data/follow-ups";
 import { listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
 import { listCertAlerts } from "@/lib/data/worker-documents";
 import { getSession } from "@/lib/auth/session";
+import { sendableMailboxFor } from "@/lib/data/mail-send";
 
 // ---------------------------------------------------------------------------
 // The one screen.
@@ -48,6 +49,7 @@ export default async function DecisionsPage() {
     waits,
     done,
     certAlerts,
+    sender,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
@@ -58,6 +60,9 @@ export default async function DecisionsPage() {
     listInProgressWaits(org),
     listDoneSince(org),
     listCertAlerts(org),
+    // Send from Triangle (DEV-013): this person's own mailbox with sending
+    // turned on, or null — then the card keeps Open mail only.
+    sendableMailboxFor(org, session.userId),
   ]);
   // Cert Alerts left the menu (DEV-011); the exceptions are a Needs you card.
   const certs = certAlerts.filter(
@@ -95,6 +100,7 @@ export default async function DecisionsPage() {
         waits={waits}
         done={done}
         certs={certs}
+        sender={sender}
       />
     </div>
   );
