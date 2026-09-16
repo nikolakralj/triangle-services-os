@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -641,11 +640,9 @@ export function AgentConsole({
           <div>
             <p className="text-sm font-semibold text-slate-900">What you handed out</p>
             <p className="text-xs text-slate-500">
-              The full record. New answers arrive on the{" "}
-              <Link href="/decisions" className="font-medium text-sky-700 hover:text-sky-900">
-                Decision Inbox
-              </Link>
-              .
+              Archive of assignments. New answers belong on the case — open the
+              thread from Today, not from here. This list will be demoted when
+              Team shrinks (DEV-012).
             </p>
           </div>
           <p className="text-xs text-slate-500">

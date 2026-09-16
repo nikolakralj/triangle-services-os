@@ -25,16 +25,24 @@ import {
 import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
-import { MissionsZone, ReadyForYou } from "@/components/modules/today-missions";
+import { MissionsZone, ReadyForYou, InProgressWaits } from "@/components/modules/today-missions";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
+import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
+import {
+  TodayHandoffProvider,
+  type ThreadTarget,
+} from "@/components/modules/today-handoff-context";
+import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
-// One screen. Three zones. Numbered because it is a real order on the page.
+// One screen. Needs you, then In progress, then Missions.
 //
-//   01  NOW       the hero — one action, the only thing in colour
-//   02  READY     people a mission made reachable, and missions that ask
-//   03  MISSIONS  the work in progress, one card per objective
-//   04  BACK      older reports, a tight list with a state rail
+//   01  NEEDS YOU    human decisions only — the hero card and the rest
+//   02  IN PROGRESS  quiet waits with Bob / Scout / Hanna; Open thread here
+//   03  MISSIONS     large objectives
+//   04  BACK         older reports, a tight list with a state rail
+//
+// Handoff changes the owner of the work. It does not change where it lives.
 //
 // The first version of this worked and looked like every admin panel: one
 // border radius, one shadow, one text size, white cards on a white page. Same
@@ -81,6 +89,7 @@ export function TodayScreen({
   missions,
   ready,
   followUps,
+  waits,
 }: {
   move: NextMove;
   employees: Employee[];
@@ -92,16 +101,19 @@ export function TodayScreen({
   ready: ReadyToContact[];
   /** Sends and unanswered calls whose follow-up date has come. */
   followUps: { items: FollowUp[]; total: number };
+  /** Open Bob / Scout / Hanna waits — quiet In progress, not Needs you. */
+  waits: InProgressWait[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
+  const [thread, setThread] = useState<ThreadTarget | null>(null);
+  const [toast, setToast] = useState<ThreadTarget | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
-  const asking = missions.filter(
-    (m) => m.state === "needs_you" || m.state === "blocked",
-  ).length;
-  // The person on the NOW card is already the one action; listing them again
-  // underneath is two buttons for one conversation.
   const nowAction = move.action;
+  const nowWait = nowAction
+    ? findWait(waits, { leadId: nowAction.leadId, contactId: nowAction.contactId })
+    : null;
+  const nowNeedsYou = Boolean(nowAction && !nowWait && !move.clear);
   const due = followUps.items.filter(
     (f) =>
       !nowAction ||
@@ -112,14 +124,23 @@ export function TodayScreen({
   );
   const dueMore = Math.max(0, followUps.total - followUps.items.length);
 
-  // Keyed by what the card is about, so a new move is a new card: the note box
-  // and the button state start empty instead of carrying over from the last
-  // person.
   const cardKey = move.action?.leadId || move.action?.contactId || move.headline;
 
   return (
+    <TodayHandoffProvider
+      value={{
+        openThread: (next) => {
+          setThread(next);
+          setToast(null);
+        },
+        announceHanded: (next) => {
+          setToast(next);
+          setThread(null);
+        },
+      }}
+    >
     <div className="space-y-7">
-      <Zone n="01" name="Now" note="one action — the rest can wait">
+      <Zone n="01" name="Needs you" note="human decisions only">
         <div className="space-y-2">
           {logged && (
             <RecordedStrip
@@ -128,43 +149,40 @@ export function TodayScreen({
               onClear={() => setLogged(null)}
             />
           )}
-          <NowCard key={cardKey} move={move} onLogged={setLogged} />
+          {nowNeedsYou ? (
+            <NowCard key={cardKey} move={move} onLogged={setLogged} waits={waits} />
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
+              <p className="text-base font-semibold text-slate-900">
+                {nowWait ? "Nothing needs you on this case" : move.headline}
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                {nowWait
+                  ? "It is with the team under In progress. Open thread or take it back there."
+                  : move.because}
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="mt-3">
+          <ReadyForYou
+            people={ready}
+            missions={missions}
+            followUps={due}
+            moreFollowUps={dueMore}
+            waits={waits}
+          />
         </div>
       </Zone>
 
-      {/* Only what needs a person: a mission that asked something or
-          stopped, somebody waiting to hear from us again, and somebody a
-          mission made reachable. The research itself stays in its mission,
-          one click behind each row. */}
       <Zone
         n="02"
-        name="Ready for you"
-        note={
-          ready.length === 0 && asking === 0 && due.length === 0
-            ? "nothing waiting"
-            : [
-                due.length > 0
-                  ? `${due.length + dueMore} ${due.length + dueMore === 1 ? "follow-up" : "follow-ups"} due`
-                  : null,
-                ready.length > 0 ? `${ready.length} to reach` : null,
-                asking > 0
-                  ? `${asking} ${asking === 1 ? "mission needs" : "missions need"} you`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")
-        }
+        name="In progress"
+        note={waits.length === 0 ? "nothing with the team" : `${waits.length} with the team`}
       >
-        <ReadyForYou
-          people={ready}
-          missions={missions}
-          followUps={due}
-          moreFollowUps={dueMore}
-        />
+        <InProgressWaits waits={waits} />
       </Zone>
 
-      {/* The Ask console that sat here answered one question and forgot it.
-          Work is a mission now; the box that starts one is on every page. */}
       <Zone
         n="03"
         name="Missions"
@@ -215,7 +233,39 @@ export function TodayScreen({
         on file · {counts.people} people · {counts.projects} projects ·{" "}
         {counts.companies} companies
       </p>
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-30 flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] shadow-lg shadow-slate-900/10"
+        >
+          <span>
+            <span className="font-semibold text-slate-900">Handed to Bob</span>
+            {" · "}
+            <button
+              type="button"
+              onClick={() => {
+                setThread(toast);
+                setToast(null);
+              }}
+              className="font-semibold text-sky-700 hover:text-sky-900"
+            >
+              Open thread
+            </button>
+          </span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+            className="rounded p-1 text-slate-400 hover:text-slate-700"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <AssignmentThreadDrawer thread={thread} onClose={() => setThread(null)} />
     </div>
+    </TodayHandoffProvider>
   );
 }
 
@@ -344,9 +394,11 @@ function Zone({
 function NowCard({
   move,
   onLogged,
+  waits,
 }: {
   move: NextMove;
   onLogged: (logged: LoggedAttempt) => void;
+  waits: InProgressWait[];
 }) {
   if (move.clear || !move.action) {
     return (
@@ -370,7 +422,7 @@ function NowCard({
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} onLogged={onLogged} />
+      <ActionPanel action={move.action} onLogged={onLogged} waits={waits} />
     </div>
   );
 }
@@ -392,9 +444,11 @@ const TONE: Record<"good" | "neutral" | "bad", string> = {
 function ActionPanel({
   action,
   onLogged,
+  waits,
 }: {
   action: NextMoveAction;
   onLogged: (logged: LoggedAttempt) => void;
+  waits: InProgressWait[];
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -607,6 +661,10 @@ function ActionPanel({
                   .join(" "),
               })
             }
+            alreadyWith={findWait(waits, {
+              leadId: action.leadId,
+              contactId: action.contactId,
+            })}
           />
         )}
 

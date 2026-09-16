@@ -16,6 +16,7 @@ import {
   Undo2,
   UserRound,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { hostOf, type MissionTab, type ReadyToContact } from "@/lib/data/mission-shared";
 import type { FollowUp } from "@/lib/data/follow-ups";
@@ -31,6 +32,8 @@ import { MissionCard } from "@/components/missions/missions-index";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { openAsk } from "@/components/missions/ask-launcher";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
+import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
 // ---------------------------------------------------------------------------
 // What the missions put on Today.
@@ -59,6 +62,7 @@ export function ReadyForYou({
   missions,
   followUps = [],
   moreFollowUps = 0,
+  waits = [],
 }: {
   people: ReadyToContact[];
   missions: MissionTab[];
@@ -66,17 +70,20 @@ export function ReadyForYou({
   followUps?: FollowUp[];
   /** Due beyond the ones listed. */
   moreFollowUps?: number;
+  /** Open Bob / Scout / Hanna waits — those cards belong in In progress. */
+  waits?: InProgressWait[];
 }) {
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
+  const due = followUps.filter(
+    (f) => !findWait(waits, { leadId: f.target.leadId, contactId: f.target.contactId, personId: f.target.personId }),
+  );
+  const reachable = people.filter(
+    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+  );
 
-  if (asking.length === 0 && people.length === 0 && followUps.length === 0 && !recorded) {
-    return (
-      <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
-        Nothing waiting on you. When a mission makes somebody reachable, they appear here with the
-        number and the words.
-      </p>
-    );
+  if (asking.length === 0 && reachable.length === 0 && due.length === 0 && !recorded) {
+    return null;
   }
 
   return (
@@ -120,11 +127,11 @@ export function ReadyForYou({
       {/* Above the strangers: someone who already heard from us is worth more
           than someone who never has. Follow-ups are Bob's to chase; this list
           is the exception rail, not a place to report Sent-a-follow-up. */}
-      {followUps.length > 0 && (
+      {due.length > 0 && (
         <div>
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {followUps.map((f) => (
-              <FollowUpRow key={f.actionId} item={f} onRecorded={setRecorded} />
+            {due.map((f) => (
+              <FollowUpRow key={f.actionId} item={f} onRecorded={setRecorded} waits={waits} />
             ))}
           </ul>
           {moreFollowUps > 0 && (
@@ -136,10 +143,10 @@ export function ReadyForYou({
         </div>
       )}
 
-      {people.length > 0 && (
+      {reachable.length > 0 && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          {people.map((p) => (
-            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} />
+          {reachable.map((p) => (
+            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={waits} />
           ))}
         </ul>
       )}
@@ -162,9 +169,11 @@ function shortDate(iso: string): string {
 function FollowUpRow({
   item,
   onRecorded,
+  waits,
 }: {
   item: FollowUp;
   onRecorded: (r: Recorded) => void;
+  waits: InProgressWait[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
@@ -363,6 +372,11 @@ function FollowUpRow({
                 draft: item.sent,
               }}
               onRecorded={onRecorded}
+              alreadyWith={findWait(waits, {
+                leadId: item.target.leadId,
+                contactId: item.target.contactId,
+                personId: item.target.personId,
+              })}
             />
           </div>
         )}
@@ -381,9 +395,11 @@ function FollowUpRow({
 function ReadyPerson({
   person,
   onRecorded,
+  waits,
 }: {
   person: ReadyToContact;
   onRecorded: (r: Recorded) => void;
+  waits: InProgressWait[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ContactOutcome | null>(null);
@@ -599,6 +615,10 @@ function ReadyPerson({
                 draft: person.words,
               }}
               onRecorded={onRecorded}
+              alreadyWith={findWait(waits, {
+                personId: person.contactId,
+                contactId: person.contactId,
+              })}
             />
           </div>
         )}
@@ -682,6 +702,100 @@ function RecordedLine({ recorded, onClear }: { recorded: Recorded; onClear: () =
         <X className="h-3.5 w-3.5" />
       </button>
       {error && <p className="w-full text-[12px] text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Quiet In progress: Bob / Scout / Hanna still working. Needs you stays for
+ * human decisions only.
+ */
+export function InProgressWaits({ waits }: { waits: InProgressWait[] }) {
+  const router = useRouter();
+  const handoff = useTodayHandoff();
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function takeBack(assignmentId: string) {
+    setBusyId(assignmentId);
+    setError(null);
+    try {
+      const res = await fetch("/api/agents/assignments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignmentId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Could not take it back.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (waits.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
+        Nothing with the team right now. Hand a card to Bob and it waits here.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {waits.map((wait) => (
+          <li key={wait.assignmentId} className="flex items-start gap-3 px-4 py-3">
+            <span className="mt-0.5 text-[16px]" aria-hidden>
+              {wait.agentEmoji}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-slate-900">{wait.title}</p>
+              <p className="mt-0.5 text-[12px] text-slate-500">
+                {wait.withLabel}
+                {wait.status === "active" ? " · working" : " · queued"}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  handoff?.openThread({
+                    assignmentId: wait.assignmentId,
+                    title: wait.title,
+                    agentName: wait.agentName,
+                    messageCount: wait.messageCount,
+                    awaitingAgent: wait.awaitingAgent,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Open thread
+              </button>
+              <button
+                type="button"
+                disabled={busyId === wait.assignmentId}
+                onClick={() => void takeBack(wait.assignmentId)}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+              >
+                {busyId === wait.assignmentId ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Undo2 className="h-3 w-3" />
+                )}
+                Take back
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-2 text-[12px] text-rose-600">{error}</p>}
     </div>
   );
 }

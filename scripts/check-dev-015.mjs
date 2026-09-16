@@ -123,6 +123,108 @@ test('Bob role file tells him commercial_follow_through completes with result', 
   assert.match(bobMd, /sends nothing/i);
 });
 
+const emailActions = read('src/components/modules/today-email-actions.tsx');
+const askBobRoute = read('src/app/api/ask/bob/route.ts');
+const todayScreen = read('src/components/modules/today-screen.tsx');
+const todayMissions = read('src/components/modules/today-missions.tsx');
+const drawer = read('src/components/modules/assignment-thread-drawer.tsx');
+const thread = read('src/components/modules/assignment-thread.tsx');
+const decisionsPage = read('src/app/(app)/decisions/page.tsx');
+const todayAlias = read('src/app/(app)/today/page.tsx');
+const decisions = read('DECISIONS.md');
+const roadmap = read('ROADMAP.md');
+const execution = read('ROADMAP_EXECUTION.md');
+const {
+  matchesWait,
+  findWait,
+  withLabelFor,
+} = moduleLoader()('src/lib/data/today-handoff.ts');
+
+test('Hand to Bob does not dismiss the Today card', () => {
+  assert.doesNotMatch(askBobRoute, /dismissTodayCard/);
+  assert.doesNotMatch(emailActions, /dismissActionId: target.actionId/);
+  assert.match(askBobRoute, /does not dismiss the card/i);
+});
+
+test('After Hand to Bob the card is With Bob with Open thread and Take back', () => {
+  assert.match(emailActions, /With Bob|withLabel/);
+  assert.match(emailActions, /Open thread/);
+  assert.match(emailActions, /Take back/);
+  assert.match(emailActions, /\/api\/agents\/assignments/);
+  assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
+});
+
+test('Toast copy is Handed to Bob · Open thread', () => {
+  assert.match(todayScreen, /Handed to Bob/);
+  assert.match(todayScreen, /Open thread/);
+  assert.match(todayScreen, /announceHanded/);
+});
+
+test('Open thread is a right-side drawer on Today, reusing AssignmentThread', () => {
+  assert.match(drawer, /role="dialog"/);
+  assert.match(drawer, /max-w-md/);
+  assert.match(drawer, /AssignmentThread/);
+  assert.match(drawer, /alwaysOpen/);
+  assert.match(thread, /alwaysOpen/);
+  assert.match(todayScreen, /AssignmentThreadDrawer/);
+  assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
+});
+
+test('Today has Needs you and In progress; Needs you is not the wait list', () => {
+  assert.match(todayScreen, /Needs you/);
+  assert.match(todayScreen, /In progress/);
+  assert.match(todayMissions, /InProgressWaits/);
+  assert.match(decisionsPage, /listInProgressWaits/);
+});
+
+test('Handoff matching uses lead/contact/person ids, not assignment title', () => {
+  const wait = {
+    assignmentId: 'a1',
+    title: 'Follow up',
+    agentName: 'Bob',
+    agentEmoji: '📦',
+    roleKey: 'inbox_coordinator',
+    withLabel: 'With Bob',
+    status: 'queued',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+    companyId: null,
+    missionId: null,
+    entityIds: ['lead-1'],
+    messageCount: 1,
+    awaitingAgent: 0,
+    createdAt: '',
+  };
+  assert.equal(matchesWait(wait, { leadId: 'lead-1' }), true);
+  assert.equal(matchesWait(wait, { leadId: 'lead-2' }), false);
+  assert.equal(findWait([wait], { contactId: 'nope' }), null);
+  assert.equal(withLabelFor('inbox_coordinator', 'Ops'), 'With Bob');
+  assert.equal(withLabelFor('project_researcher', 'Scout'), 'With Scout');
+  assert.equal(withLabelFor('hr', 'Hanna'), 'With Hanna');
+});
+
+test('/today aliases /decisions', () => {
+  assert.match(todayAlias, /redirect\("\/decisions"\)/);
+});
+
+test('docs lock the handoff rule and commercial_follow_through', () => {
+  assert.match(decisions, /Handoff changes the owner of the work/);
+  assert.match(decisions, /Needs you/);
+  assert.match(decisions, /In progress/);
+  assert.match(decisions, /commercial_follow_through/);
+  assert.match(roadmap, /Handoff changes the/);
+  assert.match(execution, /DEV-015/);
+  assert.match(execution, /commercial_follow_through/);
+});
+
+test('Workforce is not redesigned; What you handed out is noted for later demotion', () => {
+  const workforce = read('src/components/modules/agent-console.tsx');
+  assert.match(workforce, /What you handed out/);
+  assert.match(workforce, /will be demoted/);
+  assert.doesNotMatch(workforce, /Team marketplace/);
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {
