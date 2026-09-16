@@ -133,14 +133,32 @@ is no in-app OpenAI stand-in) gets its mission steps as `execution_mode: bot`:
 the step waits in the employee's inbox, and Triangle calls the bot's wake-up
 webhook (`BOT_WAKE_URL_<ROLE>`, signed with `BOT_WAKE_KEY_<ROLE>`) when the
 step is assigned or retried, when a colleague is asked or answers, when Scout
-is given non-mission work (`assignment`), and when a human posts on the
-assignment thread (`human_followup`), carrying only the event and the ids.
+is given non-mission work (`assignment`), when a human posts on the
+assignment thread (`human_followup`), and when an outbox event fires
+(`client_reply`, `follow_up_due`, `availability_stale`), carrying only the event
+and the ids.
 The bot reads the mission from `GET /api/agent/missions/:id?assignmentId=…` and writes back
 with its badge to `/targets`, `/activity`, `/decisions`, `/plan` and
 `/complete`. Every write is refused unless the badge's employee owns the step
 and the step is still open, and a plain inbox result cannot close a mission
 step. Triangle's runner never takes a bot's step. The bot's own scheduled
 inbox check is the backup for a missed wake-up.
+
+## Minimal event outbox
+
+The event outbox records domain events and wakes the owning employee:
+- `client_reply` — a client or recruiter replied on outreach or inbound lead
+  (wakes Bob/commercial ops).
+- `follow_up_due` — a scheduled follow-up date has arrived without response
+  (wakes Bob/commercial ops).
+- `availability_stale` — a worker or supply partner capacity confirmation
+  has reached its 14-day shelf life (wakes Hanna/HR).
+
+Every outbox event is stored canonically in `agent_assignments` with an
+idempotency key and `case_type: event_outbox`. Triangle attempts an immediate
+webhook wake; the result (`sent`, `failed`, or `not_configured`) is recorded
+honestly in the assignment's constraints. Scheduled inbox checks and morning
+cron sweeps ensure missed wakes are recovered without duplicate work.
 
 How an employee works is the CEO's to write and Triangle's to keep: standing
 instructions per employee (`agent_house_rules`, migration 046), versioned with

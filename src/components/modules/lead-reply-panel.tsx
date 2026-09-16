@@ -11,6 +11,7 @@ import {
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LearnRulePrompt } from "@/components/modules/learn-rule-prompt";
 
 interface ReplyDraft {
   id: string;
@@ -50,6 +51,7 @@ export function LeadReplyPanel({
   const [body, setBody] = useState(existingDraft?.body ?? "");
   /** Set once "I sent this" has written the send to the ledger. */
   const [followUpAt, setFollowUpAt] = useState<string | null>(null);
+  const [showLearnPrompt, setShowLearnPrompt] = useState(false);
 
   async function generate() {
     setGenerating(true);
@@ -102,6 +104,10 @@ export function LeadReplyPanel({
       setDraft(data.draft);
       if (data.followUpAt) setFollowUpAt(data.followUpAt);
       setEditing(false);
+      // If content was edited, offer to save a learning rule
+      if (payload.body !== undefined || payload.subject !== undefined) {
+        setShowLearnPrompt(true);
+      }
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -291,6 +297,18 @@ export function LeadReplyPanel({
               </>
             )}
           </div>
+
+          {showLearnPrompt && (
+            <div className="pt-2">
+              <LearnRulePrompt
+                targetRole="inbox_coordinator"
+                targetEmployeeName="Bob"
+                diffSummary="edited recruiter reply"
+                suggestedRulePlaceholder="e.g. Always ask for headcount and start date before sharing rates."
+                onDismiss={() => setShowLearnPrompt(false)}
+              />
+            </div>
+          )}
 
           <p className="text-[11px] text-slate-500">
             Copy this into your own email to {contactName ?? "the recruiter"} and

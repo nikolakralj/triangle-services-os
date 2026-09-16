@@ -131,6 +131,62 @@ organization profile instead of hardcoded names.
 or "The team"; comments that tripped the scanner were rewritten. Checked:
 `npm run check:tenant-identity` exits 0.
 
+### Learning from the CEO's edits ? a changed draft offers a rule in the CEO's words � `DONE`
+
+**Why:** when a human edits an AI-generated draft before sending, that correction
+is the clearest signal of how the employee should behave. Without learning,
+the user re-edits the same phrases repeatedly.
+
+**Acceptance:**
+1. Editing an AI draft in `LeadReplyPanel` (recruiter reply) or `OutreachDraftsPanel`
+   (project outreach) prompts the user with `LearnRulePrompt` to capture a standing
+   instruction in their own words.
+2. Saving the instruction calls `POST /api/agents/house-rules` with the rule text
+   and the owning employee (Bob for recruiter replies, Scout for project outreach).
+3. The rule is appended cleanly to the employee's existing versioned `agent_house_rules`.
+4. The employee immediately receives the updated rules in their next mission payload,
+   inbox response, and prompt context (`HOW THE CEO WANTS YOU TO WORK`).
+5. Offline tests `scripts/check-ceo-learning.mjs` verify `appendHouseRule` combining
+   and panel integration. Lint 0, build 0, tenant identity 0. No migration.
+
+**Done 15 September.** Checked: 3/3 offline checks pass (`scripts/check-ceo-learning.mjs`);
+`npm run lint` 0 errors/warnings; `npm run build` succeeds; `npm run check:tenant-identity` exits 0.
+
+### Minimal event outbox ? client reply, follow-up due, availability stale � `DONE`
+
+**Why:** when a client or recruiter replied on outreach or inbound email, a
+scheduled follow-up date arrived without an answer, or a worker/partner's
+availability confirmation passed the 14-day shelf life, Triangle recorded facts
+in the database but never woke the owning employee. Assignment thread follow-up
+was DEV-007; this item builds the minimal event outbox for the domain events.
+
+**Acceptance:**
+1. `WakeEvent` supports `client_reply`, `follow_up_due`, and `availability_stale`.
+2. Events are stored canonically in `agent_assignments` with idempotency keys and
+   `case_type: event_outbox`; identical events within a window do not duplicate
+   assignments or send duplicate wakes.
+3. Event routing:
+   - `client_reply` -> commercial ops / Bob (`inbox_coordinator`)
+   - `follow_up_due` -> commercial ops / Bob (`inbox_coordinator`)
+   - `availability_stale` -> HR / Hanna (`hr`)
+4. Immediate webhook wake (`wakeEmployee`) is attempted with ids only; result
+   (`sent`, `failed`, `not_configured`) is recorded in `constraints.wake`.
+   Missed wakes are collected at the employee's next scheduled inbox check.
+5. Integrations:
+   - Outreach reply (`markOutreachReplied`) and live contact (`outcome: reached`)
+     dispatch `client_reply`.
+   - Inbound job opportunities with leads dispatch `client_reply`.
+   - Morning cron `/api/agents/cron` sweeps due follow-ups and stale availability
+     (>14 days shelf life).
+   - `/api/agents/outbox` provides GET audit and POST on-demand sweep.
+6. Offline test suite `scripts/check-event-outbox.mjs` verifies dispatch,
+   idempotency, and both sweeps. Lint, build, and tenant identity exit 0.
+   No migration.
+
+**Done 15 September.** Checked: 4/4 offline checks pass (`scripts/check-event-outbox.mjs`);
+`npm run lint` 0 warnings/errors; `npm run build` succeeds with dynamic route
+`/api/agents/outbox`; `npm run check:tenant-identity` exits 0.
+
 ### DEV-007 â Wake on assignment follow-up Â· `DONE`
 
 **Why:** the CEO posted in Hanna's assignment thread and the UI said the
@@ -235,10 +291,9 @@ the diagnostics banner.
 
 ## Next, once the gate is moving
 
-- A minimal event outbox â client reply received, follow-up due, availability
-  stale â that wakes the owning employee. Assignment-thread follow-up wake is
-  already DEV-007; this remaining item is the other events.
-- Learning from the CEO's edits: a changed draft offers a rule in the CEO's words.
+- A minimal event outbox ? client reply received, follow-up due, availability
+  stale ? **DONE 15 September** (see above).
+- Learning from the CEO's edits: a changed draft offers a rule in the CEO's words ? **DONE 15 September** (see below).
 - Budget and cost per mission.
 - Separate research and communications computers for bots (see the
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).

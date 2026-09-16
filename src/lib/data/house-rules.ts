@@ -103,6 +103,58 @@ export async function saveHouseRules(params: {
 }
 
 /**
+ * Append or add a rule to an employee's existing house rules.
+ * If existing rules exist, appends the new rule as a numbered or bulleted entry.
+ */
+export async function appendHouseRule(params: {
+  orgId: string;
+  agentInstanceId: string;
+  newRule: string;
+  userId: string | null;
+}): Promise<HouseRules | { error: string }> {
+  const current = await loadHouseRules(params.orgId, params.agentInstanceId);
+  const trimmedRule = params.newRule.trim();
+  if (!trimmedRule) return { error: "Rule text cannot be empty." };
+
+  const currentBody = current?.body?.trim() ?? "";
+  const combined = currentBody
+    ? `${currentBody}\n- ${trimmedRule}`
+    : `- ${trimmedRule}`;
+
+  return saveHouseRules({
+    orgId: params.orgId,
+    agentInstanceId: params.agentInstanceId,
+    body: combined,
+    userId: params.userId,
+  });
+}
+
+/**
+ * Resolves the agent instance id and display name for a role key (e.g. inbox_coordinator, project_researcher).
+ */
+export async function resolveEmployeeByRole(
+  orgId: string,
+  roleKey: string,
+): Promise<{ id: string; name: string; roleKey: string } | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data } = await svc
+    .from("agent_instances")
+    .select("id, display_name, role_key")
+    .eq("org_id", orgId)
+    .eq("role_key", roleKey)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!data) return null;
+  return {
+    id: data.id as string,
+    name: (data.display_name as string) ?? "Employee",
+    roleKey: (data.role_key as string) ?? roleKey,
+  };
+}
+
+/**
  * The block a worker is handed. Named and dated on purpose: an employee that
  * says "your rule from version 4" is one the CEO can correct.
  */

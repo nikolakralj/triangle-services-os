@@ -298,6 +298,24 @@ export async function logContactAttempt(params: {
 
   // The ids go back so the screen can say what was recorded and offer to take
   // it back. Returning only {ok:true} is why a click looked like nothing.
+  if (params.outcome === "reached") {
+    try {
+      const { recordClientReplyEvent } = await import("./event-outbox");
+      await recordClientReplyEvent({
+        orgId: params.orgId,
+        sourceType: "contact_log",
+        sourceId: action.id as string,
+        recipientName,
+        recipientEmail,
+        recipientCompany,
+        subject,
+        replySummary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
+      });
+    } catch (err) {
+      console.error("logContactAttempt: outbox dispatch failed:", err);
+    }
+  }
+
   return {
     ok: true,
     actionId: action.id as string,

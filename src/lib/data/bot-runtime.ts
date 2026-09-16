@@ -111,7 +111,10 @@ export type WakeEvent =
   | "requested"
   | "request_returned"
   | "human_followup"
-  | "assignment";
+  | "assignment"
+  | "client_reply"
+  | "follow_up_due"
+  | "availability_stale";
 
 export interface WakeResult {
   status: "sent" | "failed" | "not_configured";
@@ -120,13 +123,14 @@ export interface WakeResult {
 
 /**
  * Call the employee's wake-up webhook for one assignment (a mission step, a
- * colleague request, a new non-mission assignment, or a human follow-up on
- * the thread), and write down on that assignment that it was called and what
- * came back. Never throws; a bot that could not be woken still collects the
- * work at its next scheduled check.
+ * colleague request, a new non-mission assignment, a human follow-up on
+ * the thread, or an outbox event like client_reply, follow_up_due, or
+ * availability_stale), and write down on that assignment that it was called
+ * and what came back. Never throws; a bot that could not be woken still
+ * collects the work at its next scheduled check.
  *
  * `missionId` is null when the assignment is not inside a mission; the bot
- * still gets `assignmentId` and reads the thread from its inbox.
+ * still gets `assignmentId` and reads the thread or work from its inbox.
  */
 export async function wakeEmployee(params: {
   orgId: string;

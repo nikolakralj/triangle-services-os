@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { runNextScoutAssignment } from "@/lib/ai/scout-executor";
 import { safeEqual } from "@/lib/job-intake/credentials";
+import { runEventOutboxSweep } from "@/lib/data/event-outbox";
 
 // ---------------------------------------------------------------------------
 // Scheduled agent work.
 //
-// This used to claim stalled Scout jobs and run them on OpenAI — a second
-// brain, and the thing the CEO retired on 15 September 2026. Scout is
-// bot-owned: Triangle stores the work and wakes the bot; the bot's own
-// scheduled inbox check is the backup for a missed wake-up.
+// Sweeps the minimal event outbox for:
+//   - follow_up_due: outreach / commercial actions whose follow-up date has arrived
+//   - availability_stale: workers & supply partners with expired shelf life (>14d)
 //
-// The route stays so Vercel Cron does not 404. It does not claim Scout work
-// and does not call OpenAI.
+// Wakes the owning employees (Bob for commercial follow-ups, Hanna for pool
+// availability) with webhook calls carrying ids only.
+//
+// Scout work is bot-owned; this cron does not run the retired in-app OpenAI executor.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -34,14 +36,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await runNextScoutAssignment(orgId);
+  const [result, outboxSummary] = await Promise.all([
+    runNextScoutAssignment(orgId),
+    runEventOutboxSweep(orgId),
+  ]);
+
   return NextResponse.json({
     ok: true,
     ran: 0,
     results: [],
     status: result.status,
+    outbox: outboxSummary,
     message:
-      "Scout work is owned by the Scout bot. This cron no longer runs the in-app OpenAI executor.",
+      "Scout work is owned by the Scout bot. Event outbox swept due follow-ups and stale availability.",
   });
 }
 
