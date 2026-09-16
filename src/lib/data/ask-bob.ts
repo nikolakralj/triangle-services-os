@@ -7,6 +7,7 @@ import {
   askBobTitle,
   bobFollowThroughBlockedReason,
   isBobEmployee,
+  COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE,
   type AskBobContext,
 } from "@/lib/data/ask-bob-policy";
 
@@ -17,6 +18,8 @@ export {
   isBobEmployee,
   BOB_ROLE_KEYS,
   MISSION_WORK_SCOPE,
+  COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE,
+  RESEARCH_FINDING_CASE_TYPES,
   type AskBobContext,
 } from "@/lib/data/ask-bob-policy";
 
@@ -94,12 +97,12 @@ export async function askBob(params: {
       assignmentId: attempt.openAssignmentId,
       alreadyOut: true,
       bobName: bob.name,
-      notice: `${bob.name} already has this — the answer will land on Workforce.`,
+      notice: `${bob.name} already has this — Open thread on Today.`,
     };
   }
 
   const entityRefs: Array<{
-    type: "job_lead" | "contact" | "other";
+    type: "job_lead" | "contact" | "company" | "other";
     id: string;
     relation: "target" | "context";
   }> = [];
@@ -111,6 +114,9 @@ export async function askBob(params: {
   }
   if (params.context.personId) {
     entityRefs.push({ type: "contact", id: params.context.personId, relation: "target" });
+  }
+  if (params.context.companyId) {
+    entityRefs.push({ type: "company", id: params.context.companyId, relation: "context" });
   }
   if (params.context.missionId) {
     entityRefs.push({ type: "other", id: params.context.missionId, relation: "context" });
@@ -126,10 +132,12 @@ export async function askBob(params: {
       "A draft of the next commercial move, or the decision only a person can make. Do not send.",
     constraints: {
       execution_mode: "bot",
+      case_type: COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE,
       source: "today_ask_bob",
       leadId: params.context.leadId ?? null,
       contactId: params.context.contactId ?? null,
       personId: params.context.personId ?? null,
+      companyId: params.context.companyId ?? null,
       missionId: params.context.missionId ?? null,
       channelKind: params.context.channelKind ?? null,
       value: params.context.value ?? null,

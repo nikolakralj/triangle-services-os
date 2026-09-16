@@ -7,6 +7,7 @@ import { RefusalLedger } from "@/components/modules/refusal-ledger";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
+import { listInProgressWaits } from "@/lib/data/today-in-progress";
 import { getSession } from "@/lib/auth/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
@@ -51,6 +52,7 @@ export default async function DecisionsPage() {
     missions,
     ready,
     followUps,
+    waits,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
@@ -62,6 +64,7 @@ export default async function DecisionsPage() {
     listMissionTabs(org),
     listReadyToContact(org),
     listFollowUpsDue(org),
+    listInProgressWaits(org),
   ]);
 
   // Scout first, then Hanna, then the rest — the order the router in the Ask
@@ -80,7 +83,7 @@ export default async function DecisionsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Today"
-        description="One action to take, the people your missions made reachable, and the work in progress."
+        description="Needs you, work in progress, and missions. Handoff changes the owner — the case stays here."
       />
       {/* What the system would not let anyone record. Moved off Overview:
           it is the most informative thing this product produces and it was
@@ -94,6 +97,7 @@ export default async function DecisionsPage() {
         missions={missions}
         ready={ready}
         followUps={followUps}
+        waits={waits}
       />
     </div>
   );

@@ -6,6 +6,40 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: Handoff changes the owner of the work, not where it lives (DEV-015)
+
+Locked by Nikola. Ask Bob / Hand to Bob from a Today mail card (e.g. Veronika ·
+Computer Futures) does **not** dismiss the card into Workforce / "What you
+handed out".
+
+Rule:
+
+1. Handoff changes the **owner**. The work stays on the same case.
+2. The same Today card becomes **With Bob** (Open thread + Take back). Toast:
+   "Handed to Bob · Open thread".
+3. After confirmation the item belongs in quiet **In progress** on Today.
+   **Needs you** stays sacred for human decisions only.
+4. Open thread is a **right-side drawer on Today** (the durable assignment
+   conversation). It does not navigate to `/agents`.
+5. When Bob needs a human or finishes with a draft/decision, the **business
+   situation** returns to Needs you (company / person / requirement), not
+   "assignment #abc completed".
+6. Assignments carry structured context ids (`leadId`, `contactId`, `personId`,
+   `companyId`, `missionId`, …) so any surface can show "Bob working" on that
+   case.
+7. Do not beautify Workforce in this slice. "What you handed out" will be
+   demoted when Team shrinks (DEV-012). DEV-015 is ahead of that redesign.
+8. Ask Bob `createAssignment` sets `constraints.case_type` to
+   `commercial_follow_through`. Migration 041 defaults a missing case_type to
+   `open_research`, which 409s a plain `{assignmentId, result}` complete.
+   Message-only and `failed: true` already skipped the finding contract;
+   successful commercial complete must too.
+
+Today's structure: **Needs you | In progress | Missions…**
+
+Why: handing Veronika to Bob and then hunting her under Workforce made the
+CEO the transport layer between the case and the employee.
+
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 
 CEO accepted the external expert amendment on 16 September 2026. Direction is
@@ -71,9 +105,17 @@ Implement as DEV-010 **before** inventing new UI concepts.
 
 #### Today
 
-Today is the **exception inbox**: needs you, important agent results, a
-multi-agent status strip. It is not Sent / They replied administration (DEV-009
-already started that cut). It is not an agent activity map as the main job.
+Today is the **exception inbox**, structured as:
+
+- **Needs you** — human decisions only (the one action, due follow-ups, a
+  mission that asked, a reachable person nobody has contacted).
+- **In progress** — quiet waits with Bob, Scout, or Hanna. Open thread is a
+  drawer on this page.
+- **Missions** — large objectives.
+
+Handoff changes the owner of the work; it does not change where the work lives
+(DEV-015). It is not Sent / They replied administration (DEV-009 already
+started that cut). It is not an agent activity map as the main job.
 
 #### Missions
 

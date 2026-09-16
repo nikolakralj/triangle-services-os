@@ -3,13 +3,13 @@ import { z } from "zod";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { askBob } from "@/lib/data/ask-bob";
-import { dismissTodayCard } from "@/lib/data/today-dismiss";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask/bob — hand a Today mail card to Commercial Ops.
 //
-// A short instruction plus the card's entity ids. If Bob cannot take mission
-// work (DEV-004), this fails honestly. Triangle still sends nothing.
+// Handoff changes the owner. It does not dismiss the card or send the CEO to
+// Workforce. If Bob cannot take mission work (DEV-004), this fails honestly.
+// Triangle still sends nothing.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -23,10 +23,11 @@ const bodySchema = z.object({
   leadId: uuid.optional(),
   contactId: uuid.optional(),
   personId: uuid.optional(),
+  companyId: uuid.optional(),
   missionId: uuid.optional(),
   channelKind: z.string().trim().max(40).optional(),
   value: z.string().trim().max(400).optional(),
-  // After a successful hand-off, take the card off the human rail.
+  // Accepted and ignored: Hand to Bob used to dismiss the card. It must not.
   dismissActionId: uuid.optional(),
 });
 
@@ -52,27 +53,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: asked.error }, { status: asked.status });
   }
 
-  let dismissed: { actionId: string | null; sentence: string } | null = null;
-  const targetId = parsed.data.leadId || parsed.data.contactId || parsed.data.personId;
-  if (targetId || parsed.data.dismissActionId) {
-    const takenOff = await dismissTodayCard({
-      orgId: access.organizationId,
-      userId: access.userId,
-      target: {
-        reason: "not_now",
-        channelKind: parsed.data.channelKind || "email",
-        value: parsed.data.value || "the address on record",
-        actionId: parsed.data.dismissActionId,
-        leadId: parsed.data.leadId,
-        contactId: parsed.data.contactId,
-        personId: parsed.data.personId,
-      },
-    });
-    if (takenOff.ok) {
-      dismissed = { actionId: takenOff.actionId, sentence: takenOff.sentence };
-    }
-  }
-
   return NextResponse.json(
     {
       ok: true,
@@ -80,7 +60,6 @@ export async function POST(request: Request) {
       alreadyOut: asked.alreadyOut,
       bobName: asked.bobName,
       notice: asked.notice,
-      dismissed,
     },
     { status: asked.alreadyOut ? 200 : 201 },
   );

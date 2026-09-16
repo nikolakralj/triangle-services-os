@@ -58,6 +58,7 @@ the record they read from and write to.
 | Learning from CEO edits: editing an AI draft in `LeadReplyPanel` or `OutreachDraftsPanel` offers `LearnRulePrompt` to append a standing house rule in the user's words; `POST /api/agents/house-rules` | pending | 3/3 offline checks pass (`scripts/check-ceo-learning.mjs`); lint 0, production build 0, tenant-identity 0; no signed-in check here | Appends to existing versioned `agent_house_rules`; travels with future work; no migration |
 | Today email cards slim (DEV-009): Open mail · Ask Bob · scoped Dismiss; Sent / They replied / Sent a follow-up off the primary rail; Recorded outside Triangle under Dismiss; phone cards unchanged | this PR | 12/12 offline (`check:today-slim`); lint 0; production build 0; tenant-identity 0; no signed-in check here | Ask Bob is a real assignment + wake and fails honestly if DEV-004; no Gmail draft, no Scout/Hanna routing, no mailbox-derived sent/replied; overdue-list rewrite still NEXT |
 | Bob takes follow-through (DEV-004): `mission.work` in the catalog; Bob hire preset is mail ingest + mission work; Ask Bob / assignments force `execution_mode: bot` and wake like Scout | this PR | 13/13 offline (`check:dev-004`); lint 0; production build 0; tenant-identity 0; no signed-in check here | SQL not applied — Nikola must preview then run `supabase/data-fixes/2026-09-16-bob-mission-work-scope.sql` (shared live DB). Wake env `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR` must be set if the Grok routine exists. Bob sends nothing |
+| Context-preserving handoff (DEV-015): Hand to Bob stays on Today as With Bob; Open thread drawer; In progress strip; Ask Bob `case_type commercial_follow_through` | this PR | offline `check:dev-015`; lint; production build; tenant-identity; no signed-in check here | Existing open Ask Bob rows need unapplied data-fix SQL. Workforce / What you handed out is not redesigned. `/today` redirects to `/decisions`. Nothing sends |
 
 Scout (demand) and Hanna (access to people) work missions on their Grok bots. Hanna files people on a recruiting mission through `POST /api/agent/missions/{id}/pool` Ã¢â¬â she proposes candidates and availability; a person accepts new workers and availability, and sends availability-check drafts; no CV data leaves Triangle in the bot payload.
 Bob is bot-owned for commercial follow-through in code (`mission.work` plus
@@ -89,11 +90,12 @@ resolve genuine exceptions and provide real-world evidence. The 8 September
 clarification changes ambition, not external-action or final-record authority.
 External software-customer discovery remains paused under the 4 September decision.
 
-**16 September IA lock** (docs only; nav and Ask code are unchanged): primary
-surfaces are Today, Missions, Talent, Team. Signal Inbox leaves primary nav
-(DEV-011). Ask on a situation is a missionless assignment, not a new Mission
-(DEV-010). Human-approved Send from Triangle is allowed (DEV-013); the button
-is not built. See `DECISIONS.md`.
+**16 September IA lock** (nav hide and AskLauncher rewrite still later):
+primary surfaces are Today, Missions, Talent, Team. Today is Needs you |
+In progress | Missions… Handoff changes the owner, not the place (DEV-015).
+Signal Inbox leaves primary nav (DEV-011). Ask on a situation is a
+missionless assignment, not a new Mission (DEV-010). Human-approved Send from
+Triangle is allowed (DEV-013); the button is not built. See `DECISIONS.md`.
 
 Supply includes individual people and partner firms with recently human-confirmed
 capacity. A partner firm is not evidence of each worker's certificates, right to
@@ -105,7 +107,7 @@ work, consent, availability for a specific order or mobilization clearance.
 | --- | --- | --- |
 | Intake | Mail ingestion, classification/scoring, leads, draft replies and contact logging. The list is off primary nav; `/job-intake` remains diagnostics until Bob mail ? Today is proven | Extraction uses a model; paid/business conversion is not established by ingestion; Bob waking on commercial mail is not built |
 | Research | Project/company evidence, two proposal stores, human review, case history. Project Research Agent chat retired; Scout missions and suggestions remain. Company detail still opens from missions; the directory is not in the shell | Accepted research is not a buyer-confirmed requirement |
-| Today screen | Next move, Ask, returned findings, funnel and refusal ledger; former cockpit and Overview removed | Ask missions go to the bot; leftover Ask box no longer runs Scout on OpenAI; action-content and acknowledgment persistence defects remain |
+| Today screen | Needs you, In progress (Bob/Scout/Hanna waits + Open thread drawer), missions, older reports. Hand to Bob stays on the case | AskLauncher still starts Missions (DEV-010). Live Ask Bob rows need the commercial_follow_through data-fix SQL |
 | Scout | Bot-owned: Triangle stores work and wakes Grok; in-app OpenAI executor does not claim Scout jobs | Specific-job execution on the bot, crash recovery, and measured cost are not fully proven; older in_app rows are not rewritten |
 | Talent | CV storage/extraction, candidate profiles, history, generated CVs, talent questions | Upload auto-acceptance, identity merging, readiness and access boundaries need correction |
 | Partner firms | `supply_partners`, create/confirm/status UI/API, capacity age checks, Scout/Hanna context | Source exists; role/actor and precise capacity-readiness checks remain incomplete |

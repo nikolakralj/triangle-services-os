@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, Send } from "lucide-react";
 import type { AssignmentMessage } from "@/lib/data/assignment-threads";
@@ -26,6 +26,7 @@ export function AssignmentThread({
   recipientLabel,
   finished,
   label,
+  alwaysOpen = false,
 }: {
   assignmentId: string;
   messageCount: number;
@@ -34,9 +35,11 @@ export function AssignmentThread({
   recipientLabel?: string;
   finished: boolean;
   label?: string;
+  /** Skip the fold; used in the Today thread drawer. */
+  alwaysOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(alwaysOpen);
   const [messages, setMessages] = useState<AssignmentMessage[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("");
@@ -64,6 +67,34 @@ export function AssignmentThread({
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!alwaysOpen) return;
+    let cancelled = false;
+    fetch(`/api/assignments/${assignmentId}/messages`)
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          messages?: AssignmentMessage[];
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(data.error ?? "Could not load the conversation.");
+          setMessages([]);
+          return;
+        }
+        setMessages(data.messages ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Network error.");
+          setMessages([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [alwaysOpen, assignmentId]);
 
   function toggle() {
     const next = !open;
@@ -111,26 +142,28 @@ export function AssignmentThread({
   }
 
   return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={toggle}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
-      >
-        <MessageSquare className="h-3.5 w-3.5" />
-        {label ?? (messageCount === 0
-          ? "Ask a follow-up"
-          : `Conversation · ${messageCount}`)}
-        {awaitingAgent > 0 && (
-          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-            {awaitingAgent} not picked up yet
-          </span>
-        )}
-      </button>
+    <div className={alwaysOpen ? "" : "mt-2"}>
+      {!alwaysOpen && (
+        <button
+          type="button"
+          onClick={toggle}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {label ?? (messageCount === 0
+            ? "Ask a follow-up"
+            : `Conversation · ${messageCount}`)}
+          {awaitingAgent > 0 && (
+            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+              {awaitingAgent} not picked up yet
+            </span>
+          )}
+        </button>
+      )}
 
       {open && (
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-          {loading && (
+          {(loading || (open && messages === null && !error)) && (
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
               <Loader2 className="h-3 w-3 animate-spin" />
               Loading…

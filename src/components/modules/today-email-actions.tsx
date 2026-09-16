@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquare, Undo2 } from "lucide-react";
 import {
   EMAIL_DISMISS_ADVANCED,
   EMAIL_DISMISS_OPTIONS,
   dismissSentence,
   type EmailDismissReason,
 } from "@/lib/data/today-card-actions";
+import { useTodayHandoff } from "@/components/modules/today-handoff-context";
+import type { InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
 // Open mail stays on the channel bar. These two are the human judgments:
@@ -55,6 +57,10 @@ const TONE = {
     cancel: "rounded-lg px-2 py-1.5 text-[12.5px] text-slate-400 transition hover:text-slate-200",
     error: "text-[13px] text-rose-400",
     note: "text-[11px] text-slate-500",
+    with: "rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-[12.5px] font-semibold text-sky-100",
+    thread:
+      "inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-[12.5px] font-semibold text-sky-950 transition hover:bg-sky-400 disabled:opacity-40",
+    back: "inline-flex items-center gap-1 rounded-lg border border-white/15 px-3 py-1.5 text-[12.5px] font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-40",
   },
   light: {
     ask: "rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40",
@@ -72,6 +78,10 @@ const TONE = {
     cancel: "rounded-lg px-2 py-1.5 text-[12.5px] text-slate-500 transition hover:text-slate-800",
     error: "text-[12px] text-rose-600",
     note: "text-[11px] text-slate-500",
+    with: "rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-[12.5px] font-semibold text-sky-900",
+    thread:
+      "inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40",
+    back: "inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40",
   },
 } as const;
 
@@ -85,18 +95,44 @@ export function EmailCardActions({
   target,
   tone = "light",
   onRecorded,
+  alreadyWith = null,
 }: {
   target: EmailCardTarget;
   tone?: keyof typeof TONE;
   onRecorded: (recorded: Recorded) => void;
+  alreadyWith?: InProgressWait | null;
 }) {
   const router = useRouter();
+  const handoff = useTodayHandoff();
   const t = TONE[tone];
   const [asking, setAsking] = useState(false);
   const [instruction, setInstruction] = useState(defaultAsk(target));
   const [openDismiss, setOpenDismiss] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [handed, setHanded] = useState<{
+    assignmentId: string;
+    bobName: string;
+    messageCount: number;
+  } | null>(null);
+
+  const withBob = alreadyWith
+    ? {
+        assignmentId: alreadyWith.assignmentId,
+        bobName: alreadyWith.agentName,
+        messageCount: alreadyWith.messageCount,
+        awaitingAgent: alreadyWith.awaitingAgent,
+        title: alreadyWith.title,
+      }
+    : handed
+      ? {
+          assignmentId: handed.assignmentId,
+          bobName: handed.bobName,
+          messageCount: handed.messageCount,
+          awaitingAgent: 0,
+          title: instruction.trim() || defaultAsk(target),
+        }
+      : null;
 
   async function askBob() {
     const text = instruction.trim();
@@ -117,10 +153,10 @@ export function EmailCardActions({
           leadId: target.leadId,
           contactId: target.contactId || undefined,
           personId: target.personId,
+          companyId: target.companyId,
           missionId: target.missionId,
           channelKind: target.channelKind || "email",
           value: target.value,
-          dismissActionId: target.actionId,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -128,20 +164,54 @@ export function EmailCardActions({
         assignmentId?: string;
         alreadyOut?: boolean;
         notice?: string;
-        dismissed?: { actionId: string | null };
+        bobName?: string;
       };
       if (!res.ok) {
         setError(body.error ?? "Bob could not take that.");
         return;
       }
-      onRecorded({
-        actionId: body.dismissed?.actionId || body.assignmentId || "asked",
-        sentence: body.alreadyOut
-          ? "Bob already has this"
-          : "Asked Bob",
-        who: target.who,
-      });
+      if (!body.assignmentId) {
+        setError("Bob took it, but no thread came back.");
+        return;
+      }
+      const next = {
+        assignmentId: body.assignmentId,
+        bobName: body.bobName || "Bob",
+        messageCount: 1,
+      };
+      setHanded(next);
       setAsking(false);
+      const thread = {
+        assignmentId: next.assignmentId,
+        title: text,
+        agentName: next.bobName,
+        messageCount: next.messageCount,
+        awaitingAgent: 0,
+      };
+      handoff?.announceHanded(thread);
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function takeBack(assignmentId: string) {
+    setBusy("back");
+    setError(null);
+    try {
+      const res = await fetch("/api/agents/assignments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignmentId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "Could not take it back.");
+        return;
+      }
+      setHanded(null);
       router.refresh();
     } catch {
       setError("Network error.");
@@ -197,98 +267,138 @@ export function EmailCardActions({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          disabled={busy !== null}
-          onClick={() => {
-            setAsking((v) => !v);
-            setOpenDismiss(false);
-            setError(null);
-          }}
-          className={t.ask}
-        >
-          {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-          Ask Bob
-        </button>
-        <div className="relative">
+      {withBob ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={t.with}>
+            {alreadyWith?.withLabel ?? `With ${withBob.bobName}`}
+          </span>
           <button
             type="button"
             disabled={busy !== null}
-            aria-expanded={openDismiss}
-            onClick={() => {
-              setOpenDismiss((v) => !v);
-              setAsking(false);
-            }}
-            className={t.dismiss}
+            onClick={() =>
+              handoff?.openThread({
+                assignmentId: withBob.assignmentId,
+                title: withBob.title,
+                agentName: withBob.bobName,
+                messageCount: withBob.messageCount,
+                awaitingAgent: withBob.awaitingAgent,
+              })
+            }
+            className={t.thread}
           >
-            Dismiss
-            <ChevronDown className="h-3 w-3" />
+            <MessageSquare className="h-3.5 w-3.5" />
+            Open thread
           </button>
-          {openDismiss && (
-            <div role="menu" className={t.menu}>
-              {EMAIL_DISMISS_OPTIONS.map((opt) => (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void takeBack(withBob.assignmentId)}
+            className={t.back}
+          >
+            {busy === "back" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Undo2 className="h-3 w-3" />
+            )}
+            Take back
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => {
+                setAsking((v) => !v);
+                setOpenDismiss(false);
+                setError(null);
+              }}
+              className={t.ask}
+            >
+              {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+              Ask Bob
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                disabled={busy !== null}
+                aria-expanded={openDismiss}
+                onClick={() => {
+                  setOpenDismiss((v) => !v);
+                  setAsking(false);
+                }}
+                className={t.dismiss}
+              >
+                Dismiss
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {openDismiss && (
+                <div role="menu" className={t.menu}>
+                  {EMAIL_DISMISS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.reason}
+                      type="button"
+                      role="menuitem"
+                      disabled={busy !== null}
+                      onClick={() => void dismiss(opt.reason)}
+                      className={t.item}
+                    >
+                      <span className={t.label}>{opt.label}</span>
+                      <span className={t.hint}>{opt.hint}</span>
+                    </button>
+                  ))}
+                  <div className={t.advanced}>
+                    {EMAIL_DISMISS_ADVANCED.map((opt) => (
+                      <button
+                        key={opt.reason}
+                        type="button"
+                        role="menuitem"
+                        disabled={busy !== null}
+                        onClick={() => void dismiss(opt.reason)}
+                        className={t.item}
+                      >
+                        <span className={t.label}>{opt.label}</span>
+                        <span className={t.hint}>{opt.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          {asking && (
+            <div className={t.box}>
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                rows={3}
+                disabled={busy !== null}
+                placeholder="What should Bob do?"
+                className={t.input}
+              />
+              <div className="mt-2 flex items-center gap-2">
                 <button
-                  key={opt.reason}
                   type="button"
-                  role="menuitem"
-                  disabled={busy !== null}
-                  onClick={() => void dismiss(opt.reason)}
-                  className={t.item}
+                  disabled={busy !== null || instruction.trim().length < 2}
+                  onClick={() => void askBob()}
+                  className={t.send}
                 >
-                  <span className={t.label}>{opt.label}</span>
-                  <span className={t.hint}>{opt.hint}</span>
+                  {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+                  Hand to Bob
                 </button>
-              ))}
-              <div className={t.advanced}>
-                {EMAIL_DISMISS_ADVANCED.map((opt) => (
-                  <button
-                    key={opt.reason}
-                    type="button"
-                    role="menuitem"
-                    disabled={busy !== null}
-                    onClick={() => void dismiss(opt.reason)}
-                    className={t.item}
-                  >
-                    <span className={t.label}>{opt.label}</span>
-                    <span className={t.hint}>{opt.hint}</span>
-                  </button>
-                ))}
+                <button type="button" onClick={() => setAsking(false)} className={t.cancel}>
+                  Cancel
+                </button>
               </div>
             </div>
           )}
-        </div>
-      </div>
-      {asking && (
-        <div className={t.box}>
-          <textarea
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            rows={3}
-            disabled={busy !== null}
-            placeholder="What should Bob do?"
-            className={t.input}
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              disabled={busy !== null || instruction.trim().length < 2}
-              onClick={() => void askBob()}
-              className={t.send}
-            >
-              {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-              Hand to Bob
-            </button>
-            <button type="button" onClick={() => setAsking(false)} className={t.cancel}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        </>
       )}
       <p className={t.note}>
-        Open mail sends nothing. Sent and They replied come off this rail until
-        the mailbox can observe them. Recorded outside Triangle is under Dismiss
-        if you already handled this.
+        {withBob
+          ? "Bob has this case. Open thread stays here — it does not go to Workforce."
+          : "Open mail sends nothing. Sent and They replied come off this rail until the mailbox can observe them. Recorded outside Triangle is under Dismiss if you already handled this."}
       </p>
       {error && <p className={t.error}>{error}</p>}
     </div>

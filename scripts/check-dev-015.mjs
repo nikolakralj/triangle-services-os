@@ -1,0 +1,240 @@
+// DEV-015: context-preserving handoff + Ask Bob case_type.
+// Isolated fixtures. No env, no live database, no messages sent, SQL is not applied.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import ts from 'typescript';
+
+const require = createRequire(import.meta.url);
+const root = process.cwd();
+
+function read(file) {
+  return fs.readFileSync(path.resolve(root, file), 'utf8');
+}
+
+function moduleLoader(mocks = {}) {
+  const cache = new Map();
+  return function load(file) {
+    const full = path.resolve(root, file);
+    if (cache.has(full)) return cache.get(full);
+    const code = ts.transpileModule(fs.readFileSync(full, 'utf8'), {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        jsx: ts.JsxEmit.ReactJSX,
+        esModuleInterop: true,
+      },
+    }).outputText;
+    const mod = { exports: {} };
+    cache.set(full, mod.exports);
+    const localRequire = (name) => {
+      if (name === 'server-only') return {};
+      if (name in mocks) return mocks[name];
+      if (name.startsWith('@/')) {
+        const base = 'src/' + name.slice(2);
+        if (fs.existsSync(path.resolve(root, base + '.ts'))) return load(base + '.ts');
+        if (fs.existsSync(path.resolve(root, base + '.tsx'))) return load(base + '.tsx');
+      }
+      return require(name);
+    };
+    new Function('require', 'module', 'exports', code)(localRequire, mod, mod.exports);
+    return mod.exports;
+  };
+}
+
+const tests = [];
+function test(name, fn) {
+  tests.push([name, fn]);
+}
+
+const sqlPath = 'supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql';
+const askBobSrc = read('src/lib/data/ask-bob.ts');
+const policySrc = read('src/lib/data/ask-bob-policy.ts');
+const findingSql = read('supabase/migrations/041_finding_contract.sql');
+const {
+  COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE,
+  RESEARCH_FINDING_CASE_TYPES,
+  askBobObjective,
+} = moduleLoader()('src/lib/data/ask-bob-policy.ts');
+
+test('Ask Bob case_type is commercial_follow_through, not a research finding', () => {
+  assert.equal(COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE, 'commercial_follow_through');
+  assert.equal(
+    RESEARCH_FINDING_CASE_TYPES.includes(COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE),
+    false,
+  );
+  assert.match(askBobSrc, /case_type:\s*COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE/);
+  assert.match(askBobSrc, /source:\s*"today_ask_bob"/);
+  assert.match(policySrc, /commercial_follow_through/);
+});
+
+test('migration 041 still defaults a missing case_type to open_research', () => {
+  assert.match(
+    findingSql,
+    /COALESCE\(NEW\.constraints->>'case_type',\s*'open_research'\)/,
+  );
+  assert.match(
+    findingSql,
+    /case_type NOT IN \('open_research', 'company_qualification', 'contact_reachability'\)/,
+  );
+});
+
+test('Ask Bob still carries entity ids so UI can show Bob working on the case', () => {
+  assert.match(askBobSrc, /leadId: params\.context\.leadId/);
+  assert.match(askBobSrc, /contactId: params\.context\.contactId/);
+  assert.match(askBobSrc, /personId: params\.context\.personId/);
+  assert.match(askBobSrc, /companyId: params\.context\.companyId/);
+  assert.match(askBobSrc, /missionId: params\.context\.missionId/);
+  const text = askBobObjective({
+    instruction: 'Follow up with Veronika Igic.',
+    who: 'Veronika Igic',
+    leadId: '11111111-1111-4111-8111-111111111111',
+    companyId: '33333333-3333-4333-8333-333333333333',
+  });
+  assert.match(text, /leadId: 11111111-1111-4111-8111-111111111111/);
+  assert.match(text, /companyId: 33333333-3333-4333-8333-333333333333/);
+});
+
+test('Ask Bob already-out notice stays on Today, not Workforce', () => {
+  assert.match(askBobSrc, /Open thread on Today/);
+  assert.doesNotMatch(askBobSrc, /land on Workforce/);
+});
+
+test('data-fix SQL exists, is previewable, and is not a migration', () => {
+  assert.equal(fs.existsSync(path.resolve(root, sqlPath)), true);
+  const sql = read(sqlPath);
+  assert.match(sql, /DO NOT APPLY/i);
+  assert.match(sql, /Preview/i);
+  assert.match(sql, /today_ask_bob/);
+  assert.match(sql, /commercial_follow_through/);
+  assert.match(sql, /constraints \|\| '\{"case_type":"commercial_follow_through"\}'::jsonb/);
+  assert.doesNotMatch(sql, /SET constraints = 'open_research'/i);
+  assert.equal(
+    fs.existsSync(path.resolve(root, 'supabase/migrations/' + path.basename(sqlPath))),
+    false,
+  );
+});
+
+test('Bob role file tells him commercial_follow_through completes with result', () => {
+  const bobMd = read('agents/bob.md');
+  assert.match(bobMd, /commercial_follow_through/);
+  assert.match(bobMd, /assignmentId, result/);
+  assert.match(bobMd, /sends nothing/i);
+});
+
+const emailActions = read('src/components/modules/today-email-actions.tsx');
+const askBobRoute = read('src/app/api/ask/bob/route.ts');
+const todayScreen = read('src/components/modules/today-screen.tsx');
+const todayMissions = read('src/components/modules/today-missions.tsx');
+const drawer = read('src/components/modules/assignment-thread-drawer.tsx');
+const thread = read('src/components/modules/assignment-thread.tsx');
+const decisionsPage = read('src/app/(app)/decisions/page.tsx');
+const todayAlias = read('src/app/(app)/today/page.tsx');
+const decisions = read('DECISIONS.md');
+const roadmap = read('ROADMAP.md');
+const execution = read('ROADMAP_EXECUTION.md');
+const {
+  matchesWait,
+  findWait,
+  withLabelFor,
+} = moduleLoader()('src/lib/data/today-handoff.ts');
+
+test('Hand to Bob does not dismiss the Today card', () => {
+  assert.doesNotMatch(askBobRoute, /dismissTodayCard/);
+  assert.doesNotMatch(emailActions, /dismissActionId: target.actionId/);
+  assert.match(askBobRoute, /does not dismiss the card/i);
+});
+
+test('After Hand to Bob the card is With Bob with Open thread and Take back', () => {
+  assert.match(emailActions, /With Bob|withLabel/);
+  assert.match(emailActions, /Open thread/);
+  assert.match(emailActions, /Take back/);
+  assert.match(emailActions, /\/api\/agents\/assignments/);
+  assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
+});
+
+test('Toast copy is Handed to Bob · Open thread', () => {
+  assert.match(todayScreen, /Handed to Bob/);
+  assert.match(todayScreen, /Open thread/);
+  assert.match(todayScreen, /announceHanded/);
+});
+
+test('Open thread is a right-side drawer on Today, reusing AssignmentThread', () => {
+  assert.match(drawer, /role="dialog"/);
+  assert.match(drawer, /max-w-md/);
+  assert.match(drawer, /AssignmentThread/);
+  assert.match(drawer, /alwaysOpen/);
+  assert.match(thread, /alwaysOpen/);
+  assert.match(todayScreen, /AssignmentThreadDrawer/);
+  assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
+});
+
+test('Today has Needs you and In progress; Needs you is not the wait list', () => {
+  assert.match(todayScreen, /Needs you/);
+  assert.match(todayScreen, /In progress/);
+  assert.match(todayMissions, /InProgressWaits/);
+  assert.match(decisionsPage, /listInProgressWaits/);
+});
+
+test('Handoff matching uses lead/contact/person ids, not assignment title', () => {
+  const wait = {
+    assignmentId: 'a1',
+    title: 'Follow up',
+    agentName: 'Bob',
+    agentEmoji: '📦',
+    roleKey: 'inbox_coordinator',
+    withLabel: 'With Bob',
+    status: 'queued',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+    companyId: null,
+    missionId: null,
+    entityIds: ['lead-1'],
+    messageCount: 1,
+    awaitingAgent: 0,
+    createdAt: '',
+  };
+  assert.equal(matchesWait(wait, { leadId: 'lead-1' }), true);
+  assert.equal(matchesWait(wait, { leadId: 'lead-2' }), false);
+  assert.equal(findWait([wait], { contactId: 'nope' }), null);
+  assert.equal(withLabelFor('inbox_coordinator', 'Ops'), 'With Bob');
+  assert.equal(withLabelFor('project_researcher', 'Scout'), 'With Scout');
+  assert.equal(withLabelFor('hr', 'Hanna'), 'With Hanna');
+});
+
+test('/today aliases /decisions', () => {
+  assert.match(todayAlias, /redirect\("\/decisions"\)/);
+});
+
+test('docs lock the handoff rule and commercial_follow_through', () => {
+  assert.match(decisions, /Handoff changes the owner of the work/);
+  assert.match(decisions, /Needs you/);
+  assert.match(decisions, /In progress/);
+  assert.match(decisions, /commercial_follow_through/);
+  assert.match(roadmap, /Handoff changes the/);
+  assert.match(execution, /DEV-015/);
+  assert.match(execution, /commercial_follow_through/);
+});
+
+test('Workforce is not redesigned; What you handed out is noted for later demotion', () => {
+  const workforce = read('src/components/modules/agent-console.tsx');
+  assert.match(workforce, /What you handed out/);
+  assert.match(workforce, /will be demoted/);
+  assert.doesNotMatch(workforce, /Team marketplace/);
+});
+
+let failed = 0;
+for (const [name, fn] of tests) {
+  try {
+    fn();
+    console.log('ok  ' + name);
+  } catch (err) {
+    failed += 1;
+    console.log('FAIL  ' + name);
+    console.log('  ' + (err instanceof Error ? err.message : err));
+  }
+}
+console.log(failed === 0 ? `${tests.length}/${tests.length} ok` : `${tests.length - failed}/${tests.length} passed`);
+process.exit(failed === 0 ? 0 : 1);

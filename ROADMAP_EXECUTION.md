@@ -38,10 +38,11 @@ management changes the order, or when the gate is met or fails.
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-**16 September IA (docs lock):** first `READY` item is **DEV-010** (context-aware
-Ask). DEV-009 (Today slim: Open mail / Ask Bob / Dismiss) is `DONE` and did
-not change Ask, Signal Inbox, Team, or Send. Do not invent Work Items. Do not
-implement the Send button unless you are on DEV-013.
+**16 September IA (docs lock):** first `READY` item after DEV-015 is **DEV-010**
+(context-aware Ask). DEV-009 (Today slim) and DEV-015 (context-preserving
+handoff + Ask Bob `case_type`) are `DONE` and did not rename Team or add Send.
+Do not invent Work Items. Do not implement the Send button unless you are on
+DEV-013.
 
 ### DEV-001 Ã¢Â€Â” Sent-message record Ã‚Â· `DONE`
 
@@ -338,10 +339,36 @@ slims Today email cards (no Sent / They replied on the primary rail). It did
 Send button. Those are DEV-010 onwards, ordered below. "Triangle still sends
 nothing" here is this slice, not the standing send-from-Triangle law.
 
-**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied;
-Today copy "Bob handling N; 1 needs you" as a full overdue-list rewrite.
-Ask context and intent routing are DEV-010 and DEV-014, not a second Today
-chrome pass.
+**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied.
+DEV-015 (context-preserving handoff) is the Today destination for Hand to Bob.
+Ask context and intent routing are DEV-010 and DEV-014.
+
+### DEV-015 — Context-preserving handoff · `DONE` (code; live Ask Bob SQL still Nikola)
+
+**Why now:** Hand to Bob dismissed the Today card into Workforce / "What you
+handed out". Bob then 409ed completing `{assignmentId, result}` because
+migration 041 treated a missing `case_type` as `open_research`.
+
+**Acceptance:**
+1. Docs lock the handoff rule: owner changes, place does not.
+2. Ask Bob sets `constraints.case_type = commercial_follow_through` so a
+   commercial complete is not a research finding. Data-fix SQL prepared, not
+   applied.
+3. After Hand to Bob the same Today card is With Bob (Open thread + Take
+   back); toast "Handed to Bob · Open thread"; no Workforce navigation.
+4. Open thread is a right-side drawer on Today (AssignmentThread).
+5. Quiet In progress lists active Bob / Scout / Hanna waits. Needs you stays
+   for human decisions.
+6. No .env, no production promote, no Scout research credentials, nothing
+   sends email. Workforce is not redesigned.
+
+**Done 16 September (code).** `/today` aliases `/decisions`. Existing open
+Ask Bob rows still lack `case_type` until Nikola runs
+`supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql`.
+
+Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
+Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
+Bob ? Open thread drawer ? the card is in In progress, not Workforce.
 
 ### DEV-010 - Context-aware AskLauncher / `/api/ask` - `READY`
 

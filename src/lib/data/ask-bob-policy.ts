@@ -10,6 +10,19 @@ export const BOB_ROLE_KEYS = new Set([
 
 export const MISSION_WORK_SCOPE = "mission.work";
 
+/**
+ * Ask Bob / Hand to Bob is commercial follow-through, not a research finding.
+ * Migration 041 COALESCE(constraints->>'case_type', 'open_research') would
+ * otherwise 409 a plain {assignmentId, result} complete.
+ */
+export const COMMERCIAL_FOLLOW_THROUGH_CASE_TYPE = "commercial_follow_through";
+
+export const RESEARCH_FINDING_CASE_TYPES = [
+  "open_research",
+  "company_qualification",
+  "contact_reachability",
+] as const;
+
 export interface AskBobContext {
   instruction: string;
   who?: string | null;
@@ -17,6 +30,7 @@ export interface AskBobContext {
   leadId?: string | null;
   contactId?: string | null;
   personId?: string | null;
+  companyId?: string | null;
   missionId?: string | null;
   channelKind?: string | null;
   value?: string | null;
@@ -78,6 +92,7 @@ export function askBobObjective(params: AskBobContext): string {
     params.leadId ? `leadId: ${params.leadId}` : null,
     params.contactId ? `contactId: ${params.contactId}` : null,
     params.personId ? `personId: ${params.personId}` : null,
+    params.companyId ? `companyId: ${params.companyId}` : null,
     params.missionId ? `missionId: ${params.missionId}` : null,
     params.channelKind && params.value
       ? `Channel: ${params.channelKind} ${params.value}`

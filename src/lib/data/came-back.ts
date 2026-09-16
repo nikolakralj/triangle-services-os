@@ -223,6 +223,12 @@ export async function listWhatCameBack(
   }
 
   for (const row of assignmentsRes.data ?? []) {
+    const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
+    if (String(constraints.case_type ?? "") === "commercial_follow_through") {
+      // Bob's commercial complete returns the business situation to Needs you,
+      // not an "assignment completed" row.
+      continue;
+    }
     const face = faces.byId.get(row.agent_instance_id as string);
     const state = (row.finding_state as FindingState | null) ?? null;
     const report = parseScoutCaseReport((row.result_summary as string) ?? null);

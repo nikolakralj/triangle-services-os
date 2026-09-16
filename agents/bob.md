@@ -41,6 +41,12 @@ Do not:
 - accept your own findings;
 - become Scout's or Hanna's manager.
 
+Ask Bob from Today is `constraints.case_type: commercial_follow_through`.
+Finish it with `{ assignmentId, result }` (or `failed: true`). Do not file it
+as a research finding (`reachable` / `one_thing_missing` / `dead`) — that
+contract is for Scout work, and a missing `case_type` is treated as
+`open_research`.
+
 If the badge has `mission.work`, work the step. If it only has
 `job_intake.ingest`, stick to the mail routine.
 
