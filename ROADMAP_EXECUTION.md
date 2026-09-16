@@ -524,7 +524,15 @@ Today plus a filter in Talent. Compliance → a tab in Talent. Setup Readiness
 and Data Imports → Settings. Tables, APIs, suggestions and contractor-chain
 accept stay; no migration; no page deleted; Talent is not hidden.
 
-### DEV-012 - Team in Settings (Workforce leaves the menu) - `READY` (after DEV-017)
+### DEV-012 - Team in Settings (Workforce leaves the menu) - `IN_PROGRESS` (Claude, branch `claude/team-in-settings`)
+
+**Slices, so another agent can continue:** A — a Team section in Settings with
+each employee's ownership, health, runtime and wake-up, load by state,
+permissions, standing rules, refusals this week, and Activity (recent tasks with
+results, opening the thread drawer). B — Workforce leaves the sidebar, `/agents`
+redirects to Settings → Team, the humans board becomes Settings → Members, the
+work log moves to Diagnostics, and the hand-out console, handed-out list and
+quick notes are removed.
 
 **Why:** amended by the operating-shell decision. On Preview 76c42d4 only the
 three employee cards on Workforce were useful; the rest was a hand-out console
