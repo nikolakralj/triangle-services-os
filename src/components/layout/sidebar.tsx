@@ -2,17 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ClipboardCheck,
-  FileText,
-  Radar,
-  Settings,
-  ShieldAlert,
-  Target,
-  Upload,
-  UserRound,
-  ListChecks,
-} from "lucide-react";
+import { ClipboardCheck, Settings, Target, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,66 +10,26 @@ type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  badge?: string;
-  highlight?: boolean;
 };
 
-type NavGroup = {
-  label: string;
-  items: NavItem[];
-};
-
-// Ordered by how often a person should need it, not by how the data is
-// modelled. The stated goal is to spend LESS time here — every extra
-// destination is a place to get lost on the way to finding a client, so the
-// two screens that answer "what needs me" and "where does the company stop"
-// come first and everything else is filed under what it is: reference.
+// Three operating surfaces and Settings (the operating shell, 16 September;
+// DEV-011). The stated goal is to spend LESS time here — every extra
+// destination is a place to get lost on the way to finding a client.
 //
-// Tasks was removed rather than demoted. Assignments are the work object; a
-// second task list beside them is two answers to one question.
-//
-// Workforce left the menu the same way (DEV-012). Work is handed out from the
-// case — Ask, Ask Bob, an instruction inside a mission — and the AI employees
-// are an admin matter, so they live in Settings → Team. `/agents` redirects.
-//
-// The Companies directory was removed the same way. Company rows stay in the
-// database, and `/companies/[id]` still opens from missions, Approvals and
-// holdings. A mega-list of names is not a place the CEO browses.
-//
-// Job Intake left the same way. Mail ingestion, scoring, leads and reply
-// history stay; `/job-intake` remains a hidden diagnostics page. Commercial
-// mail exceptions belong on Today once Bob's wake is proven.
-const navGroups: NavGroup[] = [
-  {
-    label: "Every day",
-    items: [
-      { href: "/decisions", label: "Today", icon: ClipboardCheck },
-      // One objective each, and every instruction given inside it.
-      { href: "/missions", label: "Missions", icon: Target },
-    ],
-  },
-  {
-    label: "What we found",
-    items: [
-      { href: "/hunter", label: "Signal Inbox", icon: Radar },
-    ],
-  },
-  {
-    label: "Our people",
-    items: [
-      { href: "/workers", label: "Talent Pool", icon: UserRound },
-      { href: "/workers/cert-checklist", label: "Cert Alerts", icon: ShieldAlert },
-      { href: "/documents", label: "Compliance", icon: FileText },
-    ],
-  },
-  {
-    label: "Setup",
-    items: [
-      { href: "/onboarding", label: "Setup Readiness", icon: ListChecks },
-      { href: "/imports", label: "Data Imports", icon: Upload },
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
+// What left, and where it went. None of the data moved and no page was
+// deleted; the list is hidden, the record still opens from the case.
+//   Workforce      → Settings → Team (DEV-012). `/agents` redirects.
+//   Signal Inbox   → Settings → Diagnostics. Scout consumes signals; a project
+//                    still opens from its mission, Today and a case.
+//   Cert Alerts    → certificate exceptions on Today, and a filter in Talent.
+//   Compliance     → a tab in Talent.
+//   Setup Readiness, Data Imports → Settings.
+//   Tasks, Companies, Job Intake left earlier for the same reason.
+const navItems: NavItem[] = [
+  { href: "/decisions", label: "Today", icon: ClipboardCheck },
+  { href: "/missions", label: "Missions", icon: Target },
+  { href: "/workers", label: "Talent", icon: UserRound },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar({
@@ -100,67 +50,41 @@ export function Sidebar({
         </h1>
         <p className="mt-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">Project to Placement</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {navGroups.map((group) => (
-          <div key={group.label}>
-            <h3 className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {group.label}
-            </h3>
-            <nav className="space-y-1">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href);
-                const highlight = item.highlight;
-                // A live count beats a static label: work waiting on a human
-                // has to be visible from anywhere in the app, not only once
-                // you've opened the right project.
-                const live =
-                  item.href === "/decisions"
-                    ? approvalsCount
-                    : item.href === "/missions"
-                      ? missionsCount
-                      : 0;
-                const pending = live > 0;
-                const badge = pending ? String(live) : item.badge;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                      active
-                        ? highlight
-                          ? "bg-sky-600 text-white shadow-md shadow-sky-200"
-                          : "bg-white text-sky-700 shadow-sm border border-slate-200"
-                        : highlight
-                          ? "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-100"
-                          : "text-slate-600 hover:bg-slate-200 hover:text-slate-900",
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4", active && !highlight ? "text-sky-600" : "")} />
-                    <span className="flex-1">{item.label}</span>
-                    {badge && (
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                          active && highlight
-                            ? "bg-white/20 text-white"
-                            : pending
-                              ? "bg-amber-500 text-white shadow-sm"
-                              : "bg-sky-500 text-white shadow-sm",
-                        )}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        ))}
+      <div className="flex-1 overflow-y-auto p-4">
+        <nav className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            // A live count beats a static label: work waiting on a human has
+            // to be visible from anywhere in the app.
+            const live =
+              item.href === "/decisions"
+                ? approvalsCount
+                : item.href === "/missions"
+                  ? missionsCount
+                  : 0;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  active
+                    ? "bg-white text-sky-700 shadow-sm border border-slate-200"
+                    : "text-slate-600 hover:bg-slate-200 hover:text-slate-900",
+                )}
+              >
+                <Icon className={cn("h-4 w-4", active ? "text-sky-600" : "")} />
+                <span className="flex-1">{item.label}</span>
+                {live > 0 && (
+                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                    {live}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </aside>
   );

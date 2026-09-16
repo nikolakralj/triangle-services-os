@@ -6,6 +6,7 @@ import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
 import { listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
+import { listCertAlerts } from "@/lib/data/worker-documents";
 import { getSession } from "@/lib/auth/session";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +47,7 @@ export default async function DecisionsPage() {
     followUps,
     waits,
     done,
+    certAlerts,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
@@ -55,7 +57,12 @@ export default async function DecisionsPage() {
     listFollowUpsDue(org),
     listInProgressWaits(org),
     listDoneSince(org),
+    listCertAlerts(org),
   ]);
+  // Cert Alerts left the menu (DEV-011); the exceptions are a Needs you card.
+  const certs = certAlerts.filter(
+    (c) => c.expiryStatus === "expired" || c.expiryStatus === "expiring_soon",
+  );
 
   // Scout first, then Hanna, then the rest — the order the router in the Ask
   // box falls back through when a brief does not clearly belong to either.
@@ -87,6 +94,7 @@ export default async function DecisionsPage() {
         followUps={followUps}
         waits={waits}
         done={done}
+        certs={certs}
       />
     </div>
   );

@@ -53,7 +53,7 @@ interface Recorded {
  * What kind of decision a Needs you card asks for, in the same place on every
  * card: Reply, Follow up, Call, Write, Decide. The first piece of one card shape.
  */
-function KindChip({ kind }: { kind: string }) {
+export function KindChip({ kind }: { kind: string }) {
   return (
     <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-800">
       {kind}

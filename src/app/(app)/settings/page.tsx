@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -72,7 +73,39 @@ export default async function SettingsPage({
     { label: "Reply style", href: "#reply-style" },
     { label: "Organization", href: "#organization" },
     { label: "Business defaults", href: "#business-defaults" },
+    { label: "Setup & data", href: "#setup" },
     ...(canSeeDiagnostics ? [{ label: "Diagnostics", href: "#diagnostics" }] : []),
+  ];
+
+  // Pages that left the menu (DEV-011). Nothing was deleted; they open here.
+  const setupLinks = [
+    {
+      href: "/onboarding",
+      label: "Setup readiness",
+      hint: "A truthful checklist for the first safe intake, qualification, draft and package.",
+    },
+    {
+      href: "/imports",
+      label: "Data imports",
+      hint: "Bring people in — one CV at a time, or the whole roster from a spreadsheet.",
+    },
+  ];
+  const diagnosticPages = [
+    {
+      href: "/hunter",
+      label: "Signal Inbox",
+      hint: "Every project the employees found, with status, sector and country filters. Scout works these from missions.",
+    },
+    {
+      href: "/job-intake",
+      label: "Job Intake",
+      hint: "Mail ingestion, scoring, leads and reply history.",
+    },
+    {
+      href: "/workers/cert-checklist",
+      label: "Certificate expiry list",
+      hint: "Every worker certificate expiring within 60 days. The exceptions are on Today.",
+    },
   ];
 
   return (
@@ -215,6 +248,15 @@ export default async function SettingsPage({
               </div>
             </CardContent>
           </Card>
+          <Card id="setup" className="scroll-mt-20">
+            <CardHeader
+              title="Setup & data"
+              description="Getting the organization ready and getting people in. These left the menu; they did not go away."
+            />
+            <CardContent>
+              <LinkList items={setupLinks} />
+            </CardContent>
+          </Card>
           {canSeeDiagnostics && (
             <Card id="diagnostics" className="scroll-mt-20">
               <CardHeader
@@ -222,6 +264,14 @@ export default async function SettingsPage({
                 description="Machine records for whoever maintains Triangle; nothing here needs a business decision."
               />
               <CardContent className="space-y-6">
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-900">Hidden pages</h3>
+                  <p className="mb-3 mt-0.5 text-[13px] text-slate-500">
+                    Lists that are not operating surfaces. The data stays; the record
+                    opens from the case.
+                  </p>
+                  <LinkList items={diagnosticPages} />
+                </section>
                 {refusals && (
                   <section>
                     <h3 className="text-sm font-semibold text-slate-900">Refused records</h3>
@@ -246,5 +296,26 @@ export default async function SettingsPage({
         </div>
       </div>
     </>
+  );
+}
+
+function LinkList({ items }: { items: Array<{ href: string; label: string; hint: string }> }) {
+  return (
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
+      {items.map((item) => (
+        <li key={item.href}>
+          <Link
+            href={item.href}
+            className="flex items-center justify-between gap-3 px-3 py-2.5 transition hover:bg-slate-50"
+          >
+            <span className="min-w-0">
+              <span className="block text-[13px] font-medium text-slate-900">{item.label}</span>
+              <span className="block text-[12px] text-slate-500">{item.hint}</span>
+            </span>
+            <span className="shrink-0 text-[12px] font-medium text-sky-700">Open →</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

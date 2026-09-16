@@ -100,6 +100,7 @@ export default async function HunterPage({
             : "Everything your employees found, waiting to be qualified."
         }
       />
+      <DiagnosticsBanner />
 
       <SectorSwitcher
         sectors={sectors}
@@ -218,6 +219,25 @@ export default async function HunterPage({
       {/* Projects */}
       <DiscoveredProjectsTable projects={projects} progress={progress} />
     </>
+  );
+}
+
+// Same pattern as Job Intake and Companies: hide the list, keep the data.
+// Scout consumes signals; the CEO does not patrol this queue (DEV-011).
+function DiagnosticsBanner() {
+  return (
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <p className="text-sm font-semibold text-amber-950">
+        Diagnostics — not a daily operating surface
+      </p>
+      <p className="mt-1 text-sm text-amber-900">
+        Every project your employees found stays here, with its status, sector
+        and country filters. Scout works these from missions; a project opens
+        from its mission, from Today and from a case. This page is reachable
+        from Settings → Diagnostics and bookmarks; it is not in primary
+        navigation.
+      </p>
+    </div>
   );
 }
 
