@@ -171,7 +171,7 @@ export async function answerAboutTalent(
   if (pool.length === 0 && partnerPool.length === 0) {
     return {
       answer:
-        "There is nobody in the pool yet. Upload CVs on Data Imports and they will be read into profiles, or add a partner firm on Workers.",
+        "There is nobody in the pool yet. Upload CVs under Settings → Setup & data → Data imports and they will be read into profiles, or add a partner firm in Talent.",
       people: [],
       partners: [],
       blockers: [],

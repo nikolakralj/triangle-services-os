@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, ShieldAlert, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // One toolbar, filtering as you go.
@@ -32,6 +32,7 @@ export function WorkersFilterForm({
   initialAvailability,
   initialCountry,
   initialSkill,
+  initialCerts = "",
   resultCount,
   totalCount,
 }: {
@@ -43,6 +44,8 @@ export function WorkersFilterForm({
   initialAvailability: string;
   initialCountry: string;
   initialSkill: string;
+  /** `attention` = only people with a certificate expired or expiring within 30 days. */
+  initialCerts?: string;
   resultCount: number;
   totalCount: number;
 }) {
@@ -54,13 +57,14 @@ export function WorkersFilterForm({
   const [availability, setAvailability] = useState(initialAvailability);
   const [country, setCountry] = useState(initialCountry);
   const [skill, setSkill] = useState(initialSkill);
+  const [certs, setCerts] = useState(initialCerts);
 
   // The URL stays the source of truth so a filtered pool can be linked and
   // shared — "here are the four people who could do it" is a message someone
   // sends, not a state they re-create by hand.
   function push(next: Record<string, string>) {
     const params = new URLSearchParams();
-    const all = { search, role, availability, country, skill, ...next };
+    const all = { search, role, availability, country, skill, certs, ...next };
     for (const [k, v] of Object.entries(all)) if (v) params.set(k, v);
     const qs = params.toString();
     startTransition(() => router.replace(`/workers${qs ? `?${qs}` : ""}`));
@@ -157,6 +161,26 @@ export function WorkersFilterForm({
           <option value="">All countries</option>
           {countries.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+
+        {/* Cert Alerts used to be a page in the menu. It is a question about
+            the pool, so it is a filter on the pool (DEV-011). */}
+        <button
+          type="button"
+          aria-pressed={certs === "attention"}
+          onClick={() => {
+            const next = certs === "attention" ? "" : "attention";
+            setCerts(next);
+            push({ certs: next });
+          }}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition ${
+            certs === "attention"
+              ? "border-amber-300 bg-amber-50 text-amber-900"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Certs need attention
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -182,11 +206,11 @@ export function WorkersFilterForm({
           </button>
         ))}
 
-        {(active.length > 0 || availability) && (
+        {(active.length > 0 || availability || certs) && (
           <button
             type="button"
             onClick={() => {
-              setSearch(""); setRole(""); setAvailability(""); setCountry(""); setSkill("");
+              setSearch(""); setRole(""); setAvailability(""); setCountry(""); setSkill(""); setCerts("");
               startTransition(() => router.replace("/workers"));
             }}
             className="font-medium text-slate-500 underline hover:text-slate-800"
