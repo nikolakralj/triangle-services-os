@@ -547,6 +547,12 @@ projects; Talent shows the two tabs and the certificate filter; Today shows a
 Renew card only if a worker certificate is expired or within 30 days; Settings
 → Setup & data opens readiness and imports; Diagnostics lists the hidden pages.
 
+**Seen on the Preview (Nikola, 16 September):** the Compliance tab lists the
+same CV for one person up to six times — six uploads of one file, each its own
+document row. Not this item; a follow-up: skip or fold duplicate uploads (same
+worker, same category, same file name and size) at upload time and on the
+list. No row is deleted until a person says so.
+
 ### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (code on branches; slice B awaits signed-in check on the Preview)
 
 **Slices, so another agent can continue:** A — a Team section in Settings with
