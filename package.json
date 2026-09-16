@@ -11,6 +11,7 @@
     "check:today-slim": "node scripts/check-today-slim.mjs",
     "check:dev-004": "node scripts/check-dev-004.mjs",
     "check:dev-015": "node scripts/check-dev-015.mjs",
+    "check:dev-011": "node scripts/check-dev-011.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "ship": "node scripts/ship.mjs"
