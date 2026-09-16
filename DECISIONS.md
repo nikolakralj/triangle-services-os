@@ -6,6 +6,54 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-16: Machines observe; humans judge — Today cards slim
+
+Agreed 15–16 September 2026 (CEO + external expert + Triangle Engineer).
+Direction is locked here. This slice only slims Today email cards; most of
+the direction is still NEXT.
+
+Decision:
+
+- **Machines observe; humans judge.** Email sent, replied, and follow-up due
+  should eventually come from the connected mailbox and the outbox, not from
+  CEO buttons that report observable state.
+- **Today cards for commercial mail** converge on three human actions:
+  **Open mail** (existing provider/thread deep link), **Ask Bob** (short
+  contextual instruction with person / thread / lead / mission ids — Bob is
+  Commercial Ops), and **Dismiss** (scoped judgment: not now / not this
+  opportunity / wrong person / don’t contact). Dismiss is not a forever
+  blacklist and is not silent ML.
+- **Remove from the primary rail:** Sent, They replied, Sent a follow-up, and
+  similar “report what the mailbox can see” buttons. Keep a thin escape under
+  Dismiss or advanced: **Recorded outside Triangle**, so Today does not lie
+  until mailbox sync proves outcomes.
+- **Follow-ups are Bob-owned work.** Today should shrink toward exceptions
+  (“Bob handling N; 1 needs you”). This slice stops encouraging manual
+  Sent-a-follow-up as the main path; a full rewrite of the overdue list can
+  follow.
+- **Phone cards stay** (Dial / Got through / No answer / Dead end) until
+  phone is in the mailbox.
+- Ask Bob creates a real assignment for Bob with the card’s entity ids. If
+  Bob’s mission scope (DEV-004) is not on his badge, or his wake-up routine
+  is not on, the UI fails honestly and does not pretend the work was taken.
+- Do not widen `communicationPolicy`. Triangle still sends nothing.
+
+NEXT (not this slice — do not fake the buttons):
+
+- provider `createDraft` in Gmail / Outlook;
+- mailbox-derived sent / replied, so the ledger is observed rather than
+  clicked;
+- typed / voice **Ask Triangle** that routes Scout / Hanna / Bob by intent
+  (e.g. “investigate the end client from this email” → Scout). No Scout
+  buttons on the Today mail card until that router exists.
+
+Why:
+
+- reporting “Sent” and “They replied” on Today taught the operating system
+  to wait for the CEO to type the weather;
+- Bob already owns commercial follow-through once DEV-004 lands; Today
+  should hand him the thread, not duplicate his job as three outcome buttons.
+
 ### 2026-09-15: Project Research Agent chat is retired
 
 Decision:

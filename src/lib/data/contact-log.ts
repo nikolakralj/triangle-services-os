@@ -151,6 +151,12 @@ export async function logContactAttempt(params: {
   draft?: string | null;
   subject?: string | null;
   note?: string | null;
+  /**
+   * "Not now" with no prior send: archive a look-again without claiming a
+   * mailbox send. The card leaves Today and comes back with the follow-up
+   * date. Not a Sent record.
+   */
+  defer?: boolean;
 }): Promise<
   | { ok: true; actionId: string; draftId: string; followUpAt: string | null }
   | { ok: false; error: string }
@@ -226,18 +232,25 @@ export async function logContactAttempt(params: {
 
   const channel = DRAFT_CHANNEL[params.channelKind] ?? "email_cold";
   const now = new Date().toISOString();
+  const defer = Boolean(params.defer);
   // Something went and nothing came back yet, so there is a date to look again.
+  // A defer is a look-again with no send — still needs a date, or it vanishes.
   const followUpAt =
-    params.outcome === "sent" || params.outcome === "no_answer" ? followUpDate() : null;
+    defer || params.outcome === "sent" || params.outcome === "no_answer" ? followUpDate() : null;
   // The words belong to what we did: a message that went, or a call. When the
   // event is their reply, the prepared email is not what happened, and filing
   // it as the content would say we sent it again.
-  const ourWords = params.outcome === "sent" || params.channelKind === "phone";
-  const record =
-    (ourWords ? params.content?.trim() : null) ||
-    recordOf(params.outcome, params.channelKind, recipientName, params.value);
+  const ourWords = !defer && (params.outcome === "sent" || params.channelKind === "phone");
+  const record = defer
+    ? params.note?.trim() || "Not now. No message sent from Triangle."
+    : (ourWords ? params.content?.trim() : null) ||
+      recordOf(params.outcome, params.channelKind, recipientName, params.value);
   const aiDraft = ourWords ? params.draft?.trim() || null : null;
   const subject = ourWords ? params.subject?.trim() || null : null;
+  const draftStatus = defer ? "archived" : DRAFT_STATUS[params.outcome];
+  const actionStatus = defer ? "completed" : ACTION_STATUS[params.outcome];
+  const outcome = defer ? "deferred" : params.outcome;
+  const summary = params.note?.trim() || (defer ? "Not now" : ATTEMPT_LABEL[params.outcome]);
 
   const { data: draft, error: draftError } = await svc
     .from("outreach_drafts")
@@ -252,10 +265,10 @@ export async function logContactAttempt(params: {
       channel,
       subject,
       body: record,
-      status: DRAFT_STATUS[params.outcome],
+      status: draftStatus,
       sent_at: now,
-      replied_at: params.outcome === "reached" ? now : null,
-      reply_summary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
+      replied_at: params.outcome === "reached" && !defer ? now : null,
+      reply_summary: summary,
       created_by_user_id: params.userId,
     })
     .select("id")
@@ -270,7 +283,7 @@ export async function logContactAttempt(params: {
     outreach_draft_id: draft.id,
     ...(personId ? { contact_id: personId } : {}),
     action_type: ACTION_TYPE[channel] ?? "other",
-    status: ACTION_STATUS[params.outcome],
+    status: actionStatus,
     channel,
     sender_user_id: params.userId,
     recipient_name: recipientName,
@@ -279,8 +292,8 @@ export async function logContactAttempt(params: {
     subject,
     ai_draft: aiDraft,
     final_content: record,
-    response_summary: params.note?.trim() || ATTEMPT_LABEL[params.outcome],
-    outcome: params.outcome,
+    response_summary: summary,
+    outcome,
     occurred_at: now,
     follow_up_at: followUpAt,
     human_confirmed_at: now,
@@ -298,7 +311,7 @@ export async function logContactAttempt(params: {
 
   // The ids go back so the screen can say what was recorded and offer to take
   // it back. Returning only {ok:true} is why a click looked like nothing.
-  if (params.outcome === "reached") {
+  if (params.outcome === "reached" && !defer) {
     try {
       const { recordClientReplyEvent } = await import("./event-outbox");
       await recordClientReplyEvent({

@@ -36,6 +36,8 @@ export interface FollowUp {
   /** 0 when it is due today. */
   daysOverdue: number;
   outcome: "sent" | "no_answer";
+  /** True when Today deferred this with no send recorded. */
+  lookAgain?: boolean;
 }
 
 const KIND_OF_CHANNEL: Record<string, ChannelKind> = {
@@ -259,6 +261,7 @@ export async function listFollowUpsDue(
       dueAt,
       daysOverdue: Math.max(0, Math.round((today - utcDay(dueAt)) / DAY)),
       outcome: a.outcome === "no_answer" ? "no_answer" : "sent",
+      lookAgain: a.outcome === "deferred",
     });
   }
 

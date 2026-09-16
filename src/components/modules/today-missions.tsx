@@ -30,6 +30,7 @@ import { EditableWords } from "@/components/modules/editable-words";
 import { MissionCard } from "@/components/missions/missions-index";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { openAsk } from "@/components/missions/ask-launcher";
+import { EmailCardActions } from "@/components/modules/today-email-actions";
 
 // ---------------------------------------------------------------------------
 // What the missions put on Today.
@@ -117,7 +118,8 @@ export function ReadyForYou({
       )}
 
       {/* Above the strangers: someone who already heard from us is worth more
-          than someone who never has. */}
+          than someone who never has. Follow-ups are Bob's to chase; this list
+          is the exception rail, not a place to report Sent-a-follow-up. */}
       {followUps.length > 0 && (
         <div>
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -128,7 +130,7 @@ export function ReadyForYou({
           {moreFollowUps > 0 && (
             <p className="mt-1.5 px-1 text-[11.5px] text-slate-500">
               {moreFollowUps} more {moreFollowUps === 1 ? "follow-up is" : "follow-ups are"} due —
-              they appear here as these are answered.
+              they appear here as these are handed to Bob or dismissed.
             </p>
           )}
         </div>
@@ -154,11 +156,8 @@ function shortDate(iso: string): string {
 }
 
 /**
- * "Oliver Hall · g2 Recruitment — emailed 10 Sep, follow-up due 14 Sep."
- *
- * The same three words as everywhere else, because what happens next is one
- * of them: they replied, it is not for us, or we wrote again. "Later" moves
- * the date instead of recording something that did not happen.
+ * A follow-up due. Email cards hand the chase to Bob; phone stays a human
+ * call until the mailbox covers voice.
  */
 function FollowUpRow({
   item,
@@ -173,6 +172,7 @@ function FollowUpRow({
   const [showSent, setShowSent] = useState(false);
   const outcomes = outcomesFor(item.channelKind);
   const isPhone = item.channelKind === "phone";
+  const isEmail = item.channelKind === "email";
   const overdue = item.daysOverdue > 0;
   const who = [item.who, item.company].filter(Boolean).join(" · ");
 
@@ -231,13 +231,15 @@ function FollowUpRow({
     }
   }
 
-  const verb = isPhone
-    ? item.outcome === "no_answer"
-      ? "Called, no answer"
-      : "Called"
-    : item.channelKind === "linkedin"
-      ? "Messaged"
-      : "Emailed";
+  const verb = item.lookAgain
+    ? "Look again"
+    : isPhone
+      ? item.outcome === "no_answer"
+        ? "Called, no answer"
+        : "Called"
+      : item.channelKind === "linkedin"
+        ? "Messaged"
+        : "Emailed";
 
   // Two lines, not four: eight of these sat above the people still to reach
   // and pushed them a screen down.
@@ -268,7 +270,7 @@ function FollowUpRow({
                   : "follow-up due today"}
               </span>
               {item.value && <span className="font-mono text-slate-500">{item.value}</span>}
-              {item.sent && (
+              {item.sent && !item.lookAgain && (
                 <button
                   type="button"
                   onClick={() => setShowSent((v) => !v)}
@@ -290,7 +292,7 @@ function FollowUpRow({
                 <Phone className="h-3 w-3" />
                 Dial
               </a>
-            ) : item.value && item.channelKind === "email" ? (
+            ) : item.value && isEmail ? (
               <a
                 href={mailtoHref(
                   item.value,
@@ -312,34 +314,58 @@ function FollowUpRow({
                 <ArrowUpRight className="h-3 w-3" />
               </a>
             ) : null}
-            <button
-              type="button"
-              onClick={() => void later()}
-              disabled={busy !== null}
-              title="Look at this again in four days. Nothing is recorded as done."
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
-            >
-              {busy === "later" && <Loader2 className="h-3 w-3 animate-spin" />}
-              Later
-            </button>
-            <div className="flex overflow-hidden rounded-lg border border-slate-200">
-              {outcomes.map(({ outcome, label }, i) => (
+            {!isEmail && (
+              <>
                 <button
-                  key={outcome}
                   type="button"
+                  onClick={() => void later()}
                   disabled={busy !== null}
-                  onClick={() => void log(outcome)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 ${
-                    i > 0 ? "border-l border-slate-200" : ""
-                  }`}
+                  title="Look at this again in four days. Nothing is recorded as done."
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
                 >
-                  {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-                  {FOLLOW_UP_LABEL[outcome] ?? label}
+                  {busy === "later" && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Later
                 </button>
-              ))}
-            </div>
+                <div className="flex overflow-hidden rounded-lg border border-slate-200">
+                  {outcomes.map(({ outcome, label }, i) => (
+                    <button
+                      key={outcome}
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void log(outcome)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 ${
+                        i > 0 ? "border-l border-slate-200" : ""
+                      }`}
+                    >
+                      {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {FOLLOW_UP_LABEL[outcome] ?? label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
+        {isEmail && (
+          <div className="mt-2">
+            <EmailCardActions
+              target={{
+                who,
+                about: item.about,
+                leadId: item.target.leadId,
+                contactId: item.target.contactId,
+                personId: item.target.personId,
+                actionId: item.actionId,
+                channelKind: item.channelKind,
+                value: item.value ?? "the address on record",
+                subject: item.subject,
+                words: item.sent,
+                draft: item.sent,
+              }}
+              onRecorded={onRecorded}
+            />
+          </div>
+        )}
         {showSent && item.sent && (
           <pre className="mt-2 max-w-3xl whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 font-mono text-[12px] leading-[1.7] text-slate-700">
             {item.subject ? `${item.subject}\n\n` : ""}
@@ -536,25 +562,47 @@ function ReadyPerson({
               {copied ? "Copied" : "Copy the words"}
             </button>
           )}
-          <span className="grow" />
-          <div className="flex overflow-hidden rounded-lg border border-slate-200">
-            {outcomes.map(({ outcome, label }, i) => (
-              <button
-                key={outcome}
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void log(outcome)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 ${
-                  i > 0 ? "border-l border-slate-200" : ""
-                }`}
-              >
-                {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-                {label}
-              </button>
-            ))}
-          </div>
+          {channel.kind !== "email" && (
+            <>
+              <span className="grow" />
+              <div className="flex overflow-hidden rounded-lg border border-slate-200">
+                {outcomes.map(({ outcome, label }, i) => (
+                  <button
+                    key={outcome}
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void log(outcome)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 ${
+                      i > 0 ? "border-l border-slate-200" : ""
+                    }`}
+                  >
+                    {busy === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-        {channel.kind !== "phone" && (
+        {channel.kind === "email" && (
+          <div className="mt-2">
+            <EmailCardActions
+              target={{
+                who: [person.name, person.companyName].filter(Boolean).join(" · "),
+                about: person.title,
+                personId: person.contactId,
+                missionId: person.mission.id,
+                companyId: person.companyId ?? undefined,
+                channelKind: channel.kind,
+                value: channel.value,
+                words: outgoing,
+                draft: person.words,
+              }}
+              onRecorded={onRecorded}
+            />
+          </div>
+        )}
+        {channel.kind !== "phone" && channel.kind !== "email" && (
           <p className="mt-1.5 text-[11px] text-slate-500">
             Opening mail sends nothing — press Sent once it has actually gone.
           </p>

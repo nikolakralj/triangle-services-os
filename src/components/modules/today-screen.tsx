@@ -26,6 +26,7 @@ import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
 import { MissionsZone, ReadyForYou } from "@/components/modules/today-missions";
+import { EmailCardActions } from "@/components/modules/today-email-actions";
 
 // ---------------------------------------------------------------------------
 // One screen. Three zones. Numbered because it is a real order on the page.
@@ -555,41 +556,58 @@ function ActionPanel({
             />
           ))}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="What happened? (optional)"
-            className="h-9 min-w-[12rem] grow rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[13px] text-slate-200 placeholder-slate-600 transition focus:border-white/25 focus:bg-white/[0.07] focus:outline-none"
-          />
-          {/* One segmented control, not three loose buttons. */}
-          <div className="flex overflow-hidden rounded-lg border border-white/15">
-            {outcomes.map(({ outcome, label, tone }, i) => (
-              <button
-                key={outcome}
-                type="button"
-                disabled={logging !== null}
-                onClick={() => void log(outcome)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium transition disabled:opacity-40 ${TONE[tone]} ${
-                  i > 0 ? "border-l border-white/15" : ""
-                }`}
-              >
-                {logging === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
-                {label}
-              </button>
-            ))}
+        {isPhone ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What happened? (optional)"
+              className="h-9 min-w-[12rem] grow rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[13px] text-slate-200 placeholder-slate-600 transition focus:border-white/25 focus:bg-white/[0.07] focus:outline-none"
+            />
+            <div className="flex overflow-hidden rounded-lg border border-white/15">
+              {outcomes.map(({ outcome, label, tone: outcomeTone }, i) => (
+                <button
+                  key={outcome}
+                  type="button"
+                  disabled={logging !== null}
+                  onClick={() => void log(outcome)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium transition disabled:opacity-40 ${TONE[outcomeTone]} ${
+                    i > 0 ? "border-l border-white/15" : ""
+                  }`}
+                >
+                  {logging === outcome && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Open mail hands the words to your mail program and sends nothing.
-            Saying so here is what stops "Sent" being pressed for an email
-            that is still sitting in a draft. */}
-        {!isPhone && (
-          <p className="text-[11px] text-slate-500">
-            Open mail sends nothing by itself — press{" "}
-            <span className="text-slate-300">Sent</span> once the email has actually
-            gone.
-          </p>
+        ) : (
+          <EmailCardActions
+            tone="dark"
+            target={{
+              who: action.personName,
+              about: [action.personRole, action.country ? `in ${action.country}` : null]
+                .filter(Boolean)
+                .join(" "),
+              leadId: action.leadId,
+              contactId: action.contactId || undefined,
+              channelKind: action.channelKind,
+              value: action.value,
+              subject: action.subject,
+              words: outgoing,
+              draft: action.script,
+            }}
+            onRecorded={(recorded) =>
+              onLogged({
+                actionId: recorded.actionId,
+                sentence: recorded.sentence,
+                who: recorded.who,
+                about: [action.personRole, action.country ? `in ${action.country}` : null]
+                  .filter(Boolean)
+                  .join(" "),
+              })
+            }
+          />
         )}
 
         {error && <p className="text-[13px] text-rose-400">{error}</p>}

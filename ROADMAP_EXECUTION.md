@@ -281,6 +281,37 @@ in the route table. Could not signed-in check here. Nikola: confirm the
 sidebar has no Job Intake, then open `/job-intake` from a bookmark and read
 the diagnostics banner.
 
+### DEV-009 — Today cards: machines observe, humans judge · `DONE`
+
+**Why:** Today's email cards asked the CEO to report Sent / They replied /
+Sent a follow-up — observable mailbox state. Agreed 15–16 September: machines
+observe, humans judge. First slice is the card chrome, not Gmail sync.
+
+**Acceptance:** email follow-up and ready-to-contact cards keep Open mail;
+primary outcome buttons Sent / They replied / Sent a follow-up / Later are
+gone; Ask Bob creates a real assignment with the card's entity ids, or fails
+honestly when DEV-004 blocks Bob; Dismiss is scoped (not now / not this
+opportunity / wrong person / don't contact) and is not a forever blacklist;
+Recorded outside Triangle remains so the ledger can stay true; phone cards
+stay; no Gmail draft API, no Scout/Hanna routing UI, no migration, no send
+path. Offline check for "primary email outcome buttons removed / Ask Bob
+present". Lint, production build, tenant-identity.
+
+**Done 16 September.** Card chrome is Open mail · Ask Bob · Dismiss. Ask Bob
+posts `/api/ask/bob` (instruction + person/lead/contact/mission ids), creates
+a Bob assignment, wakes him, and takes the card off the human rail. If his
+badge lacks `mission.work` or he is not on a bot, the UI shows that and
+creates nothing. Dismiss maps onto Later / not-for-us / dead_end / a deferred
+look-again — never `do_not_contact`. Recorded outside Triangle still writes
+the ledger as sent. Phone cards unchanged.
+
+Checked: 12/12 offline (`npm run check:today-slim`); lint 0; production
+build 0; tenant-identity 0. Could not signed-in check here. Nikola: on Today,
+an email follow-up should show Open mail · Ask Bob · Dismiss, not Sent.
+
+**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied;
+Ask Triangle that routes Scout/Hanna/Bob by intent; Today copy "Bob handling
+N; 1 needs you" as a full overdue-list rewrite.
 
 ### Only if live work stalls on it
 
@@ -297,6 +328,10 @@ the diagnostics banner.
 - Budget and cost per mission.
 - Separate research and communications computers for bots (see the
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
+- Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
+- Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons.
+- Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent. Do not
+  fake Scout buttons on the mail card before that router exists.
 
 Not now: a workforce registry, marketplace hiring, quality scores, autonomous
 sending.
