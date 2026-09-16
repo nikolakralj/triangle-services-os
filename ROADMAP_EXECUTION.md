@@ -373,7 +373,7 @@ Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
 Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
 Bob ? Open thread drawer ? the card is in In progress, not Workforce.
 
-### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `READY`
+### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `DONE` (branch `claude/today-one-inbox`)
 
 **Why now:** Today / Workforce shows "The system refused N attempts..." with
 Postgres finding-contract sentences (Ask Bob completes mis-classified as
@@ -399,7 +399,56 @@ landings for commercial follow-through.
 
 This item is **docs-locked** in this change. Code is the next slice.
 
-### DEV-017 - Today: one inbox - `READY` (after DEV-016)
+**Done 16 September** on branch `claude/today-one-inbox`. Today no longer
+renders `RefusalLedger`; Settings has a Diagnostics section, shown to admins and
+partners, with the same ledger. Records, component and `summarizeRefusals` are
+unchanged; Workforce never rendered the ledger. Checked signed in on localhost,
+3/3; type check and lint pass. Not merged or on production yet.
+
+### DEV-017 - Today: one inbox - `DONE` (branch `claude/today-one-inbox`; one limit below)
+
+**Slices, so another agent can continue:** A — structure: pulse line, In
+progress grouped per employee, Done since you looked, Missions zone and "on
+file" counts off Today, old reports folded under Done. B — group Needs you
+cards by person or case. C — one card shape for every Needs you card; Take back
+moves into the thread drawer. Status per slice is recorded below as each lands.
+
+**Slice A done 16 September** (branch `claude/today-one-inbox`). Today opens
+with a pulse line ("11 need you · Bob on 8 · Hanna on 2" on the day it
+landed), then Needs you (unchanged cards), In progress as one collapsed line
+per employee whose rows keep Open thread and Take back, and Done since you
+looked: missions finished since last opened (state `ready`) plus missionless
+work completed in the last 24 hours (`listDoneSince`), each opening its
+mission or thread. Old reports sit folded under Done. The mission grid, its Ask
+box, the "on file" counts and their three count queries are gone from Today.
+Checked signed in on localhost, 8/8; `check:dev-015` 15/15 and
+`check:today-slim` 12/12 still pass; type check and lint pass.
+**Next: slice B**, then C.
+
+**Slice B done 16 September** (branch `claude/today-one-inbox`). Follow-ups for
+the same person are one card, grouped by the address the follow-up goes to (or
+name and company without one): the person, the oldest overdue date, the address
+and one Open mail or Dial on the card, then one line per role with its own Ask
+Bob or thread and Dismiss. A single follow-up still renders as before. Checked
+signed in on localhost, 4/4: Nicolas Preckler's two roles are one card with one
+Open mail and two Ask Bob actions, and his name appears once in Needs you.
+**Next: slice C.** Known: the "Open mail sends nothing" note repeats on each role
+line; one card shape should say it once.
+
+**Slice C done 16 September** (branch `claude/today-one-inbox`). Every Needs you
+card now leads with its kind in the same place — Reply or Call on the hero card,
+Decide or Stopped on a mission that asked, Follow up, and Call or Write on a
+person a mission made reachable. A grouped card says "Open mail sends nothing"
+once. Take back left the In progress rows and sits in the thread drawer's header
+for open work, next to what the employee has done; the With Bob state on a card
+keeps its own Take back (DEV-015). Checked signed in on localhost, 6/6, without
+pressing Take back; `check:dev-015` 15/15 and `check:today-slim` 12/12 still
+pass; type check and lint pass.
+
+**Limit:** card internals are not yet identical. Phone cards keep Got through,
+No answer and Dead end (DEV-009 keeps phone outcomes), and a mission's question
+is answered on the mission page, not on Today. Answering a mission's question on
+Today is listed under Next.
 
 **Why:** on Preview 76c42d4 Today mixed four card designs, listed the same
 recruiter once per role, kept a mission grid and a second Ask box under the
@@ -568,6 +617,8 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
   first that replies and the Sent folder reach Triangle.
 - A Today per person: Needs you filtered to the cases each person owns (Ralph
   may get his own), once work carries a human owner consistently.
+- Answer a mission's question on Today, in the card, instead of opening the
+  mission (the remaining step to one card shape from DEV-017).
 - Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent
   (DEV-014, after DEV-010). Do not fake Scout buttons on the mail card before
   that router exists.

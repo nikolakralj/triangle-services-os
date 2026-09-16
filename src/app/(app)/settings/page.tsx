@@ -6,6 +6,9 @@ import { IntakeRulesPanel } from "@/components/modules/intake-rules-panel";
 import { ReplyStylePanel } from "@/components/modules/reply-style-panel";
 import { ChangePasswordPanel } from "@/components/modules/change-password-panel";
 import { OrganizationProfilePanel } from "@/components/modules/organization-profile-panel";
+import { RefusalLedger } from "@/components/modules/refusal-ledger";
+import { getSession } from "@/lib/auth/session";
+import { summarizeRefusals } from "@/lib/data/refusals";
 import {
   COMPANY_TYPES,
   COUNTRIES,
@@ -13,16 +16,30 @@ import {
   SECTORS,
 } from "@/lib/constants";
 
-const sections = [
-  { label: "Your account", href: "#account" },
-  { label: "Job Intake mailboxes", href: "#mailboxes" },
-  { label: "What the agent looks for", href: "#intake-rules" },
-  { label: "Reply style", href: "#reply-style" },
-  { label: "Organization", href: "#organization" },
-  { label: "Business defaults", href: "#business-defaults" },
-];
+export const dynamic = "force-dynamic";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  // Diagnostics are for whoever runs the organization. A refused record is a
+  // check that worked, so it sits here rather than on Today (DEV-016).
+  const session = await getSession();
+  const canSeeDiagnostics =
+    Boolean(session?.organizationId) &&
+    (session?.role === "admin" || session?.role === "partner");
+  const refusals =
+    canSeeDiagnostics && session?.organizationId
+      ? await summarizeRefusals(session.organizationId)
+      : null;
+
+  const sections = [
+    { label: "Your account", href: "#account" },
+    { label: "Job Intake mailboxes", href: "#mailboxes" },
+    { label: "What the agent looks for", href: "#intake-rules" },
+    { label: "Reply style", href: "#reply-style" },
+    { label: "Organization", href: "#organization" },
+    { label: "Business defaults", href: "#business-defaults" },
+    ...(refusals ? [{ label: "Diagnostics", href: "#diagnostics" }] : []),
+  ];
+
   return (
     <>
       <PageHeader
@@ -130,6 +147,17 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+          {refusals && (
+            <Card id="diagnostics" className="scroll-mt-20">
+              <CardHeader
+                title="Diagnostics"
+                description="What the system refused to record in the last seven days, in the database's own words. For whoever maintains Triangle; nothing here needs a business decision."
+              />
+              <CardContent>
+                <RefusalLedger summary={refusals} />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </>

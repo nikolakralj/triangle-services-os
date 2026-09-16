@@ -12,14 +12,14 @@ import {
   Loader2,
   Mail,
   Phone,
-  Sparkles,
   Undo2,
   UserRound,
   X,
   MessageSquare,
 } from "lucide-react";
-import { hostOf, type MissionTab, type ReadyToContact } from "@/lib/data/mission-shared";
+import { ago, hostOf, type MissionTab, type ReadyToContact } from "@/lib/data/mission-shared";
 import type { FollowUp } from "@/lib/data/follow-ups";
+import type { DoneItem } from "@/lib/data/today-in-progress";
 import {
   mailtoHref,
   outcomeSentence,
@@ -28,10 +28,8 @@ import {
   type ContactOutcome,
 } from "@/lib/data/contact-channels";
 import { EditableWords } from "@/components/modules/editable-words";
-import { MissionCard } from "@/components/missions/missions-index";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
-import { openAsk } from "@/components/missions/ask-launcher";
-import { EmailCardActions } from "@/components/modules/today-email-actions";
+import { EMAIL_CARD_NOTE, EmailCardActions } from "@/components/modules/today-email-actions";
 import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
@@ -49,6 +47,18 @@ interface Recorded {
   actionId: string;
   sentence: string;
   who: string;
+}
+
+/**
+ * What kind of decision a Needs you card asks for, in the same place on every
+ * card: Reply, Follow up, Call, Write, Decide. The first piece of one card shape.
+ */
+function KindChip({ kind }: { kind: string }) {
+  return (
+    <span className="rounded bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+      {kind}
+    </span>
+  );
 }
 
 const WHOSE = {
@@ -103,6 +113,7 @@ export function ReadyForYou({
                 <StateGlyph state={m.state} className="mt-1" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
+                    <KindChip kind={m.state === "needs_you" ? "Decide" : "Stopped"} />
                     <MissionMark emoji={m.emoji} size="sm" />
                     {m.title}
                   </span>
@@ -130,9 +141,18 @@ export function ReadyForYou({
       {due.length > 0 && (
         <div>
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {due.map((f) => (
-              <FollowUpRow key={f.actionId} item={f} onRecorded={setRecorded} waits={waits} />
-            ))}
+            {groupByPerson(due).map((group) =>
+              group.length === 1 ? (
+                <FollowUpRow key={group[0].actionId} item={group[0]} onRecorded={setRecorded} waits={waits} />
+              ) : (
+                <FollowUpGroup
+                  key={group[0].actionId}
+                  items={group}
+                  onRecorded={setRecorded}
+                  waits={waits}
+                />
+              ),
+            )}
           </ul>
           {moreFollowUps > 0 && (
             <p className="mt-1.5 px-1 text-[11.5px] text-slate-500">
@@ -163,6 +183,106 @@ function shortDate(iso: string): string {
 }
 
 /**
+ * Follow-ups for the same person, together.
+ *
+ * A recruiter who sent four roles got four replies, and Today showed the same
+ * name four times with four mail buttons for one mailbox. Grouped by the
+ * address the follow-up would go to (or, without one, the name and company),
+ * in the order Today already sorts them: most overdue first.
+ */
+function groupByPerson(items: FollowUp[]): FollowUp[][] {
+  const groups = new Map<string, FollowUp[]>();
+  for (const item of items) {
+    const key =
+      (item.value ?? "").trim().toLowerCase() ||
+      `${item.who}|${item.company ?? ""}`.toLowerCase();
+    const group = groups.get(key);
+    if (group) group.push(item);
+    else groups.set(key, [item]);
+  }
+  return Array.from(groups.values());
+}
+
+/** One card per person: who, where, one channel button, then a line per role. */
+function FollowUpGroup({
+  items,
+  onRecorded,
+  waits,
+}: {
+  items: FollowUp[];
+  onRecorded: (r: Recorded) => void;
+  waits: InProgressWait[];
+}) {
+  const first = items[0];
+  const mostOverdue = Math.max(...items.map((i) => i.daysOverdue));
+  const overdue = mostOverdue > 0;
+  const isPhone = first.channelKind === "phone";
+  const isEmail = first.channelKind === "email";
+
+  return (
+    <li className="flex">
+      <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
+      <div className="min-w-0 grow">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-1 pt-2.5">
+          <div className="min-w-0 grow basis-72">
+            <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
+              <KindChip kind="Follow up" />
+              <span className="font-semibold tracking-[-0.01em] text-slate-900">{first.who}</span>
+              {first.company && first.company !== first.who ? (
+                <span className="text-slate-700">· {first.company}</span>
+              ) : null}
+              <span className="text-slate-500">— {items.length} roles to follow up</span>
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]">
+              <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              <span className={overdue ? "font-medium text-amber-800" : "text-slate-500"}>
+                {overdue
+                  ? `oldest follow-up ${mostOverdue === 1 ? "a day" : `${mostOverdue} days`} overdue`
+                  : "follow-ups due today"}
+              </span>
+              {first.value && <span className="font-mono text-slate-500">{first.value}</span>}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {first.value && isPhone ? (
+              <a
+                href={telHref(first.value)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Phone className="h-3 w-3" />
+                Dial
+              </a>
+            ) : first.value && isEmail ? (
+              <a
+                href={mailtoHref(first.value)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
+              >
+                <Mail className="h-3 w-3" />
+                Open mail
+              </a>
+            ) : null}
+          </div>
+        </div>
+        <ul className="divide-y divide-slate-100">
+          {items.map((item) => (
+            <FollowUpRow
+              key={item.actionId}
+              item={item}
+              onRecorded={onRecorded}
+              waits={waits}
+              compact
+            />
+          ))}
+        </ul>
+        {isEmail && (
+          <p className="px-4 pb-2.5 pt-1 text-[11px] text-slate-500">{EMAIL_CARD_NOTE}</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
  * A follow-up due. Email cards hand the chase to Bob; phone stays a human
  * call until the mailbox covers voice.
  */
@@ -170,10 +290,13 @@ function FollowUpRow({
   item,
   onRecorded,
   waits,
+  compact = false,
 }: {
   item: FollowUp;
   onRecorded: (r: Recorded) => void;
   waits: InProgressWait[];
+  /** One role inside a person's card: the person, address and mail button live on the card. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
@@ -253,23 +376,34 @@ function FollowUpRow({
   // Two lines, not four: eight of these sat above the people still to reach
   // and pushed them a screen down.
   return (
-    <li className="flex">
-      <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
-      <div className="min-w-0 grow px-4 py-2.5">
+    <li className={compact ? "flex pl-4" : "flex"}>
+      {!compact && (
+        <span aria-hidden className={`w-[3px] shrink-0 ${overdue ? "bg-amber-500" : "bg-sky-500"}`} />
+      )}
+      <div className={`min-w-0 grow px-4 ${compact ? "py-2" : "py-2.5"}`}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-0 grow basis-72">
-            <p className="flex flex-wrap items-baseline gap-x-2 text-[13.5px]">
-              <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
-              {item.company && item.company !== item.who ? (
-                <span className="text-slate-700">· {item.company}</span>
-              ) : null}
-              {item.about ? <span className="text-slate-500">— {item.about}</span> : null}
-            </p>
+            {compact ? (
+              <p className="text-[13px] font-medium text-slate-800">
+                {item.about ?? item.subject ?? "Follow-up"}
+              </p>
+            ) : (
+              <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
+                <KindChip kind="Follow up" />
+                <span className="font-semibold tracking-[-0.01em] text-slate-900">{item.who}</span>
+                {item.company && item.company !== item.who ? (
+                  <span className="text-slate-700">· {item.company}</span>
+                ) : null}
+                {item.about ? <span className="text-slate-500">— {item.about}</span> : null}
+              </p>
+            )}
             <p
               className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]"
               suppressHydrationWarning
             >
-              <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              {!compact && (
+                <Clock className={`h-3 w-3 ${overdue ? "text-amber-600" : "text-sky-600"}`} />
+              )}
               <span className="text-slate-600">
                 {verb} {shortDate(item.at)}
               </span>
@@ -278,7 +412,7 @@ function FollowUpRow({
                   ? `follow-up ${item.daysOverdue === 1 ? "a day" : `${item.daysOverdue} days`} overdue`
                   : "follow-up due today"}
               </span>
-              {item.value && <span className="font-mono text-slate-500">{item.value}</span>}
+              {item.value && !compact && <span className="font-mono text-slate-500">{item.value}</span>}
               {item.sent && !item.lookAgain && (
                 <button
                   type="button"
@@ -293,7 +427,7 @@ function FollowUpRow({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-            {item.value && isPhone ? (
+            {compact ? null : item.value && isPhone ? (
               <a
                 href={telHref(item.value)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
@@ -372,6 +506,7 @@ function FollowUpRow({
                 draft: item.sent,
               }}
               onRecorded={onRecorded}
+              hideNote={compact}
               alreadyWith={findWait(waits, {
                 leadId: item.target.leadId,
                 contactId: item.target.contactId,
@@ -465,7 +600,8 @@ function ReadyPerson({
     <li className="flex">
       <span aria-hidden className="w-[3px] shrink-0 bg-emerald-500" />
       <div className="min-w-0 grow px-4 py-3.5">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <KindChip kind={channel.kind === "phone" ? "Call" : "Write"} />
           <p className="text-[14px] font-semibold tracking-[-0.01em] text-slate-900">{person.name}</p>
           {person.title ? <p className="text-[13px] text-slate-500">{person.title}</p> : null}
           {person.companyName ? <p className="text-[13px] text-slate-700">· {person.companyName}</p> : null}
@@ -708,38 +844,21 @@ function RecordedLine({ recorded, onClear }: { recorded: Recorded; onClear: () =
 
 /**
  * Quiet In progress: Bob / Scout / Hanna still working. Needs you stays for
- * human decisions only.
+ * human decisions only. Take back lives in the thread, next to what the
+ * employee has done so far, so nobody takes work back without reading it.
  */
-export function InProgressWaits({ waits }: { waits: InProgressWait[] }) {
-  const router = useRouter();
+export function InProgressWaits({
+  waits,
+  embedded = false,
+}: {
+  waits: InProgressWait[];
+  /** Inside an employee's group: no frame of its own and no empty message. */
+  embedded?: boolean;
+}) {
   const handoff = useTodayHandoff();
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function takeBack(assignmentId: string) {
-    setBusyId(assignmentId);
-    setError(null);
-    try {
-      const res = await fetch("/api/agents/assignments", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(body.error ?? "Could not take it back.");
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError("Network error.");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   if (waits.length === 0) {
-    return (
+    return embedded ? null : (
       <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
         Nothing with the team right now. Hand a card to Bob and it waits here.
       </p>
@@ -748,7 +867,13 @@ export function InProgressWaits({ waits }: { waits: InProgressWait[] }) {
 
   return (
     <div>
-      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <ul
+        className={
+          embedded
+            ? "divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/40"
+            : "divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+        }
+      >
         {waits.map((wait) => (
           <li key={wait.assignmentId} className="flex items-start gap-3 px-4 py-3">
             <span className="mt-0.5 text-[16px]" aria-hidden>
@@ -778,59 +903,186 @@ export function InProgressWaits({ waits }: { waits: InProgressWait[] }) {
                 <MessageSquare className="h-3.5 w-3.5" />
                 Open thread
               </button>
-              <button
-                type="button"
-                disabled={busyId === wait.assignmentId}
-                onClick={() => void takeBack(wait.assignmentId)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
-              >
-                {busyId === wait.assignmentId ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Undo2 className="h-3 w-3" />
-                )}
-                Take back
-              </button>
             </div>
           </li>
         ))}
       </ul>
-      {error && <p className="mt-2 text-[12px] text-rose-600">{error}</p>}
     </div>
   );
 }
 
-export function MissionsZone({ missions }: { missions: MissionTab[] }) {
-  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+/**
+ * In progress, one quiet line per employee.
+ *
+ * Ten rows of "With Bob · working", each with two buttons, made the work that
+ * needs nothing from you as loud as the work that does. The line says who is
+ * busy with what; the rows, Open thread and Take back are one click away.
+ */
+export function InProgressByEmployee({ waits }: { waits: InProgressWait[] }) {
+  if (waits.length === 0) {
+    return (
+      <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
+        Nothing with the team right now. Hand a card to Bob and it waits here.
+      </p>
+    );
+  }
+
+  const groups: Array<{ name: string; emoji: string; waits: InProgressWait[] }> = [];
+  for (const wait of waits) {
+    const group = groups.find((g) => g.name === wait.agentName);
+    if (group) group.waits.push(wait);
+    else groups.push({ name: wait.agentName, emoji: wait.agentEmoji, waits: [wait] });
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {groups.map((group) => (
+        <EmployeeWaits key={group.name} {...group} />
+      ))}
+    </div>
+  );
+}
+
+function EmployeeWaits({
+  name,
+  emoji,
+  waits,
+}: {
+  name: string;
+  emoji: string;
+  waits: InProgressWait[];
+}) {
+  const [open, setOpen] = useState(false);
+  const working = waits.filter((w) => w.status === "active").length;
+  const queued = waits.length - working;
+  const replies = waits.reduce((n, w) => n + (w.awaitingAgent > 0 ? 1 : 0), 0);
+  const preview = waits
+    .slice(0, 3)
+    .map((w) => w.title)
+    .join(" · ");
+
+  return (
+    <div>
       <button
         type="button"
-        onClick={() => openAsk({})}
-        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left transition hover:border-slate-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500/40"
       >
-        <Sparkles className="h-4 w-4 shrink-0 text-sky-600" />
-        <span className="flex-1 text-[15px] text-slate-400">
-          Give the team work, or ask about your people…
+        <span className="mt-0.5 text-[16px]" aria-hidden>
+          {emoji}
         </span>
-        <kbd
-          suppressHydrationWarning
-          className="hidden rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 sm:inline"
-        >
-          {mac ? "⌘K" : "Ctrl K"}
-        </kbd>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-semibold text-slate-900">
+            {name}
+            <span className="font-normal text-slate-500">
+              {" — "}
+              {working > 0 ? `${working} working` : null}
+              {working > 0 && queued > 0 ? ", " : null}
+              {queued > 0 ? `${queued} queued` : null}
+              {replies > 0 ? ` · ${replies} with a message for ${name}` : null}
+            </span>
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] text-slate-500">
+            {preview}
+            {waits.length > 3 ? ` · and ${waits.length - 3} more` : ""}
+          </span>
+        </span>
+        <span className="shrink-0 pt-0.5 text-[12px] font-medium text-sky-700">
+          {open ? "Hide" : "Show"}
+        </span>
       </button>
-      {missions.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {missions.map((t) => (
-            <MissionCard key={t.id} tab={t} />
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-6 text-center text-[13px] text-slate-500">
-          No open missions. Anything you give the team becomes one you can keep talking to.
+      {open && <InProgressWaits waits={waits} embedded />}
+    </div>
+  );
+}
+
+/**
+ * Done since you looked.
+ *
+ * A mission that finished since you last opened it, and work outside missions
+ * finished in the last day. Opening the mission or the thread is where the
+ * result lives; a mission leaves this list once you have opened it.
+ */
+export function DoneSince({
+  missions,
+  done,
+  children,
+}: {
+  /** Missions whose latest step finished after you last opened them. */
+  missions: MissionTab[];
+  /** Missionless work finished in the last day. */
+  done: DoneItem[];
+  /** Older reports, folded, when there are any. */
+  children?: React.ReactNode;
+}) {
+  const handoff = useTodayHandoff();
+
+  if (missions.length === 0 && done.length === 0) {
+    return (
+      <div className="space-y-2.5">
+        <p className="rounded-2xl border border-dashed border-slate-300 px-5 py-5 text-center text-[13px] text-slate-500">
+          Nothing new has come back since you looked.
         </p>
-      )}
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {missions.map((m) => (
+          <li key={m.id}>
+            <Link
+              href={`/missions/${m.id}`}
+              className="flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50"
+            >
+              <span className="mt-0.5">
+                <MissionMark emoji={m.emoji} size="sm" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-semibold text-slate-900">{m.title}</span>
+                <span className="mt-0.5 block text-[12px] text-slate-500" suppressHydrationWarning>
+                  Mission finished a step · {ago(m.updatedAt)}
+                </span>
+              </span>
+              <span className="shrink-0 pt-0.5 text-[12px] font-medium text-sky-700">Open →</span>
+            </Link>
+          </li>
+        ))}
+        {done.map((item) => (
+          <li key={item.assignmentId} className="flex items-start gap-3 px-4 py-3">
+            <span className="mt-0.5 text-[16px]" aria-hidden>
+              {item.agentEmoji}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-semibold text-slate-900">{item.title}</span>
+              <span className="mt-0.5 block text-[12px] text-slate-500" suppressHydrationWarning>
+                {item.agentName} finished · {ago(item.completedAt)}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                handoff?.openThread({
+                  assignmentId: item.assignmentId,
+                  title: item.title,
+                  agentName: item.agentName,
+                  messageCount: item.messageCount,
+                  awaitingAgent: item.awaitingAgent,
+                  finished: true,
+                })
+              }
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Open thread
+            </button>
+          </li>
+        ))}
+      </ul>
+      {children}
     </div>
   );
 }

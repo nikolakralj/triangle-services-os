@@ -7,7 +7,8 @@ import {
 } from "@/lib/data/today-handoff";
 
 // Quiet In progress on Today: open Bob / Scout / Hanna waits that still
-// belong on the same card, not in Workforce and not in Needs you.
+// belong on the same card, not in Workforce and not in Needs you. And the
+// other end of the same work: what an employee finished recently.
 
 function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -98,4 +99,83 @@ export async function listInProgressWaits(
     if (waits.length >= limit) break;
   }
   return waits;
+}
+
+/** Work an employee finished recently that no mission holds. */
+export interface DoneItem {
+  assignmentId: string;
+  title: string;
+  agentName: string;
+  agentEmoji: string;
+  completedAt: string;
+  messageCount: number;
+  awaitingAgent: number;
+}
+
+/**
+ * "Done since you looked" for work outside missions.
+ *
+ * A mission knows when it was last seen; a missionless task (an Ask Bob, a
+ * request) has no such marker, so this reads the last `hours` of finished work.
+ * Event-outbox wake-ups are machinery, not results, and stay off the list.
+ */
+export async function listDoneSince(
+  orgId: string,
+  hours = 24,
+  limit = 8,
+): Promise<DoneItem[]> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return [];
+
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const { data: rows } = await svc
+    .from("agent_assignments")
+    .select("id, agent_instance_id, title, constraints, completed_at")
+    .eq("org_id", orgId)
+    .eq("status", "completed")
+    .is("mission_id", null)
+    .gte("completed_at", since)
+    .order("completed_at", { ascending: false })
+    .limit(40);
+
+  const finished = (rows ?? []).filter((row) => {
+    const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
+    return String(constraints.case_type ?? "") !== "event_outbox";
+  });
+  if (finished.length === 0) return [];
+
+  const assignmentIds = finished.map((row) => row.id as string);
+  const agentIds = Array.from(new Set(finished.map((row) => row.agent_instance_id as string)));
+  const [{ data: agents }, threads] = await Promise.all([
+    svc
+      .from("agent_instances")
+      .select("id, display_name, emoji")
+      .eq("org_id", orgId)
+      .in("id", agentIds),
+    countMessagesByAssignment(assignmentIds, orgId),
+  ]);
+  const faces = new Map(
+    (agents ?? []).map((a) => [
+      a.id as string,
+      { name: (a.display_name as string) || "Employee", emoji: (a.emoji as string) || "🤖" },
+    ]),
+  );
+
+  const done: DoneItem[] = [];
+  for (const row of finished) {
+    const face = faces.get(row.agent_instance_id as string);
+    if (!face) continue;
+    const thread = threads.get(row.id as string);
+    done.push({
+      assignmentId: row.id as string,
+      title: (row.title as string) || "Finished work",
+      agentName: face.name,
+      agentEmoji: face.emoji,
+      completedAt: (row.completed_at as string) ?? "",
+      messageCount: thread?.total ?? 0,
+      awaitingAgent: thread?.awaitingAgent ?? 0,
+    });
+    if (done.length >= limit) break;
+  }
+  return done;
 }
