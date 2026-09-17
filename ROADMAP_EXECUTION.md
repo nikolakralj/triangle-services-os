@@ -97,7 +97,7 @@ counts from those findings. Company targets still need `research.suggestion.crea
 No migration. Checked: 13/13 offline DEV-003; lint, production build,
 tenant-identity 0. Could not signed-in check here.
 
-### DEV-004 — Bob takes follow-through · `DONE` (code; live SQL + wake still Nikola)
+### DEV-004 — Bob takes follow-through · `DONE` (live: badge + wake on Production, 17 September)
 
 **Why now:** Today Ask Bob already creates a real assignment, then fails
 honestly without `mission.work` on Bob's badge or a bot runtime. The CEO
@@ -109,20 +109,12 @@ records. Bob sends nothing.
 
 **Done 16 September (code).** `mission.work` is in the scope catalog. Bob's hire
 preset is `job_intake.ingest` + `mission.work`. Ask Bob / Workforce assignments
-force `execution_mode: bot` and wake like Scout. Data-fix SQL prepared, **not
-applied** — Nikola must preview then run
-`supabase/data-fixes/2026-09-16-bob-mission-work-scope.sql` (local and
-production share one database). Wake env, if the Grok routine exists:
-`BOT_WAKE_URL_INBOX_COORDINATOR` and `BOT_WAKE_KEY_INBOX_COORDINATOR`. Do not
-invent a URL.
+force `execution_mode: bot` and wake like Scout.
 
-**Limit:** until that SQL runs, Ask Bob still says the badge needs a mission
-scope. Until the wake env is set, a created assignment records
-`constraints.wake.status = not_configured` and waits for the next inbox check.
-Bob still sends nothing. Not Scout's or Hanna's boss.
-
-Checked: 13/13 offline (`npm run check:dev-004`); lint 0; production build 0;
-tenant-identity 0. Could not signed-in check here.
+**Live 17 September (Nikola):** `mission.work` is on Bob's badge. Wake env
+`BOT_WAKE_URL_INBOX_COORDINATOR` and `BOT_WAKE_KEY_INBOX_COORDINATOR` are set
+on Production and Preview (values not recorded here). Bob still sends nothing.
+Not Scout's or Hanna's boss.
 
 ### DEV-005 — Known defects · `DONE`
 
@@ -346,7 +338,7 @@ nothing" here is this slice, not the standing send-from-Triangle law.
 DEV-015 (context-preserving handoff) is the Today destination for Hand to Bob.
 Ask context and intent routing are DEV-010 and DEV-014.
 
-### DEV-015 — Context-preserving handoff — `DONE` (code; live Ask Bob SQL still Nikola)
+### DEV-015 — Context-preserving handoff — `DONE` (live: `commercial_follow_through` backfill complete, 17 September)
 
 **Why now:** Hand to Bob dismissed the Today card into Workforce / "What you
 handed out". Bob then 409ed completing `{assignmentId, result}` because
@@ -365,13 +357,10 @@ migration 041 treated a missing `case_type` as `open_research`.
 6. No .env, no production promote, no Scout research credentials, nothing
    sends email. Workforce is not redesigned.
 
-**Done 16 September (code).** `/today` aliases `/decisions`. Existing open
-Ask Bob rows still lack `case_type` until Nikola runs
-`supabase/data-fixes/2026-09-16-ask-bob-commercial-follow-through.sql`.
+**Done 16 September (code).** `/today` aliases `/decisions`.
 
-Checked: `npm run check:dev-015`; lint; production build; tenant-identity.
-Could not signed-in check here. Nikola: Hand to Bob on Preview Today ? With
-Bob ? Open thread drawer ? the card is in In progress, not Workforce.
+**Live 17 September (Nikola):** Ask Bob `commercial_follow_through` backfill
+complete — 0 rows still missing. Hand to Bob stays on Today.
 
 ### DEV-016 - Hide refusal ledger from Workforce primary (diagnostics only) - `DONE` (branch `claude/today-one-inbox`)
 
@@ -479,7 +468,7 @@ team". The operating-shell decision makes Today one inbox.
 7. No new table, no navigation change, no send path, no change to what any
    button records. Signed-in check on the Preview.
 
-### DEV-010 - Context-aware AskLauncher / `/api/ask` - `DONE` (on `main`; signed-in check on the Preview still owed)
+### DEV-010 - Context-aware AskLauncher / `/api/ask` - `DONE` (on `main`; Production: mission-scoped Ask checked 17 September)
 
 **Why now (smallest Ask slice):** the 16 September IA. Current Ask treats
 anything that is not a talent-pool question as a new Mission. That fills
@@ -531,15 +520,13 @@ no send path, no AI call added. Email cards keep Ask Bob; `job_lead` and
 `contact` are accepted by the API but no page mounts them yet.
 
 Checked: `npm run check:dev-010` 14/14; lint 0; type check 0;
-tenant-identity 0; production build 0. Could not signed-in check here.
-Nikola, on the Preview: open a project, Ctrl+K, see "On {project}" selected,
-ask "Scout, who is the MEP contractor here?" -> the box says Scout has it,
-you are still on the project, Case history shows the job queued, Missions
-gained nothing; then on a mission page Ctrl+K defaults to that mission; on
-Today with nothing in view a substantial Ask still opens a Mission; "who is
-free in October" still answers inline.
+tenant-identity 0; production build 0.
 
-### DEV-011 - Menu: Today · Missions · Talent - `DONE` (on `main`; signed-in check on the Preview still owed)
+**Production 17 September (Nikola):** inside a mission, Ctrl+K / Ask is
+mission-scoped. The project-page path ("On {project}", stay on the record,
+Case history shows the job) was not the check reported that morning.
+
+### DEV-011 - Menu: Today · Missions · Talent - `DONE` (on `main`; Production nav checked 17 September)
 
 **Why:** the 16 September IA withdrew "keep Signal Inbox thin in the shell",
 and the operating-shell decision leaves three primary surfaces. Scout consumes
@@ -571,11 +558,10 @@ changed; no migration; no page deleted; Talent is not hidden.
 
 Checked: `check:dev-011` 9/9 offline; lint 0; type check 0; tenant-identity 0;
 production build 0; `check:dev-015` 15/15, `check:today-slim` 12/12,
-`check:dev-004` 13/13. **Not yet:** the signed-in check on the Vercel preview.
-To test: menu has four entries; `/hunter` shows the banner and still lists
-projects; Talent shows the two tabs and the certificate filter; Today shows a
-Renew card only if a worker certificate is expired or within 30 days; Settings
-→ Setup & data opens readiness and imports; Diagnostics lists the hidden pages.
+`check:dev-004` 13/13.
+
+**Production 17 September (Nikola):** nav is Today · Missions · Talent ·
+Settings. Workforce and Signal Inbox are not in primary nav.
 
 **Seen on the Preview (Nikola, 16 September):** the Compliance tab lists the
 same CV for one person up to six times — six uploads of one file, each its own
@@ -583,7 +569,7 @@ document row. Not this item; a follow-up: skip or fold duplicate uploads (same
 worker, same category, same file name and size) at upload time and on the
 list. No row is deleted until a person says so.
 
-### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (on `main`; slice B awaits signed-in check on the Preview)
+### DEV-012 - Team in Settings (Workforce leaves the menu) - `DONE` (on `main`; Production: `/agents` → Settings → Team, 17 September)
 
 **Slices, so another agent can continue:** A — a Team section in Settings with
 each employee's ownership, health, runtime and wake-up, load by state,
@@ -654,7 +640,10 @@ DEV-010.
    frozen.
 5. Nothing is handed out from Team. The thread drawer, Ask and Ask Bob keep
    working from Today and cases. No data deleted, no new table, no new agent
-   roles. Signed-in check on the Preview.
+   roles.
+
+**Production 17 September (Nikola):** `/agents` redirects to Settings → Team
+with the workforce-moved notice.
 
 ### DEV-013 - Human-approved Send from Triangle - `DONE` (code; migration 049 and the mailbox switch still Nikola; signed-in check on the Preview owed)
 
@@ -712,11 +701,12 @@ mailbox with sending off to see the refusal.
 
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 
-**Not READY.** After DEV-010. Typed / voice Ask Triangle routes by intent
-("investigate the end client" -> Scout) without fake Scout buttons on the
-Today mail card. Do not start this to avoid doing DEV-010.
+**Not READY.** After mailbox-observed sent/replied. Typed / voice Ask Triangle
+routes by intent ("investigate the end client" -> Scout) without fake Scout
+buttons on the Today mail card. DEV-010 is done; do not start this to skip
+mailbox observation.
 
-### DEV-018 - Engineering out of the workforce - `BLOCKED_EXTERNAL` (Nikola)
+### DEV-018 - Engineering out of the workforce - `DONE` (live, 17 September; SQL file not used as-is)
 
 **Why:** on 16 September Scout's HVAC EPC EU step asked the CEO "Promote Eng
 Preview c57ec57 to Production, or hold on live outbox c27187b?", a smoke-test
@@ -727,8 +717,12 @@ task ("DEV-004 smoke…") sat in Bob's In progress, and production ran
 1. ~~Move the programming bot to its own Grok / Cursor account, so it shares
    no computer or context with Scout, Hanna and Bob.~~ Done by Nikola,
    16 September.
-2. Apply `supabase/data-fixes/2026-09-16-engineering-out-of-the-workforce.sql`
-   after reading its preview.
+2. ~~Apply `supabase/data-fixes/2026-09-16-engineering-out-of-the-workforce.sql`
+   after reading its preview.~~ Live 17 September: smoke assignment already
+   completed (cancel was a no-op); HVAC assignment no longer has
+   `questionForCeo` / eng-promote. The official SQL file cannot run as-is —
+   some `result_summary` rows are not JSON (`Draft…`) so `::jsonb` fails.
+   Applied safely by assignment id.
 3. Promote only commits merged into the working branch.
 
 **Acceptance:** Today shows no engineering question and no test task; Scout's
