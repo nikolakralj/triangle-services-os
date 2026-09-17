@@ -42,7 +42,7 @@ These unblock the Phase 0 exit gate below; none of them counts toward it.
 build in this order — **DEV-016** refusal ledger off Today → **DEV-017** Today
 as one inbox → **DEV-012** Team in Settings → **DEV-011** menu Today · Missions
 · Talent → **DEV-010** context-aware Ask → **DEV-013** Send from Triangle →
-**DEV-019** mailbox-observed sent/replied (this item) → **DEV-014** later.
+**DEV-019** mailbox-observed sent/replied → **DEV-020** personal mailbox vs shared space → **DEV-014** later.
 **DEV-018** is Nikola's, in parallel. DEV-009 and DEV-015 are `DONE`. Do not
 invent Work Items. Decision: "The operating shell" in
 `DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html`.
@@ -734,9 +734,36 @@ leave the ready-to-contact list and show as a follow-up without pressing
 Sent; their reply should take the follow-up off Today without pressing They
 replied.
 
+### DEV-020 - Personal mailbox vs shared space - `DONE` (code; migration 051 still Nikola)
+
+**Why:** two people, two inboxes. Each person signs in and sees what arrived
+in their connected mailbox. They can put a lead into the common shared space
+when the team should work it. Send from Triangle already leaves from that
+person's own address (DEV-013); sending stays optional and off until they
+tick it.
+
+**Acceptance:** new ingest is personal (`shared_at` null); existing leads are
+backfilled into the shared space on first apply of 051 so live follow-ups
+do not vanish; Today and Job Intake Mine show this person's mailbox; Shared
+is the common space; Share is a human action; person Sync now reads only
+their mailbox (cron still all); Bob does not wake on unshared personal
+ingest; Send remains owner + `can_send`; Today keeps Open mail � Ask Bob �
+Dismiss � no Sent / They replied; nothing is sent; DEV-014 stays later.
+
+**Done 17 September (code).** Policy in `src/lib/mail/mailbox-space.ts`.
+Migration `051_mailbox_space.sql` (idempotent after first apply). Data
+layer filters by viewer. `POST /api/job-intake/leads/[id]/share`. Today
+Your mail. Job Intake Mine | Shared.
+
+Checked: `npm run check:dev-020` 21/21; lint 0; type check 0; tenant-identity 0;
+production build 0. Could not signed-in check a live second mailbox here.
+Nikola: apply 050 then 051; each person connects their own mailbox; Sync
+now reads yours; Share puts a lead where the other person can see it.
+
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 
-**Not READY.** After mailbox-observed sent/replied. Typed / voice Ask Triangle
+**Not READY.** After mailbox-observed sent/replied and personal vs shared
+mail. Typed / voice Ask Triangle
 routes by intent ("investigate the end client" -> Scout) without fake Scout
 buttons on the Today mail card. DEV-010 is done; do not start this to skip
 mailbox observation.
@@ -779,12 +806,13 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
 - Budget and cost per mission.
 - Separate research and communications computers for bots (see the
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
-- Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
 - Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons
-  — **DEV-019** done in code (this PR). Migration 050 and a live Sync now
-  are still owed. Provider createDraft stays later.
-- A Today per person: Needs you filtered to the cases each person owns (Ralph
-  may get his own), once work carries a human owner consistently.
+  � **DEV-019** done in code. Migration 050 and a live Sync now are still owed.
+- Personal mailbox vs shared space � **DEV-020** done in code. Migration 051
+  still owed. Each person sees their inbox; Share puts a lead in the common
+  space; Send from Triangle stays that person's address, optional, off by
+  default. A Today per person of *owned cases* stays later.
+- Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
 - Answer a mission's question on Today, in the card, instead of opening the
   mission (the remaining step to one card shape from DEV-017).
 - Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent

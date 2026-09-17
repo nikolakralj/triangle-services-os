@@ -174,7 +174,7 @@ export default async function SettingsPage({
           <Card id="mailboxes" className="scroll-mt-20">
             <CardHeader
               title="Job Intake mailboxes"
-              description="Mailboxes the agent reads for agency opportunities."
+              description="Each person connects their own inbox. Mail stays theirs until they share it. Sending from Triangle is optional, off by default, and only from that person's address."
             />
             <CardContent>
               <MailboxSettingsPanel />

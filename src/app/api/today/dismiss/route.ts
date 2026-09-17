@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { dismissTodayCard } from "@/lib/data/today-dismiss";
+import { getJobLead } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
 // POST /api/today/dismiss — scoped judgment on a Today mail card.
@@ -50,6 +51,13 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "Say which card to dismiss, and why." }, { status: 400 });
+  }
+
+  if (parsed.data.leadId) {
+    const lead = await getJobLead(parsed.data.leadId, access.organizationId, access.userId);
+    if (!lead) {
+      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    }
   }
 
   const result = await dismissTodayCard({

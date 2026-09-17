@@ -134,9 +134,11 @@ export function MailboxSettingsPanel() {
       <div>
         <h2 className="text-sm font-semibold text-slate-900">Connected mailboxes</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Each person connects their own mailbox. Your password is encrypted before
-          it is saved and is never shown again — not to your colleagues, and not to
-          the AI.
+          Each person connects their own mailbox and sees what arrived there.
+          Share a lead into the common space when the team should work it.
+          Your password is encrypted before it is saved and is never shown again
+          — not to your colleagues, and not to the AI. Sending from Triangle is
+          optional and off until you tick it on your own mailbox.
         </p>
       </div>
 
@@ -209,8 +211,9 @@ node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&
                       <span className="font-medium">Let me send from Triangle</span>
                       <span className="block text-slate-500">
                         Review, edit and press Send on a drafted reply; it leaves from this
-                        address over SMTP and is recorded with its follow-up. Only you can
-                        press it. Employees (AI) never send.
+                        address over SMTP and is recorded with its follow-up. Off until you
+                        tick it — a colleague never sends from your address. Employees (AI)
+                        never send.
                       </span>
                     </span>
                   </label>

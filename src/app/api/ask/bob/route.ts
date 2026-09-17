@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiAccess } from "@/lib/supabase/server";
 import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { askBob } from "@/lib/data/ask-bob";
+import { getJobLead } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask/bob — hand a Today mail card to Commercial Ops.
@@ -42,6 +43,13 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: "Write what Bob should do." }, { status: 400 });
+  }
+
+  if (parsed.data.leadId) {
+    const lead = await getJobLead(parsed.data.leadId, access.organizationId, access.userId);
+    if (!lead) {
+      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    }
   }
 
   const asked = await askBob({

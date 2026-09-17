@@ -26,8 +26,9 @@ import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile
 //
 // Auth: Bearer MCP_API_KEY (see requireApiAccess), or a signed-in session.
 //
-// Two people running two separate personal bots therefore end up with ONE
-// shared, attributed pipeline: `mailbox` records whose inbox a lead came from.
+// Two people running two separate personal bots therefore each keep their
+// own inbox until they share a lead: `mailbox` records whose inbox a lead
+// came from. Sharing is a person action, not this ingest.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";

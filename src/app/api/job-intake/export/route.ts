@@ -65,6 +65,8 @@ export async function GET(request: Request) {
     status,
     sort,
     limit: 1000,
+    viewerUserId: access.userId,
+    space: url.searchParams.get("space") === "shared" ? "shared" : "mine",
   });
 
   const lines = [

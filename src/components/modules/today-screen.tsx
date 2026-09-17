@@ -26,7 +26,7 @@ import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
 import type { DoneItem } from "@/lib/data/today-in-progress";
-import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
+import { DoneSince, InProgressByEmployee, ReadyForYou, YourMail, type YourMailItem } from "@/components/modules/today-missions";
 import { CertExceptions } from "@/components/modules/today-certs";
 import type { CertAlertRow } from "@/lib/data/worker-documents";
 import { EmailCardActions } from "@/components/modules/today-email-actions";
@@ -103,6 +103,7 @@ export function TodayScreen({
   done,
   certs = [],
   sender = null,
+  yourMail = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -121,6 +122,8 @@ export function TodayScreen({
   certs?: CertAlertRow[];
   /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
   sender?: { id: string; emailAddress: string } | null;
+  /** Unshared mail from this person's inbox. */
+  yourMail?: YourMailItem[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
@@ -152,6 +155,10 @@ export function TodayScreen({
         personId: f.target.personId,
       }),
   );
+  const heroLeadId = nowAction?.leadId ?? null;
+  const inboxOpen = yourMail.filter(
+    (m) => m.id !== heroLeadId && !findWait(waits, { leadId: m.id }),
+  );
   const reachableOpen = ready.filter(
     (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
   );
@@ -161,6 +168,7 @@ export function TodayScreen({
     dueOpen.length +
     (dueOpen.length > 0 ? dueMore : 0) +
     reachableOpen.length +
+    inboxOpen.length +
     certs.length;
   const finishedMissions = missions.filter((m) => m.state === "ready");
   const cameBackCount = decisions.length + older.length;
@@ -209,6 +217,9 @@ export function TodayScreen({
               </p>
             </div>
           )}
+        </div>
+        <div className="mt-3">
+          <YourMail items={inboxOpen} waits={waits} />
         </div>
         <div className="mt-3">
           <ReadyForYou

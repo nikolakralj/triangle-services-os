@@ -177,10 +177,43 @@ function fakeSvc() {
           q.filters.push([c, v]);
           return api;
         },
+        in() {
+          return api;
+        },
+        limit() {
+          return api;
+        },
+        maybeSingle() {
+          return api.then((r) => ({
+            data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data,
+            error: r.error,
+          }));
+        },
         then(resolve) {
-          if (table !== 'mail_accounts') return resolve({ data: [], error: null });
-          const rows = mailboxes.filter((r) => q.filters.every(([c, v]) => r[c] === v));
-          return resolve({ data: rows, error: null });
+          if (table === 'mail_accounts') {
+            const rows = mailboxes.filter((r) => q.filters.every(([c, v]) => r[c] === v));
+            return resolve({ data: rows, error: null });
+          }
+          if (table === 'job_leads') {
+            return resolve({
+              data: [
+                {
+                  id: LEAD,
+                  org_id: ORG,
+                  inbound_email_id: null,
+                  shared_at: '2026-09-01T00:00:00.000Z',
+                  role_title: 'Role',
+                  technologies: [],
+                  requested_documents: [],
+                  missing_fields: [],
+                  status: 'new',
+                  created_at: '2026-09-01T00:00:00.000Z',
+                },
+              ],
+              error: null,
+            });
+          }
+          return resolve({ data: [], error: null });
         },
       };
       return api;
@@ -190,6 +223,9 @@ function fakeSvc() {
 
 const loadSend = moduleLoader({
   '@/lib/supabase/server': { createServiceSupabaseClient: fakeSvc },
+  '@/lib/data/job-intake': {
+    getJobLead: async (id) => (id === LEAD ? { id: LEAD } : null),
+  },
   '@/lib/data/contact-log': {
     logContactAttempt: async (p) => {
       logged.push(p);

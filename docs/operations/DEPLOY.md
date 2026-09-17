@@ -66,8 +66,8 @@ configuration into a signed-in demo session.
 ## Database migrations — CEO approves each one
 
 Migrations live in `supabase/migrations/` and run through
-`050_mailbox_observe.sql` (049 is on the live database as of 17 September;
-050 waits for the CEO). Because every environment shares one database,
+`051_mailbox_space.sql` (049 is on the live database as of 17 September;
+050 and 051 wait for the CEO). Because every environment shares one database,
 a migration is applied only after the CEO approves that migration. After any
 column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
 against the live organization.
@@ -171,6 +171,22 @@ replied. Nothing is sent.
 2. Sync now. A Gmail send to someone already on Today should leave
    ready-to-contact and become a follow-up; their reply should take the
    follow-up off Today.
+
+## Personal mailbox vs shared space — CEO applies 051
+
+Each person sees mail from their own connected inbox. Share puts a lead in
+the common space. Person Sync now reads only that person's mailbox; the
+scheduled job still reads every connected inbox. Sending is unchanged
+(DEV-013): optional, off by default, from that person's address.
+
+1. Apply `050_mailbox_observe.sql` first if it is not already on the database.
+2. Approve and apply `051_mailbox_space.sql` (adds `job_leads.shared_at` /
+   `shared_by`; first apply stamps existing leads into the shared space so
+   live follow-ups do not vanish; re-applying does not stamp new personal
+   leads), then `NOTIFY pgrst, 'reload schema';`.
+3. Each person connects their own mailbox in Settings. Sync now. Share a
+   lead from Today or Job Intake Mine to put it where the other person can
+   see it.
 
 ## Mail from a bot into Job Intake
 

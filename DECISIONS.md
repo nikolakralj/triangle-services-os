@@ -6,6 +6,16 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-17: Personal mailbox vs shared space
+
+Two people, two inboxes. Signed in, each person sees mail that arrived in
+their connected mailbox. They may put a lead into a common shared space when
+the team should work it. Until then it stays on their Today and Job Intake
+Mine, and Bob does not wake on it. Send from Triangle already leaves from
+that person's own address (DEV-013); sending stays optional and off until
+they tick it on their mailbox. A Today filtered to owned *cases* is still
+later. Provider createDraft and DEV-014 intent routing stay later.
+
 ### 2026-09-16: The operating shell — three menu items, one inbox, tasks on cases
 
 Proposed by Claude on 16 September at Nikola's request ("Workforce is useless";

@@ -9,6 +9,7 @@ import {
   getIntakeRules,
 } from "@/lib/data/job-intake";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
+import { shouldWakeOnIngest } from "@/lib/mail/mailbox-space";
 
 // ---------------------------------------------------------------------------
 // The ingestion run: fetch → clean → classify → store, then observe Sent
@@ -57,16 +58,21 @@ const FIRST_RUN_DAYS = 14;
 /** Overlap window so a message arriving mid-run isn't missed. */
 const OVERLAP_MINUTES = 10;
 
-export async function listActiveMailAccounts(orgId: string): Promise<MailAccountRow[]> {
+export async function listActiveMailAccounts(
+  orgId: string,
+  opts: { ownerUserId?: string } = {},
+): Promise<MailAccountRow[]> {
   const svc = createServiceSupabaseClient();
   if (!svc) return [];
-  const { data } = await svc
+  let query = svc
     .from("mail_accounts")
     .select(
       "id, email_address, credential_ref, credential_encrypted, imap_host, imap_port, provider, watch_label, status, last_synced_at, owner_user_id",
     )
     .eq("org_id", orgId)
     .eq("status", "active");
+  if (opts.ownerUserId) query = query.eq("owner_user_id", opts.ownerUserId);
+  const { data } = await query;
   return (data as MailAccountRow[]) ?? [];
 }
 
@@ -225,20 +231,29 @@ export async function ingestAccount(
         });
         if (leadId) {
           summary.leadsCreated += 1;
-          try {
-            const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
-            await recordClientReplyEvent({
-              orgId,
-              sourceType: "inbound_email",
-              sourceId: leadId,
-              recipientName: result.lead.contactName,
-              recipientEmail: result.lead.contactEmail,
-              recipientCompany: result.lead.clientCompany || result.lead.agencyName,
-              subject: msg.subject,
-              replySummary: result.reason,
-            });
-          } catch (err) {
-            console.error("ingestAccount: outbox dispatch failed:", err);
+          // Personal mail stays quiet. Bob wakes when a person shares it, or
+          // when the mailbox has no owner (org-visible).
+          if (
+            shouldWakeOnIngest({
+              sharedAt: null,
+              mailboxOwnerUserId: account.owner_user_id,
+            })
+          ) {
+            try {
+              const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
+              await recordClientReplyEvent({
+                orgId,
+                sourceType: "inbound_email",
+                sourceId: leadId,
+                recipientName: result.lead.contactName,
+                recipientEmail: result.lead.contactEmail,
+                recipientCompany: result.lead.clientCompany || result.lead.agencyName,
+                subject: msg.subject,
+                replySummary: result.reason,
+              });
+            } catch (err) {
+              console.error("ingestAccount: outbox dispatch failed:", err);
+            }
           }
         }
       }
@@ -268,12 +283,15 @@ export async function ingestAccount(
   return summary;
 }
 
-/** Ingest every active mailbox for an org. */
+/** Ingest every active mailbox for an org. A person Sync passes ownerUserId so it only reads their inbox; cron omits it. */
 export async function ingestAllAccounts(
   orgId: string,
-  opts: { limit?: number; sinceDays?: number } = {},
+  opts: { limit?: number; sinceDays?: number; ownerUserId?: string } = {},
 ): Promise<IngestSummary[]> {
-  const accounts = await listActiveMailAccounts(orgId);
+  const accounts = await listActiveMailAccounts(
+    orgId,
+    opts.ownerUserId ? { ownerUserId: opts.ownerUserId } : {},
+  );
   const summaries: IngestSummary[] = [];
   // Sequential on purpose: keeps IMAP connections and OpenAI spend predictable.
   for (const account of accounts) {

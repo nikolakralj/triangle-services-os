@@ -17,7 +17,8 @@ export const maxDuration = 300;
 //
 // Fetch → classify opportunities → observe Sent / replies. Never sends,
 // replies, or deletes anything. Observation writes the commercial ledger
-// from mail that is already in the mailbox.
+// from mail that is already in the mailbox. A signed-in person only syncs
+// their own mailbox; the scheduled job still reads every connected inbox.
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   const isCron = Boolean(cronSecret && token && safeEqual(token, cronSecret));
 
   let orgId: string;
+  let ownerUserId: string | undefined;
 
   if (isCron) {
     // A scheduled run has no user session, so it needs an explicit org.
@@ -50,6 +52,9 @@ export async function POST(request: Request) {
       );
     }
     orgId = access.organizationId;
+    // A person Sync now reads their mailbox only. Cron still reads every
+    // connected inbox. A machine key is not a person Sync.
+    if (access.actor === "human") ownerUserId = access.userId;
   }
 
   let limit = 60;
@@ -68,13 +73,14 @@ export async function POST(request: Request) {
     // No body is fine — use the defaults.
   }
 
-  const summaries = await ingestAllAccounts(orgId, { limit, sinceDays });
+  const summaries = await ingestAllAccounts(orgId, { limit, sinceDays, ownerUserId });
 
   if (summaries.length === 0) {
     return NextResponse.json({
       summaries,
-      message:
-        "No mailboxes are connected yet. Add one in Settings before syncing.",
+      message: ownerUserId
+        ? "No mailbox of yours is connected yet. Add one in Settings before syncing."
+        : "No mailboxes are connected yet. Add one in Settings before syncing.",
     });
   }
 

@@ -98,6 +98,8 @@ export async function getNextMove(
   orgId: string,
   /** Signs the drafted reply. A letter from nobody does not get answered. */
   senderName?: string,
+  /** Shared space plus this person's mailbox. Omit for cron: shared only. */
+  viewerUserId?: string | null,
 ): Promise<NextMove> {
   const svc = createServiceSupabaseClient();
   const profile = await getOrganizationOperatingProfile(orgId);
@@ -159,7 +161,7 @@ export async function getNextMove(
   // read findings, contacts and unsent drafts, and sent the CEO to cold-call a
   // steel plant switchboard while g2 Recruitment sat in the inbox asking for
   // the exact engineer we have.
-  const leadMatches = await matchOpenLeads(orgId, 5);
+  const leadMatches = await matchOpenLeads(orgId, 5, viewerUserId);
   if (leadMatches.length > 0) {
     const best = leadMatches[0];
     const who = best.candidates[0];
