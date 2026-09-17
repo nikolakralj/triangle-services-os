@@ -41,10 +41,10 @@ These unblock the Phase 0 exit gate below; none of them counts toward it.
 **Operating shell (16 September; locked when Nikola merges its pull request):**
 build in this order — **DEV-016** refusal ledger off Today → **DEV-017** Today
 as one inbox → **DEV-012** Team in Settings → **DEV-011** menu Today · Missions
-· Talent → **DEV-010** context-aware Ask → mailbox observed (Next) →
-**DEV-013** Send from Triangle. **DEV-018** is Nikola's, in parallel. DEV-009
-and DEV-015 are `DONE`. Do not invent Work Items. Do not implement the Send
-button unless you are on DEV-013. Decision: "The operating shell" in
+· Talent → **DEV-010** context-aware Ask → **DEV-013** Send from Triangle →
+**DEV-019** mailbox-observed sent/replied (this item) → **DEV-014** later.
+**DEV-018** is Nikola's, in parallel. DEV-009 and DEV-015 are `DONE`. Do not
+invent Work Items. Decision: "The operating shell" in
 `DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html`.
 
 ### DEV-001 — Sent-message record · `DONE`
@@ -334,9 +334,9 @@ slims Today email cards (no Sent / They replied on the primary rail). It did
 Send button. Those are DEV-010 onwards, ordered below. "Triangle still sends
 nothing" here is this slice, not the standing send-from-Triangle law.
 
-**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied.
-DEV-015 (context-preserving handoff) is the Today destination for Hand to Bob.
-Ask context and intent routing are DEV-010 and DEV-014.
+**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied
+is **DEV-019**. DEV-015 (context-preserving handoff) is the Today destination
+for Hand to Bob. Ask context and intent routing are DEV-010 and DEV-014.
 
 ### DEV-015 — Context-preserving handoff — `DONE` (live: `commercial_follow_through` backfill complete, 17 September)
 
@@ -698,6 +698,41 @@ Oliver Hall reply → Send from Triangle → review → Send now → the card sh
 "Sent to … from …", the message is in your Sent folder and the recipient's
 inbox, and the follow-up appears on Today in three days. Then press it on a
 mailbox with sending off to see the refusal.
+
+### DEV-019 - Mailbox-observed sent / replied - `DONE` (code; migration 050 still Nikola)
+
+**Why:** DEV-009 took Sent / They replied off Today so a person would not
+type the weather. The connected mailbox already knows: outgoing mail is in
+Sent; a reply lands in INBOX with In-Reply-To pointing at our Message-ID
+(DEV-013 stored that id). Until this item, the ledger still waited for
+Recorded outside Triangle.
+
+**Acceptance:** mail sync reads INBOX and Sent (envelopes, no LLM, INBOX even
+when job intake uses a watch label); a send to someone we are working is
+recorded (`sent_via = outside`, Message-ID, follow-up from the message date);
+a reply is recorded when In-Reply-To / References / Gmail thread / subject
+after a send match; a new job email from the same recruiter is not a reply;
+already-recorded Message-IDs (including DEV-013) are skipped; Today keeps
+Open mail � Ask Bob � Dismiss � no Sent / They replied buttons; nothing is
+sent; `SENT_MESSAGES_RECORDED` stays false.
+
+**Done 17 September (code).** After job-intake classify, `observeAccount`
+(`src/lib/data/mailbox-observe.ts`) fetches INBOX + Sent on one IMAP
+connection (`fetchForObserve`, no bodies). Matching is pure
+(`src/lib/mail/observe-policy.ts`). Hits go through `logContactAttempt` as
+the mailbox owner, `sent_via = outside`, Message-ID for idempotency. Job
+intake still classifies only the watch folder; Sent is never an LLM pass.
+Migration `050_mailbox_observe.sql` (idempotent, changes no rows) adds
+`inbound_emails.in_reply_to` / `references_header` / `folder` and
+`outreach_drafts.outbound_thread_id`, **not applied**.
+
+Checked: `npm run check:dev-019` (offline); lint; type check;
+tenant-identity; production build. Could not signed-in check here � a live
+mailbox sync is owed after 050. Nikola: approve and apply 050; Sync now on
+the connected mailbox; a Gmail send to a person already on Today should
+leave the ready-to-contact list and show as a follow-up without pressing
+Sent; their reply should take the follow-up off Today without pressing They
+replied.
 
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 

@@ -1,6 +1,11 @@
 import "server-only";
 import { ImapFlow, type FetchMessageObject } from "imapflow";
 import { isObviousNoiseHeader } from "./clean-email";
+import {
+  parseMessageIds,
+  type ObserveFolder,
+  type ObserveMessage,
+} from "@/lib/mail/observe-policy";
 
 // ---------------------------------------------------------------------------
 // Reading mailboxes.
@@ -27,6 +32,8 @@ export interface FetchedMessage {
   sentAt: string | null;
   body: string;
   bodyIsHtml: boolean;
+  inReplyTo: string | null;
+  referencesHeader: string | null;
 }
 
 export interface MailSource {
@@ -129,7 +136,12 @@ export class ImapMailSource implements MailSource {
 
         for await (const msg of client.fetch(
           { since },
-          { uid: true, envelope: true, bodyStructure: true },
+          {
+            uid: true,
+            envelope: true,
+            bodyStructure: true,
+            headers: ["in-reply-to", "references"],
+          },
         )) {
           if (!msg.envelope?.messageId) continue;
           // Cheap sender/subject filter: most of a real inbox is newsletters
@@ -161,6 +173,69 @@ export class ImapMailSource implements MailSource {
     }
 
     return out;
+  }
+
+  /**
+   * Envelopes from INBOX and Sent. No bodies, no LLM, no watch-label.
+   * Job intake may only read a labelled folder; replies and outgoing mail
+   * live on the real INBOX / Sent folders.
+   */
+  async fetchForObserve(since: Date, limit = 200): Promise<ObserveMessage[]> {
+    const client = this.newClient();
+    client.on("error", () => undefined);
+
+    const out: ObserveMessage[] = [];
+    await client.connect();
+
+    try {
+      out.push(...(await this.fetchFolderEnvelopes(client, "INBOX", "inbox", since, limit)));
+      try {
+        const sentPath = pickSentMailboxPath(await client.list());
+        if (sentPath) {
+          out.push(
+            ...(await this.fetchFolderEnvelopes(client, sentPath, "sent", since, limit)),
+          );
+        }
+      } catch {
+        // INBOX observations still count if Sent cannot be opened.
+      }
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+
+    return out;
+  }
+
+  private async fetchFolderEnvelopes(
+    client: ImapFlow,
+    mailbox: string,
+    folder: ObserveFolder,
+    since: Date,
+    limit: number,
+  ): Promise<ObserveMessage[]> {
+    const lock = await client.getMailboxLock(mailbox);
+    try {
+      const rows: FetchMessageObject[] = [];
+      for await (const msg of client.fetch(
+        { since },
+        {
+          uid: true,
+          envelope: true,
+          threadId: true,
+          headers: ["in-reply-to", "references"],
+        },
+      )) {
+        if (!msg.envelope?.messageId) continue;
+        rows.push(msg);
+      }
+      rows.sort((a, b) => b.uid - a.uid);
+      return rows.slice(0, limit).flatMap((msg) => {
+        const mapped = toObserveMessage(msg, folder);
+        return mapped ? [mapped] : [];
+      });
+    } finally {
+      lock.release();
+    }
   }
 
   private async resolveMailbox(client: ImapFlow): Promise<string | null> {
@@ -221,7 +296,75 @@ function toFetchedMessage(
     sentAt: env?.date ? new Date(env.date).toISOString() : null,
     body,
     bodyIsHtml,
+    inReplyTo: inReplyToOf(msg),
+    referencesHeader: headerValue(msg.headers, "references"),
   };
+}
+
+function toObserveMessage(
+  msg: FetchMessageObject,
+  folder: ObserveFolder,
+): ObserveMessage | null {
+  const env = msg.envelope;
+  const messageId = env?.messageId ? String(env.messageId) : "";
+  if (!messageId) return null;
+  const to = (env?.to ?? [])
+    .map((a) => a.address)
+    .filter((a): a is string => Boolean(a))
+    .join(", ");
+  const refs = headerValue(msg.headers, "references");
+  return {
+    messageId,
+    inReplyTo: inReplyToOf(msg),
+    references: refs ? parseMessageIds(refs) : [],
+    from: env?.from?.[0]?.address ?? "",
+    to,
+    subject: env?.subject ?? "",
+    sentAt: env?.date ? new Date(env.date).toISOString() : null,
+    folder,
+    threadId: readGmailThreadId(msg),
+  };
+}
+
+function inReplyToOf(msg: FetchMessageObject): string | null {
+  const env = msg.envelope?.inReplyTo ? String(msg.envelope.inReplyTo) : null;
+  return env || headerValue(msg.headers, "in-reply-to");
+}
+
+/** IMAP header blob → one field, unfolding wrapped lines. */
+export function headerValue(headers: Buffer | undefined, name: string): string | null {
+  if (!headers) return null;
+  const unfolded = headers.toString("utf8").replace(/\r?\n[ \t]+/g, " ");
+  const re = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*(.*)$`, "im");
+  const m = unfolded.match(re);
+  const v = m?.[1]?.trim();
+  return v ? v : null;
+}
+
+/**
+ * Prefer the server's SPECIAL-USE \\Sent flag; fall back to common names
+ * (Gmail "[Gmail]/Sent Mail", Outlook "Sent Items").
+ */
+export function pickSentMailboxPath(
+  boxes: Array<{ path: string; name?: string; specialUse?: string | null }>,
+): string | null {
+  const special = boxes.find((b) => {
+    const use = String(b.specialUse ?? "").toLowerCase().replace(/^\\/, "");
+    return use === "sent";
+  });
+  if (special) return special.path;
+  const names = new Set([
+    "[gmail]/sent mail",
+    "sent",
+    "sent mail",
+    "sent items",
+    "inbox.sent",
+  ]);
+  const hit = boxes.find(
+    (b) =>
+      names.has(b.path.toLowerCase()) || names.has((b.name ?? "").toLowerCase()),
+  );
+  return hit?.path ?? null;
 }
 
 // Cheap envelope pre-filter — shared with the ingest endpoint; lives in
@@ -281,6 +424,7 @@ export function pickBodyPart(structure: unknown): PickedPart | null {
 
 /** Gmail exposes a stable thread id when the X-GM-EXT-1 capability is on. */
 function readGmailThreadId(msg: FetchMessageObject): string | null {
+  if (msg.threadId) return String(msg.threadId);
   const gm = (msg as unknown as { "x-gm-thrid"?: string | number })["x-gm-thrid"];
   return gm !== undefined && gm !== null ? String(gm) : null;
 }
