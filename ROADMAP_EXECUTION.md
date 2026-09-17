@@ -780,11 +780,9 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
 - Separate research and communications computers for bots (see the
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
 - Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
-- Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons.
-  Start from each person's connected mailbox: Nikola replies from
-  `nikola.kralj86@gmail.com` (connected); Ralph connects his own in Settings.
-  On 16 September no stored message in the last 14 days was a reply, so check
-  first that replies and the Sent folder reach Triangle.
+- Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons
+  — **DEV-019** done in code (this PR). Migration 050 and a live Sync now
+  are still owed. Provider createDraft stays later.
 - A Today per person: Needs you filtered to the cases each person owns (Ralph
   may get his own), once work carries a human owner consistently.
 - Answer a mission's question on Today, in the card, instead of opening the
