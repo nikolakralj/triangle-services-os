@@ -645,11 +645,11 @@ DEV-010.
 **Production 17 September (Nikola):** `/agents` redirects to Settings → Team
 with the workforce-moved notice.
 
-### DEV-013 - Human-approved Send from Triangle - `DONE` (code; migration 049 and the mailbox switch still Nikola; signed-in check on the Preview owed)
+### DEV-013 - Human-approved Send from Triangle - `DONE` (live 17 September: 049 applied, send recorded)
 
 **Why:** 16 September sending policy. Review / edit / press Send in Triangle
 is allowed. Agent-autonomous sending remains AUTO / APPROVAL / FORBIDDEN.
-Policy is decided; the button is not built yet.
+Policy is decided; the button is live.
 
 **When ready:** after Ask context is honest, and preferably once a real draft
 is waiting on a situation. Not a drive-by. Legal/privacy, deliverability,
@@ -685,19 +685,16 @@ the owner a switch "Let me send from Triangle" (`PATCH
 Recorded outside Triangle remain. `communicationPolicy` is unchanged and
 `SENT_MESSAGES_RECORDED` stays `false`: a human send does not make an
 employee's own sending recorded, and the freeze on autonomous outbound holds.
-Migration `049_send_from_triangle.sql` (idempotent, changes no rows) is
-written, **not applied**.
+Migration `049_send_from_triangle.sql` is applied on the live database
+(17 September). The connected Gmail mailbox has `can_send = true`.
 
-Checked: `npm run check:dev-013` 18/18 (policy, MIME and dot-stuffing,
-transport stub, end to end against a fake database, route guards, only one
-module reaches SMTP); lint 0; type check 0; tenant-identity 0; production
-build 0. Could not signed-in check here. Nikola: approve and apply 049;
-Settings → Mailboxes → tick "Let me send from Triangle" on your mailbox
-(Gmail: the stored password must be the app password); on Today open the
-Oliver Hall reply → Send from Triangle → review → Send now → the card shows
-"Sent to … from …", the message is in your Sent folder and the recipient's
-inbox, and the follow-up appears on Today in three days. Then press it on a
-mailbox with sending off to see the refusal.
+Checked: `npm run check:dev-013` 18/18; lint 0; type check 0; tenant-identity
+0; production build 0.
+
+**Live 17 September (Nikola):** Oliver Hall reply → Send from Triangle →
+message in Gmail Sent and recorded. Open mail remains. `They replied` is
+still a human press until mailbox-observed sent/replied. Agents still cannot
+send. `SENT_MESSAGES_RECORDED` stays `false`.
 
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 
