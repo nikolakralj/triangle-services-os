@@ -22,14 +22,27 @@
 --   2. Run the two updates.
 --   3. Run the Confirm select: the smoke task is cancelled, and the HVAC step
 --      has no question_for_ceo while its headline is unchanged.
+--
+-- 17 September live note: some agent_assignments.result_summary rows are
+-- plain text ("Draft…"), not JSON. Casting the whole table with ::jsonb
+-- fails. Preview/confirm below only jsonb-cast rows that look like JSON.
+-- If a listed id is already completed, the cancel update is a no-op. Apply
+-- 2 still requires a JSON result_summary on the HVAC row. If that row is
+-- already clear of questionForCeo, skip Apply 2.
 
 -- Preview — read this before updating.
 select
   id,
   status,
   title,
-  result_summary::jsonb ->> 'questionForCeo' as question_for_ceo,
-  result_summary::jsonb -> 'brief' ->> 'headline' as headline
+  case
+    when result_summary ~ '^\s*[\[{]'
+      then result_summary::jsonb ->> 'questionForCeo'
+  end as question_for_ceo,
+  case
+    when result_summary ~ '^\s*[\[{]'
+      then result_summary::jsonb -> 'brief' ->> 'headline'
+  end as headline
 from public.agent_assignments
 where id in (
   'f878723e-7718-4720-8e8c-eef335cfeda1',
@@ -44,9 +57,11 @@ where id = 'f878723e-7718-4720-8e8c-eef335cfeda1'
   and status in ('queued', 'active', 'waiting_review');
 
 -- Apply 2 — clear only the engineering question from Scout's HVAC step.
+-- Skip rows whose result_summary is not JSON.
 update public.agent_assignments
 set result_summary = (result_summary::jsonb - 'questionForCeo')::text
 where id = '5a0d52be-cc2b-4cac-9e9d-fc52d4f5233b'
+  and result_summary ~ '^\s*[\[{]'
   and result_summary::jsonb ->> 'questionForCeo' like 'Promote Eng Preview%';
 
 -- Confirm.
@@ -54,8 +69,14 @@ select
   id,
   status,
   title,
-  result_summary::jsonb ->> 'questionForCeo' as question_for_ceo,
-  result_summary::jsonb -> 'brief' ->> 'headline' as headline
+  case
+    when result_summary ~ '^\s*[\[{]'
+      then result_summary::jsonb ->> 'questionForCeo'
+  end as question_for_ceo,
+  case
+    when result_summary ~ '^\s*[\[{]'
+      then result_summary::jsonb -> 'brief' ->> 'headline'
+  end as headline
 from public.agent_assignments
 where id in (
   'f878723e-7718-4720-8e8c-eef335cfeda1',
