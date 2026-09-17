@@ -726,8 +726,8 @@ Migration `050_mailbox_observe.sql` (idempotent, changes no rows) adds
 `inbound_emails.in_reply_to` / `references_header` / `folder` and
 `outreach_drafts.outbound_thread_id`, **not applied**.
 
-Checked: `npm run check:dev-019` (offline); lint; type check;
-tenant-identity; production build. Could not signed-in check here — a live
+Checked: `npm run check:dev-019` 21/21; lint 0; type check 0;
+tenant-identity 0; production build 0. Could not signed-in check here — a live
 mailbox sync is owed after 050. Nikola: approve and apply 050; Sync now on
 the connected mailbox; a Gmail send to a person already on Today should
 leave the ready-to-contact list and show as a follow-up without pressing

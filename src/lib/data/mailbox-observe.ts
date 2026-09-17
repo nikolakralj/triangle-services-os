@@ -189,7 +189,7 @@ async function loadObserveTargets(
     if (id) alreadyRecorded.add(id);
   }
 
-  const drafts = (draftsRes.data ?? []) as Array<Record<string, unknown>>;
+  const drafts = (draftsRes.data ?? []) as unknown as Array<Record<string, unknown>>;
   const draftIds = drafts.map((d) => d.id as string);
   const outcomeByDraft = new Map<string, { outcome: string; at: string | null }>();
   if (draftIds.length > 0) {
