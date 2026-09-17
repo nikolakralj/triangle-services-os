@@ -12,6 +12,7 @@
     "check:dev-004": "node scripts/check-dev-004.mjs",
     "check:dev-010": "node scripts/check-dev-010.mjs",
     "check:dev-013": "node scripts/check-dev-013.mjs",
+    "check:dev-019": "node scripts/check-dev-019.mjs",
     "check:dev-015": "node scripts/check-dev-015.mjs",
     "check:dev-011": "node scripts/check-dev-011.mjs",
     "test:e2e": "playwright test",

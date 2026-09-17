@@ -416,7 +416,7 @@ test('policy: SENT_MESSAGES_RECORDED stays false; the freeze on autonomous outbo
 
 test('ROADMAP_EXECUTION records DEV-013 as done in code, with the live steps still owed', () => {
   const roadmap = read('ROADMAP_EXECUTION.md');
-  const slice = roadmap.slice(roadmap.indexOf('### DEV-013'), roadmap.indexOf('### DEV-014'));
+  const slice = roadmap.slice(roadmap.indexOf('### DEV-013'), roadmap.indexOf('### DEV-019'));
   assert.match(slice, /`DONE`/);
   assert.match(slice, /049_send_from_triangle\.sql/);
   assert.match(slice, /signed-in check/i);

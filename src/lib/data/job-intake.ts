@@ -232,6 +232,9 @@ export async function recordInboundEmail(params: {
   reason: string;
   /** Pass null for anything that isn't a real opportunity — we discard it. */
   bodyText: string | null;
+  inReplyTo?: string | null;
+  referencesHeader?: string | null;
+  folder?: "inbox" | "sent";
 }): Promise<{ id: string; alreadyExisted: boolean } | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -245,27 +248,39 @@ export async function recordInboundEmail(params: {
 
   if (existing) return { id: existing.id as string, alreadyExisted: true };
 
-  const { data, error } = await svc
+  const base = {
+    org_id: params.orgId,
+    mail_account_id: params.mailAccountId,
+    provider_message_id: params.providerMessageId,
+    provider_thread_id: params.providerThreadId,
+    sender_email: params.senderEmail,
+    sender_name: params.senderName,
+    recipient_email: params.recipientEmail,
+    subject: params.subject,
+    sent_at: params.sentAt,
+    body_text: params.bodyText,
+    body_discarded: params.bodyText === null,
+    classification: params.classification,
+    classification_confidence: params.confidence,
+    classification_reason: params.reason,
+    processed_at: new Date().toISOString(),
+  };
+  const extra = {
+    in_reply_to: params.inReplyTo ?? null,
+    references_header: params.referencesHeader ?? null,
+    folder: params.folder ?? "inbox",
+  };
+
+  let { data, error } = await svc
     .from("inbound_emails")
-    .insert({
-      org_id: params.orgId,
-      mail_account_id: params.mailAccountId,
-      provider_message_id: params.providerMessageId,
-      provider_thread_id: params.providerThreadId,
-      sender_email: params.senderEmail,
-      sender_name: params.senderName,
-      recipient_email: params.recipientEmail,
-      subject: params.subject,
-      sent_at: params.sentAt,
-      body_text: params.bodyText,
-      body_discarded: params.bodyText === null,
-      classification: params.classification,
-      classification_confidence: params.confidence,
-      classification_reason: params.reason,
-      processed_at: new Date().toISOString(),
-    })
+    .insert({ ...base, ...extra })
     .select("id")
     .maybeSingle();
+  if (error) {
+    const retry = await svc.from("inbound_emails").insert(base).select("id").maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) return null;
   return { id: data.id as string, alreadyExisted: false };

@@ -49,7 +49,8 @@ IMAP mailbox
   → LLM: classify + extract + score
   → store (bodies kept ONLY for opportunities)
   → dedupe (same agency + role within 14 days)
-  → user reads, drafts reply, sends it themselves
+  → observe INBOX + Sent (envelopes only, no LLM): record sent/replied
+  → user reads, drafts reply, or Send from Triangle
 ```
 
 ## Data model
@@ -76,7 +77,7 @@ the scoped organization row.
 
 ```
 src/lib/job-intake/
-  mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later.
+  mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later. fetchForObserve reads INBOX + Sent without bodies.
   clean-email.ts    HTML→text + signature stripping. Pure, no server imports.
   extract.ts        Classify + extract + score. Holds the prompt and the score bands.
   contact-email.ts  Recruiter address: never the receiving mailbox or a forwarder.

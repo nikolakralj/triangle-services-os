@@ -66,8 +66,8 @@ configuration into a signed-in demo session.
 ## Database migrations — CEO approves each one
 
 Migrations live in `supabase/migrations/` and run through
-`049_send_from_triangle.sql` (048 is the last one applied; 049 waits for the
-CEO). Because every environment shares one database,
+`050_mailbox_observe.sql` (049 is on the live database as of 17 September;
+050 waits for the CEO). Because every environment shares one database,
 a migration is applied only after the CEO approves that migration. After any
 column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
 against the live organization.
@@ -157,6 +157,20 @@ already stored for reading: Gmail and Microsoft accept the same app password on
 refused send is written to the refusal ledger and shown as "Not sent. <reason>";
 it is never recorded as sent. Employees (AI) have no path to this: `/api/mail/send`
 refuses every badge and the MCP key before reading the body.
+
+## Mailbox-observed sent / replied — CEO applies 050
+
+After job-intake classify, sync reads INBOX and Sent (envelopes only, no LLM)
+and writes the commercial ledger when outgoing mail or a reply is already in
+the connected mailbox. Today does not ask a person to press Sent or They
+replied. Nothing is sent.
+
+1. Approve and apply `050_mailbox_observe.sql` (adds `in_reply_to`,
+   `references_header`, `folder` on `inbound_emails`, and `outbound_thread_id`
+   on `outreach_drafts`; changes no rows), then `NOTIFY pgrst, 'reload schema';`.
+2. Sync now. A Gmail send to someone already on Today should leave
+   ready-to-contact and become a follow-up; their reply should take the
+   follow-up off Today.
 
 ## Mail from a bot into Job Intake
 

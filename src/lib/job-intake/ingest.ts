@@ -11,13 +11,15 @@ import {
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
 
 // ---------------------------------------------------------------------------
-// The ingestion run: fetch → clean → classify → store.
+// The ingestion run: fetch → clean → classify → store, then observe Sent
+// and replies without a second LLM pass.
 //
 // Two rules this enforces, both deliberate:
 //   1. Idempotent. Re-running never duplicates, because recordInboundEmail
 //      is keyed on (org_id, provider_message_id). Safe to run on a cron.
 //   2. Classify before storing. Anything that isn't a real agency opportunity
 //      keeps only its verdict — the body is discarded and never written.
+//   3. Observation never classifies Sent mail. Envelopes only.
 // ---------------------------------------------------------------------------
 
 export interface MailAccountRow {
@@ -31,6 +33,7 @@ export interface MailAccountRow {
   watch_label: string | null;
   status: string;
   last_synced_at: string | null;
+  owner_user_id: string | null;
 }
 
 export interface IngestSummary {
@@ -40,6 +43,8 @@ export interface IngestSummary {
   opportunities: number;
   noiseDiscarded: number;
   leadsCreated: number;
+  observedSent: number;
+  observedReplied: number;
   errors: string[];
 }
 
@@ -58,7 +63,7 @@ export async function listActiveMailAccounts(orgId: string): Promise<MailAccount
   const { data } = await svc
     .from("mail_accounts")
     .select(
-      "id, email_address, credential_ref, credential_encrypted, imap_host, imap_port, provider, watch_label, status, last_synced_at",
+      "id, email_address, credential_ref, credential_encrypted, imap_host, imap_port, provider, watch_label, status, last_synced_at, owner_user_id",
     )
     .eq("org_id", orgId)
     .eq("status", "active");
@@ -136,6 +141,8 @@ export async function ingestAccount(
     opportunities: 0,
     noiseDiscarded: 0,
     leadsCreated: 0,
+    observedSent: 0,
+    observedReplied: 0,
     errors: [],
   };
 
@@ -188,6 +195,9 @@ export async function ingestAccount(
         recipientEmail: msg.recipientEmail,
         subject: msg.subject,
         sentAt: msg.sentAt,
+        inReplyTo: msg.inReplyTo,
+        referencesHeader: msg.referencesHeader,
+        folder: "inbox",
         classification: result.classification,
         confidence: result.confidence,
         reason: result.reason,
@@ -237,6 +247,21 @@ export async function ingestAccount(
         `${msg.subject}: ${err instanceof Error ? err.message : "extraction failed"}`,
       );
     }
+  }
+
+  try {
+    const { observeAccount } = await import("@/lib/data/mailbox-observe");
+    const observed = await observeAccount(account, orgId, {
+      since: sinceFor(account, opts.sinceDays),
+      limit: opts.limit ?? 200,
+    });
+    summary.observedSent = observed.sent;
+    summary.observedReplied = observed.replied;
+    summary.errors.push(...observed.errors);
+  } catch (err) {
+    summary.errors.push(
+      `observe: ${err instanceof Error ? err.message : "observation failed"}`,
+    );
   }
 
   await markSynced(account.id);

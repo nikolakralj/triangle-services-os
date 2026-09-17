@@ -10,13 +10,14 @@ export const maxDuration = 300;
 
 // ---------------------------------------------------------------------------
 // POST /api/job-intake/sync
-// Read every active mailbox, classify, store opportunities.
 //
 // Two ways in:
 //   • a signed-in org member (the "Sync now" button)
 //   • a scheduled call carrying `Authorization: Bearer $CRON_SECRET`
 //
-// Read-only against the mailbox. Never sends, replies, or deletes anything.
+// Fetch → classify opportunities → observe Sent / replies. Never sends,
+// replies, or deletes anything. Observation writes the commercial ledger
+// from mail that is already in the mailbox.
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
@@ -83,9 +84,11 @@ export async function POST(request: Request) {
       leadsCreated: acc.leadsCreated + s.leadsCreated,
       noiseDiscarded: acc.noiseDiscarded + s.noiseDiscarded,
       alreadySeen: acc.alreadySeen + s.alreadySeen,
+      observedSent: acc.observedSent + s.observedSent,
+      observedReplied: acc.observedReplied + s.observedReplied,
       errors: acc.errors + s.errors.length,
     }),
-    { fetched: 0, leadsCreated: 0, noiseDiscarded: 0, alreadySeen: 0, errors: 0 },
+    { fetched: 0, leadsCreated: 0, noiseDiscarded: 0, alreadySeen: 0, observedSent: 0, observedReplied: 0, errors: 0 },
   );
 
   // The IMAP fallback shows up in the same activity feed as the bots.
