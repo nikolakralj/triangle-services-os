@@ -263,6 +263,7 @@ test('Today keeps the Now card when Bob has the case; Bob wrote in Triangle is o
   assert.doesNotMatch(todayScreen, /Nothing needs you on this case/);
   assert.match(todayScreen, /Who we put forward/);
   assert.match(todayScreen, /today-offering/);
+  assert.match(todayScreen, /Someone else in the pool/);
 });
 
 test('Done follow-through matches the same lead/contact as the card', () => {
