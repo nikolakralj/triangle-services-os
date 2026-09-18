@@ -93,6 +93,112 @@ export function packIntentVerb(intent: PackIntent): string {
   return intent === "full_cv" ? "preparing the full CV" : "preparing the bio";
 }
 
+// ── the human review gate ───────────────────────────────────────────────────
+//
+// Nothing about a real person leaves Triangle because a checkbox was already
+// ticked. Before this, picking somebody in the Send review turned the attach
+// on for you, and the server took the tick on trust: it never looked at the
+// case, never checked that anyone had read the document, and built an
+// anonymised profile even when the case said a full CV had been asked for.
+//
+// So the tick is now the last step of a decision, not the decision. A person
+// opens the document, approves it on the case, and only then may it be
+// attached — and only to the case it was approved on, in the version it was
+// approved as.
+//
+// The approval is recorded in migration 042's review columns, with who and
+// when. "acknowledged" there already means "a person read this and agrees",
+// kept beside the employee's own claim rather than over it, which is exactly
+// what this is.
+
+export const PACK_APPROVED_OUTCOME = "acknowledged";
+export const PACK_NOT_USED_OUTCOME = "discarded";
+
+/**
+ * `not_checked`  nobody has approved it — it cannot be attached
+ * `approved`     a person opened it and approved it
+ * `superseded`   approved, then the employee said something after that
+ * `not_used`     a person ruled it out, with a reason
+ */
+export type PackApproval = "not_checked" | "approved" | "superseded" | "not_used";
+
+export function packApprovalOf(params: {
+  reviewOutcome: string | null | undefined;
+  reviewedAt: string | null | undefined;
+  /** When the employee handed her check in. */
+  completedAt: string | null | undefined;
+}): PackApproval {
+  if (params.reviewOutcome === PACK_NOT_USED_OUTCOME) return "not_used";
+  if (params.reviewOutcome !== PACK_APPROVED_OUTCOME) return "not_checked";
+  // Approving the document Triangle already holds does not have to wait for
+  // Hanna. But if she answered afterwards, what was approved is not what the
+  // case now says, and a stale approval must not carry an attachment.
+  if (
+    params.completedAt &&
+    params.reviewedAt &&
+    params.completedAt > params.reviewedAt
+  ) {
+    return "superseded";
+  }
+  return "approved";
+}
+
+/** The one state in which a document may ride on a message. */
+export function mayAttachPack(approval: PackApproval): boolean {
+  return approval === "approved";
+}
+
+export const PACK_NOT_APPROVED =
+  "Nobody has approved this one for sending. Open it on the case and approve it first.";
+
+export const PACK_SUPERSEDED =
+  "This was approved, and then Hanna answered. Read what she said and approve it again before it goes.";
+
+export const PACK_WRONG_CASE =
+  "That was approved on a different case. Ask Hanna for one on this case.";
+
+/** What the card says about where the approval stands. */
+export function packApprovalSentence(params: {
+  approval: PackApproval;
+  agentName: string;
+  finished: boolean;
+  intent: PackIntent;
+}): string {
+  const what = params.intent === "full_cv" ? "full named CV" : "bio";
+  switch (params.approval) {
+    case "approved":
+      return `Approved. Tick it in the Send review to attach the ${what}.`;
+    case "superseded":
+      return PACK_SUPERSEDED;
+    case "not_used":
+      return "Ruled out. It cannot be attached.";
+    default:
+      return params.finished
+        ? `${params.agentName} has checked it. Open it, then approve it — nothing attaches until you do.`
+        : `${params.agentName} has not checked the facts yet. You can still open this and approve it; nothing attaches until you do.`;
+  }
+}
+
+/**
+ * What a person is recorded as having approved. Written into `review_note`
+ * so the decision survives without a second table, and so "he approved it"
+ * can be read back as a sentence months later.
+ */
+export function packApprovalNote(params: {
+  intent: PackIntent;
+  who: string;
+  filename: string;
+  agentName: string;
+  finished: boolean;
+}): string {
+  const what = params.intent === "full_cv" ? "full named CV" : "anonymised bio";
+  return `Approved the ${what} for ${params.who} (${params.filename}). ${
+    params.finished
+      ? `${params.agentName}'s check was in.`
+      : `${params.agentName} had not checked the facts yet.`
+  }`.slice(0, 1000);
+}
+
 /**
  * Does this sentence ask for a person to be put forward? Used to notice that
  * a message typed into Bob's thread is really resourcing work, and offer the
@@ -200,4 +306,9 @@ export interface PutForwardCase {
   completedAt: string | null;
   pack: PutForwardPack | null;
   nobodyBound: boolean;
+  /** Where the human review gate stands. Only `approved` may be attached. */
+  approval: PackApproval;
+  approvedAt: string | null;
+  /** What the person wrote when they approved it or ruled it out. */
+  decidedNote: string | null;
 }

@@ -56,12 +56,20 @@ const handoff = load('src/lib/data/today-handoff.ts');
 const {
   DEFAULT_PACK_INTENT,
   PUT_FORWARD_CASE_TYPE,
+  PACK_APPROVED_OUTCOME,
+  PACK_NOT_USED_OUTCOME,
   asksForAPutForward,
   initialsOf,
+  mayAttachPack,
+  packApprovalNote,
+  packApprovalOf,
+  packApprovalSentence,
   packDisplayName,
   packIntentLabel,
   parsePackIntent,
 } = putForward;
+
+const filenames = load('src/lib/data/anonymised-cv-filename.ts');
 
 const askHannaSrc = read('src/lib/data/ask-hanna.ts');
 const policySrc = read('src/lib/data/ask-hanna-policy.ts');
@@ -336,7 +344,7 @@ test('the result returns on the same case, not a second chat', () => {
   assert.match(casesSrc, /PUT_FORWARD_CASE_TYPE/);
   assert.match(casesSrc, /buildWorkerCv/);
   assert.match(casesSrc, /includeIdentity: named/);
-  assert.match(casesSrc, /anonymisedCvFilename/);
+  assert.match(casesSrc, /packFilename/);
   assert.match(decisionsPage, /listPutForwardCases/);
   assert.match(todayScreenSrc, /PutForwardBlock/);
   assert.match(blockSrc, /Who we put forward/);
@@ -394,6 +402,124 @@ test('the role files tell Bob and Hanna whose half this is', () => {
   const inbox = read('src/app/api/agent/inbox/route.ts');
   assert.match(inbox, /who_we_put_forward/);
   assert.match(inbox, /pack_intent/);
+});
+
+// ── the human review gate (DEV-022) ────────────────────────────────────────
+
+test('nothing is approved until a person approves it', () => {
+  const none = packApprovalOf({ reviewOutcome: null, reviewedAt: null, completedAt: null });
+  assert.equal(none, 'not_checked');
+  assert.equal(mayAttachPack(none), false, 'an unreviewed pack can never be attached');
+  // A half-written review row is not an approval either.
+  assert.equal(
+    packApprovalOf({ reviewOutcome: 'sent_back', reviewedAt: '2026-09-18T09:00:00Z', completedAt: null }),
+    'not_checked',
+  );
+});
+
+test('approved is approved, and a ruled-out pack stays out', () => {
+  assert.equal(
+    mayAttachPack(
+      packApprovalOf({
+        reviewOutcome: PACK_APPROVED_OUTCOME,
+        reviewedAt: '2026-09-18T09:00:00Z',
+        completedAt: '2026-09-18T08:00:00Z',
+      }),
+    ),
+    true,
+  );
+  const out = packApprovalOf({
+    reviewOutcome: PACK_NOT_USED_OUTCOME,
+    reviewedAt: '2026-09-18T09:00:00Z',
+    completedAt: null,
+  });
+  assert.equal(out, 'not_used');
+  assert.equal(mayAttachPack(out), false);
+});
+
+test('an approval lapses when Hanna answers after it', () => {
+  const stale = packApprovalOf({
+    reviewOutcome: PACK_APPROVED_OUTCOME,
+    reviewedAt: '2026-09-18T09:00:00Z',
+    completedAt: '2026-09-18T11:00:00Z',
+  });
+  assert.equal(stale, 'superseded');
+  assert.equal(mayAttachPack(stale), false, 'what was approved is not what the case now says');
+  assert.match(
+    packApprovalSentence({
+      approval: stale,
+      agentName: 'Hanna',
+      finished: true,
+      intent: 'bio_anonymised',
+    }),
+    /approve it again/i,
+  );
+});
+
+test('a person may approve before Hanna answers, and the record says which it was', () => {
+  const waiting = packApprovalSentence({
+    approval: 'not_checked',
+    agentName: 'Hanna',
+    finished: false,
+    intent: 'bio_anonymised',
+  });
+  assert.match(waiting, /has not checked the facts yet/);
+  assert.match(waiting, /nothing attaches until you do/);
+  const early = packApprovalNote({
+    intent: 'bio_anonymised',
+    who: 'M. P.',
+    filename: 'ts-aabbccdd-profile.pdf',
+    agentName: 'Hanna',
+    finished: false,
+  });
+  assert.match(early, /anonymised bio for M\. P\./);
+  assert.match(early, /had not checked the facts yet/);
+  const late = packApprovalNote({
+    intent: 'full_cv',
+    who: 'Matej Pavlović',
+    filename: 'matej-pavlovic-cv.pdf',
+    agentName: 'Hanna',
+    finished: true,
+  });
+  assert.match(late, /full named CV/);
+  assert.match(late, /check was in/);
+});
+
+test('the filename on the card is the filename on the wire', () => {
+  assert.equal(
+    filenames.packFilename({
+      intent: 'bio_anonymised',
+      reference: 'TS-AABBCCDD',
+      workerName: 'Matej Pavlović',
+    }),
+    'ts-aabbccdd-profile.pdf',
+    'a bio is named after the reference, never the person',
+  );
+  assert.equal(
+    filenames.packFilename({
+      intent: 'full_cv',
+      reference: 'TS-AABBCCDD',
+      workerName: 'Matej Pavlović',
+    }),
+    'matej-pavlovic-cv.pdf',
+  );
+});
+
+test('the card is where a person opens it and approves it', () => {
+  assert.match(blockSrc, /Open \{pack\.filename\}/);
+  assert.match(blockSrc, /Approve for sending/);
+  assert.match(blockSrc, /Not this one/);
+  assert.match(blockSrc, /"\/api\/put-forward"/);
+  assert.match(blockSrc, /method: "PATCH"/);
+  assert.match(blockSrc, /packApprovalSentence/);
+  // Ruling one out costs a reason, like every other discard on Today.
+  assert.match(blockSrc, /reason\.trim\(\)\.length < 3/);
+});
+
+test('the Send review is told about the pack, and only an approved one arrives ticked-able', () => {
+  assert.match(todayScreenSrc, /attachablePackFrom/);
+  assert.match(todayScreenSrc, /pack=\{attachable\}/);
+  assert.match(todayScreenSrc, /mayAttachPack\(item\.approval\)/);
 });
 
 test('docs record the split and the human-only Send', () => {

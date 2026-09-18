@@ -203,11 +203,14 @@ const COLLEAGUE = '88888888-8888-4888-8888-888888888888';
 const LEAD = '55555555-5555-4555-8555-555555555555';
 const WORKER = '66666666-6666-4666-8666-666666666666';
 
+const PACK_CASE = '77777777-7777-4777-8777-777777777777';
+const OTHER_CASE_PACK = '88888888-8888-4888-8888-888888888888';
 let mailboxes = [];
 let logged = [];
 let refusals = [];
 let smtpCalls = [];
 let smtpFail = null;
+let approvedPacks = {};
 
 function fakeSvc() {
   return {
@@ -253,14 +256,31 @@ const loadSend = moduleLoader({
       return { rfc822Id: '<msg-1@x.com>' };
     },
   },
-  '@/lib/mail/anonymised-cv-attachment': {
-    buildAnonymisedCvAttachment: async ({ workerId }) => {
+  '@/lib/mail/pack-attachment': {
+    buildPackAttachment: async ({ workerId, intent }) => {
       if (!workerId || workerId === 'missing') return null;
       return {
-        filename: 'ts-aabbccdd-profile.pdf',
+        filename:
+          intent === 'full_cv' ? 'matej-pavlovic-cv.pdf' : 'ts-aabbccdd-profile.pdf',
         contentType: 'application/pdf',
         bytes: Buffer.from('%PDF-mock'),
       };
+    },
+  },
+  // The human review gate. `approvedPackForSend` is the only thing that may
+  // put a person's profile on a message, and it reads the record, not the
+  // browser — so the fake stands in for the record here.
+  '@/lib/data/put-forward-cases': {
+    approvedPackForSend: async ({ assignmentId, ids }) => {
+      const found = approvedPacks[assignmentId];
+      if (!found) {
+        return { ok: false, error: 'Nobody has approved this one for sending.', status: 409 };
+      }
+      const here = [ids.leadId, ids.contactId, ids.personId].filter(Boolean);
+      if (!here.includes(found.caseId)) {
+        return { ok: false, error: 'That was approved on a different case.', status: 409 };
+      }
+      return { ok: true, workerId: found.workerId, intent: found.intent, filename: found.filename };
     },
   },
 });
@@ -295,6 +315,20 @@ function reset() {
   refusals = [];
   smtpCalls = [];
   smtpFail = null;
+  approvedPacks = {
+    [PACK_CASE]: {
+      caseId: LEAD,
+      workerId: WORKER,
+      intent: 'bio_anonymised',
+      filename: 'ts-aabbccdd-profile.pdf',
+    },
+    [OTHER_CASE_PACK]: {
+      caseId: '99999999-9999-4999-8999-999999999999',
+      workerId: WORKER,
+      intent: 'bio_anonymised',
+      filename: 'ts-aabbccdd-profile.pdf',
+    },
+  };
 }
 
 const message = {
@@ -384,13 +418,13 @@ test('sendableMailboxFor tells the Today page whose button to show', async () =>
   assert.equal(await sendableMailboxFor(ORG, COLLEAGUE), null);
 });
 
-test('attaching an anonymised profile: builder runs, SMTP gets the file, the record names the filename', async () => {
+test('an approved profile: builder runs, SMTP gets the file, the record names the filename', async () => {
   reset();
   const r = await sendFromTriangle({
     ...message,
     userId: OWNER,
-    workerId: WORKER,
-    attachAnonymisedCv: true,
+    attachPack: true,
+    putForwardAssignmentId: PACK_CASE,
   });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.attachedFilename, 'ts-aabbccdd-profile.pdf');
@@ -401,27 +435,85 @@ test('attaching an anonymised profile: builder runs, SMTP gets the file, the rec
   assert.match(logged[0].note, /ts-aabbccdd-profile\.pdf/);
 });
 
-test('attach without picking a worker never reaches the server', async () => {
+test('the version that goes out is the version that was approved', async () => {
   reset();
-  const r = await sendFromTriangle({ ...message, userId: OWNER, attachAnonymisedCv: true });
-  assert.equal(r.ok, false);
-  assert.equal(r.status, 400);
-  assert.match(r.error, /Pick who to put forward/);
-  assert.equal(smtpCalls.length, 0);
-  assert.equal(logged.length, 0);
+  approvedPacks[PACK_CASE].intent = 'full_cv';
+  approvedPacks[PACK_CASE].filename = 'matej-pavlovic-cv.pdf';
+  const r = await sendFromTriangle({
+    ...message,
+    userId: OWNER,
+    attachPack: true,
+    putForwardAssignmentId: PACK_CASE,
+  });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(
+    r.attachedFilename,
+    'matej-pavlovic-cv.pdf',
+    'a case approved as a full CV must not silently attach the anonymised one',
+  );
 });
 
-test('a missing profile is a 404 and nothing is sent', async () => {
+test('a tick with no approved pack behind it sends nothing and is a refusal', async () => {
   reset();
   const r = await sendFromTriangle({
     ...message,
     userId: OWNER,
-    workerId: 'missing',
-    attachAnonymisedCv: true,
+    attachPack: true,
+    putForwardAssignmentId: '00000000-0000-4000-8000-000000000000',
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 409);
+  assert.match(r.error, /Nobody has approved/i);
+  assert.equal(smtpCalls.length, 0, 'not even the words go out');
+  assert.equal(logged.length, 0);
+  assert.equal(refusals.length, 1, 'a blocked attach is in the ledger');
+  assert.equal(refusals[0].kind, 'boundary');
+});
+
+test('a tick with no case id at all is refused before anything is built', async () => {
+  reset();
+  const r = await sendFromTriangle({ ...message, userId: OWNER, attachPack: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 400);
+  assert.match(r.error, /approve/i);
+  assert.equal(smtpCalls.length, 0);
+  assert.equal(logged.length, 0);
+});
+
+test('an approval given on another case does not travel to this one', async () => {
+  reset();
+  const r = await sendFromTriangle({
+    ...message,
+    userId: OWNER,
+    attachPack: true,
+    putForwardAssignmentId: OTHER_CASE_PACK,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 409);
+  assert.match(r.error, /different case/i);
+  assert.equal(smtpCalls.length, 0);
+});
+
+test('a missing profile is a 404 and nothing is sent', async () => {
+  reset();
+  approvedPacks[PACK_CASE].workerId = 'missing';
+  const r = await sendFromTriangle({
+    ...message,
+    userId: OWNER,
+    attachPack: true,
+    putForwardAssignmentId: PACK_CASE,
   });
   assert.equal(r.ok, false);
   assert.equal(r.status, 404);
   assert.equal(smtpCalls.length, 0);
+});
+
+test('no attach asked for, no attachment and no gate call', async () => {
+  reset();
+  const r = await sendFromTriangle({ ...message, userId: OWNER });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.attachedFilename, null);
+  assert.equal(smtpCalls[0].mail.attachments.length, 0);
 });
 
 // ── the record keeps working on a database without migration 049 ────────────
@@ -440,9 +532,13 @@ test('/api/mail/send refuses machines and demo before reading the body', () => {
   assert.ok(guard > 0 && body > guard, 'guard before body');
   assert.match(src, /sendFromTriangle\(/);
   assert.doesNotMatch(src, /agentInstanceId|machine_credentials/);
-  assert.match(src, /workerId: z\.string\(\)\.uuid\(\)\.optional\(\)\.nullable\(\)/);
-  assert.match(src, /attachAnonymisedCv: z\.boolean\(\)\.optional\(\)/);
+  assert.match(src, /attachPack: z\.boolean\(\)\.optional\(\)/);
+  assert.match(src, /putForwardAssignmentId: z\.string\(\)\.uuid\(\)\.optional\(\)\.nullable\(\)/);
   assert.match(src, /attachedFilename: result\.attachedFilename/);
+  // The old pair let a browser name any worker and get a profile built for
+  // it. Both are gone; the case id is what the approval is read from.
+  assert.doesNotMatch(src, /attachAnonymisedCv/);
+  assert.doesNotMatch(src, /workerId: z\.string\(\)/);
 });
 
 test('nothing but the human route reaches the SMTP transport', () => {
@@ -482,10 +578,53 @@ test('Today card: Send from Triangle only with a sender; Open mail stays; review
   assert.match(comp, /Send now/);
   assert.match(comp, /nothing is\s+recorded as sent/);
   assert.match(comp, /draft: target\.draft/);
-  assert.match(comp, /attachAnonymisedCv/);
-  assert.match(comp, /Attach the anonymised Triangle profile/);
-  assert.match(comp, /Bob does not send/);
+  assert.match(comp, /attachPack: attach && canAttach/);
+  assert.match(comp, /putForwardAssignmentId/);
   assert.match(comp, /packet-worker/);
+});
+
+// ── the tick is the last step of a decision, not the decision ──────────────
+test('the attach starts off and exists only for a pack somebody approved', () => {
+  const comp = read('src/components/modules/send-from-triangle.tsx');
+  // Picking a person used to switch the attach on for you.
+  assert.match(comp, /const \[attach, setAttach\] = useState\(false\)/);
+  assert.doesNotMatch(comp, /setAttach\(true\)/);
+  assert.match(comp, /const canAttach = Boolean\(pack && mayAttachPack\(pack\.approval\)\)/);
+  // No checkbox at all until it is approved; an unapproved state says why.
+  const row = comp.slice(comp.indexOf('function AttachRow'));
+  assert.match(row, /if \(!mayAttachPack\(pack\.approval\)\)/);
+  assert.match(row, /PACK_NOT_APPROVED/);
+  assert.match(row, /PACK_SUPERSEDED/);
+  const tickAt = row.indexOf('type="checkbox"');
+  const guardAt = row.indexOf('if (!mayAttachPack');
+  assert.ok(guardAt > 0 && tickAt > guardAt, 'the refusal branch returns before the tick');
+});
+
+test('the server re-reads the approval; the browser boolean is never enough', () => {
+  const src = read('src/lib/data/mail-send.ts');
+  assert.match(src, /approvedPackForSend\(/);
+  assert.match(src, /putForwardAssignmentId/);
+  // The gate runs before anything is built and before SMTP is touched.
+  const gate = src.indexOf('approvedPackForSend(');
+  const build = src.indexOf('buildPackAttachment(');
+  const smtp = src.indexOf('sendViaMailbox(');
+  assert.ok(gate > 0 && build > gate && smtp > build, 'gate, then build, then send');
+  assert.match(src, /intent: approved\.intent/);
+  assert.doesNotMatch(src, /includeIdentity: false/);
+});
+
+test('approval is recorded with who and when, and a refusal needs a reason', () => {
+  const cases = read('src/lib/data/put-forward-cases.ts');
+  assert.match(cases, /review_outcome:/);
+  assert.match(cases, /reviewed_by: params\.userId/);
+  assert.match(cases, /reviewed_at: new Date\(\)\.toISOString\(\)/);
+  assert.match(cases, /decision === "not_used" && note\.length < 3/);
+  const route = read('src/app/api/put-forward/route.ts');
+  assert.match(route, /refuseUnlessHuman\(\s*access,\s*"canWrite"/);
+  assert.match(route, /refuseUnlessHuman\(\s*access,\s*"canSeeWorkers"/);
+  const guard = route.indexOf('refuseUnlessHuman');
+  const body = route.indexOf('patchSchema.safeParse');
+  assert.ok(guard > 0 && body > guard, 'machines are refused before the body is read');
 });
 
 test('mailbox switch: owner only, off by default, PATCH refuses machines', () => {

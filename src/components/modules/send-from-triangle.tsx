@@ -2,21 +2,50 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Send } from "lucide-react";
+import { FileText, Loader2, Send } from "lucide-react";
+import {
+  mayAttachPack,
+  PACK_NOT_APPROVED,
+  PACK_SUPERSEDED,
+  type PackApproval,
+  type PackIntent,
+} from "@/lib/data/put-forward";
 
 // ---------------------------------------------------------------------------
 // Send from Triangle (DEV-013 + packet attach).
 //
 // Review, edit, press Send. The words in the card's editor are what goes;
 // the person sees To / From / Subject and the text once more, then presses
-// Send now. They may attach the anonymised Triangle profile for the person
-// they picked — filename is the Triangle reference, never the name. The
-// server sends through the person's own mailbox and only then records it.
-// If the mailbox's server refuses, nothing is recorded as sent.
+// Send now. The server sends through the person's own mailbox and only then
+// records it. If the mailbox's server refuses, nothing is recorded as sent.
+//
+// The attachment is the part that had to change. Picking somebody here used
+// to tick the attach for you, and the tick was the whole gate: the server
+// took the boolean, built a profile for whatever worker id arrived, and sent
+// it. So a person's profile could leave Triangle without anyone having
+// opened it.
+//
+// Now the tick only exists for a profile a person has already approved on
+// this case, it starts off, and the server re-reads the approval anyway.
+// With nothing approved, this says what is missing instead of offering a
+// checkbox that cannot work.
 //
 // Rendered only when the person has a mailbox with sending turned on; with
 // none, Open mail stays the way out and this component renders nothing.
 // ---------------------------------------------------------------------------
+
+/** The approved profile on this case, as the Send review needs to know it. */
+export interface AttachablePack {
+  assignmentId: string;
+  approval: PackApproval;
+  intent: PackIntent;
+  /** "M. P." on a bio; the name once identity has been released. */
+  who: string;
+  filename: string;
+  href: string;
+  agentName: string;
+  approvedAt: string | null;
+}
 
 export interface OfferChoice {
   workerId: string;
@@ -128,6 +157,7 @@ export function SendFromTriangleReview({
   sender,
   tone = "dark",
   pool = [],
+  pack = null,
   onSent,
   onCancel,
   onPickWorker,
@@ -136,6 +166,8 @@ export function SendFromTriangleReview({
   sender: { id: string; emailAddress: string };
   tone?: keyof typeof TONE;
   pool?: PoolWorker[];
+  /** What Hanna prepared on this case, and whether anybody approved it. */
+  pack?: AttachablePack | null;
   onSent: (sent: SentRecord) => void;
   onCancel: () => void;
   onPickWorker?: (workerId: string) => void;
@@ -146,15 +178,13 @@ export function SendFromTriangleReview({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workerId, setWorkerId] = useState(target.workerId ?? "");
-  const [attach, setAttach] = useState(Boolean(target.workerId));
+  // Never pre-ticked. Nothing about a real person goes out because the page
+  // decided it for you.
+  const [attach, setAttach] = useState(false);
   const [query, setQuery] = useState("");
   const body = target.body.trim();
-  const canAttach = Boolean(workerId);
-  const ready =
-    !busy &&
-    subject.trim().length > 0 &&
-    body.length >= 2 &&
-    (!attach || canAttach);
+  const canAttach = Boolean(pack && mayAttachPack(pack.approval));
+  const ready = !busy && subject.trim().length > 0 && body.length >= 2;
 
   const choices = useMemo(() => {
     const seen = new Set<string>();
@@ -177,9 +207,11 @@ export function SendFromTriangleReview({
     return out;
   }, [target.candidates, pool, query]);
 
+  // Picking who the words are about does not decide what is attached. Those
+  // were one control until 18 September, which is how a profile could ride
+  // out on a message nobody had approved it for.
   function pick(id: string) {
     setWorkerId(id);
-    if (id) setAttach(true);
     onPickWorker?.(id);
   }
 
@@ -200,8 +232,8 @@ export function SendFromTriangleReview({
           contactId: target.contactId || undefined,
           personId: target.personId,
           mailAccountId: sender.id,
-          workerId: attach && workerId ? workerId : undefined,
-          attachAnonymisedCv: attach && Boolean(workerId),
+          attachPack: attach && canAttach,
+          putForwardAssignmentId: attach && canAttach ? pack?.assignmentId : undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -233,8 +265,6 @@ export function SendFromTriangleReview({
     }
   }
 
-  const selected = choices.find((c) => c.workerId === workerId);
-
   return (
     <div className={t.box} role="dialog" aria-label="Review before sending">
       <p className={t.label}>Once more before it goes</p>
@@ -256,9 +286,11 @@ export function SendFromTriangleReview({
       </label>
       <pre className={t.pre}>{body}</pre>
 
+      {/* Who the words name. Changing it rewrites the background line in the
+          reply; it does not attach anything. */}
       {(target.candidates?.length || pool.length > 0) && (
         <div className="mt-3">
-          <p className={`${t.line} ${t.muted}`}>Who to put forward</p>
+          <p className={`${t.line} ${t.muted}`}>Who the reply is about</p>
           <div className="mt-1.5 space-y-1">
             {choices.map((c) => (
               <label
@@ -297,27 +329,13 @@ export function SendFromTriangleReview({
         </div>
       )}
 
-      <label className={t.check}>
-        <input
-          type="checkbox"
-          checked={attach}
-          onChange={(e) => setAttach(e.target.checked)}
-          disabled={busy}
-          className="mt-1"
-        />
-        <span>
-          Attach the anonymised Triangle profile (PDF). The filename is the
-          Triangle reference, never their name. Bob does not send.
-        </span>
-      </label>
-      {attach && !workerId && (
-        <p className={t.error}>Pick who to put forward before attaching a profile.</p>
-      )}
-      {attach && selected && (
-        <p className={t.note}>
-          {selected.name} — initials and no contact details. Named CVs stay in Talent.
-        </p>
-      )}
+      <AttachRow
+        pack={pack}
+        attach={attach}
+        onAttach={setAttach}
+        busy={busy}
+        tone={tone}
+      />
 
       <p className={t.note}>
         Leaves from your own mailbox. Triangle records the text as sent, the draft as
@@ -335,5 +353,81 @@ export function SendFromTriangleReview({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The attachment, and only in the state where attaching is a real option.
+ *
+ * Every other state says what is missing and where to go, rather than
+ * offering a tick that the server would refuse. An unapproved profile has no
+ * checkbox at all — a disabled one still reads as "almost allowed".
+ */
+function AttachRow({
+  pack,
+  attach,
+  onAttach,
+  busy,
+  tone,
+}: {
+  pack: AttachablePack | null;
+  attach: boolean;
+  onAttach: (next: boolean) => void;
+  busy: boolean;
+  tone: keyof typeof TONE;
+}) {
+  const t = TONE[tone];
+
+  if (!pack) {
+    return (
+      <p className={t.note}>
+        Nothing is attached. To put somebody forward, ask Hanna on this case and
+        approve what she prepares.
+      </p>
+    );
+  }
+
+  const preview = (
+    <a
+      href={pack.href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+    >
+      <FileText className="h-3 w-3" />
+      Open {pack.filename}
+    </a>
+  );
+
+  if (!mayAttachPack(pack.approval)) {
+    return (
+      <p className={t.note}>
+        {pack.approval === "superseded" ? PACK_SUPERSEDED : PACK_NOT_APPROVED} {preview}
+      </p>
+    );
+  }
+
+  const what =
+    pack.intent === "full_cv"
+      ? "the full named CV"
+      : "the anonymised profile — initials, no contact details";
+
+  return (
+    <>
+      <label className={t.check}>
+        <input
+          type="checkbox"
+          checked={attach}
+          onChange={(e) => onAttach(e.target.checked)}
+          disabled={busy}
+          className="mt-1"
+        />
+        <span>
+          Attach {pack.filename} — {what} for {pack.who}. You approved this on the
+          case; it goes only because you tick it.
+        </span>
+      </label>
+      <p className={t.note}>{preview}</p>
+    </>
   );
 }

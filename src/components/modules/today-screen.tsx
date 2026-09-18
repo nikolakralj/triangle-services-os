@@ -33,6 +33,7 @@ import { EmailCardActions } from "@/components/modules/today-email-actions";
 import {
   SendFromTriangleButton,
   SendFromTriangleReview,
+  type AttachablePack,
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
 import {
@@ -43,7 +44,7 @@ import {
   type CaseRef,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
-import type { PutForwardCase } from "@/lib/data/put-forward";
+import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { PutForwardBlock } from "@/components/modules/put-forward-block";
 
 // ---------------------------------------------------------------------------
@@ -624,6 +625,9 @@ function ActionPanel({
   const putForwardHere = putForward.filter((item) =>
     matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
   );
+  // What the Send review may offer to attach: an approved pack on this case,
+  // or the nearest one so the review can say what is still missing.
+  const attachable = attachablePackFrom(putForwardHere);
 
   function pickWorker(nextId: string, next: OfferWorker | null) {
     setWorkerId(nextId);
@@ -887,6 +891,7 @@ function ActionPanel({
             target={sendTarget}
             sender={sender}
             pool={pool}
+            pack={attachable}
             onPickWorker={(id) => {
               const next =
                 (action.candidates ?? []).find((c) => c.workerId === id) ??
@@ -1001,6 +1006,28 @@ function ActionPanel({
       </div>
     </div>
   );
+}
+
+/**
+ * The pack the Send review should talk about: an approved one if there is
+ * one, otherwise the newest with a document, so the review can name what is
+ * still missing rather than going quiet.
+ */
+function attachablePackFrom(items: PutForwardCase[]): AttachablePack | null {
+  const withDocument = items.filter((item) => item.pack !== null);
+  const chosen =
+    withDocument.find((item) => mayAttachPack(item.approval)) ?? withDocument[0];
+  if (!chosen?.pack) return null;
+  return {
+    assignmentId: chosen.assignmentId,
+    approval: chosen.approval,
+    intent: chosen.intent,
+    who: chosen.pack.displayName,
+    filename: chosen.pack.filename,
+    href: chosen.pack.href,
+    agentName: chosen.agentName,
+    approvedAt: chosen.approvedAt,
+  };
 }
 
 function rewriteBackground(script: string, why: string): string {
