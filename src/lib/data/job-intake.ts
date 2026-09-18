@@ -120,9 +120,44 @@ function rowToLead(
   };
 }
 
+function spaceOfLeadRow(
+  row: LeadRow,
+  spaces: Map<string, LeadSpace>,
+): LeadSpace {
+  return (
+    spaces.get(String(row.id)) ?? {
+      sharedAt: (row.shared_at as string | null | undefined) ?? undefined,
+      mailboxOwnerUserId: null,
+    }
+  );
+}
+
+function viewerMaySeeLead(
+  space: LeadSpace,
+  viewerUserId: string | null,
+  mailSpace?: MailSpace,
+): boolean {
+  if (!canViewLead(space, viewerUserId)) return false;
+  if (mailSpace === "shared") {
+    const owned = Boolean(space.mailboxOwnerUserId);
+    if (!isInSharedSpace(space.sharedAt) && owned) return false;
+  }
+  if (
+    mailSpace === "mine" &&
+    viewerUserId &&
+    space.mailboxOwnerUserId !== viewerUserId
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * List leads for the org, best crew opportunities first. Duplicates are
  * hidden by default — they're linked to the original instead.
+ *
+ * Visibility (personal vs shared) is applied while paging, then the limit.
+ * A colleague's unshared mail must not consume the page and leave Mine empty.
  */
 export type LeadSort = "score" | "newest" | "oldest";
 
@@ -132,6 +167,8 @@ export async function listJobLeads(
     status?: string;
     includeDuplicates?: boolean;
     limit?: number;
+    /** Skip this many already-visible leads (used to page Mine / Your mail). */
+    offset?: number;
     sort?: LeadSort;
     /** Required for a person-facing list: shared + this mailbox. */
     viewerUserId?: string | null;
@@ -142,19 +179,51 @@ export async function listJobLeads(
   const svc = createServiceSupabaseClient();
   if (!svc) return [];
 
-  let query = svc
-    .from("job_leads")
-    .select("*")
-    .eq("org_id", orgId)
-    .order("team_potential", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(opts.limit ?? 200);
+  const viewerUserId = opts.viewerUserId ?? null;
+  const take = opts.limit ?? 200;
+  const skip = opts.offset ?? 0;
+  const need = skip + take;
+  const PAGE = 100;
+  const SCAN_CAP = 5000;
+  const sort = opts.sort ?? "score";
+  const collected: LeadRow[] = [];
+  let dbOffset = 0;
 
-  if (opts.status) query = query.eq("status", opts.status);
-  if (!opts.includeDuplicates) query = query.is("duplicate_of_id", null);
+  while (collected.length < need && dbOffset < SCAN_CAP) {
+    let query = svc.from("job_leads").select("*").eq("org_id", orgId);
+    if (sort === "oldest") {
+      query = query.order("created_at", { ascending: true });
+    } else if (sort === "newest") {
+      query = query.order("created_at", { ascending: false });
+    } else {
+      query = query
+        .order("team_potential", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+    }
+    if (opts.status) query = query.eq("status", opts.status);
+    if (!opts.includeDuplicates) query = query.is("duplicate_of_id", null);
+    query = query.range(dbOffset, dbOffset + PAGE - 1);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) break;
+
+    const spaces = await leadSpacesFor(
+      orgId,
+      data.map((r) => String(r.id)),
+    );
+    for (const row of data as LeadRow[]) {
+      if (!viewerMaySeeLead(spaceOfLeadRow(row, spaces), viewerUserId, opts.space)) {
+        continue;
+      }
+      collected.push(row);
+      if (collected.length >= need) break;
+    }
+    dbOffset += data.length;
+    if (data.length < PAGE) break;
+  }
+
+  const data = collected.slice(skip, skip + take);
+  if (data.length === 0) return [];
 
   const spaces = await leadSpacesFor(
     orgId,
@@ -192,41 +261,22 @@ export async function listJobLeads(
     }
   }
 
-  const viewerUserId = opts.viewerUserId ?? null;
-  const leads = data.flatMap((row) => {
-    const space = spaces.get(String(row.id)) ?? {
-      sharedAt: (row.shared_at as string | null | undefined) ?? undefined,
-      mailboxOwnerUserId: null,
-    };
-    if (!canViewLead(space, viewerUserId)) return [];
-    if (opts.space === "shared") {
-      const owned = Boolean(space.mailboxOwnerUserId);
-      if (!isInSharedSpace(space.sharedAt) && owned) return [];
-    }
-    if (
-      opts.space === "mine" &&
-      viewerUserId &&
-      space.mailboxOwnerUserId !== viewerUserId
-    ) {
-      return [];
-    }
+  const leads = data.map((row) => {
+    const space = spaceOfLeadRow(row, spaces);
     const email = emailMap.get(String(row.inbound_email_id));
     const accountId = email?.mail_account_id as string | undefined;
-    return [
-      rowToLead(
-        row,
-        email,
-        accountId ? mailboxMap.get(accountId) ?? null : null,
-        space,
-        viewerUserId,
-      ),
-    ];
+    return rowToLead(
+      row,
+      email,
+      accountId ? mailboxMap.get(accountId) ?? null : null,
+      space,
+      viewerUserId,
+    );
   });
 
   // Date ordering happens here rather than in SQL: the date that matters is
   // when the recruiter sent the mail, which lives on inbound_emails, not on
   // the lead row. Falls back to createdAt when a lead has no linked email.
-  const sort = opts.sort ?? "score";
   if (sort === "score") return leads;
 
   const timeOf = (l: JobLead) =>
@@ -723,21 +773,34 @@ export async function listPersonalInbox(
   viewerUserId: string,
   limit = 8,
 ): Promise<JobLead[]> {
-  const leads = await listJobLeads(orgId, {
-    viewerUserId,
-    space: "mine",
-    sort: "newest",
-    limit: 40,
-  });
-  return leads
-    .filter((l) =>
-      isPersonalUnshared(
-        { sharedAt: l.sharedAt, mailboxOwnerUserId: l.mailboxOwnerUserId },
-        viewerUserId,
-      ),
-    )
-    .filter((l) => l.status === "new" || l.status === "reviewing")
-    .slice(0, limit);
+  const PAGE = 40;
+  const out: JobLead[] = [];
+  let offset = 0;
+  while (out.length < limit) {
+    const batch = await listJobLeads(orgId, {
+      viewerUserId,
+      space: "mine",
+      sort: "newest",
+      limit: PAGE,
+      offset,
+    });
+    if (batch.length === 0) break;
+    offset += batch.length;
+    for (const l of batch) {
+      if (
+        isPersonalUnshared(
+          { sharedAt: l.sharedAt, mailboxOwnerUserId: l.mailboxOwnerUserId },
+          viewerUserId,
+        ) &&
+        (l.status === "new" || l.status === "reviewing")
+      ) {
+        out.push(l);
+        if (out.length >= limit) break;
+      }
+    }
+    if (batch.length < PAGE) break;
+  }
+  return out;
 }
 
 export async function shareJobLead(params: {

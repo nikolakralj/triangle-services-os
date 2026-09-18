@@ -52,7 +52,46 @@ interface IncomingMessage {
 /**
  * Find or create the mail_accounts row representing an external source, so
  * leads stay attributed to a mailbox even though we hold no credentials.
+ *
+ * A mailbox that matches a person in the org stays personal to them. An
+ * address nobody in the org owns (the company intake box) stays unowned and
+ * org-visible. Never uses a machine/MCP user id as the owner.
  */
+async function ownerUserIdForMailbox(
+  orgId: string,
+  mailbox: string,
+): Promise<string | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const address = mailbox.trim().toLowerCase();
+
+  const { data: members } = await svc
+    .from("organization_members")
+    .select("user_id, invited_email")
+    .eq("organization_id", orgId)
+    .eq("status", "active");
+  if (!members?.length) return null;
+
+  const invited = members.find(
+    (m) => (m.invited_email as string | null)?.trim().toLowerCase() === address,
+  );
+  if (invited?.user_id) return invited.user_id as string;
+
+  const userIds = members
+    .map((m) => m.user_id as string | null)
+    .filter((id): id is string => Boolean(id));
+  if (userIds.length === 0) return null;
+
+  const { data: profiles } = await svc
+    .from("profiles")
+    .select("id, email")
+    .in("id", userIds);
+  const hit = (profiles ?? []).find(
+    (p) => (p.email as string | null)?.trim().toLowerCase() === address,
+  );
+  return (hit?.id as string | undefined) ?? null;
+}
+
 async function resolveExternalAccount(
   orgId: string,
   mailbox: string | null,
@@ -72,6 +111,8 @@ async function resolveExternalAccount(
 
   if (existing) return existing.id as string;
 
+  const ownerUserId = await ownerUserIdForMailbox(orgId, address);
+
   const { data: created } = await svc
     .from("mail_accounts")
     .insert({
@@ -81,6 +122,7 @@ async function resolveExternalAccount(
       provider: "external",
       status: "active",
       last_synced_at: new Date().toISOString(),
+      owner_user_id: ownerUserId,
     })
     .select("id")
     .maybeSingle();

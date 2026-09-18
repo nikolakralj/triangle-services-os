@@ -135,8 +135,10 @@ in a vendor's silo.
 **This is also the multi-user answer.** Bots are per-person assistants; two people
 running two separate bots would otherwise have two disconnected views. Both post here
 instead, `mailbox` records whose inbox each lead came through (a `mail_accounts` row
-with `provider='external'` and no credentials). Each person sees mail from their
-own inbox first. Share puts a lead in the common space. The "via <mailbox>" label
+with `provider='external'` and no credentials). If that address matches a person in
+the org, the row is owned by them and stays personal until Share. An address nobody
+owns (the company intake box) stays unowned and org-visible. Each person sees mail
+from their own inbox first. Share puts a lead in the common space. The "via <mailbox>" label
 only renders once leads arrive from more than one mailbox.
 
 Verified 2026-08-25: a bot-shaped payload with one real opportunity and one newsletter

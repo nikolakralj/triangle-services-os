@@ -149,6 +149,8 @@ test('migration 051 adds shared_at/shared_by, first-apply backfill, notify; no d
   assert.match(sql, /add column if not exists shared_by/);
   assert.match(sql, /set shared_at = created_at/);
   assert.match(sql, /not exists \(select 1 from public\.job_leads where shared_at is not null\)/);
+  assert.match(sql, /051_backfill_done/);
+  assert.match(sql, /col_description/);
   assert.match(sql, /notify pgrst, 'reload schema'/);
   assert.doesNotMatch(sql, /drop table|delete from/i);
 });
@@ -159,6 +161,16 @@ test('new leads insert shared_at null (personal until Share)', () => {
   assert.match(src, /export async function shareJobLead/);
   assert.match(src, /listPersonalInbox/);
   assert.match(src, /viewerUserId/);
+});
+
+test('listJobLeads pages until the visible limit; Your mail keeps paging Mine', () => {
+  const src = read('src/lib/data/job-intake.ts');
+  assert.match(src, /\.range\(dbOffset, dbOffset \+ PAGE - 1\)/);
+  assert.match(src, /offset \?\? 0/);
+  assert.match(src, /while \(out\.length < limit\)/);
+  const match = read('src/lib/data/lead-match.ts');
+  assert.match(match, /fetchVisibleOpenLeads/);
+  assert.match(match, /\.range\(offset, offset \+ PAGE - 1\)/);
 });
 
 test('person Sync reads only their mailbox; cron still reads all', () => {
@@ -178,6 +190,15 @@ test('personal ingest does not wake Bob; share route is human-only', () => {
   assert.match(share, /put mail in the shared space/);
   assert.match(share, /shareJobLead/);
   assert.match(share, /recordClientReplyEvent/);
+});
+
+test('external ingest maps a person mailbox to that owner; org boxes stay unowned', () => {
+  const route = read('src/app/api/job-intake/ingest/route.ts');
+  assert.match(route, /owner_user_id: ownerUserId/);
+  assert.match(route, /async function ownerUserIdForMailbox/);
+  assert.match(route, /from\("profiles"\)/);
+  assert.match(route, /invited_email/);
+  assert.doesNotMatch(route, /MCP_USER_ID/);
 });
 
 test('Today Your mail + Share; Open mail · Ask Bob · Dismiss stay; no Sent / They replied', () => {

@@ -186,7 +186,10 @@ scheduled job still reads every connected inbox. Sending is unchanged
 
 **Applied 18 September.** First-apply backfill stamped 38/38 existing leads
 into the shared space (0 left personal). Re-applying does not stamp new
-personal leads.
+personal leads. After this PR is on the database file, re-apply 051 once
+while those shared rows still exist — that only writes the `051_backfill_done`
+column comment so a later re-apply cannot republish private leads. Do not
+apply it from an agent.
 
 1. Merge PR #29 and promote (same PR as 050).
 2. Each person connects their own mailbox in Settings. Sync now (your inbox
