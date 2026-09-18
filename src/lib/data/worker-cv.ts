@@ -5,6 +5,11 @@ import {
   letterheadForProfile,
   type OrganizationLetterhead,
 } from "@/lib/data/organization-profile";
+import {
+  DEFAULT_PACK_INTENT,
+  isAnonymisedIntent,
+  type PackIntent,
+} from "@/lib/data/put-forward";
 
 // ---------------------------------------------------------------------------
 // The active organization's worker CV.
@@ -33,6 +38,8 @@ export interface WorkerCvDocument {
   /** "Electrical Supervisor · P.Ö." or the full name when identity is released. */
   displayName: string;
   reference: string;
+  /** Which version this is: the bio, the short bio, or the named CV. */
+  intent: PackIntent;
   anonymised: boolean;
   role: string;
   workerType: string | null;
@@ -64,8 +71,13 @@ export interface WorkerCvDocument {
 export async function buildWorkerCv(params: {
   workerId: string;
   orgId: string;
+  /** Which version to build. `full_cv` is the only one carrying a name. */
+  intent?: PackIntent;
+  /** Kept for callers that only know "named or not". */
   includeIdentity?: boolean;
 }): Promise<WorkerCvDocument | null> {
+  const intent: PackIntent =
+    params.intent ?? (params.includeIdentity ? "full_cv" : DEFAULT_PACK_INTENT);
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
 
@@ -88,7 +100,7 @@ export async function buildWorkerCv(params: {
 
   const fullName = String(w.full_name ?? "").trim();
   const role = String(w.role ?? "").trim();
-  const anonymised = !params.includeIdentity;
+  const anonymised = isAnonymisedIntent(intent);
 
   const skills = list(w.skills);
   const certificates = list(w.certificates);
@@ -114,13 +126,14 @@ export async function buildWorkerCv(params: {
   if (!w.country && !w.city) notRecorded.push("Location");
   // On a released CV, missing contact details are the buyer's problem to know
   // about — they were told identity would be released and it was, partially.
-  if (params.includeIdentity && !w.email && !w.phone) {
+  if (!anonymised && !w.email && !w.phone) {
     notRecorded.push("Contact details");
   }
 
   return {
     displayName: anonymised ? anonymiseName(fullName, role) : fullName || "Unnamed",
     reference: `${organizationReferencePrefix(orgName)}-${String(w.id).slice(0, 8).toUpperCase()}`,
+    intent,
     anonymised,
     role: role || "Role not recorded",
     workerType: w.worker_type ? String(w.worker_type) : null,

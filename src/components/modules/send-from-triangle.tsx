@@ -410,7 +410,9 @@ function AttachRow({
   const what =
     pack.intent === "full_cv"
       ? "the full named CV"
-      : "the anonymised profile — initials, no contact details";
+      : pack.intent === "short_bio"
+        ? "the short bio — initials, one screen, no contact details"
+        : "the anonymised bio — initials, no contact details";
 
   return (
     <>

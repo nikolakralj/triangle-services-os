@@ -113,6 +113,61 @@ test('only an explicit full/named CV releases the identity', () => {
   }
 });
 
+test('asking for a short one gets the short one, not the long bio', () => {
+  for (const words of [
+    'short bio please',
+    'just a short profile',
+    'can you do a one-pager',
+    'one page version',
+    'brief bio for the recruiter',
+    'keep it short',
+    'just the headlines',
+  ]) {
+    assert.equal(parsePackIntent(words), 'short_bio', words);
+  }
+  // "short bio" contains "bio"; read in the other order it would come back
+  // as the long one, which is the wrong document for somebody who said short.
+  assert.equal(parsePackIntent('a short bio, initials only'), 'short_bio');
+});
+
+test('short is still anonymised, and still never carries the name', () => {
+  assert.equal(packDisplayName('Matej Pavlović', 'short_bio'), 'M. P.');
+  assert.equal(
+    filenames.packFilename({
+      intent: 'short_bio',
+      reference: 'TS-1A2B3C4D',
+      workerName: 'Matej Pavlović',
+    }),
+    'ts-1a2b3c4d-short-profile.pdf',
+  );
+  assert.doesNotMatch(
+    filenames.packFilename({
+      intent: 'short_bio',
+      reference: 'TS-1A2B3C4D',
+      workerName: 'Matej Pavlović',
+    }),
+    /matej|pavlovic/i,
+  );
+  assert.equal(putForward.isAnonymisedIntent('short_bio'), true);
+  assert.equal(putForward.isAnonymisedIntent('bio_anonymised'), true);
+  assert.equal(putForward.isAnonymisedIntent('full_cv'), false);
+});
+
+test('the short version is a shorter document, not the same one relabelled', () => {
+  const pdf = read('src/lib/pdf/worker-cv-pdf.tsx');
+  assert.match(pdf, /short_bio: \{ skills: 5, projects: 3, certificates: 4, mobility: false \}/);
+  assert.match(pdf, /bio_anonymised: \{ skills: 10, projects: 6, certificates: 8/);
+  assert.match(pdf, /KEEP\[cv\.intent\]/);
+  const cv = read('src/lib/data/worker-cv.ts');
+  assert.match(cv, /intent,/);
+  assert.match(cv, /isAnonymisedIntent\(intent\)/);
+  // The route serves the exact version the case approved.
+  const route = read('src/app/api/workers/[id]/cv/route.ts');
+  assert.match(route, /isPackIntent\(asked\)/);
+  assert.match(route, /packFilename\(/);
+  assert.match(casesSrc, /cv\?variant=\$\{intent\}/);
+});
+
 test('a bio marker beats "full named CV" in the same sentence', () => {
   // The CEO's own example. A parser that read the last marker it found would
   // have sent the name.
@@ -343,7 +398,7 @@ test('Ask Hanna posts a handoff, not an email, and defaults to the bio', () => {
 test('the result returns on the same case, not a second chat', () => {
   assert.match(casesSrc, /PUT_FORWARD_CASE_TYPE/);
   assert.match(casesSrc, /buildWorkerCv/);
-  assert.match(casesSrc, /includeIdentity: named/);
+  assert.match(casesSrc, /buildWorkerCv\(\{ orgId, workerId, intent \}\)/);
   assert.match(casesSrc, /packFilename/);
   assert.match(decisionsPage, /listPutForwardCases/);
   assert.match(todayScreenSrc, /PutForwardBlock/);

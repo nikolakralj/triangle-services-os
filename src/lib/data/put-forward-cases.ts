@@ -218,7 +218,7 @@ async function buildPack(
   intent: PackIntent,
 ): Promise<PutForwardPack | null> {
   const named = intent === "full_cv";
-  const cv = await buildWorkerCv({ orgId, workerId, includeIdentity: named });
+  const cv = await buildWorkerCv({ orgId, workerId, intent });
   if (!cv) return null;
   // `buildWorkerCv` anonymises the display name itself; the real name is read
   // once here for the internal card so a person knows who they are looking at.
@@ -229,9 +229,9 @@ async function buildPack(
     workerName,
     reference: cv.reference,
     filename: packFilename({ intent, reference: cv.reference, workerName }),
-    href: named
-      ? `/api/workers/${workerId}/cv?identity=1`
-      : `/api/workers/${workerId}/cv`,
+    // The link opens the exact version that would be attached, because that
+    // is the document being approved.
+    href: `/api/workers/${workerId}/cv?variant=${intent}`,
     role: cv.role,
     basedIn: cv.basedIn,
     availability: cv.availability,

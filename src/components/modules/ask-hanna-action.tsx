@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, UserSearch } from "lucide-react";
 import {
   DEFAULT_PACK_INTENT,
+  PACK_INTENTS,
   defaultPutForwardAsk,
   packIntentLabel,
   parsePackIntent,
@@ -262,7 +263,7 @@ export function AskHannaAction({
           />
           <fieldset className="mt-2 space-y-1">
             <legend className={t.note}>What goes out</legend>
-            {(["bio_anonymised", "full_cv"] as PackIntent[]).map((option) => (
+            {PACK_INTENTS.map((option) => (
               <label key={option} className={t.choice}>
                 <input
                   type="radio"

@@ -32,7 +32,12 @@ export function packFilename(params: {
   reference: string;
   workerName: string;
 }): string {
-  return params.intent === "full_cv"
-    ? namedCvFilename(params.workerName)
-    : anonymisedCvFilename(params.reference);
+  if (params.intent === "full_cv") return namedCvFilename(params.workerName);
+  if (params.intent === "short_bio") {
+    return anonymisedCvFilename(params.reference).replace(
+      /-profile\.pdf$/,
+      "-short-profile.pdf",
+    );
+  }
+  return anonymisedCvFilename(params.reference);
 }

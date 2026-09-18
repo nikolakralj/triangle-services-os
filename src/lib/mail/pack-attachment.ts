@@ -32,11 +32,10 @@ export async function buildPackAttachment(params: {
   contentType: string;
   bytes: Buffer;
 } | null> {
-  const named = params.intent === "full_cv";
   const cv = await buildWorkerCv({
     workerId: params.workerId,
     orgId: params.orgId,
-    includeIdentity: named,
+    intent: params.intent,
   });
   if (!cv) return null;
 
@@ -46,7 +45,7 @@ export async function buildPackAttachment(params: {
   const buffer = await renderToBuffer(element);
   return {
     filename: packFilename({
-      intent: params.intent,
+      intent: cv.intent,
       reference: cv.reference,
       workerName: cv.displayName,
     }),
