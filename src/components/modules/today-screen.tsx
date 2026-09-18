@@ -574,6 +574,7 @@ function ActionPanel({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [workerId, setWorkerId] = useState(action.offering?.workerId ?? "");
+  const [poolQuery, setPoolQuery] = useState("");
 
   const isPhone = action.channelKind === "phone";
   const outcomes = outcomesFor(action.channelKind);
@@ -585,8 +586,23 @@ function ActionPanel({
   const about = [action.personRole, action.country ? `in ${action.country}` : null]
     .filter(Boolean)
     .join(" ");
-  const offering =
-    (action.candidates ?? []).find((c) => c.workerId === workerId) ?? action.offering ?? null;
+  const offeringFromPool = workerId
+    ? pool.find((p) => p.workerId === workerId)
+    : null;
+  const offering: OfferWorker | null =
+    (action.candidates ?? []).find((c) => c.workerId === workerId) ??
+    (offeringFromPool
+      ? {
+          workerId: offeringFromPool.workerId,
+          name: offeringFromPool.name,
+          role: offeringFromPool.role,
+          why: "",
+          caveats:
+            offeringFromPool.status === "candidate" ? ["on file as a candidate"] : [],
+        }
+      : null) ??
+    action.offering ??
+    null;
   const sendTarget = {
     to: action.value,
     subject: action.subject,
@@ -730,52 +746,92 @@ function ActionPanel({
       <div className="space-y-4 px-6 py-5">
         <EmployeePrepared wait={nowWait} done={nowDone} />
 
-        {(offering || (action.candidates && action.candidates.length > 0)) && (
+        {(offering || (action.candidates && action.candidates.length > 0) || pool.length > 0) && (
           <div>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-400">
               Who we put forward
             </p>
-            {(action.candidates?.length ?? 0) > 1 && (
-              <div className="mt-2 space-y-1">
-                {action.candidates!.map((c) => (
-                  <label
-                    key={c.workerId}
-                    className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
-                  >
-                    <input
-                      type="radio"
-                      name="today-offering"
-                      checked={workerId === c.workerId}
-                      onChange={() => pickWorker(c.workerId, c)}
-                      className="mt-1.5"
-                    />
-                    <span>
-                      <span className="text-[14px] font-semibold text-white">{c.name}</span>
-                      {c.role && (
-                        <span className="ml-2 text-[13px] font-normal text-slate-400">
-                          {c.role}
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {offering && (action.candidates?.length ?? 0) <= 1 && (
-              <p className="mt-1.5 text-[15px] font-semibold text-white">
-                {offering.name}
-                {offering.role && (
-                  <span className="ml-2 text-[13px] font-normal text-slate-400">
-                    {offering.role}
+            <div className="mt-2 space-y-1">
+              {(action.candidates ?? []).map((c) => (
+                <label
+                  key={c.workerId}
+                  className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
+                >
+                  <input
+                    type="radio"
+                    name="today-offering"
+                    checked={workerId === c.workerId}
+                    onChange={() => pickWorker(c.workerId, c)}
+                    className="mt-1.5"
+                  />
+                  <span>
+                    <span className="text-[14px] font-semibold text-white">{c.name}</span>
+                    {c.role && (
+                      <span className="ml-2 text-[13px] font-normal text-slate-400">{c.role}</span>
+                    )}
                   </span>
-                )}
-              </p>
+                </label>
+              ))}
+              {poolQuery.trim().length >= 2 &&
+                pool
+                  .filter((p) => {
+                    if ((action.candidates ?? []).some((c) => c.workerId === p.workerId)) {
+                      return false;
+                    }
+                    const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
+                    return hay.includes(poolQuery.trim().toLowerCase());
+                  })
+                  .slice(0, 8)
+                  .map((p) => (
+                    <label
+                      key={p.workerId}
+                      className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
+                    >
+                      <input
+                        type="radio"
+                        name="today-offering"
+                        checked={workerId === p.workerId}
+                        onChange={() =>
+                          pickWorker(p.workerId, {
+                            workerId: p.workerId,
+                            name: p.name,
+                            role: p.role,
+                            why: "",
+                            caveats:
+                              p.status === "candidate" ? ["on file as a candidate"] : [],
+                          })
+                        }
+                        className="mt-1.5"
+                      />
+                      <span>
+                        <span className="text-[14px] font-semibold text-white">{p.name}</span>
+                        {p.role && (
+                          <span className="ml-2 text-[13px] font-normal text-slate-400">
+                            {p.role}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+            </div>
+            {pool.length > 0 && (
+              <label className="mt-2 block">
+                <span className="text-[12px] text-slate-500">
+                  Someone else in the pool — type two letters
+                </span>
+                <input
+                  value={poolQuery}
+                  onChange={(e) => setPoolQuery(e.target.value)}
+                  placeholder="Name or role"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-slate-100 placeholder-slate-600 focus:border-white/25 focus:outline-none"
+                />
+              </label>
             )}
             {offering && (
               <>
-                <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
-                  {offering.why}
-                </p>
+                {offering.why ? (
+                  <p className="mt-2 text-[13px] leading-relaxed text-slate-400">{offering.why}</p>
+                ) : null}
                 {offering.caveats.length > 0 && (
                   <ul className="mt-2.5 space-y-1">
                     {offering.caveats.map((c) => (
@@ -800,7 +856,20 @@ function ActionPanel({
             sender={sender}
             pool={pool}
             onPickWorker={(id) => {
-              const next = (action.candidates ?? []).find((c) => c.workerId === id) ?? null;
+              const next =
+                (action.candidates ?? []).find((c) => c.workerId === id) ??
+                (() => {
+                  const p = pool.find((w) => w.workerId === id);
+                  return p
+                    ? {
+                        workerId: p.workerId,
+                        name: p.name,
+                        role: p.role,
+                        why: "",
+                        caveats: p.status === "candidate" ? ["on file as a candidate"] : [],
+                      }
+                    : null;
+                })();
               pickWorker(id, next);
             }}
             onCancel={() => setReviewing(false)}
