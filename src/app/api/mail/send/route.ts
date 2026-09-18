@@ -28,6 +28,8 @@ const bodySchema = z
     personId: z.string().uuid().optional(),
     mailAccountId: z.string().uuid().optional().nullable(),
     inReplyTo: z.string().trim().max(998).optional().nullable(),
+    workerId: z.string().uuid().optional().nullable(),
+    attachAnonymisedCv: z.boolean().optional(),
   })
   .refine((v) => Boolean(v.contactId || v.leadId || v.personId), {
     message: "Say who this is about: a contactId, a leadId or a personId.",
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
       draftId: result.draftId,
       followUpAt: result.followUpAt,
       from: result.from,
+      attachedFilename: result.attachedFilename ?? null,
     },
     { status: 201 },
   );

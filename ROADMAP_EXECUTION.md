@@ -708,6 +708,55 @@ routes by intent ("investigate the end client" -> Scout) without fake Scout
 buttons on the Today mail card. DEV-010 is done; do not start this to skip
 mailbox observation.
 
+### DEV-021 - Ask Hanna on the same case: who we put forward, bio vs full CV - `DONE` (code; Preview smoke owed)
+
+**Why now (18 September, Production):** on a follow-up case the drawer's Send
+posted to Bob's thread and wake only — it did not reach Hanna and did not
+email the recruiter. "Ask Hanna" and "prepare draft with matej cv" typed in
+that drawer left "not picked up yet" with no Hanna job at all. The CEO said
+chat is easier until this loop works, and he is right: a handoff that produces
+no owner is a queue, not a workforce.
+
+**Depends on:** DEV-015 (handoff changes the owner, not the place), DEV-013
+(human-approved Send), and the packet-send fixes composed into this branch
+(Bob's Triangle write-up on the card; anonymised profile attach; who we put
+forward searchable from the pool).
+
+**Acceptance:**
+1. From the case or from Bob's thread, **Ask Hanna** creates a real assignment
+   with `constraints.case_type: who_we_put_forward` on the **same** lead /
+   contact / person ids, plus `pack_intent` and the bound `worker_id`.
+2. `pack_intent` is parsed from the human's words — bio / initials /
+   anonymised / "M.P." → `bio_anonymised`; "full CV" / "named CV" →
+   `full_cv`; a bio marker anywhere wins; the default is `bio_anonymised`.
+3. The person is resolved against `workers` rows only. Two matches bind
+   nobody and come back as a question.
+4. The case shows the packet Triangle can already build (reference, initials,
+   tickets, dated availability, what is not recorded), then Hanna's check when
+   it lands — on the same card, never a second chat or a Workforce hunt.
+5. A put-forward job does not hide Ask Bob and does not take a follow-up out
+   of Needs you. Only the chase half decides who holds the card.
+6. The thread composer says it messages the employee and emails nobody. The
+   only Send is the human one on the case. Triangle sends nothing.
+
+**Done 18 September (code).** `src/lib/data/put-forward.ts` (parse and labels),
+`ask-hanna-policy.ts`, `ask-hanna.ts`, `POST /api/ask/hanna`,
+`put-forward-cases.ts`, `ask-hanna-action.tsx`, `put-forward-block.tsx`;
+`chaseWaits` splits the two halves. Check: `npm run check:ask-hanna`.
+
+**No migration and no SQL.** `who_we_put_forward` is a `constraints` value, and
+migration 041 only governs the three research case types.
+
+**Still owed (Nikola):** a signed-in Preview smoke on a real follow-up case.
+Steps are in `scripts/smoke-ask-hanna.mjs` (`npm run smoke:ask-hanna` is the
+offline half). Hanna's wake env (`BOT_WAKE_URL_TRIANGLE_HR` /
+`BOT_WAKE_KEY_TRIANGLE_HR` for her role key) if her check is to arrive without
+waiting for her next scheduled inbox read. Until it is set the case says so
+in words rather than pretending she was woken.
+
+**Follow-up, deliberately not here:** the dual From picker (gmail vs
+triangle-services.com) and autonomous send.
+
 ### DEV-018 - Engineering out of the workforce - `DONE` (live, 17 September; SQL file not used as-is)
 
 **Why:** on 16 September Scout's HVAC EPC EU step asked the CEO "Promote Eng
@@ -735,8 +784,14 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues
   make one-by-one review materially slow.
-- **Packet-send record:** check that the existing send record works on the first
-  real packet send; fix only the defects that send shows.
+- **Packet-send record:** the first real packet send showed three defects, now
+  fixed in code: Send from Triangle was text-only; the Today card hid when
+  Bob had the case so his Triangle write-up was not on it; the first match
+  was locked as who to put forward. Send from Triangle may attach the
+  anonymised Triangle profile (filename is the reference, never the name);
+  the same card stays with Bob's last Triangle thread message on it; a
+  person picks who to put forward. Human Send now. Bob still sends nothing.
+  Live mailbox / migration 049 / the send itself remain a person.
 
 ## Next, once the gate is moving
 

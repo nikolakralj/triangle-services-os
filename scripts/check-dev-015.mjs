@@ -157,8 +157,10 @@ test('After Hand to Bob the card is With Bob with Open thread and Take back', ()
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
-test('Toast copy is Handed to Bob · Open thread, and the drawer opens on the case', () => {
-  assert.match(handoffCtx, /Handed to Bob/);
+test('Toast copy is Handed to <employee> · Open thread, and the drawer opens on the case', () => {
+  // Named rather than literally "Bob": Hanna takes cases from Today too, and
+  // the toast must not claim the wrong owner (DEV-021).
+  assert.match(handoffCtx, /Handed to \{toast\.agentName/);
   assert.match(handoffCtx, /The answer returns on this case/);
   assert.match(handoffCtx, /Open thread/);
   const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));
@@ -208,6 +210,7 @@ test('Handoff matching uses lead/contact/person ids, not assignment title', () =
     messageCount: 1,
     awaitingAgent: 0,
     createdAt: '',
+    lastAgentBody: null,
   };
   assert.equal(matchesWait(wait, { leadId: 'lead-1' }), true);
   assert.equal(matchesWait(wait, { leadId: 'lead-2' }), false);
@@ -252,6 +255,31 @@ test('docs lock the handoff rule and commercial_follow_through', () => {
   assert.match(roadmap, /Handoff changes the/);
   assert.match(execution, /DEV-015/);
   assert.match(execution, /commercial_follow_through/);
+});
+
+test('Today keeps the Now card when Bob has the case; Bob wrote in Triangle is on it', () => {
+  assert.match(todayScreen, /nowShowCard/);
+  assert.match(todayScreen, /EmployeePrepared/);
+  assert.match(todayScreen, /Nothing is in the Triangle thread yet/);
+  assert.match(todayScreen, /Copy what they wrote/);
+  assert.doesNotMatch(todayScreen, /Nothing needs you on this case/);
+  assert.match(todayScreen, /Who we put forward/);
+  assert.match(todayScreen, /today-offering/);
+  assert.match(todayScreen, /Someone else in the pool/);
+});
+
+test('Done follow-through matches the same lead/contact as the card', () => {
+  const {
+    findDone,
+  } = moduleLoader()('src/lib/data/today-handoff.ts');
+  const item = {
+    assignmentId: 'done-1',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+  };
+  assert.equal(findDone([item], { leadId: 'lead-1' })?.assignmentId, 'done-1');
+  assert.equal(findDone([item], { leadId: 'lead-2' }), null);
 });
 
 test('Workforce console is gone (DEV-012 slice B); Team hands nothing out', () => {

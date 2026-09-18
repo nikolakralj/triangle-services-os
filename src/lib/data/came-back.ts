@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { parseScoutCaseReport } from "@/lib/ai/scout-case-report";
 import { loadAgentFaces } from "@/lib/data/agent-identity";
+import { PUT_FORWARD_CASE_TYPE } from "@/lib/data/put-forward";
 
 // ---------------------------------------------------------------------------
 // What came back while you were away.
@@ -224,9 +225,11 @@ export async function listWhatCameBack(
 
   for (const row of assignmentsRes.data ?? []) {
     const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
-    if (String(constraints.case_type ?? "") === "commercial_follow_through") {
-      // Bob's commercial complete returns the business situation to Needs you,
-      // not an "assignment completed" row.
+    const caseType = String(constraints.case_type ?? "");
+    if (caseType === "commercial_follow_through" || caseType === PUT_FORWARD_CASE_TYPE) {
+      // Bob's commercial complete and Hanna's who-we-put-forward pack both
+      // return the business situation to the case on Today, not an
+      // "assignment completed" row in a second list.
       continue;
     }
     const face = faces.byId.get(row.agent_instance_id as string);

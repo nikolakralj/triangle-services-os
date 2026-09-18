@@ -30,7 +30,18 @@ import {
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { EmailCardActions, type EmailCardTarget } from "@/components/modules/today-email-actions";
-import { findWait, findWaitForAny, type InProgressWait } from "@/lib/data/today-handoff";
+import {
+  caseRefFromWait,
+  chaseWaits,
+  findAllMatching,
+  findWait,
+  findWaitForAny,
+  type CaseRef,
+  type HandoffIds,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
+import { PutForwardBlock } from "@/components/modules/put-forward-block";
+import type { PutForwardCase } from "@/lib/data/put-forward";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
 // ---------------------------------------------------------------------------
@@ -73,6 +84,7 @@ export function ReadyForYou({
   followUps = [],
   moreFollowUps = 0,
   waits = [],
+  putForward = [],
 }: {
   people: ReadyToContact[];
   missions: MissionTab[];
@@ -82,9 +94,14 @@ export function ReadyForYou({
   moreFollowUps?: number;
   /** Open Bob / Scout / Hanna waits — those cards belong in In progress. */
   waits?: InProgressWait[];
+  /** Hanna's who-we-put-forward cases, shown on the same follow-up card. */
+  putForward?: PutForwardCase[];
 }) {
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const handoff = useTodayHandoff();
+  // Who owns the chase. A Hanna put-forward job on the same case is the other
+  // half and must not take the card out of Needs you.
+  const chase = chaseWaits(waits);
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
   const due = followUps.filter((f) => {
     const ids = {
@@ -92,13 +109,13 @@ export function ReadyForYou({
       contactId: f.target.contactId,
       personId: f.target.personId,
     };
-    if (!findWait(waits, ids)) return true;
+    if (!findWait(chase, ids)) return true;
     // Just handed to Bob: keep the same card as With Bob / Open thread so
     // the result is not a black hole into collapsed In progress.
     return handoff?.isPinned(ids) === true;
   });
   const reachable = people.filter(
-    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+    (p) => !findWait(chase, { personId: p.contactId, contactId: p.contactId }),
   );
 
   if (asking.length === 0 && reachable.length === 0 && due.length === 0 && !recorded) {
@@ -152,13 +169,20 @@ export function ReadyForYou({
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {groupByPerson(due).map((group) =>
               group.length === 1 ? (
-                <FollowUpRow key={group[0].actionId} item={group[0]} onRecorded={setRecorded} waits={waits} />
+                <FollowUpRow
+                  key={group[0].actionId}
+                  item={group[0]}
+                  onRecorded={setRecorded}
+                  waits={chase}
+                  putForward={putForward}
+                />
               ) : (
                 <FollowUpGroup
                   key={group[0].actionId}
                   items={group}
                   onRecorded={setRecorded}
-                  waits={waits}
+                  waits={chase}
+                  putForward={putForward}
                 />
               ),
             )}
@@ -175,7 +199,7 @@ export function ReadyForYou({
       {reachable.length > 0 && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {reachable.map((p) => (
-            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={waits} />
+            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={chase} />
           ))}
         </ul>
       )}
@@ -229,15 +253,60 @@ function followUpEmailTarget(item: FollowUp, who: string): EmailCardTarget {
   };
 }
 
+function followUpIds(item: FollowUp): HandoffIds {
+  return {
+    leadId: item.target.leadId,
+    contactId: item.target.contactId,
+    personId: item.target.personId,
+  };
+}
+
+function followUpCaseRef(item: FollowUp, who: string): CaseRef {
+  return {
+    who,
+    about: item.about ?? null,
+    leadId: item.target.leadId,
+    contactId: item.target.contactId,
+    personId: item.target.personId,
+  };
+}
+
+function PutForwardOnCard({
+  ids,
+  putForward,
+  caseRef,
+}: {
+  ids: HandoffIds[];
+  putForward: PutForwardCase[];
+  caseRef: CaseRef;
+}) {
+  const items = findAllMatching(putForward, ids);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-2">
+      {items.map((item) => (
+        <PutForwardBlock
+          key={item.assignmentId}
+          item={item}
+          caseRef={caseRef}
+          tone="light"
+        />
+      ))}
+    </div>
+  );
+}
+
 /** One card per person: who, where, one channel button, then a line per role. */
 function FollowUpGroup({
   items,
   onRecorded,
   waits,
+  putForward = [],
 }: {
   items: FollowUp[];
   onRecorded: (r: Recorded) => void;
   waits: InProgressWait[];
+  putForward?: PutForwardCase[];
 }) {
   const first = items[0];
   const mostOverdue = Math.max(...items.map((i) => i.daysOverdue));
@@ -315,7 +384,12 @@ function FollowUpGroup({
           ))}
         </ul>
         {isEmail && (
-          <div className="px-4 pb-2.5 pt-1">
+          <div className="space-y-2 px-4 pb-2.5 pt-1">
+            <PutForwardOnCard
+              ids={items.map(followUpIds)}
+              putForward={putForward}
+              caseRef={followUpCaseRef(first, who)}
+            />
             <EmailCardActions
               target={emailTarget}
               onRecorded={onRecorded}
@@ -337,12 +411,14 @@ function FollowUpRow({
   onRecorded,
   waits,
   compact = false,
+  putForward = [],
 }: {
   item: FollowUp;
   onRecorded: (r: Recorded) => void;
   waits: InProgressWait[];
   /** One role inside a person's card: the person, address and mail button live on the card. */
   compact?: boolean;
+  putForward?: PutForwardCase[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<ContactOutcome | "later" | null>(null);
@@ -536,15 +612,16 @@ function FollowUpRow({
           </div>
         </div>
         {isEmail && !compact && (
-          <div className="mt-2">
+          <div className="mt-2 space-y-2">
+            <PutForwardOnCard
+              ids={[followUpIds(item)]}
+              putForward={putForward}
+              caseRef={followUpCaseRef(item, who)}
+            />
             <EmailCardActions
               target={followUpEmailTarget(item, who)}
               onRecorded={onRecorded}
-              alreadyWith={findWait(waits, {
-                leadId: item.target.leadId,
-                contactId: item.target.contactId,
-                personId: item.target.personId,
-              })}
+              alreadyWith={findWait(waits, followUpIds(item))}
             />
           </div>
         )}
@@ -918,6 +995,11 @@ export function InProgressWaits({
                 {wait.withLabel}
                 {wait.status === "active" ? " · working" : " · queued"}
               </p>
+              {wait.lastAgentBody && (
+                <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-slate-600">
+                  {wait.lastAgentBody}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <button
@@ -929,6 +1011,7 @@ export function InProgressWaits({
                     agentName: wait.agentName,
                     messageCount: wait.messageCount,
                     awaitingAgent: wait.awaitingAgent,
+                    case: caseRefFromWait(wait),
                   })
                 }
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800"
@@ -1094,6 +1177,11 @@ export function DoneSince({
               <span className="mt-0.5 block text-[12px] text-slate-500" suppressHydrationWarning>
                 {item.agentName} finished · {ago(item.completedAt)}
               </span>
+              {(item.lastAgentBody || item.resultSummary) && (
+                <span className="mt-1 block line-clamp-2 text-[12.5px] leading-snug text-slate-600">
+                  {item.lastAgentBody || item.resultSummary}
+                </span>
+              )}
             </span>
             <button
               type="button"
@@ -1105,6 +1193,13 @@ export function DoneSince({
                   messageCount: item.messageCount,
                   awaitingAgent: item.awaitingAgent,
                   finished: true,
+                  case: {
+                    who: item.title,
+                    about: item.title,
+                    leadId: item.leadId,
+                    contactId: item.contactId,
+                    personId: item.personId,
+                  },
                 })
               }
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"

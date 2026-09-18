@@ -149,6 +149,67 @@ Today's structure: **Needs you | In progress | Missions…**
 Why: handing Veronika to Bob and then hunting her under Workforce made the
 CEO the transport layer between the case and the employee.
 
+### 2026-09-18: Bob's work is the Triangle thread on the same Today card; Send may attach the anonymised profile
+
+Locked against the Oliver Hall / anonymised-profile miss. Grok chat is not
+Triangle truth. After Ask Bob:
+
+1. The **same Today card** stays. Needs you does not count it while Bob has
+   it; In progress stays quiet. The card shows the last thing Bob wrote in
+   the Triangle thread, or that nothing is in the thread yet.
+2. When Bob finishes, the **business situation** returns to Needs you with
+   that write-up still on the card — not "assignment completed" as the object.
+3. **Send from Triangle** may attach the anonymised Triangle profile for the
+   person the human picked. Filename is the Triangle reference, never their
+   name. Named CVs stay in Talent.
+4. Bob still **sends nothing**. `SENT_MESSAGES_RECORDED` stays false. Human
+   Send now.
+
+This is the Phase 0 packet-send defect list, not a new DEV ticket and not
+DEV-014.
+
+### 2026-09-18: Two employees on one case — Bob chases the thread; Hanna says who we put forward
+
+Locked against the Oliver Hall follow-up on Production, 18 September. Saying
+"ask Hanna" or "prepare draft with matej cv" in Bob's drawer produced a queued
+message on Bob's thread, no Hanna job, and a Send button that read as email.
+The CEO said, correctly, that Grok chat is easier until this loop works.
+
+Law:
+
+1. **The case has two halves and one place.** Bob chases: digs the mail
+   threads, drafts A/B, lists the decisions only a person can make. Hanna says
+   **who we put forward** and in which form. Asking one is not taking it off
+   the other, and neither handoff moves the work: both answers return on the
+   same Today case, under Open thread and on the card.
+2. **Bio is the default; a full CV is a deliberate release of identity.**
+   `pack_intent` is `bio_anonymised` or `full_cv`, set from the human's own
+   words — "bio", "initials", "anonymised", "M.P." mean the packet; "full CV"
+   or "named CV" mean identity released. **A bio marker anywhere wins**, so
+   "Matej as M.P., not a full named CV" prepares the packet. Silence means the
+   packet. Being wrong towards anonymous costs a re-ask; being wrong the other
+   way puts a candidate's name in a stranger's inbox.
+3. **A bio never carries the name.** Initials on the card, initials in the
+   document, and a filename that is the Triangle reference. No contact
+   details. No rate, in either form.
+4. **Nobody is invented.** The person is bound to a `workers` row Triangle
+   already holds, matched from the words. Two people matching binds nobody and
+   Hanna names the candidates instead.
+5. **The case is never empty while she thinks.** Triangle renders the packet
+   from the worker record and shows it immediately, marked as Triangle's own
+   record — not as something Hanna said. Attributing a generated summary to an
+   employee who has not answered is the same lie as a queued row nobody picks
+   up. Her check lands on the same card.
+6. **A put-forward job is not an owner of the whole case.** It does not hide
+   Ask Bob and does not take a follow-up out of Needs you. Only the chase half
+   decides who holds the card.
+7. **Send is a person, still.** `who_we_put_forward` is a proposal; the thread
+   composer messages the employee and says so; the only Send is the human one
+   on the case. `SENT_MESSAGES_RECORDED` stays false and no agent gets SMTP.
+
+Deliberately not in this: autonomous send, and the dual From picker (gmail vs
+triangle-services.com), which stays a follow-up.
+
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 
 CEO accepted the external expert amendment on 16 September 2026. Direction is

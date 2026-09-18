@@ -78,7 +78,7 @@ export async function listInProgressWaits(
     if (!face) continue;
     const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
     const thread = threads.get(row.id as string);
-    waits.push({
+        waits.push({
       assignmentId: row.id as string,
       title: (row.title as string) || "Follow-through",
       agentName: face.name,
@@ -95,6 +95,8 @@ export async function listInProgressWaits(
       messageCount: thread?.total ?? 0,
       awaitingAgent: thread?.awaitingAgent ?? 0,
       createdAt: (row.created_at as string) ?? "",
+      lastAgentBody: thread?.lastAgentBody ?? null,
+      caseType: asId(constraints.case_type),
     });
     if (waits.length >= limit) break;
   }
@@ -110,6 +112,19 @@ export interface DoneItem {
   completedAt: string;
   messageCount: number;
   awaitingAgent: number;
+  leadId: string | null;
+  contactId: string | null;
+  personId: string | null;
+  lastAgentBody: string | null;
+  resultSummary: string | null;
+}
+
+/** People on the books a human may attach as an anonymised profile. */
+export interface AttachableWorker {
+  workerId: string;
+  name: string;
+  role: string | null;
+  status: string;
 }
 
 /**
@@ -130,7 +145,7 @@ export async function listDoneSince(
   const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const { data: rows } = await svc
     .from("agent_assignments")
-    .select("id, agent_instance_id, title, constraints, completed_at")
+    .select("id, agent_instance_id, title, constraints, completed_at, result_summary")
     .eq("org_id", orgId)
     .eq("status", "completed")
     .is("mission_id", null)
@@ -166,6 +181,7 @@ export async function listDoneSince(
     const face = faces.get(row.agent_instance_id as string);
     if (!face) continue;
     const thread = threads.get(row.id as string);
+    const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
     done.push({
       assignmentId: row.id as string,
       title: (row.title as string) || "Finished work",
@@ -174,8 +190,38 @@ export async function listDoneSince(
       completedAt: (row.completed_at as string) ?? "",
       messageCount: thread?.total ?? 0,
       awaitingAgent: thread?.awaitingAgent ?? 0,
+      leadId: asId(constraints.leadId),
+      contactId: asId(constraints.contactId),
+      personId: asId(constraints.personId),
+      lastAgentBody: thread?.lastAgentBody ?? null,
+      resultSummary: (row.result_summary as string | null) ?? null,
     });
     if (done.length >= limit) break;
   }
   return done;
+}
+
+/**
+ * Active and candidate people a human may attach as an anonymised profile.
+ * Candidates belong here: a CV on file is who Bob often names from the mail.
+ */
+export async function listAttachableWorkers(
+  orgId: string,
+  limit = 200,
+): Promise<AttachableWorker[]> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return [];
+  const { data } = await svc
+    .from("workers")
+    .select("id, full_name, role, status")
+    .eq("organization_id", orgId)
+    .in("status", ["active", "candidate"])
+    .order("full_name", { ascending: true })
+    .limit(limit);
+  return (data ?? []).map((w) => ({
+    workerId: w.id as string,
+    name: (w.full_name as string) || "Unnamed",
+    role: (w.role as string | null) ?? null,
+    status: (w.status as string) || "candidate",
+  }));
 }

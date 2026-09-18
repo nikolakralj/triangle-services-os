@@ -35,7 +35,10 @@ progress | Done since you looked** (DEV-017). Handoff changes the
 owner of the work; it does not change where the work lives (DEV-015, ahead of
 the Team redesign). Open thread is a drawer on Today. Ask Bob assignments use
 `case_type: commercial_follow_through` so commercial complete is not judged as
-a research finding. System refusals, tenant walls, and finding-contract
+a research finding. Who we put forward is Hanna's half of the same case
+(`who_we_put_forward`, DEV-021): bio / initials / anonymised is the default
+packet; a full named CV is a deliberate release of identity; both return on
+the Today card; a person still presses Send. System refusals, tenant walls, and finding-contract
 sentences are **diagnostics**, not CEO work — hide them from Workforce
 primary and from primary nav (DEV-016, same class as the Job Intake hide).
 Do not put the refusal ledger under Needs you.

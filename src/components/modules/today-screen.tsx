@@ -12,7 +12,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type { NextMove, NextMoveAction } from "@/lib/data/next-move";
+import type { NextMove, NextMoveAction, OfferWorker } from "@/lib/data/next-move";
 import type { CameBackItem } from "@/lib/data/came-back";
 import type { FollowUp } from "@/lib/data/follow-ups";
 import {
@@ -25,7 +25,7 @@ import {
 import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
-import type { DoneItem } from "@/lib/data/today-in-progress";
+import type { AttachableWorker, DoneItem } from "@/lib/data/today-in-progress";
 import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
 import { CertExceptions } from "@/components/modules/today-certs";
 import type { CertAlertRow } from "@/lib/data/worker-documents";
@@ -35,7 +35,16 @@ import {
   SendFromTriangleReview,
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
-import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import {
+  chaseWaits,
+  findDone,
+  findWait,
+  matchesIds,
+  type CaseRef,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
+import type { PutForwardCase } from "@/lib/data/put-forward";
+import { PutForwardBlock } from "@/components/modules/put-forward-block";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -99,6 +108,8 @@ export function TodayScreen({
   done,
   certs = [],
   sender = null,
+  pool = [],
+  putForward = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -117,15 +128,27 @@ export function TodayScreen({
   certs?: CertAlertRow[];
   /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
   sender?: { id: string; emailAddress: string } | null;
+  /** People on the books a human may attach as an anonymised profile. */
+  pool?: AttachableWorker[];
+  /** Open and recently finished "who we put forward" cases (Hanna's half). */
+  putForward?: PutForwardCase[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
   const nowAction = move.action;
-  const nowWait = nowAction
-    ? findWait(waits, { leadId: nowAction.leadId, contactId: nowAction.contactId })
+  // Who owns the chase. Hanna's who-we-put-forward job is the other half of
+  // the same case and has its own block on the card; counting it here would
+  // read as "somebody else is handling this" and take the card off Needs you.
+  const chase = chaseWaits(waits);
+  const nowIds = nowAction
+    ? { leadId: nowAction.leadId, contactId: nowAction.contactId }
     : null;
-  const nowNeedsYou = Boolean(nowAction && !nowWait && !move.clear);
+  const nowWait = nowIds ? findWait(chase, nowIds) : null;
+  // The same card stays when Bob has it (DEV-015). Needs you is only the
+  // human decision — Send now, not the wait itself.
+  const nowShowCard = Boolean(nowAction && !move.clear);
+  const nowNeedsYou = Boolean(nowShowCard && !nowWait);
   const due = followUps.items.filter(
     (f) =>
       !nowAction ||
@@ -140,14 +163,14 @@ export function TodayScreen({
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
   const dueOpen = due.filter(
     (f) =>
-      !findWait(waits, {
+      !findWait(chase, {
         leadId: f.target.leadId,
         contactId: f.target.contactId,
         personId: f.target.personId,
       }),
   );
   const reachableOpen = ready.filter(
-    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+    (p) => !findWait(chase, { personId: p.contactId, contactId: p.contactId }),
   );
   const needsYou =
     (nowNeedsYou ? 1 : 0) +
@@ -169,7 +192,7 @@ export function TodayScreen({
         waits={waits}
         doneCount={finishedMissions.length + done.length}
       />
-      <Zone n="01" name="Needs you" note="human decisions only">
+      <Zone n="01" name="Needs you" note="human decisions only" id="today-needs-you">
         <div className="space-y-2">
           {logged && (
             <RecordedStrip
@@ -178,18 +201,21 @@ export function TodayScreen({
               onClear={() => setLogged(null)}
             />
           )}
-          {nowNeedsYou ? (
-            <NowCard key={cardKey} move={move} onLogged={setLogged} waits={waits} sender={sender} />
+          {nowShowCard ? (
+            <NowCard
+              key={cardKey}
+              move={move}
+              onLogged={setLogged}
+              waits={chase}
+              done={done}
+              sender={sender}
+              pool={pool}
+              putForward={putForward}
+            />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
-              <p className="text-base font-semibold text-slate-900">
-                {nowWait ? "Nothing needs you on this case" : move.headline}
-              </p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                {nowWait
-                  ? "It is with the team under In progress. Open thread or take it back there."
-                  : move.because}
-              </p>
+              <p className="text-base font-semibold text-slate-900">{move.headline}</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{move.because}</p>
             </div>
           )}
         </div>
@@ -200,6 +226,7 @@ export function TodayScreen({
             followUps={due}
             moreFollowUps={dueMore}
             waits={waits}
+            putForward={putForward}
           />
         </div>
         {certs.length > 0 && (
@@ -213,6 +240,7 @@ export function TodayScreen({
         n="02"
         name="In progress"
         note={waits.length === 0 ? "nothing with the team" : "quiet — open a line if you want to"}
+        id="today-in-progress"
       >
         <InProgressByEmployee waits={waits} />
       </Zone>
@@ -225,6 +253,7 @@ export function TodayScreen({
             ? "nothing new"
             : "a mission leaves once opened"
         }
+        id="today-done"
       >
         <DoneSince missions={finishedMissions} done={done}>
           {/* Reports filed before missions existed. They can still carry a
@@ -377,21 +406,38 @@ function Pulse({
   }
   const chip = "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium ring-1 ring-inset";
 
+  function go(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Today at a glance">
-      <span className={`${chip} ${needsYou > 0 ? PULSE_TONE.need : PULSE_TONE.calm}`}>
+      <button
+        type="button"
+        onClick={() => go("today-needs-you")}
+        className={`${chip} ${needsYou > 0 ? PULSE_TONE.need : PULSE_TONE.calm}`}
+      >
         {needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "needs" : "need"} you`}
-      </span>
+      </button>
       {employees.map((e) => (
-        <span key={e.name} className={`${chip} ${PULSE_TONE.work}`}>
+        <button
+          key={e.name}
+          type="button"
+          onClick={() => go("today-in-progress")}
+          className={`${chip} ${PULSE_TONE.work}`}
+        >
           <span aria-hidden>{e.emoji}</span>
           {e.name} on {e.count}
-        </span>
+        </button>
       ))}
       {doneCount > 0 && (
-        <span className={`${chip} ${PULSE_TONE.done}`}>
+        <button
+          type="button"
+          onClick={() => go("today-done")}
+          className={`${chip} ${PULSE_TONE.done}`}
+        >
           {doneCount} done since you looked
-        </span>
+        </button>
       )}
     </div>
   );
@@ -401,15 +447,17 @@ function Zone({
   n,
   name,
   note,
+  id,
   children,
 }: {
   n: string;
   name: string;
   note: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section id={id}>
       <div className="mb-2 flex items-baseline gap-2.5">
         <span className="font-mono text-[11px] font-medium tabular-nums text-sky-600">
           {n}
@@ -431,16 +479,22 @@ function NowCard({
   move,
   onLogged,
   waits,
+  done,
   sender,
+  pool,
+  putForward,
 }: {
   move: NextMove;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
+  pool: AttachableWorker[];
+  putForward: PutForwardCase[];
 }) {
   if (move.clear || !move.action) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center">
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
         <p className="text-base font-semibold text-slate-900">{move.headline}</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{move.because}</p>
       </div>
@@ -460,7 +514,15 @@ function NowCard({
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} onLogged={onLogged} waits={waits} sender={sender} />
+      <ActionPanel
+        action={move.action}
+        onLogged={onLogged}
+        waits={waits}
+        done={done}
+        sender={sender}
+        pool={pool}
+        putForward={putForward}
+      />
     </div>
   );
 }
@@ -483,13 +545,20 @@ function ActionPanel({
   action,
   onLogged,
   waits,
+  done,
   sender,
+  pool,
+  putForward,
 }: {
   action: NextMoveAction;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  done: DoneItem[];
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
+  pool: AttachableWorker[];
+  /** Hanna's who-we-put-forward cases, matched to this case below. */
+  putForward: PutForwardCase[];
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -497,16 +566,36 @@ function ActionPanel({
   const [logging, setLogging] = useState<ContactOutcome | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [workerId, setWorkerId] = useState(action.offering?.workerId ?? "");
+  const [poolQuery, setPoolQuery] = useState("");
 
   const isPhone = action.channelKind === "phone";
   const outcomes = outcomesFor(action.channelKind);
   // A written message can be changed before it goes; what is in the box is
   // what Copy, Open mail and Sent use. A call script is only read out.
   const [words, setWords] = useState(action.script ?? "");
+  const [autoWords, setAutoWords] = useState(action.script ?? "");
   const outgoing = isPhone ? (action.script ?? "") : words;
   const about = [action.personRole, action.country ? `in ${action.country}` : null]
     .filter(Boolean)
     .join(" ");
+  const offeringFromPool = workerId
+    ? pool.find((p) => p.workerId === workerId)
+    : null;
+  const offering: OfferWorker | null =
+    (action.candidates ?? []).find((c) => c.workerId === workerId) ??
+    (offeringFromPool
+      ? {
+          workerId: offeringFromPool.workerId,
+          name: offeringFromPool.name,
+          role: offeringFromPool.role,
+          why: "",
+          caveats:
+            offeringFromPool.status === "candidate" ? ["on file as a candidate"] : [],
+        }
+      : null) ??
+    action.offering ??
+    null;
   const sendTarget = {
     to: action.value,
     subject: action.subject,
@@ -515,7 +604,36 @@ function ActionPanel({
     who: action.personName,
     leadId: action.leadId,
     contactId: action.contactId || undefined,
+    workerId: workerId || undefined,
+    candidates: action.candidates,
   };
+  const nowWait = findWait(waits, {
+    leadId: action.leadId,
+    contactId: action.contactId,
+  });
+  const nowDone = findDone(done, {
+    leadId: action.leadId,
+    contactId: action.contactId,
+  });
+  const caseRef: CaseRef = {
+    who: action.personName,
+    about: action.personRole,
+    leadId: action.leadId,
+    contactId: action.contactId || null,
+  };
+  const putForwardHere = putForward.filter((item) =>
+    matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
+  );
+
+  function pickWorker(nextId: string, next: OfferWorker | null) {
+    setWorkerId(nextId);
+    if (!next) return;
+    if (words === autoWords) {
+      const rewritten = rewriteBackground(autoWords, next.why);
+      setWords(rewritten);
+      setAutoWords(rewritten);
+    }
+  }
 
   async function log(outcome: ContactOutcome) {
     setLogging(outcome);
@@ -628,35 +746,138 @@ function ActionPanel({
       </div>
 
       <div className="space-y-4 px-6 py-5">
-        {action.offering && (
+        <EmployeePrepared wait={nowWait} done={nowDone} />
+
+        {/* Hanna's half, on the same case. The handoff changed the owner of
+            who we put forward; it did not move the work anywhere else. */}
+        {putForwardHere.map((item) => (
+          <PutForwardBlock
+            key={item.assignmentId}
+            item={item}
+            caseRef={caseRef}
+            onPickWorker={(id) => {
+              const named = (action.candidates ?? []).find((c) => c.workerId === id);
+              const fromPool = pool.find((p) => p.workerId === id);
+              pickWorker(
+                id,
+                named ??
+                  (fromPool
+                    ? {
+                        workerId: fromPool.workerId,
+                        name: fromPool.name,
+                        role: fromPool.role,
+                        why: "",
+                        caveats:
+                          fromPool.status === "candidate"
+                            ? ["on file as a candidate"]
+                            : [],
+                      }
+                    : null),
+              );
+            }}
+          />
+        ))}
+
+        {(offering || (action.candidates && action.candidates.length > 0) || pool.length > 0) && (
           <div>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-400">
               Who we put forward
             </p>
-            <p className="mt-1.5 text-[15px] font-semibold text-white">
-              {action.offering.name}
-              {action.offering.role && (
-                <span className="ml-2 text-[13px] font-normal text-slate-400">
-                  {action.offering.role}
+            <div className="mt-2 space-y-1">
+              {(action.candidates ?? []).map((c) => (
+                <label
+                  key={c.workerId}
+                  className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
+                >
+                  <input
+                    type="radio"
+                    name="today-offering"
+                    checked={workerId === c.workerId}
+                    onChange={() => pickWorker(c.workerId, c)}
+                    className="mt-1.5"
+                  />
+                  <span>
+                    <span className="text-[14px] font-semibold text-white">{c.name}</span>
+                    {c.role && (
+                      <span className="ml-2 text-[13px] font-normal text-slate-400">{c.role}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+              {poolQuery.trim().length >= 2 &&
+                pool
+                  .filter((p) => {
+                    if ((action.candidates ?? []).some((c) => c.workerId === p.workerId)) {
+                      return false;
+                    }
+                    const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
+                    return hay.includes(poolQuery.trim().toLowerCase());
+                  })
+                  .slice(0, 8)
+                  .map((p) => (
+                    <label
+                      key={p.workerId}
+                      className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
+                    >
+                      <input
+                        type="radio"
+                        name="today-offering"
+                        checked={workerId === p.workerId}
+                        onChange={() =>
+                          pickWorker(p.workerId, {
+                            workerId: p.workerId,
+                            name: p.name,
+                            role: p.role,
+                            why: "",
+                            caveats:
+                              p.status === "candidate" ? ["on file as a candidate"] : [],
+                          })
+                        }
+                        className="mt-1.5"
+                      />
+                      <span>
+                        <span className="text-[14px] font-semibold text-white">{p.name}</span>
+                        {p.role && (
+                          <span className="ml-2 text-[13px] font-normal text-slate-400">
+                            {p.role}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+            </div>
+            {pool.length > 0 && (
+              <label className="mt-2 block">
+                <span className="text-[12px] text-slate-500">
+                  Someone else in the pool — type two letters
                 </span>
-              )}
-            </p>
-            <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
-              {action.offering.why}
-            </p>
-            {/* What is NOT known about them, before it is offered to a buyer. */}
-            {action.offering.caveats.length > 0 && (
-              <ul className="mt-2.5 space-y-1">
-                {action.offering.caveats.map((c) => (
-                  <li
-                    key={c}
-                    className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
-                  >
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                    {c}
-                  </li>
-                ))}
-              </ul>
+                <input
+                  value={poolQuery}
+                  onChange={(e) => setPoolQuery(e.target.value)}
+                  placeholder="Name or role"
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-slate-100 placeholder-slate-600 focus:border-white/25 focus:outline-none"
+                />
+              </label>
+            )}
+            {offering && (
+              <>
+                {offering.why ? (
+                  <p className="mt-2 text-[13px] leading-relaxed text-slate-400">{offering.why}</p>
+                ) : null}
+                {offering.caveats.length > 0 && (
+                  <ul className="mt-2.5 space-y-1">
+                    {offering.caveats.map((c) => (
+                      <li
+                        key={c}
+                        className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
+                      >
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
         )}
@@ -665,6 +886,24 @@ function ActionPanel({
           <SendFromTriangleReview
             target={sendTarget}
             sender={sender}
+            pool={pool}
+            onPickWorker={(id) => {
+              const next =
+                (action.candidates ?? []).find((c) => c.workerId === id) ??
+                (() => {
+                  const p = pool.find((w) => w.workerId === id);
+                  return p
+                    ? {
+                        workerId: p.workerId,
+                        name: p.name,
+                        role: p.role,
+                        why: "",
+                        caveats: p.status === "candidate" ? ["on file as a candidate"] : [],
+                      }
+                    : null;
+                })();
+              pickWorker(id, next);
+            }}
             onCancel={() => setReviewing(false)}
             onSent={(sent) => {
               setReviewing(false);
@@ -741,10 +980,7 @@ function ActionPanel({
                   .join(" "),
               })
             }
-            alreadyWith={findWait(waits, {
-              leadId: action.leadId,
-              contactId: action.contactId,
-            })}
+            alreadyWith={nowWait}
           />
         )}
 
@@ -763,6 +999,72 @@ function ActionPanel({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function rewriteBackground(script: string, why: string): string {
+  if (!why.trim()) return script;
+  const line = `Relevant background: ${why}.`;
+  if (/Relevant background:.*?(?=\n|$)/.test(script)) {
+    return script.replace(/Relevant background:.*?(?=\n|$)/, line);
+  }
+  return script;
+}
+
+/**
+ * What the employee wrote in Triangle on this case. A chat outside Triangle
+ * is not this record — if they only wrote there, the card says so.
+ */
+function EmployeePrepared({
+  wait,
+  done,
+}: {
+  wait: InProgressWait | null;
+  done: DoneItem | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const follow = wait ?? done;
+  if (!follow) return null;
+  const body = wait
+    ? wait.lastAgentBody ?? ""
+    : done?.lastAgentBody || done?.resultSummary || "";
+  const name = wait?.agentName ?? done?.agentName ?? "the team";
+  const label = wait ? wait.withLabel : `${name} prepared`;
+
+  return (
+    <div className="rounded-xl border border-sky-400/30 bg-sky-400/[0.07] p-3.5">
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">
+        {label}
+      </p>
+      {body ? (
+        <>
+          <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-slate-200">
+            {body}
+          </pre>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(body);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                /* clipboard may be blocked; the text is already on the card */
+              }
+            }}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[12px] font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy what they wrote"}
+          </button>
+        </>
+      ) : (
+        <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+          Nothing is in the Triangle thread yet. Open thread — a chat outside
+          Triangle is not the record.
+        </p>
+      )}
     </div>
   );
 }
