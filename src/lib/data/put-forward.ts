@@ -151,3 +151,53 @@ export function defaultPutForwardAsk(params: {
   const about = params.about?.trim() ? ` about ${params.about.trim()}` : "";
   return `Prepare ${subject}${to}${about}. Say what is not recorded before it goes out.`;
 }
+
+/** The file Triangle already holds, shown on the case while Hanna checks it. */
+export interface PutForwardPack {
+  workerId: string;
+  /** "M. P." for a bio, the full name once a person has released identity. */
+  displayName: string;
+  /** The real name, for the internal card only. Never the outbound filename. */
+  workerName: string;
+  reference: string;
+  filename: string;
+  /** The human-only PDF route. Anonymised unless identity was released. */
+  href: string;
+  role: string;
+  basedIn: string | null;
+  availability: string;
+  certificates: string[];
+  languages: string[];
+  /** What Triangle does not hold. Stated, because silence reads as a yes. */
+  notRecorded: string[];
+}
+
+/** Hanna's half of a Today case. Ids match the chase so it stays on the card. */
+export interface PutForwardCase {
+  assignmentId: string;
+  status: "queued" | "active" | "completed" | "failed" | "cancelled";
+  finished: boolean;
+  agentName: string;
+  agentEmoji: string;
+  intent: PackIntent;
+  intentLabel: string;
+  intentSentence: string;
+  /** "Hanna is preparing the bio" — the line the card shows while she works. */
+  workingLine: string;
+  title: string;
+  leadId?: string | null;
+  contactId?: string | null;
+  personId?: string | null;
+  entityIds: string[];
+  companyId: string | null;
+  missionId: string | null;
+  fromAssignmentId: string | null;
+  messageCount: number;
+  awaitingAgent: number;
+  hannaSaid: string | null;
+  resultSummary: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  pack: PutForwardPack | null;
+  nobodyBound: boolean;
+}

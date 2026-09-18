@@ -11,8 +11,11 @@ import {
   packIntentVerb,
   PUT_FORWARD_CASE_TYPE,
   type PackIntent,
+  type PutForwardCase,
+  type PutForwardPack,
 } from "@/lib/data/put-forward";
-import type { HandoffIds } from "@/lib/data/today-handoff";
+
+export type { PutForwardCase, PutForwardPack };
 
 // ---------------------------------------------------------------------------
 // Who we put forward, on the case the human is already looking at.
@@ -28,54 +31,6 @@ import type { HandoffIds } from "@/lib/data/today-handoff";
 // Nothing here sends. The PDF link is the same human-only route the Talent
 // page uses, and the attach happens in Send from Triangle.
 // ---------------------------------------------------------------------------
-
-export interface PutForwardPack {
-  workerId: string;
-  /** "M. P." for a bio, the full name once a person has released identity. */
-  displayName: string;
-  /** The real name, for the internal card only. Never the outbound filename. */
-  workerName: string;
-  reference: string;
-  filename: string;
-  /** The human-only PDF route. Anonymised unless identity was released. */
-  href: string;
-  role: string;
-  basedIn: string | null;
-  availability: string;
-  certificates: string[];
-  languages: string[];
-  /** What Triangle does not hold. Stated, because silence reads as a yes. */
-  notRecorded: string[];
-}
-
-export interface PutForwardCase extends HandoffIds {
-  assignmentId: string;
-  status: "queued" | "active" | "completed" | "failed" | "cancelled";
-  finished: boolean;
-  agentName: string;
-  agentEmoji: string;
-  intent: PackIntent;
-  intentLabel: string;
-  intentSentence: string;
-  /** "Hanna is preparing the bio" — the line the card shows while she works. */
-  workingLine: string;
-  title: string;
-  entityIds: string[];
-  companyId: string | null;
-  missionId: string | null;
-  /** The Bob thread this was asked from, when it was asked from one. */
-  fromAssignmentId: string | null;
-  messageCount: number;
-  awaitingAgent: number;
-  /** What Hanna actually wrote in the Triangle thread. Not a Grok chat. */
-  hannaSaid: string | null;
-  resultSummary: string | null;
-  createdAt: string;
-  completedAt: string | null;
-  pack: PutForwardPack | null;
-  /** Set when the ask named nobody Triangle holds a record for. */
-  nobodyBound: boolean;
-}
 
 function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;

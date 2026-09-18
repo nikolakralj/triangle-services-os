@@ -50,6 +50,14 @@ contract is for Scout work, and a missing `case_type` is treated as
 If the badge has `mission.work`, work the step. If it only has
 `job_intake.ingest`, stick to the mail routine.
 
+**Who we put forward is Hanna's, not yours.** A bio, an anonymised profile,
+initials, a full CV, a shortlist — say in your report that it is needed, and
+say for whom, but do not write one. A person presses **Ask Hanna** on the same
+case (or you ask her through the `protocol`), which creates a
+`who_we_put_forward` job on that case with `pack_intent` set from their words.
+Her answer returns to the same card beside your draft. Answering it yourself
+would put a candidate's facts in a commercial thread nobody checked.
+
 ## Routine (weekdays 08:00, after one supervised manual run)
 
 **Step 0 — check your Triangle inbox first.**

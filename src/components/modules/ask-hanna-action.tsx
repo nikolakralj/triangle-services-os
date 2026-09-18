@@ -195,7 +195,7 @@ export function AskHannaAction({
 
   if (handed) {
     return (
-      <div className="space-y-1.5">
+      <div className="w-full space-y-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={t.with}>
             With {handed.hannaName} · {packIntentLabel(handed.intent).toLowerCase()}
@@ -235,7 +235,7 @@ export function AskHannaAction({
   }
 
   return (
-    <div className="space-y-2">
+    <div className={open ? "w-full space-y-2" : undefined}>
       {!open && (
         <button
           type="button"

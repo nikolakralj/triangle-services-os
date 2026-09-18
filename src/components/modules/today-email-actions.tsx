@@ -400,6 +400,7 @@ export function EmailCardActions({
   return (
     <div className="space-y-2">
       {withBob ? (
+        <>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={t.with}>
             {alreadyWith?.withLabel ?? `With ${withBob.bobName}`}
@@ -437,11 +438,15 @@ export function EmailCardActions({
             )}
             Take back
           </button>
-          {/* Bob having the chase does not mean he owns who we put forward. */}
-          {!isHannaHolding && (
-            <AskHannaAction caseRef={caseRefOf(target)} tone={tone} />
-          )}
         </div>
+          {!isHannaHolding && (
+            <AskHannaAction
+              caseRef={caseRefOf(target)}
+              fromAssignmentId={withBob.assignmentId}
+              tone={tone}
+            />
+          )}
+        </>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-1.5">

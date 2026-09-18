@@ -119,3 +119,24 @@ export function findDone<T extends HandoffIds & { entityIds?: string[] }>(
 ): T | null {
   return items.find((item) => matchesIds(item, ids)) ?? null;
 }
+
+/** Every row that is the same business situation as any of these ids. */
+export function findAllMatching<T extends HandoffIds & { entityIds?: string[] }>(
+  items: T[],
+  idsList: HandoffIds[],
+): T[] {
+  return items.filter((item) => idsList.some((ids) => matchesIds(item, ids)));
+}
+
+/** Enough of a wait to hand Hanna the same case from In progress Open thread. */
+export function caseRefFromWait(wait: InProgressWait, who = wait.title): CaseRef {
+  return {
+    who,
+    about: wait.title,
+    leadId: wait.leadId,
+    contactId: wait.contactId,
+    personId: wait.personId,
+    companyId: wait.companyId,
+    missionId: wait.missionId,
+  };
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare } from "lucide-react";
 import type { AssignmentMessage } from "@/lib/data/assignment-threads";
@@ -42,7 +42,7 @@ export function AssignmentThread({
    * Shown above the composer, given whatever is currently typed. The drawer
    * uses it to notice an ask that belongs to a different colleague.
    */
-  composerHint?: (draft: string) => React.ReactNode;
+  composerHint?: (draft: string) => ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(alwaysOpen);

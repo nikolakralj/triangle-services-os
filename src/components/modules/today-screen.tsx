@@ -43,7 +43,7 @@ import {
   type CaseRef,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
-import type { PutForwardCase } from "@/lib/data/put-forward-cases";
+import type { PutForwardCase } from "@/lib/data/put-forward";
 import { PutForwardBlock } from "@/components/modules/put-forward-block";
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ export function TodayScreen({
         waits={waits}
         doneCount={finishedMissions.length + done.length}
       />
-      <Zone n="01" name="Needs you" note="human decisions only">
+      <Zone n="01" name="Needs you" note="human decisions only" id="today-needs-you">
         <div className="space-y-2">
           {logged && (
             <RecordedStrip
@@ -226,6 +226,7 @@ export function TodayScreen({
             followUps={due}
             moreFollowUps={dueMore}
             waits={waits}
+            putForward={putForward}
           />
         </div>
         {certs.length > 0 && (
@@ -239,6 +240,7 @@ export function TodayScreen({
         n="02"
         name="In progress"
         note={waits.length === 0 ? "nothing with the team" : "quiet — open a line if you want to"}
+        id="today-in-progress"
       >
         <InProgressByEmployee waits={waits} />
       </Zone>
@@ -251,6 +253,7 @@ export function TodayScreen({
             ? "nothing new"
             : "a mission leaves once opened"
         }
+        id="today-done"
       >
         <DoneSince missions={finishedMissions} done={done}>
           {/* Reports filed before missions existed. They can still carry a
@@ -403,21 +406,38 @@ function Pulse({
   }
   const chip = "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium ring-1 ring-inset";
 
+  function go(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Today at a glance">
-      <span className={`${chip} ${needsYou > 0 ? PULSE_TONE.need : PULSE_TONE.calm}`}>
+      <button
+        type="button"
+        onClick={() => go("today-needs-you")}
+        className={`${chip} ${needsYou > 0 ? PULSE_TONE.need : PULSE_TONE.calm}`}
+      >
         {needsYou === 0 ? "Nothing needs you" : `${needsYou} ${needsYou === 1 ? "needs" : "need"} you`}
-      </span>
+      </button>
       {employees.map((e) => (
-        <span key={e.name} className={`${chip} ${PULSE_TONE.work}`}>
+        <button
+          key={e.name}
+          type="button"
+          onClick={() => go("today-in-progress")}
+          className={`${chip} ${PULSE_TONE.work}`}
+        >
           <span aria-hidden>{e.emoji}</span>
           {e.name} on {e.count}
-        </span>
+        </button>
       ))}
       {doneCount > 0 && (
-        <span className={`${chip} ${PULSE_TONE.done}`}>
+        <button
+          type="button"
+          onClick={() => go("today-done")}
+          className={`${chip} ${PULSE_TONE.done}`}
+        >
           {doneCount} done since you looked
-        </span>
+        </button>
       )}
     </div>
   );
@@ -427,15 +447,17 @@ function Zone({
   n,
   name,
   note,
+  id,
   children,
 }: {
   n: string;
   name: string;
   note: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section id={id}>
       <div className="mb-2 flex items-baseline gap-2.5">
         <span className="font-mono text-[11px] font-medium tabular-nums text-sky-600">
           {n}

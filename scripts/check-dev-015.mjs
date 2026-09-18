@@ -157,8 +157,10 @@ test('After Hand to Bob the card is With Bob with Open thread and Take back', ()
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
-test('Toast copy is Handed to Bob · Open thread, and the drawer opens on the case', () => {
-  assert.match(handoffCtx, /Handed to Bob/);
+test('Toast copy is Handed to <employee> · Open thread, and the drawer opens on the case', () => {
+  // Named rather than literally "Bob": Hanna takes cases from Today too, and
+  // the toast must not claim the wrong owner (DEV-021).
+  assert.match(handoffCtx, /Handed to \{toast\.agentName/);
   assert.match(handoffCtx, /The answer returns on this case/);
   assert.match(handoffCtx, /Open thread/);
   const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));

@@ -113,6 +113,7 @@ export async function GET(request: Request) {
       "Report the job finished: POST { assignmentId, result }, adding failed: true if you could not do it. " +
       "Quick notes: POST { taskId, result }. Never send email; never invent facts. " +
       "A mission step (constraints.case_type mission_step) carries `mission` — the instruction, finish line, decisions, holdings and supply. Work it through `mission.report`: file targets (Scout) or pool proposals (Hanna) and activity as you go, then POST /api/agent/missions/{missionId}/complete. Do not finish a mission step with `result` here. " +
+      "A who_we_put_forward case (Hanna) carries `pack_intent` — bio_anonymised means initials only, no name, no contact details, no rate; full_cv means a person released the identity. `worker_id` names who, and that worker is hydrated in `workers`. Check right to work, tickets for that country, language, and dated availability, say what is not recorded, and finish with { assignmentId, result }. Triangle renders the document and a human sends it. " +
       "`houseRules` is how the CEO wants you to work, in their own words, with the version it last changed at: follow it on every job, on top of your role file. " +
       "`protocol` is how every employee works a mission and asks a colleague for work; `communicationPolicy` says which messages you may send yourself.",
   });
