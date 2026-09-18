@@ -98,7 +98,7 @@ function caseIds(ctx: CaseAskContext): string[] {
   return [...new Set(all.filter((id): id is string => typeof id === "string" && id.length > 0))];
 }
 
-/** The words without the recipient's own name, so "reply to Oliver" never binds a worker called Oliver. */
+/** The words without the recipient's own name, so "reply to Anna" never binds a worker called Anna. */
 function withoutRecipient(text: string, who: string | null | undefined): string {
   let out = ` ${text} `;
   for (const part of (who ?? "").split(/\s+/).filter((p) => p.length >= 3)) {

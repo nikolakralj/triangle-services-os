@@ -611,14 +611,18 @@ test('Today card: Send from Triangle only with a sender; Open mail stays; review
   assert.match(comp, /draft: target\.draft/);
   assert.match(comp, /attachPack: attach && canAttach/);
   assert.match(comp, /putForwardAssignmentId/);
-  assert.match(comp, /packet-worker/);
+  // Who the reply is about is the team's decision on the card, not a radio
+  // list in the review ("Employees, not buttons", 18 September).
+  assert.doesNotMatch(comp, /packet-worker|type="radio"|Who the reply is about/);
 });
 
 // ── the tick is the last step of a decision, not the decision ──────────────
-test('the attach starts off and exists only for a pack somebody approved', () => {
+test('the attach follows the person\'s approval and exists only for a pack somebody approved', () => {
   const comp = read('src/components/modules/send-from-triangle.tsx');
-  // Picking a person used to switch the attach on for you.
-  assert.match(comp, /const \[attach, setAttach\] = useState\(false\)/);
+  // Approving it on the case is the decision; nothing unapproved can start ticked.
+  const canAt = comp.indexOf('const canAttach = Boolean(pack && mayAttachPack(pack.approval))');
+  const tickAtState = comp.indexOf('const [attach, setAttach] = useState(canAttach)');
+  assert.ok(canAt > 0 && tickAtState > canAt, 'the tick starts from the approval, computed first');
   assert.doesNotMatch(comp, /setAttach\(true\)/);
   assert.match(comp, /const canAttach = Boolean\(pack && mayAttachPack\(pack\.approval\)\)/);
   // No checkbox at all until it is approved; an unapproved state says why.

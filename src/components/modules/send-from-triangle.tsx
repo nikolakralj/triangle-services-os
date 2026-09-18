@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, Send } from "lucide-react";
 import {
@@ -19,16 +19,17 @@ import {
 // Send now. The server sends through the person's own mailbox and only then
 // records it. If the mailbox's server refuses, nothing is recorded as sent.
 //
-// The attachment is the part that had to change. Picking somebody here used
-// to tick the attach for you, and the tick was the whole gate: the server
-// took the boolean, built a profile for whatever worker id arrived, and sent
-// it. So a person's profile could leave Triangle without anyone having
-// opened it.
+// Nothing here asks the person to pick what the team already decided
+// ("Employees, not buttons", 18 September):
 //
-// Now the tick only exists for a profile a person has already approved on
-// this case, it starts off, and the server re-reads the approval anyway.
-// With nothing approved, this says what is missing instead of offering a
-// checkbox that cannot work.
+//   - who the reply is about is the team's decision, on the card — change it
+//     with the one Ask, not with a radio list here;
+//   - the From address is the mailbox the recruiter wrote to, said in words.
+//     Only when Triangle cannot tell does a choice appear;
+//   - the approved document goes with the reply, named, because approving it
+//     on the case was the person's decision. It can still be taken off. The
+//     server re-reads the approval anyway: an unapproved, lapsed or other-case
+//     document is refused and nothing is sent.
 //
 // Rendered only when the person has a mailbox with sending turned on; with
 // none, Open mail stays the way out and this component renders nothing.
@@ -47,21 +48,6 @@ export interface AttachablePack {
   approvedAt: string | null;
 }
 
-export interface OfferChoice {
-  workerId: string;
-  name: string;
-  role: string | null;
-  why?: string;
-  caveats?: string[];
-}
-
-export interface PoolWorker {
-  workerId: string;
-  name: string;
-  role: string | null;
-  status?: string;
-}
-
 export interface SendTarget {
   to: string;
   subject: string | null;
@@ -74,7 +60,6 @@ export interface SendTarget {
   contactId?: string;
   personId?: string;
   workerId?: string;
-  candidates?: OfferChoice[];
 }
 
 export interface SentRecord {
@@ -84,6 +69,8 @@ export interface SentRecord {
   followUpAt: string | null;
   attachedFilename?: string | null;
 }
+
+type Mailbox = { id: string; emailAddress: string; displayName?: string | null };
 
 const TONE = {
   dark: {
@@ -151,7 +138,7 @@ export function SendFromTriangleButton({
       title={`Send from ${sender.emailAddress}`}
     >
       <Send className="h-3.5 w-3.5" />
-      Send from Triangle
+      Send
     </button>
   );
 }
@@ -160,29 +147,30 @@ export function SendFromTriangleReview({
   target,
   sender,
   senders = [],
+  replyFrom = null,
   tone = "dark",
-  pool = [],
   pack = null,
   onSent,
   onCancel,
-  onPickWorker,
 }: {
   target: SendTarget;
   sender: { id: string; emailAddress: string };
-  /** Every address this person may send from. One means no choice to make. */
-  senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
+  /** Every address this person may send from. */
+  senders?: Mailbox[];
+  /** The mailbox the conversation arrived in, when Triangle knows it. */
+  replyFrom?: string | null;
   tone?: keyof typeof TONE;
-  pool?: PoolWorker[];
   /** What Hanna prepared on this case, and whether anybody approved it. */
   pack?: AttachablePack | null;
   onSent: (sent: SentRecord) => void;
   onCancel: () => void;
-  onPickWorker?: (workerId: string) => void;
 }) {
   const router = useRouter();
   const t = TONE[tone];
-  const [mailAccountId, setMailAccountId] = useState(sender.id);
-  const from =
+  // The address the recruiter wrote to, when it is one this person sends from.
+  const decided = senders.find((box) => box.id === replyFrom) ?? null;
+  const [mailAccountId, setMailAccountId] = useState(decided?.id ?? sender.id);
+  const from: Mailbox =
     senders.find((box) => box.id === mailAccountId) ?? {
       id: sender.id,
       emailAddress: sender.emailAddress,
@@ -191,43 +179,12 @@ export function SendFromTriangleReview({
   const [subject, setSubject] = useState(target.subject ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [workerId, setWorkerId] = useState(target.workerId ?? "");
-  // Never pre-ticked. Nothing about a real person goes out because the page
-  // decided it for you.
-  const [attach, setAttach] = useState(false);
-  const [query, setQuery] = useState("");
-  const body = target.body.trim();
   const canAttach = Boolean(pack && mayAttachPack(pack.approval));
+  // Approving the document on the case was the decision; it goes with the
+  // reply unless it is taken off here. Nothing unapproved can be ticked.
+  const [attach, setAttach] = useState(canAttach);
+  const body = target.body.trim();
   const ready = !busy && subject.trim().length > 0 && body.length >= 2;
-
-  const choices = useMemo(() => {
-    const seen = new Set<string>();
-    const out: OfferChoice[] = [];
-    for (const c of target.candidates ?? []) {
-      if (seen.has(c.workerId)) continue;
-      seen.add(c.workerId);
-      out.push(c);
-    }
-    const q = query.trim().toLowerCase();
-    if (q.length >= 2) {
-      for (const p of pool) {
-        if (seen.has(p.workerId)) continue;
-        const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) continue;
-        seen.add(p.workerId);
-        out.push({ workerId: p.workerId, name: p.name, role: p.role });
-      }
-    }
-    return out;
-  }, [target.candidates, pool, query]);
-
-  // Picking who the words are about does not decide what is attached. Those
-  // were one control until 18 September, which is how a profile could ride
-  // out on a message nobody had approved it for.
-  function pick(id: string) {
-    setWorkerId(id);
-    onPickWorker?.(id);
-  }
 
   async function send() {
     if (!ready) return;
@@ -286,11 +243,10 @@ export function SendFromTriangleReview({
         <dt className={`${t.line} ${t.muted}`}>To</dt>
         <dd className={`${t.line} font-mono`}>{target.to}</dd>
         <dt className={`${t.line} ${t.muted}`}>From</dt>
-        <dd className={`${t.line} font-mono`}>
-          {/* Which identity this goes out under is a commercial decision, not
-              whichever mailbox the database listed first. With one address
-              there is nothing to choose and it stays a plain line. */}
-          {senders.length > 1 ? (
+        <dd className={t.line}>
+          {!decided && senders.length > 1 ? (
+            // Only when Triangle cannot tell which address the conversation
+            // is in. Otherwise it is the address they wrote to, said in words.
             <select
               value={mailAccountId}
               onChange={(e) => setMailAccountId(e.target.value)}
@@ -300,14 +256,15 @@ export function SendFromTriangleReview({
             >
               {senders.map((box) => (
                 <option key={box.id} value={box.id}>
-                  {box.displayName
-                    ? `${box.displayName} <${box.emailAddress}>`
-                    : box.emailAddress}
+                  {box.displayName ? `${box.displayName} <${box.emailAddress}>` : box.emailAddress}
                 </option>
               ))}
             </select>
           ) : (
-            from.emailAddress
+            <>
+              <span className="font-mono">{from.emailAddress}</span>
+              {decided && <span className={t.muted}> — the address {target.who} wrote to</span>}
+            </>
           )}
         </dd>
       </dl>
@@ -323,56 +280,7 @@ export function SendFromTriangleReview({
       </label>
       <pre className={t.pre}>{body}</pre>
 
-      {/* Who the words name. Changing it rewrites the background line in the
-          reply; it does not attach anything. */}
-      {(target.candidates?.length || pool.length > 0) && (
-        <div className="mt-3">
-          <p className={`${t.line} ${t.muted}`}>Who the reply is about</p>
-          <div className="mt-1.5 space-y-1">
-            {choices.map((c) => (
-              <label
-                key={c.workerId}
-                className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1"
-              >
-                <input
-                  type="radio"
-                  name="packet-worker"
-                  checked={workerId === c.workerId}
-                  onChange={() => pick(c.workerId)}
-                  disabled={busy}
-                  className="mt-1"
-                />
-                <span className={t.line}>
-                  {c.name}
-                  {c.role ? <span className={t.muted}> · {c.role}</span> : null}
-                </span>
-              </label>
-            ))}
-          </div>
-          {pool.length > 0 && (
-            <label className="mt-2 block">
-              <span className={`${t.line} ${t.muted}`}>
-                Someone else in the pool — type two letters
-              </span>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                disabled={busy}
-                placeholder="Name or role"
-                className={t.input}
-              />
-            </label>
-          )}
-        </div>
-      )}
-
-      <AttachRow
-        pack={pack}
-        attach={attach}
-        onAttach={setAttach}
-        busy={busy}
-        tone={tone}
-      />
+      <AttachRow pack={pack} attach={attach} onAttach={setAttach} busy={busy} tone={tone} />
 
       <p className={t.note}>
         Leaves from {from.emailAddress}, your own mailbox. Triangle records the text as
@@ -396,9 +304,9 @@ export function SendFromTriangleReview({
 /**
  * The attachment, and only in the state where attaching is a real option.
  *
- * Every other state says what is missing and where to go, rather than
- * offering a tick that the server would refuse. An unapproved profile has no
- * checkbox at all — a disabled one still reads as "almost allowed".
+ * Every other state says what is missing, rather than offering a tick that
+ * the server would refuse. An unapproved profile has no checkbox at all — a
+ * disabled one still reads as "almost allowed".
  */
 function AttachRow({
   pack,
@@ -418,8 +326,8 @@ function AttachRow({
   if (!pack) {
     return (
       <p className={t.note}>
-        Nothing is attached. To put somebody forward, ask Hanna on this case and
-        approve what she prepares.
+        Nothing is attached. When the team prepares a document for this case and you
+        approve it on the card, it goes with the reply.
       </p>
     );
   }
@@ -462,8 +370,8 @@ function AttachRow({
           className="mt-1"
         />
         <span>
-          Attach {pack.filename} — {what} for {pack.who}. You approved this on the
-          case; it goes only because you tick it.
+          With {pack.filename} — {what} for {pack.who}. You approved it on the case; untick
+          to send the reply alone.
         </span>
       </label>
       <p className={t.note}>{preview}</p>

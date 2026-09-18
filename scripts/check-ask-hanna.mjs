@@ -82,7 +82,9 @@ const threadSrc = read('src/components/modules/assignment-thread.tsx');
 const emailActionsSrc = read('src/components/modules/today-email-actions.tsx');
 const todayScreenSrc = read('src/components/modules/today-screen.tsx');
 const todayMissionsSrc = read('src/components/modules/today-missions.tsx');
-const blockSrc = read('src/components/modules/put-forward-block.tsx');
+// Who we put forward is shown as the team's decision (18 September), in the
+// block that replaced the separate Hanna block and the radio list.
+const blockSrc = read('src/components/modules/case-decision.tsx');
 const casesSrc = read('src/lib/data/put-forward-cases.ts');
 const decisionsPage = read('src/app/(app)/decisions/page.tsx');
 const findingSql = read('supabase/migrations/041_finding_contract.sql');
@@ -404,12 +406,12 @@ test('the result returns on the same case, not a second chat', () => {
   assert.match(casesSrc, /buildWorkerCv\(\{ orgId, workerId, intent \}\)/);
   assert.match(casesSrc, /packFilename/);
   assert.match(decisionsPage, /listPutForwardCases/);
-  assert.match(todayScreenSrc, /PutForwardBlock/);
-  assert.match(blockSrc, /Who we put forward/);
-  assert.match(blockSrc, /Open thread/);
+  assert.match(todayScreenSrc, /<CaseDecision/);
+  assert.match(blockSrc, /The team&apos;s decision/);
+  assert.match(blockSrc, /&apos;s thread/);
   assert.doesNotMatch(blockSrc, /router\.push\(["']\/agents/);
   assert.match(blockSrc, /Triangle&apos;s own record/);
-  assert.match(blockSrc, /Not recorded:/);
+  assert.match(blockSrc, /not recorded/);
   // Oliver Hall is a follow-up card, not only the hero.
   assert.match(todayMissionsSrc, /PutForwardOnCard/);
   assert.match(todayMissionsSrc, /putForward=\{putForward\}/);
@@ -568,14 +570,15 @@ test('the filename on the card is the filename on the wire', () => {
 });
 
 test('the card is where a person opens it and approves it', () => {
-  assert.match(blockSrc, /Open \{pack\.filename\}/);
+  assert.match(blockSrc, /Open \{doc\.label\}/);
+  assert.match(blockSrc, /label: pack\.filename/);
   assert.match(blockSrc, /Approve for sending/);
-  assert.match(blockSrc, /Not this one/);
   assert.match(blockSrc, /"\/api\/put-forward"/);
   assert.match(blockSrc, /method: "PATCH"/);
   assert.match(blockSrc, /packApprovalSentence/);
-  // Ruling one out costs a reason, like every other discard on Today.
-  assert.match(blockSrc, /reason\.trim\(\)\.length < 3/);
+  // "Not this one" is words in the one Ask now: the case is rebound and the
+  // approval cleared (case-ask.ts), rather than a second button with a reason box.
+  assert.doesNotMatch(blockSrc, /Not this one/);
 });
 
 test('the Send review is told about the pack, and only an approved one arrives ticked-able', () => {

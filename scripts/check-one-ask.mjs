@@ -171,6 +171,106 @@ test('the recipient\'s own name never binds a worker', () => {
   assert.match(caseAsk, /withoutRecipient\(text, ctx\.who\)/);
 });
 
+// ── slice B: the team's decision, not a radio list or a wall of ids ─────────
+
+const decisionHelpers = load('src/lib/data/case-decision.ts');
+const todayScreen = read('src/components/modules/today-screen.tsx');
+const todayMissions = read('src/components/modules/today-missions.tsx');
+const decisionBlock = read('src/components/modules/case-decision.tsx');
+const nextMove = read('src/lib/data/next-move.ts');
+const sendReview = read('src/components/modules/send-from-triangle.tsx');
+const leadMatch = read('src/lib/data/lead-match.ts');
+
+// Bob's real write-up on Oliver Hall's card, 18 September.
+const BOB_ON_OLIVER = `Status on Ask Bob “we should use matej and add attachment” (Oliver Hall · Automation Engineer - PLC Commissioning · lead c74e1ccd-d433-4a34-882f-ffefe70619f1):
+
+Already done in Gmail (no further send from Bob).
+
+Evidence
+- Matej = anonymised CV #244 / M.P. (Triangle_Services_CV_244_MP.pdf, Drive 1_wpvuPFgKcSsCaP7KBxnGP7GnQcoPmhs). Named file also exists as Triangle_Services_CV_Matej_Plesivcak.pdf (Drive 1TVxRJs4bj9uKw0MWRjzUW8y1G6rb3jCJ) — not used in the send.
+- Thread 1a0ae1c9394c47a0 · subject “Re: Automation Engineer - PLC commissioning engineer — USA”
+- Oliver asked for the profile 2026-09-17T10:07:55Z (oliver.hall@g2recruitment.com).
+- Sent 2026-09-18T07:35:05Z from nikola.kralj@triangle-services.com with PDF attachment Triangle_Services_CV_244_MP.pdf.
+
+This Ask Bob wake arrived ~5 minutes after that send (assignment at 2026-09-18T07:39:50Z).
+
+Human decision only if you meant the named Matej PDF instead of anonymised CV #244 — say so and Bob can draft a correction follow-up (will not send). Otherwise: wait for Oliver’s reply; no further outbound needed.
+
+Bob did not send, publish, delete, or archive anything on this wake.`;
+
+test('a report loses its machinery: no uuids, no Drive or thread ids, dates a person reads', () => {
+  const clean = decisionHelpers.humaniseReport(BOB_ON_OLIVER);
+  assert.doesNotMatch(clean, /[0-9a-f]{8}-[0-9a-f]{4}-/);
+  assert.doesNotMatch(clean, /1_wpvuPF|1TVxRJs4/);
+  assert.doesNotMatch(clean, /1a0ae1c9394c47a0/);
+  assert.doesNotMatch(clean, /T\d{2}:\d{2}:\d{2}Z/);
+  assert.match(clean, /17 Sep 10:07/);
+  assert.match(clean, /\(Oliver Hall · Automation Engineer - PLC Commissioning\)/);
+  assert.match(clean, /\(Triangle_Services_CV_244_MP\.pdf\)/);
+  assert.doesNotMatch(clean, /\(\s*\)|,\s*\)/);
+  // Hanna's own shape: "for M.P. (worker 174ef973-…) vs PLC commissioning".
+  assert.equal(
+    decisionHelpers.humaniseReport('Anonymised bio check for M.P. (worker 174ef973-2f41-4e49-b40a-10cd1730a644) vs PLC commissioning'),
+    'Anonymised bio check for M.P. vs PLC commissioning',
+  );
+});
+
+test('In progress and Done show the decision lines, not the raw report', () => {
+  assert.match(todayMissions, /reportOpening\(wait\.lastAgentBody\)/);
+  assert.match(todayMissions, /reportOpening\(item\.lastAgentBody \|\| item\.resultSummary\)/);
+});
+
+test('the opening lines are the decision and the one thing to do, not the echo or the evidence', () => {
+  const opening = decisionHelpers.reportOpening(BOB_ON_OLIVER);
+  assert.match(opening, /^Already done in Gmail/);
+  assert.match(opening, /Human decision only if/);
+  assert.doesNotMatch(opening, /Status on Ask Bob|Evidence|wake arrived|did not send, publish/);
+});
+
+test('the form comes with its reason', () => {
+  assert.match(
+    decisionHelpers.formSentence('bio_anonymised', 'g2 Recruitment'),
+    /anonymised bio — g2 Recruitment is an agency, so the name stays with us/,
+  );
+  assert.match(decisionHelpers.formSentence('full_cv', 'g2 Recruitment'), /a person released the name/);
+  assert.match(decisionHelpers.formSentence('short_bio', null), /short anonymised bio/);
+  assert.equal(decisionHelpers.othersSentence(['Igor Pejkovic', 'Nikola Kralj']), 'Igor Pejkovic and Nikola Kralj');
+  assert.equal(decisionHelpers.othersSentence(['A', 'B', 'C', 'D', 'E']), 'A, B, C and 2 more');
+});
+
+test('the card shows the team\'s decision instead of a radio list, a pool search and Bob\'s wall', () => {
+  assert.match(todayScreen, /<CaseDecision/);
+  assert.doesNotMatch(todayScreen, /type="radio"|today-offering|Someone else in the pool|EmployeePrepared|PutForwardBlock/);
+  assert.doesNotMatch(todayScreen, /Copy pitch|Copy what they wrote/);
+  assert.match(todayMissions, /<CaseDecision/);
+  assert.equal(fs.existsSync(path.resolve(root, 'src/components/modules/put-forward-block.tsx')), false);
+  // Others who fit are named, never offered as controls; switching is words.
+  assert.match(decisionBlock, /Also fit:/);
+  assert.match(decisionBlock, /in Ask to switch/);
+  assert.doesNotMatch(decisionBlock, /type="radio"|<select/);
+  // Nobody is asked to pick.
+  assert.doesNotMatch(nextMove, /pick who to put forward/);
+});
+
+// ── slice C: Send decided, not picked ────────────────────────────────────────
+
+test('the Send review has no radio list, and the From address is where they wrote', () => {
+  assert.doesNotMatch(sendReview, /type="radio"|Who the reply is about|Someone else in the pool/);
+  assert.match(sendReview, /senders\.find\(\(box\) => box\.id === replyFrom\)/);
+  // A choice appears only when Triangle cannot tell.
+  assert.match(sendReview, /!decided && senders\.length > 1 \?/);
+  assert.match(sendReview, /the address \{target\.who\} wrote to/);
+  assert.match(todayScreen, /replyFrom=\{action\.receivedIn \?\? null\}/);
+  assert.match(leadMatch, /from\("inbound_emails"\)/);
+  assert.match(leadMatch, /mail_account_id/);
+});
+
+test('the approved document goes with the reply; the server still re-reads the approval', () => {
+  assert.match(sendReview, /useState\(canAttach\)/);
+  assert.match(sendReview, /attachPack: attach && canAttach/);
+  assert.match(read('src/lib/data/mail-send.ts'), /approvedPackForSend\(/);
+});
+
 test('the law this implements is written where coding agents read it', () => {
   assert.match(rules, /Employees, not buttons/);
   assert.match(rules, /more primary buttons than it removes/);

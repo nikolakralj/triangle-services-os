@@ -312,15 +312,18 @@ test('docs lock the handoff rule and commercial_follow_through', () => {
   assert.match(execution, /commercial_follow_through/);
 });
 
-test('Today keeps the Now card when Bob has the case; Bob wrote in Triangle is on it', () => {
+test('Today keeps the Now card when Bob has the case; what Bob wrote is in the team\'s decision', () => {
   assert.match(todayScreen, /nowShowCard/);
-  assert.match(todayScreen, /EmployeePrepared/);
-  assert.match(todayScreen, /Nothing is in the Triangle thread yet/);
-  assert.match(todayScreen, /Copy what they wrote/);
   assert.doesNotMatch(todayScreen, /Nothing needs you on this case/);
-  assert.match(todayScreen, /Who we put forward/);
-  assert.match(todayScreen, /today-offering/);
-  assert.match(todayScreen, /Someone else in the pool/);
+  // One decision block instead of Bob's wall, Hanna's block and a radio list
+  // over the pool ("Employees, not buttons", 18 September).
+  assert.match(todayScreen, /<CaseDecision/);
+  assert.match(todayScreen, /chase=\{chase\}/);
+  assert.match(todayScreen, /body: nowWait\.lastAgentBody/);
+  assert.doesNotMatch(todayScreen, /EmployeePrepared|today-offering|Someone else in the pool|type="radio"/);
+  const decision = read('src/components/modules/case-decision.tsx');
+  assert.match(decision, /has not written in the Triangle thread yet/);
+  assert.match(decision, /reportOpening/);
 });
 
 test('Done follow-through matches the same lead/contact as the card', () => {

@@ -859,21 +859,32 @@ and its reason back on the card.
   the bio / short bio / CV radio, the drawer's Ask Hanna block, and
   `ask-hanna-action.tsx`. `/api/ask/bob` and `/api/ask/hanna` stay as
   internal paths.
-- **B — The team's decision instead of a radio list. NEXT.** Replace "Who we
-  put forward" radios, the pool search box and the "Bob prepared" wall with
-  one decision block: who we propose and why (Hanna's bound worker when her
-  case exists, else Triangle's top match, labelled as Triangle's pick until
-  she checks), in which form and why (an agency gets the anonymised bio), what
-  is not known yet, and the document to open. Bob's write-up shows its first
-  lines with ids stripped; the rest folds under Evidence. Approve stays one
-  button on the document (DEV-022's gate), "Not this one" becomes words in the
-  Ask. Same block on follow-up cards.
-- **C — Send decided, not picked. NEXT.** In the Send review: drop "Who the
-  reply is about" radios and the pool search (the decision block already says
-  it); pick the From address by rule — the mailbox the conversation is in,
-  said in words — instead of a select; attach the approved document named in
-  one line. Demote Open mail to a link; drop Copy pitch and "Copy what they
-  wrote".
+- **B — The team's decision instead of a radio list. DONE on the branch (not
+  merged).** `CaseDecision` (`src/components/modules/case-decision.tsx`) on
+  the hero and on follow-up cards replaces the "Who we put forward" radios,
+  the pool search, Bob's wall and Hanna's separate block: "We propose M. P. —
+  role. Matej … on our books." (Hanna's bound person when she has the case,
+  otherwise Triangle's top match, said as not checked yet), "Why: …", "As an
+  anonymised bio — <agency> is an agency, so the name stays with us until
+  there is an engagement", "Not known yet: …", Open the document, one
+  "Approve for sending", "Also fit: … Say “use Luka” in Ask to switch", then
+  what Bob and Hanna wrote as their opening lines with ids stripped
+  (`humaniseReport` / `reportOpening` in `src/lib/data/case-decision.ts`) and
+  "Read all". While Hanna is still checking, the document is marked as
+  Triangle's own record. "Not this one" is words in the Ask. The headline no
+  longer says "pick who to put forward". In progress and Done since you
+  looked show the same opening lines instead of raw reports.
+  `put-forward-block.tsx` is gone and Today no longer loads the pool list.
+- **C — Send decided, not picked. DONE on the branch (not merged).** The Send
+  review has no "Who the reply is about" radios and no pool search. The From
+  address is the mailbox the requisition arrived in (`job_leads` →
+  `inbound_emails.mail_account_id`, carried as `receivedIn` from
+  `lead-match.ts`), said as "— the address <who> wrote to"; a choice appears
+  only when Triangle cannot tell. The approved document goes with the reply by
+  default and is named; untick to send the reply alone; the server still
+  re-reads the approval (`approvedPackForSend`). On the channel bar Send is
+  the one button; Open mail is a quiet link, or the button when the person has
+  no sending mailbox. Copy pitch and "Copy what they wrote" are gone.
 - **D — Employees start by themselves. LATER.** When an agency requirement
   arrives, open Hanna's put-forward job and Bob's reply draft without a click,
   so the card arrives already decided. Needs the wake-up cost and the bots'
@@ -884,7 +895,7 @@ one Ask; the answer comes back on the card as a decision with its reason; they
 approve the document and press Send — without choosing an employee, a form or
 a candidate from a control, and with fewer primary buttons than before.
 
-**Checks:** `npm run check:one-ask` (16/16 at slice A). `check:ask-hanna`,
+**Checks:** `npm run check:one-ask` (23/23 at slices A–C; 16/16 at slice A). `check:ask-hanna`,
 `check:dev-015` and `check:today-slim` were updated from the old buttons to
 the one Ask. No migration and no SQL. Triangle still sends nothing.
 

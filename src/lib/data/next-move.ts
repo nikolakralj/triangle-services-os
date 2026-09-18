@@ -45,6 +45,8 @@ export interface NextMoveAction {
   offering?: OfferWorker;
   /** Other people on the books who also fit, so the first match is not locked. */
   candidates?: OfferWorker[];
+  /** The mailbox the requisition arrived in; the reply goes out from it when it is yours. */
+  receivedIn?: string | null;
   personName: string;
   personRole: string | null;
   company: string | null;
@@ -185,8 +187,10 @@ export async function getNextMove(
           ? `They sent this role ${best.copies} times — one reply covers every copy.`
           : null,
         `${who.name} fits it: ${who.why}.`,
+        // The team proposes; the person judges. Nobody is asked to pick from
+        // a list ("Employees, not buttons", 18 September).
         people > 1
-          ? `${people} people on the books fit it — pick who to put forward.`
+          ? `${people - 1} more on the books ${people - 1 === 1 ? "fits" : "fit"} it too.`
           : null,
         others > 0
           ? `${others} more open ${others === 1 ? "role" : "roles"} behind this one.`
@@ -214,6 +218,7 @@ export async function getNextMove(
           best.country ? ` — ${best.country}` : ""
         }`,
         history: [],
+        receivedIn: best.receivedIn,
         offering: {
           name: who.name,
           role: who.role,

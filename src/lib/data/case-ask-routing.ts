@@ -68,7 +68,7 @@ const ASKS_FOR_WORK = /\b(prepare|make|build|find|propos(e|al)|use|pick|choose|a
  * Which halves of the case the words ask for.
  *
  * `namesSomeoneOnTheBooks` is set by the server when the words name a person
- * Triangle holds ("use Matej"): choosing who goes forward is Hanna's half
+ * Triangle holds ("use Luka"): choosing who goes forward is Hanna's half
  * even when no CV word was used.
  */
 export function routeCaseAsk(

@@ -40,7 +40,8 @@ import {
   type HandoffIds,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
-import { PutForwardBlock } from "@/components/modules/put-forward-block";
+import { CaseDecision } from "@/components/modules/case-decision";
+import { reportOpening } from "@/lib/data/case-decision";
 import type { PutForwardCase } from "@/lib/data/put-forward";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
@@ -271,27 +272,25 @@ function followUpCaseRef(item: FollowUp, who: string): CaseRef {
   };
 }
 
+/** The team's decision on who we put forward — the newest case, in words. */
 function PutForwardOnCard({
   ids,
   putForward,
   caseRef,
+  agency,
 }: {
   ids: HandoffIds[];
   putForward: PutForwardCase[];
   caseRef: CaseRef;
+  /** Set only when the case came in as an agency's requisition. */
+  agency: string | null;
 }) {
   const items = findAllMatching(putForward, ids);
   if (items.length === 0) return null;
+  const newest = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   return (
-    <div className="mt-2 space-y-2">
-      {items.map((item) => (
-        <PutForwardBlock
-          key={item.assignmentId}
-          item={item}
-          caseRef={caseRef}
-          tone="light"
-        />
-      ))}
+    <div className="mt-2">
+      <CaseDecision tone="light" caseRef={caseRef} putForward={newest} pick={null} agency={agency} />
     </div>
   );
 }
@@ -389,6 +388,7 @@ function FollowUpGroup({
               ids={items.map(followUpIds)}
               putForward={putForward}
               caseRef={followUpCaseRef(first, who)}
+              agency={first.target.leadId ? first.company : null}
             />
             <EmailCardActions
               target={emailTarget}
@@ -617,6 +617,7 @@ function FollowUpRow({
               ids={[followUpIds(item)]}
               putForward={putForward}
               caseRef={followUpCaseRef(item, who)}
+              agency={item.target.leadId ? item.company : null}
             />
             <EmailCardActions
               target={followUpEmailTarget(item, who)}
@@ -995,9 +996,10 @@ export function InProgressWaits({
                 {wait.withLabel}
                 {wait.status === "active" ? " · working" : " · queued"}
               </p>
-              {wait.lastAgentBody && (
+              {/* The decision lines, ids stripped — the rest is in the thread. */}
+              {reportOpening(wait.lastAgentBody) && (
                 <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-slate-600">
-                  {wait.lastAgentBody}
+                  {reportOpening(wait.lastAgentBody)}
                 </p>
               )}
             </div>
@@ -1177,9 +1179,9 @@ export function DoneSince({
               <span className="mt-0.5 block text-[12px] text-slate-500" suppressHydrationWarning>
                 {item.agentName} finished · {ago(item.completedAt)}
               </span>
-              {(item.lastAgentBody || item.resultSummary) && (
+              {reportOpening(item.lastAgentBody || item.resultSummary) && (
                 <span className="mt-1 block line-clamp-2 text-[12.5px] leading-snug text-slate-600">
-                  {item.lastAgentBody || item.resultSummary}
+                  {reportOpening(item.lastAgentBody || item.resultSummary)}
                 </span>
               )}
             </span>

@@ -5,7 +5,7 @@ import { listWhatCameBack } from "@/lib/data/came-back";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
-import { listAttachableWorkers, listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
+import { listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
 import { listCertAlerts } from "@/lib/data/worker-documents";
 import { getSession } from "@/lib/auth/session";
 import { sendableMailboxesFor } from "@/lib/data/mail-send";
@@ -51,7 +51,6 @@ export default async function DecisionsPage() {
     done,
     certAlerts,
     senders,
-    pool,
     putForward,
   ] = await Promise.all([
     getNextMove(org),
@@ -64,11 +63,9 @@ export default async function DecisionsPage() {
     listDoneSince(org),
     listCertAlerts(org),
     // Send from Triangle (DEV-013): every address this person may send from,
-    // or none — then the card keeps Open mail only. More than one is a real
-    // choice on the card, because a personal address and a company one say
-    // different things to whoever receives the message.
+    // or none — then the card keeps Open mail only. The reply leaves from the
+    // address the recruiter wrote to when it is one of these.
     sendableMailboxesFor(org, session.userId),
-    listAttachableWorkers(org),
     // Hanna's half of an open case: who we put forward, and in which form.
     listPutForwardCases(org),
   ]);
@@ -110,7 +107,6 @@ export default async function DecisionsPage() {
         certs={certs}
         sender={senders[0] ?? null}
         senders={senders}
-        pool={pool}
         putForward={putForward}
       />
     </div>

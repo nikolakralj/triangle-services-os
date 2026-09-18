@@ -25,7 +25,7 @@ import {
 import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
-import type { AttachableWorker, DoneItem } from "@/lib/data/today-in-progress";
+import type { DoneItem } from "@/lib/data/today-in-progress";
 import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
 import { CertExceptions } from "@/components/modules/today-certs";
 import type { CertAlertRow } from "@/lib/data/worker-documents";
@@ -45,7 +45,7 @@ import {
   type InProgressWait,
 } from "@/lib/data/today-handoff";
 import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
-import { PutForwardBlock } from "@/components/modules/put-forward-block";
+import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -110,7 +110,6 @@ export function TodayScreen({
   certs = [],
   sender = null,
   senders = [],
-  pool = [],
   putForward = [],
 }: {
   move: NextMove;
@@ -132,8 +131,6 @@ export function TodayScreen({
   sender?: { id: string; emailAddress: string } | null;
   /** Every address this person may send from, when they own more than one. */
   senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
-  /** People on the books a human may attach as an anonymised profile. */
-  pool?: AttachableWorker[];
   /** Open and recently finished "who we put forward" cases (Hanna's half). */
   putForward?: PutForwardCase[];
 }) {
@@ -214,7 +211,6 @@ export function TodayScreen({
               done={done}
               sender={sender}
               senders={senders}
-              pool={pool}
               putForward={putForward}
             />
           ) : (
@@ -487,7 +483,6 @@ function NowCard({
   done,
   sender,
   senders,
-  pool,
   putForward,
 }: {
   move: NextMove;
@@ -496,7 +491,6 @@ function NowCard({
   done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
   senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
-  pool: AttachableWorker[];
   putForward: PutForwardCase[];
 }) {
   if (move.clear || !move.action) {
@@ -528,7 +522,6 @@ function NowCard({
         done={done}
         sender={sender}
         senders={senders}
-        pool={pool}
         putForward={putForward}
       />
     </div>
@@ -556,7 +549,6 @@ function ActionPanel({
   done,
   sender,
   senders,
-  pool,
   putForward,
 }: {
   action: NextMoveAction;
@@ -566,46 +558,54 @@ function ActionPanel({
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
   senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
-  pool: AttachableWorker[];
   /** Hanna's who-we-put-forward cases, matched to this case below. */
   putForward: PutForwardCase[];
 }) {
   const router = useRouter();
-  const [copied, setCopied] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [logging, setLogging] = useState<ContactOutcome | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [workerId, setWorkerId] = useState(action.offering?.workerId ?? "");
-  const [poolQuery, setPoolQuery] = useState("");
-
   const isPhone = action.channelKind === "phone";
   const outcomes = outcomesFor(action.channelKind);
+  const putForwardHere = putForward.filter((item) =>
+    matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
+  );
+  // The newest who-we-put-forward case on this card — the one an Ask rebinds.
+  const hannaCase =
+    [...putForwardHere].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+  const candidates = action.candidates ?? [];
+  // Who the reply is about is the team's decision: Hanna's person when she has
+  // the case, otherwise Triangle's own top match. Changing it is words in Ask.
+  const decidedId = hannaCase?.pack?.workerId ?? action.offering?.workerId ?? "";
+  const decidedOffer: OfferWorker | null =
+    candidates.find((c) => c.workerId === decidedId) ??
+    (action.offering?.workerId === decidedId ? action.offering : null) ??
+    null;
+  const pick = decidedOffer ?? (hannaCase ? null : (action.offering ?? null));
+  const draftFor = (offer: OfferWorker | null) =>
+    offer && offer.workerId !== action.offering?.workerId
+      ? rewriteBackground(action.script ?? "", offer.why)
+      : (action.script ?? "");
+
   // A written message can be changed before it goes; what is in the box is
-  // what Copy, Open mail and Sent use. A call script is only read out.
-  const [words, setWords] = useState(action.script ?? "");
-  const [autoWords, setAutoWords] = useState(action.script ?? "");
+  // what Open mail and Send use. A call script is only read out.
+  const [words, setWords] = useState(() => draftFor(decidedOffer));
+  const [autoWords, setAutoWords] = useState(() => draftFor(decidedOffer));
+  // When the team's decision changes under an untouched draft, the draft follows.
+  const [wordsFor, setWordsFor] = useState(decidedId);
+  if (wordsFor !== decidedId) {
+    setWordsFor(decidedId);
+    if (words === autoWords) {
+      const next = draftFor(decidedOffer);
+      setWords(next);
+      setAutoWords(next);
+    }
+  }
   const outgoing = isPhone ? (action.script ?? "") : words;
   const about = [action.personRole, action.country ? `in ${action.country}` : null]
     .filter(Boolean)
     .join(" ");
-  const offeringFromPool = workerId
-    ? pool.find((p) => p.workerId === workerId)
-    : null;
-  const offering: OfferWorker | null =
-    (action.candidates ?? []).find((c) => c.workerId === workerId) ??
-    (offeringFromPool
-      ? {
-          workerId: offeringFromPool.workerId,
-          name: offeringFromPool.name,
-          role: offeringFromPool.role,
-          why: "",
-          caveats:
-            offeringFromPool.status === "candidate" ? ["on file as a candidate"] : [],
-        }
-      : null) ??
-    action.offering ??
-    null;
   const sendTarget = {
     to: action.value,
     subject: action.subject,
@@ -614,8 +614,7 @@ function ActionPanel({
     who: action.personName,
     leadId: action.leadId,
     contactId: action.contactId || undefined,
-    workerId: workerId || undefined,
-    candidates: action.candidates,
+    workerId: decidedId || undefined,
   };
   const nowWait = findWait(waits, {
     leadId: action.leadId,
@@ -631,22 +630,32 @@ function ActionPanel({
     leadId: action.leadId,
     contactId: action.contactId || null,
   };
-  const putForwardHere = putForward.filter((item) =>
-    matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
-  );
   // What the Send review may offer to attach: an approved pack on this case,
   // or the nearest one so the review can say what is still missing.
   const attachable = attachablePackFrom(putForwardHere);
 
-  function pickWorker(nextId: string, next: OfferWorker | null) {
-    setWorkerId(nextId);
-    if (!next) return;
-    if (words === autoWords) {
-      const rewritten = rewriteBackground(autoWords, next.why);
-      setWords(rewritten);
-      setAutoWords(rewritten);
-    }
-  }
+  // Bob's half of the case, as the decision block reads it.
+  const chase: DecisionChase | null = nowWait
+    ? {
+        assignmentId: nowWait.assignmentId,
+        agentName: nowWait.agentName,
+        title: nowWait.title,
+        body: nowWait.lastAgentBody,
+        working: true,
+        messageCount: nowWait.messageCount,
+        awaitingAgent: nowWait.awaitingAgent,
+      }
+    : nowDone
+      ? {
+          assignmentId: nowDone.assignmentId,
+          agentName: nowDone.agentName,
+          title: nowDone.title,
+          body: nowDone.lastAgentBody || nowDone.resultSummary,
+          working: false,
+          messageCount: nowDone.messageCount,
+          awaitingAgent: nowDone.awaitingAgent,
+        }
+      : null;
 
   async function log(outcome: ContactOutcome) {
     setLogging(outcome);
@@ -714,8 +723,9 @@ function ActionPanel({
           </a>
         ) : (
           <>
-            {/* Review / edit / Send in Triangle (DEV-013). Only for a person
-                whose own mailbox has sending on; Open mail stays regardless. */}
+            {/* Review / edit / Send in Triangle (DEV-013). Open mail is the
+                primary way out only for a person with no sending mailbox;
+                otherwise it is a quiet link beside Send. */}
             <SendFromTriangleButton
               target={sendTarget}
               sender={sender}
@@ -727,198 +737,37 @@ function ActionPanel({
             />
             <a
               href={mailtoHref(action.value, action.subject, outgoing)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
+              className={
+                sender
+                  ? "text-[12.5px] font-medium text-slate-300 underline-offset-2 transition hover:text-white hover:underline"
+                  : "inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400"
+              }
             >
-              <Mail className="h-3.5 w-3.5" />
-              Open mail
+              {!sender && <Mail className="h-3.5 w-3.5" />}
+              {sender ? "or open in your mail" : "Open mail"}
             </a>
           </>
-        )}
-        {action.script && (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(outgoing);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              } catch {
-                setError("Could not reach the clipboard.");
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3.5 py-2 text-[13px] font-medium text-slate-200 transition hover:bg-white/10"
-          >
-            {copied ? (
-              <Check className="h-3.5 w-3.5 text-emerald-400" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-            {copied ? "Copied" : "Copy pitch"}
-          </button>
         )}
       </div>
 
       <div className="space-y-4 px-6 py-5">
-        <EmployeePrepared wait={nowWait} done={nowDone} />
-
-        {/* Hanna's half, on the same case. The handoff changed the owner of
-            who we put forward; it did not move the work anywhere else. */}
-        {putForwardHere.map((item) => (
-          <PutForwardBlock
-            key={item.assignmentId}
-            item={item}
-            caseRef={caseRef}
-            onPickWorker={(id) => {
-              const named = (action.candidates ?? []).find((c) => c.workerId === id);
-              const fromPool = pool.find((p) => p.workerId === id);
-              pickWorker(
-                id,
-                named ??
-                  (fromPool
-                    ? {
-                        workerId: fromPool.workerId,
-                        name: fromPool.name,
-                        role: fromPool.role,
-                        why: "",
-                        caveats:
-                          fromPool.status === "candidate"
-                            ? ["on file as a candidate"]
-                            : [],
-                      }
-                    : null),
-              );
-            }}
-          />
-        ))}
-
-        {(offering || (action.candidates && action.candidates.length > 0) || pool.length > 0) && (
-          <div>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-400">
-              Who we put forward
-            </p>
-            <div className="mt-2 space-y-1">
-              {(action.candidates ?? []).map((c) => (
-                <label
-                  key={c.workerId}
-                  className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
-                >
-                  <input
-                    type="radio"
-                    name="today-offering"
-                    checked={workerId === c.workerId}
-                    onChange={() => pickWorker(c.workerId, c)}
-                    className="mt-1.5"
-                  />
-                  <span>
-                    <span className="text-[14px] font-semibold text-white">{c.name}</span>
-                    {c.role && (
-                      <span className="ml-2 text-[13px] font-normal text-slate-400">{c.role}</span>
-                    )}
-                  </span>
-                </label>
-              ))}
-              {poolQuery.trim().length >= 2 &&
-                pool
-                  .filter((p) => {
-                    if ((action.candidates ?? []).some((c) => c.workerId === p.workerId)) {
-                      return false;
-                    }
-                    const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
-                    return hay.includes(poolQuery.trim().toLowerCase());
-                  })
-                  .slice(0, 8)
-                  .map((p) => (
-                    <label
-                      key={p.workerId}
-                      className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
-                    >
-                      <input
-                        type="radio"
-                        name="today-offering"
-                        checked={workerId === p.workerId}
-                        onChange={() =>
-                          pickWorker(p.workerId, {
-                            workerId: p.workerId,
-                            name: p.name,
-                            role: p.role,
-                            why: "",
-                            caveats:
-                              p.status === "candidate" ? ["on file as a candidate"] : [],
-                          })
-                        }
-                        className="mt-1.5"
-                      />
-                      <span>
-                        <span className="text-[14px] font-semibold text-white">{p.name}</span>
-                        {p.role && (
-                          <span className="ml-2 text-[13px] font-normal text-slate-400">
-                            {p.role}
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-            </div>
-            {pool.length > 0 && (
-              <label className="mt-2 block">
-                <span className="text-[12px] text-slate-500">
-                  Someone else in the pool — type two letters
-                </span>
-                <input
-                  value={poolQuery}
-                  onChange={(e) => setPoolQuery(e.target.value)}
-                  placeholder="Name or role"
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-slate-100 placeholder-slate-600 focus:border-white/25 focus:outline-none"
-                />
-              </label>
-            )}
-            {offering && (
-              <>
-                {offering.why ? (
-                  <p className="mt-2 text-[13px] leading-relaxed text-slate-400">{offering.why}</p>
-                ) : null}
-                {offering.caveats.length > 0 && (
-                  <ul className="mt-2.5 space-y-1">
-                    {offering.caveats.map((c) => (
-                      <li
-                        key={c}
-                        className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
-                      >
-                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        <CaseDecision
+          tone="dark"
+          caseRef={caseRef}
+          putForward={hannaCase}
+          pick={pick}
+          others={candidates}
+          agency={action.leadId ? action.company : null}
+          chase={chase}
+        />
 
         {reviewing && sender && !isPhone && (
           <SendFromTriangleReview
             target={sendTarget}
             sender={sender}
             senders={senders}
-            pool={pool}
+            replyFrom={action.receivedIn ?? null}
             pack={attachable}
-            onPickWorker={(id) => {
-              const next =
-                (action.candidates ?? []).find((c) => c.workerId === id) ??
-                (() => {
-                  const p = pool.find((w) => w.workerId === id);
-                  return p
-                    ? {
-                        workerId: p.workerId,
-                        name: p.name,
-                        role: p.role,
-                        why: "",
-                        caveats: p.status === "candidate" ? ["on file as a candidate"] : [],
-                      }
-                    : null;
-                })();
-              pickWorker(id, next);
-            }}
             onCancel={() => setReviewing(false)}
             onSent={(sent) => {
               setReviewing(false);
@@ -1047,63 +896,6 @@ function rewriteBackground(script: string, why: string): string {
     return script.replace(/Relevant background:.*?(?=\n|$)/, line);
   }
   return script;
-}
-
-/**
- * What the employee wrote in Triangle on this case. A chat outside Triangle
- * is not this record — if they only wrote there, the card says so.
- */
-function EmployeePrepared({
-  wait,
-  done,
-}: {
-  wait: InProgressWait | null;
-  done: DoneItem | null;
-}) {
-  const [copied, setCopied] = useState(false);
-  const follow = wait ?? done;
-  if (!follow) return null;
-  const body = wait
-    ? wait.lastAgentBody ?? ""
-    : done?.lastAgentBody || done?.resultSummary || "";
-  const name = wait?.agentName ?? done?.agentName ?? "the team";
-  const label = wait ? wait.withLabel : `${name} prepared`;
-
-  return (
-    <div className="rounded-xl border border-sky-400/30 bg-sky-400/[0.07] p-3.5">
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">
-        {label}
-      </p>
-      {body ? (
-        <>
-          <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-slate-200">
-            {body}
-          </pre>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(body);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              } catch {
-                /* clipboard may be blocked; the text is already on the card */
-              }
-            }}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[12px] font-medium text-slate-200 transition hover:bg-white/10"
-          >
-            {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-            {copied ? "Copied" : "Copy what they wrote"}
-          </button>
-        </>
-      ) : (
-        <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
-          Nothing is in the Triangle thread yet. Open thread — a chat outside
-          Triangle is not the record.
-        </p>
-      )}
-    </div>
-  );
 }
 
 // ── 04 · BACK FROM THE TEAM ─────────────────────────────────────────────────

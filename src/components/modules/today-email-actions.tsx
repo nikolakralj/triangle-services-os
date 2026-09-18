@@ -144,7 +144,7 @@ export const EMAIL_CARD_NOTE =
   "Ask says what you want — the team decides who takes it, and the answer comes back on this card. Nothing leaves Triangle until you press Send.";
 
 const ASK_PLACEHOLDER =
-  "Say what you want — “propose Matej as a bio”, “did Oliver answer?”, “follow up on Saxony, don't send”.";
+  "Say what you want — “propose the best fit as a bio”, “did they answer?”, “use Luka instead”, “follow up, don't send yet”.";
 
 function caseRefOf(target: EmailCardTarget): CaseRef {
   return {
