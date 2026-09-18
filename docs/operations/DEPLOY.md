@@ -1,6 +1,6 @@
 # Deploy and release
 
-Updated 15 September 2026. Steps marked **CEO** need a person with the accounts
+Updated 18 September 2026. Steps marked **CEO** need a person with the accounts
 or the secrets. An AI assistant never does them and never sees the values.
 
 Production: https://triangle-services-os.vercel.app · branch `main` (the
@@ -66,11 +66,12 @@ configuration into a signed-in demo session.
 ## Database migrations — CEO approves each one
 
 Migrations live in `supabase/migrations/` and run through
-`051_mailbox_space.sql` (049 is on the live database as of 17 September;
-050 and 051 wait for the CEO). Because every environment shares one database,
-a migration is applied only after the CEO approves that migration. After any
-column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
-against the live organization.
+`051_mailbox_space.sql` (049 applied 17 September; 050 and 051 applied
+18 September, `NOTIFY` after confirm; first-apply of 051 stamped 38/38
+existing `job_leads` into the shared space). Because every environment shares
+one database, a migration is applied only after the CEO approves that
+migration. After any column or enum change run `NOTIFY pgrst, 'reload schema';`.
+Never run seed files against the live organization.
 
 ## Badges — the CEO mints them
 
@@ -158,35 +159,40 @@ refused send is written to the refusal ledger and shown as "Not sent. <reason>";
 it is never recorded as sent. Employees (AI) have no path to this: `/api/mail/send`
 refuses every badge and the MCP key before reading the body.
 
-## Mailbox-observed sent / replied — CEO applies 050
+## Mailbox-observed sent / replied — 050 applied; code still PR #29
 
 After job-intake classify, sync reads INBOX and Sent (envelopes only, no LLM)
 and writes the commercial ledger when outgoing mail or a reply is already in
 the connected mailbox. Today does not ask a person to press Sent or They
 replied. Nothing is sent.
 
-1. Approve and apply `050_mailbox_observe.sql` (adds `in_reply_to`,
-   `references_header`, `folder` on `inbound_emails`, and `outbound_thread_id`
-   on `outreach_drafts`; changes no rows), then `NOTIFY pgrst, 'reload schema';`.
+**Applied 18 September** on the live shared database (`in_reply_to`,
+`references_header`, `folder` on `inbound_emails`; `outbound_thread_id` on
+`outreach_drafts`; `NOTIFY` after confirm). Code is in PR #29, which also
+carries DEV-019. Production `/api/version` is still `a191b2b`. This agent
+cannot merge or promote.
+
+1. Merge PR #29 and promote the preview to Production.
 2. Sync now. A Gmail send to someone already on Today should leave
    ready-to-contact and become a follow-up; their reply should take the
    follow-up off Today.
 
-## Personal mailbox vs shared space — CEO applies 051
+## Personal mailbox vs shared space — 051 applied; code still PR #29
 
 Each person sees mail from their own connected inbox. Share puts a lead in
 the common space. Person Sync now reads only that person's mailbox; the
 scheduled job still reads every connected inbox. Sending is unchanged
 (DEV-013): optional, off by default, from that person's address.
 
-1. Apply `050_mailbox_observe.sql` first if it is not already on the database.
-2. Approve and apply `051_mailbox_space.sql` (adds `job_leads.shared_at` /
-   `shared_by`; first apply stamps existing leads into the shared space so
-   live follow-ups do not vanish; re-applying does not stamp new personal
-   leads), then `NOTIFY pgrst, 'reload schema';`.
-3. Each person connects their own mailbox in Settings. Sync now. Share a
-   lead from Today or Job Intake Mine to put it where the other person can
-   see it.
+**Applied 18 September.** First-apply backfill stamped 38/38 existing leads
+into the shared space (0 left personal). Re-applying does not stamp new
+personal leads.
+
+1. Merge PR #29 and promote (same PR as 050).
+2. Each person connects their own mailbox in Settings. Sync now (your inbox
+   only). Share a lead from Today or Job Intake Mine when the other person
+   should see it.
+3. Tick "Let me send from Triangle" only on the mailbox that should send.
 
 ## Mail from a bot into Job Intake
 

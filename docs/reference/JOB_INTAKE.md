@@ -70,7 +70,10 @@ Migrations: `013_job_intake.sql`, `014_mail_account_credentials.sql`,
 `027_organization_operating_profile.sql`, `049_send_from_triangle.sql`,
 `050_mailbox_observe.sql`, and `051_mailbox_space.sql`. Migrations through
 `020` are known applied to the live Supabase project. 049 is applied
-(17 September). 050 and 051 are written, not applied.
+(17 September). 050 and 051 are applied (18 September, `NOTIFY` after
+confirm). First-apply of 051 stamped 38/38 existing `job_leads` into the
+shared space (0 left personal). Re-applying does not stamp new personal
+leads. Code for personal vs shared is PR #29, not on Production.
 
 ## Files
 
