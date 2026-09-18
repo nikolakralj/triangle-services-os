@@ -419,7 +419,7 @@ test('a finished put-forward pack returns to the case, not the old reports list'
 });
 
 test('the thread composer says it messages the employee, and emails nobody', () => {
-  assert.match(threadSrc, /Message \{recipient\}/);
+  assert.match(threadSrc, /Message \{recipientPhrase\}/);
   assert.match(threadSrc, /Nothing is emailed/);
   assert.doesNotMatch(threadSrc, /^\s*Send\s*$/m);
   assert.match(drawerSrc, /composerHint/);
@@ -592,6 +592,7 @@ test('docs lock the review gate, the third version and the From picker', () => {
   assert.match(decisions, /A person opens it and approves it, or it does not go/);
   assert.match(decisions, /The server is the gate, not the browser/);
   assert.match(decisions, /An approval lapses when the employee answers after it/);
+  assert.match(decisions, /The drawer is a case, not a chat window/);
   assert.match(decisions, /short_bio/);
   const execution = read('ROADMAP_EXECUTION.md');
   assert.match(execution, /DEV-022/);

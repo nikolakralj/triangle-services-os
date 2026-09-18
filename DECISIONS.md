@@ -254,6 +254,13 @@ Law:
    mailbox and a company one is telling a recruiter something different with
    each. Triangle offers both and picks neither; with one address there is
    nothing to choose. The owner-only rule is unchanged, and no agent gets SMTP.
+9. **The drawer is a case, not a chat window.** It opens on the status read
+   from the record — queued and not picked up, working, answered and back with
+   you, or stopped — then the last word, with everything before it folded and
+   a long reply folded to its opening. The history stays complete and
+   reachable; it is just not the first thing in the way. Renaming the Send
+   button was half of this; a person still had to read a Grok write-up to the
+   end to learn whose move it was.
 
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 

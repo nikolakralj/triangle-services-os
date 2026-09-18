@@ -800,6 +800,10 @@ migration 042 (human review columns on an assignment).
 8. Today loads every address the signed-in person may send from; with more
    than one the Send review offers a From picker. The owner-only rule is
    unchanged.
+9. The thread drawer opens on a status read from the record (queued / working
+   / answered / stopped, with "not picked up yet" counted honestly), then the
+   last word; earlier messages are folded, and a reply longer than a screen
+   is folded to its opening with a way to read all of it.
 
 **Done 18 September (code).** `put-forward.ts` (approval law, `short_bio`),
 `anonymised-cv-filename.ts` (one filename for card and wire),
@@ -807,8 +811,10 @@ migration 042 (human review columns on an assignment).
 `approvedPackForSend`), `PATCH /api/put-forward`, `pack-attachment.ts`
 (replaces `anonymised-cv-attachment.ts`, builds the approved version),
 `mail-send.ts`, `send-from-triangle.tsx`, `put-forward-block.tsx`,
-`send-policy.ts` (`sendableMailboxes`). Checks: `npm run check:ask-hanna`
-36/36, `npm run check:dev-013` 32/32.
+`send-policy.ts` (`sendableMailboxes`), `case-work-status.ts` +
+`assignment-work.ts` + `assignment-thread.tsx` (the drawer's status and
+fold). Checks: `npm run check:ask-hanna` 37/37, `npm run check:dev-013`
+32/32, `npm run check:dev-015` 20/20.
 
 **No migration and no SQL.** The approval reuses migration 042's review
 columns, where "acknowledged" already means a person read it and agrees.

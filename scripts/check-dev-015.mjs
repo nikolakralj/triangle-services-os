@@ -185,6 +185,61 @@ test('Open thread is a right-side drawer on Today, reusing AssignmentThread', ()
   assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
 });
 
+// ── the drawer is a case, not a chat window (DEV-022) ──────────────────────
+
+const {
+  caseWorkState,
+  caseWorkSentence,
+  caseWorkIsYours,
+} = moduleLoader()('src/lib/data/case-work-status.ts');
+
+test('the status says whose move it is, and never claims a pickup that did not happen', () => {
+  assert.equal(caseWorkState({ status: 'queued', awaitingAgent: 1 }), 'queued');
+  assert.equal(caseWorkState({ status: 'active', awaitingAgent: 0 }), 'working');
+  assert.equal(caseWorkState({ status: 'completed', awaitingAgent: 0 }), 'answered');
+  assert.equal(caseWorkState({ status: 'cancelled', awaitingAgent: 0 }), 'stopped');
+
+  const queued = caseWorkSentence({ state: 'queued', agentName: 'Bob', awaitingAgent: 1 });
+  assert.match(queued, /Not picked up yet/);
+  assert.match(queued, /1 message not picked up yet/);
+  assert.match(
+    caseWorkSentence({ state: 'answered', agentName: 'Hanna', awaitingAgent: 0 }),
+    /Hanna answered\. It is back with you\./,
+  );
+
+  // The colour of the dot is the same judgement: answered and stopped are
+  // yours, queued and working are theirs.
+  assert.equal(caseWorkIsYours('answered'), true);
+  assert.equal(caseWorkIsYours('stopped'), true);
+  assert.equal(caseWorkIsYours('queued'), false);
+  assert.equal(caseWorkIsYours('working'), false);
+});
+
+test('the drawer opens on status and the last word, not a wall of everything', () => {
+  // Status comes from the record, through the same GET the thread already made.
+  const route = read('src/app/api/assignments/[id]/messages/route.ts');
+  assert.match(route, /getAssignmentWork/);
+  assert.match(route, /messages, work/);
+  const work = read('src/lib/data/assignment-work.ts');
+  assert.match(work, /caseWorkState/);
+  assert.match(work, /withLabelFor/);
+  assert.match(work, /agent_assignments/);
+
+  assert.match(thread, /function WorkStatus/);
+  assert.match(thread, /work\.statusLine/);
+  // Everything before the last message is folded; the last one is open.
+  assert.match(thread, /Earlier in this case/);
+  assert.match(thread, /messages\.slice\(0, -1\)/);
+  assert.match(thread, /latest/);
+  // A long reply is folded to its opening rather than printed whole.
+  assert.match(thread, /const LONG_REPLY = \d+/);
+  assert.match(thread, /Read all of it/);
+  // And it is still a case, not an email: the composer says so.
+  assert.match(thread, /Message \{recipientPhrase\}/);
+  assert.match(thread, /Nothing is emailed/);
+  assert.doesNotMatch(thread, /<Send /);
+});
+
 test('Today has Needs you and In progress; Needs you is not the wait list', () => {
   assert.match(todayScreen, /Needs you/);
   assert.match(todayScreen, /In progress/);
