@@ -210,6 +210,51 @@ Law:
 Deliberately not in this: autonomous send, and the dual From picker (gmail vs
 triangle-services.com), which stays a follow-up.
 
+### 2026-09-18: A person opens it and approves it, or it does not go
+
+Locked the same day, reading the loop above back. The law is Nikola's: he must
+open Hanna's Triangle version on the case and **approve** it before it can be
+attached on Send. No silent auto-attach.
+
+What was actually there: picking who to put forward in the Send review switched
+the attach checkbox on for you, and that checkbox was the whole gate.
+`/api/mail/send` took the boolean, built a profile for whatever `workerId` the
+browser sent, and attached it. Nothing checked that anybody had opened the
+document, nothing tied the file to the case it was being sent on, and the
+builder passed `includeIdentity: false` unconditionally — so a case asked for
+as a full CV attached the anonymised one, under a checkbox that promised either
+depending on which you read.
+
+Law:
+
+1. **Approval is a recorded human act, not a tick.** A person opens the exact
+   document on the case and approves it. It goes in migration 042's review
+   columns with who and when — "acknowledged" there already means a person read
+   it and agrees — beside the employee's claim, never over it. Ruling one out
+   costs a reason, like every other discard on Today.
+2. **The server is the gate, not the browser.** `sendFromTriangle` re-reads the
+   approval from the record at the moment of sending. Unapproved, or approved
+   on another case, and nothing is sent — not the attachment and not the words.
+   The refusal goes in the ledger with its reason.
+3. **The tick is the last step of that decision.** It starts off, it exists
+   only once an approval stands, and it names the file. Choosing who the reply
+   is about is a separate control and attaches nothing.
+4. **What was approved is what goes.** The version is read from the case, so a
+   full CV approved as a full CV arrives named, and a bio arrives as a bio.
+5. **An approval lapses when the employee answers after it.** What was approved
+   is not what the case now says. The card asks for it again rather than
+   carrying an attachment nobody re-read.
+6. **Approving does not wait for Hanna.** The document is Triangle's own record
+   and is ready immediately, so a person may approve before her check lands —
+   but the card says which it was, and so does the recorded approval.
+7. **Three versions, not two.** `bio_anonymised`, `short_bio` and `full_cv`.
+   "Short bio" contains "bio", so short is read first; both are anonymised, so
+   getting that pair wrong costs a length, not an identity.
+8. **Which address it leaves from is a decision.** A person who owns a personal
+   mailbox and a company one is telling a recruiter something different with
+   each. Triangle offers both and picks neither; with one address there is
+   nothing to choose. The owner-only rule is unchanged, and no agent gets SMTP.
+
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 
 CEO accepted the external expert amendment on 16 September 2026. Direction is

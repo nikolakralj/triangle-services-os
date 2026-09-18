@@ -587,6 +587,23 @@ test('docs record the split and the human-only Send', () => {
   assert.match(execution, /who_we_put_forward/);
 });
 
+test('docs lock the review gate, the third version and the From picker', () => {
+  const decisions = read('DECISIONS.md');
+  assert.match(decisions, /A person opens it and approves it, or it does not go/);
+  assert.match(decisions, /The server is the gate, not the browser/);
+  assert.match(decisions, /An approval lapses when the employee answers after it/);
+  assert.match(decisions, /short_bio/);
+  const execution = read('ROADMAP_EXECUTION.md');
+  assert.match(execution, /DEV-022/);
+  assert.match(execution, /Approve before attach/);
+  const state = read('CURRENT_STATE.md');
+  assert.match(state, /DEV-022/);
+  // Hanna is told her answer releases nothing.
+  const hanna = read('agents/hanna.md');
+  assert.match(hanna, /short_bio/);
+  assert.match(hanna, /Your answer does not release anything/);
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {
