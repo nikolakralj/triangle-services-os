@@ -6,6 +6,98 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-18: Employees, not buttons — the core of Triangle
+
+Locked by Nikola on 18 September, looking at the Oliver Hall card: three radio
+buttons for the three people in Talent, a "Bob prepared" box full of Drive and
+thread ids, and Ask Bob, Ask Hanna and Dismiss side by side. In his words:
+
+> "I don't care what the agent is called, Bob or Hanna. When they get an email
+> they need to work and come back to me: boss, we decided to propose these
+> people, and we decided to use the bio because it's an agency and we don't
+> want to expose our candidate's name. This is the intelligence I need."
+>
+> "It's like new human employees — with time they gain trust. This needs to be
+> in the core of this app."
+
+Every other product decision is read against this one. It sits above the
+surface decisions below and amends them where they disagree.
+
+Law:
+
+1. **Employees work without being pushed.** When something arrives — a
+   requirement, a reply, a follow-up that falls due — the employee who owns
+   that kind of work starts on it. A person does not press a button for
+   routine work to begin.
+2. **They come back with decisions and reasons, not options.** "We propose
+   Matej and Igor. We used anonymised bios, initials only, because g2 is an
+   agency and we don't expose our candidates' names to agencies. The reply is
+   drafted." Who fits, which form, which thread and which wording are the
+   employee's decisions, each stated with its reason.
+3. **A person judges, in words.** A case has one Ask. A person approves,
+   changes something by saying it ("not Igor — use Matej, full CV"), or says
+   no. Triangle routes the words to whichever employees the work needs. A
+   person never chooses between Bob, Hanna and Scout, never picks a document
+   form from a control, and never picks a candidate from a list. An
+   employee's name shows who did the work; it is never a choice a person has
+   to make.
+4. **Trust is earned, like a new hire's.** For each kind of action, each
+   employee has a level of freedom, and moves up only on its record:
+   - **Proposes** — says what should happen;
+   - **Prepares** — does the whole job up to the step that cannot be undone;
+     a person approves and presses Send. **Every external message is here
+     today, for every employee: Hanna and Bob prepare drafts, a person
+     sends;**
+   - **Acts and reports** — does it within a named kind and limit, and a
+     person sees it afterwards.
+
+   A kind of action moves up only when the CEO grants it on the record, for
+   one employee, on evidence: how often their prepared work was approved
+   unchanged, what had to be corrected, what went wrong. It comes down in one
+   step. An employee never promotes itself, and no code change or
+   configuration raises a level as a side effect. Commitments (price, rate,
+   date, headcount, contract), payment, signing and deletion never move up:
+   they stay a person's. This is the path through the existing
+   `communicationPolicy` — Prepares is APPROVAL, Acts and reports is AUTO,
+   FORBIDDEN stays forbidden — and enforcement stays where the action happens.
+5. **A person sees a decision, not machinery.** What we decided, why, what is
+   prepared (open it to read it), the one thing needed now, and what happens
+   after approval. Ids, file ids, thread ids, JSON and transcripts stay behind
+   the evidence link.
+6. **Design for ten thousand.** Talent will hold ten thousand people and
+   Today a hundred cases a day. A control that works only because there are
+   three candidates is wrong today too. The employee searches the pool; a
+   person sees the two or three it chose, and why.
+
+The test a design must pass is "Employees, not buttons" in
+`PRODUCT_OPERATING_RULES.md`. A design that adds more primary buttons than it
+removes is rejected.
+
+Amends:
+
+- **Two employees on one case (18 September).** Bob chasing and Hanna putting
+  forward stay as the internal division of work; they stop being two
+  controls. The form is the employee's decision under the same rules — a bio
+  by default and always for an agency, a full CV only when a person releases
+  the name — and a person's words override it. Releasing a name still takes a
+  person.
+- **The operating shell (16 September), law 5.** "Ask the employee" means the
+  one Ask on the case, not an Ask button per employee.
+
+Building it: one Ask on the case, routed inside Triangle, is the first slice
+(briefed 18 September). Each employee's track record and the CEO's step to
+grant or withdraw a level come after, as their own item in
+`ROADMAP_EXECUTION.md`.
+
+Why:
+
+- the Oliver Hall card asked the CEO to pick a candidate from radio buttons,
+  to choose between Ask Bob and Ask Hanna, and to read Drive ids — work a
+  competent colleague does without being asked;
+- a list of controls grows with every feature, and a person operating it is
+  rebuilding a CRM by hand. A colleague who decides, explains and earns more
+  freedom is the product.
+
 ### 2026-09-16: The operating shell — three menu items, one inbox, tasks on cases
 
 Proposed by Claude on 16 September at Nikola's request ("Workforce is useless";
