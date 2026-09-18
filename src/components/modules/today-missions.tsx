@@ -1193,6 +1193,13 @@ export function DoneSince({
                   messageCount: item.messageCount,
                   awaitingAgent: item.awaitingAgent,
                   finished: true,
+                  case: {
+                    who: item.title,
+                    about: item.title,
+                    leadId: item.leadId,
+                    contactId: item.contactId,
+                    personId: item.personId,
+                  },
                 })
               }
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
