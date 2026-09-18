@@ -16,10 +16,16 @@ export const runtime = "nodejs";
 
 const uuid = z.string().uuid();
 
+const alsoRef = z.object({
+  leadId: uuid.optional(),
+  contactId: uuid.optional(),
+  personId: uuid.optional(),
+});
+
 const bodySchema = z.object({
   instruction: z.string().trim().min(2).max(4_000),
   who: z.string().trim().max(200).optional(),
-  about: z.string().trim().max(300).optional(),
+  about: z.string().trim().max(800).optional(),
   leadId: uuid.optional(),
   contactId: uuid.optional(),
   personId: uuid.optional(),
@@ -27,6 +33,7 @@ const bodySchema = z.object({
   missionId: uuid.optional(),
   channelKind: z.string().trim().max(40).optional(),
   value: z.string().trim().max(400).optional(),
+  also: z.array(alsoRef).max(12).optional(),
   // Accepted and ignored: Hand to Bob used to dismiss the card. It must not.
   dismissActionId: uuid.optional(),
 });

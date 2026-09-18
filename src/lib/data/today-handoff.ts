@@ -40,7 +40,7 @@ export function withLabelFor(roleKey: string, displayName: string): string {
   return name ? `With ${name}` : "With the team";
 }
 
-function idsOf(ids: HandoffIds): string[] {
+export function handoffKeys(ids: HandoffIds): string[] {
   return [ids.leadId, ids.contactId, ids.personId].filter(
     (v): v is string => typeof v === "string" && v.length > 0,
   );
@@ -48,7 +48,7 @@ function idsOf(ids: HandoffIds): string[] {
 
 /** True when this wait is the same business situation as the card. */
 export function matchesWait(wait: InProgressWait, ids: HandoffIds): boolean {
-  const candidates = idsOf(ids);
+  const candidates = handoffKeys(ids);
   if (candidates.length === 0) return false;
   if (wait.leadId && candidates.includes(wait.leadId)) return true;
   if (wait.contactId && candidates.includes(wait.contactId)) return true;
@@ -61,4 +61,16 @@ export function findWait(
   ids: HandoffIds,
 ): InProgressWait | null {
   return waits.find((w) => matchesWait(w, ids)) ?? null;
+}
+
+/** One wait covering any of several roles on the same person card. */
+export function findWaitForAny(
+  waits: InProgressWait[],
+  idsList: HandoffIds[],
+): InProgressWait | null {
+  for (const ids of idsList) {
+    const found = findWait(waits, ids);
+    if (found) return found;
+  }
+  return null;
 }

@@ -23,6 +23,12 @@ export const RESEARCH_FINDING_CASE_TYPES = [
   "contact_reachability",
 ] as const;
 
+export interface AskBobAlsoRef {
+  leadId?: string | null;
+  contactId?: string | null;
+  personId?: string | null;
+}
+
 export interface AskBobContext {
   instruction: string;
   who?: string | null;
@@ -34,6 +40,8 @@ export interface AskBobContext {
   missionId?: string | null;
   channelKind?: string | null;
   value?: string | null;
+  /** Other roles on the same person/case — one Ask Bob covers them. */
+  also?: AskBobAlsoRef[] | null;
 }
 
 export function isBobRole(roleKey: string | null | undefined): boolean {
@@ -92,6 +100,11 @@ export function askBobObjective(params: AskBobContext): string {
     params.leadId ? `leadId: ${params.leadId}` : null,
     params.contactId ? `contactId: ${params.contactId}` : null,
     params.personId ? `personId: ${params.personId}` : null,
+    ...(params.also ?? []).flatMap((ref, i) => [
+      ref.leadId ? `also[${i}].leadId: ${ref.leadId}` : null,
+      ref.contactId ? `also[${i}].contactId: ${ref.contactId}` : null,
+      ref.personId ? `also[${i}].personId: ${ref.personId}` : null,
+    ]),
     params.companyId ? `companyId: ${params.companyId}` : null,
     params.missionId ? `missionId: ${params.missionId}` : null,
     params.channelKind && params.value

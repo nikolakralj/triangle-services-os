@@ -86,6 +86,7 @@ test('Ask Bob still carries entity ids so UI can show Bob working on the case', 
   assert.match(askBobSrc, /personId: params\.context\.personId/);
   assert.match(askBobSrc, /companyId: params\.context\.companyId/);
   assert.match(askBobSrc, /missionId: params\.context\.missionId/);
+  assert.match(askBobSrc, /params\.context\.also/);
   const text = askBobObjective({
     instruction: 'Follow up with Veronika Igic.',
     who: 'Veronika Igic',
@@ -127,6 +128,7 @@ const emailActions = read('src/components/modules/today-email-actions.tsx');
 const askBobRoute = read('src/app/api/ask/bob/route.ts');
 const todayScreen = read('src/components/modules/today-screen.tsx');
 const todayMissions = read('src/components/modules/today-missions.tsx');
+const handoffCtx = read('src/components/modules/today-handoff-context.tsx');
 const drawer = read('src/components/modules/assignment-thread-drawer.tsx');
 const thread = read('src/components/modules/assignment-thread.tsx');
 const decisionsPage = read('src/app/(app)/decisions/page.tsx');
@@ -137,6 +139,7 @@ const execution = read('ROADMAP_EXECUTION.md');
 const {
   matchesWait,
   findWait,
+  findWaitForAny,
   withLabelFor,
 } = moduleLoader()('src/lib/data/today-handoff.ts');
 
@@ -154,19 +157,29 @@ test('After Hand to Bob the card is With Bob with Open thread and Take back', ()
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
-test('Toast copy is Handed to Bob · Open thread', () => {
-  assert.match(todayScreen, /Handed to Bob/);
-  assert.match(todayScreen, /Open thread/);
-  assert.match(todayScreen, /announceHanded/);
+test('Toast copy is Handed to Bob · Open thread, and the drawer opens on the case', () => {
+  assert.match(handoffCtx, /Handed to Bob/);
+  assert.match(handoffCtx, /The answer returns on this case/);
+  assert.match(handoffCtx, /Open thread/);
+  const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));
+  const announce = impl.slice(impl.indexOf('announceHanded'), impl.indexOf('isPinned'));
+  assert.match(announce, /setThread\(next\)/);
+  assert.doesNotMatch(announce, /setThread\(null\)/);
+  assert.match(todayMissions, /isPinned/);
+  assert.match(emailActions, /openCaseThread/);
+  assert.match(emailActions, /AssignmentThreadDrawer/);
 });
 
 test('Open thread is a right-side drawer on Today, reusing AssignmentThread', () => {
+  assert.match(drawer, /createPortal/);
+  assert.match(drawer, /document\.body/);
   assert.match(drawer, /role="dialog"/);
   assert.match(drawer, /max-w-md/);
   assert.match(drawer, /AssignmentThread/);
   assert.match(drawer, /alwaysOpen/);
   assert.match(thread, /alwaysOpen/);
-  assert.match(todayScreen, /AssignmentThreadDrawer/);
+  assert.match(handoffCtx, /AssignmentThreadDrawer/);
+  assert.match(todayScreen, /TodayHandoffProvider/);
   assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
 });
 
@@ -202,6 +215,29 @@ test('Handoff matching uses lead/contact/person ids, not assignment title', () =
   assert.equal(withLabelFor('inbox_coordinator', 'Ops'), 'With Bob');
   assert.equal(withLabelFor('project_researcher', 'Scout'), 'With Scout');
   assert.equal(withLabelFor('hr', 'Hanna'), 'With Hanna');
+});
+
+test('findWaitForAny matches any role on a grouped person card', () => {
+  const wait = {
+    assignmentId: 'a1',
+    title: 'Follow up',
+    agentName: 'Bob',
+    agentEmoji: '📦',
+    roleKey: 'inbox_coordinator',
+    withLabel: 'With Bob',
+    status: 'queued',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+    companyId: null,
+    missionId: null,
+    entityIds: ['lead-1', 'lead-2'],
+    messageCount: 1,
+    awaitingAgent: 0,
+    createdAt: '',
+  };
+  assert.equal(findWaitForAny([wait], [{ leadId: 'lead-2' }])?.assignmentId, 'a1');
+  assert.equal(findWaitForAny([wait], [{ leadId: 'lead-9' }]), null);
 });
 
 test('/today aliases /decisions', () => {

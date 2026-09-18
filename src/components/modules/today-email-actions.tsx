@@ -9,14 +9,31 @@ import {
   dismissSentence,
   type EmailDismissReason,
 } from "@/lib/data/today-card-actions";
-import { useTodayHandoff } from "@/components/modules/today-handoff-context";
-import type { InProgressWait } from "@/lib/data/today-handoff";
+import { useTodayHandoff, type ThreadTarget } from "@/components/modules/today-handoff-context";
+import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
+import { type HandoffIds, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
 // Open mail stays on the channel bar. These two are the human judgments:
 // Ask Bob (hand the thread to Commercial Ops) and Dismiss (scoped, not a
 // blacklist). Sent / They replied / Later are off this rail.
 // ---------------------------------------------------------------------------
+
+export interface EmailCardAlsoTarget {
+  who?: string;
+  about?: string | null;
+  leadId?: string;
+  contactId?: string;
+  personId?: string;
+  missionId?: string;
+  companyId?: string;
+  actionId?: string;
+  channelKind?: string;
+  value?: string;
+  subject?: string | null;
+  words?: string | null;
+  draft?: string | null;
+}
 
 export interface EmailCardTarget {
   who: string;
@@ -32,6 +49,8 @@ export interface EmailCardTarget {
   subject?: string | null;
   words?: string | null;
   draft?: string | null;
+  /** Other roles on the same person/case. One Ask Bob / Dismiss covers them. */
+  also?: EmailCardAlsoTarget[];
 }
 
 interface Recorded {
@@ -90,8 +109,28 @@ export const EMAIL_CARD_NOTE =
 
 function defaultAsk(target: EmailCardTarget): string {
   const who = target.who.trim() || "this person";
-  if (target.about) return `Follow up with ${who} about ${target.about}.`;
+  const roles = [
+    target.about,
+    ...(target.also ?? []).map((item) => item.about),
+  ].filter((value): value is string => Boolean(value && value.trim()));
+  const unique = [...new Set(roles.map((value) => value.trim()))];
+  if (unique.length > 0) return `Follow up with ${who} about ${unique.join("; ")}.`;
   return `Follow up with ${who}.`;
+}
+
+function handoffIdsOf(target: EmailCardTarget): HandoffIds[] {
+  return [
+    {
+      leadId: target.leadId,
+      contactId: target.contactId,
+      personId: target.personId,
+    },
+    ...(target.also ?? []).map((item) => ({
+      leadId: item.leadId,
+      contactId: item.contactId,
+      personId: item.personId,
+    })),
+  ];
 }
 
 export function EmailCardActions({
@@ -121,6 +160,7 @@ export function EmailCardActions({
     bobName: string;
     messageCount: number;
   } | null>(null);
+  const [fallbackThread, setFallbackThread] = useState<ThreadTarget | null>(null);
 
   const withBob = alreadyWith
     ? {
@@ -139,6 +179,25 @@ export function EmailCardActions({
           title: instruction.trim() || defaultAsk(target),
         }
       : null;
+
+  function threadFrom(
+    assignmentId: string,
+    title: string,
+    agentName: string,
+    messageCount: number,
+    awaitingAgent = 0,
+  ): ThreadTarget {
+    return { assignmentId, title, agentName, messageCount, awaitingAgent };
+  }
+
+  function openCaseThread(thread: ThreadTarget, pin: boolean) {
+    if (handoff) {
+      if (pin) handoff.announceHanded(thread, handoffIdsOf(target));
+      else handoff.openThread(thread);
+      return;
+    }
+    setFallbackThread(thread);
+  }
 
   async function askBob() {
     const text = instruction.trim();
@@ -163,6 +222,13 @@ export function EmailCardActions({
           missionId: target.missionId,
           channelKind: target.channelKind || "email",
           value: target.value,
+          also: (target.also ?? [])
+            .map((item) => ({
+              leadId: item.leadId,
+              contactId: item.contactId,
+              personId: item.personId,
+            }))
+            .filter((item) => item.leadId || item.contactId || item.personId),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -187,15 +253,11 @@ export function EmailCardActions({
       };
       setHanded(next);
       setAsking(false);
-      const thread = {
-        assignmentId: next.assignmentId,
-        title: text,
-        agentName: next.bobName,
-        messageCount: next.messageCount,
-        awaitingAgent: 0,
-      };
-      handoff?.announceHanded(thread);
-      router.refresh();
+      openCaseThread(
+        threadFrom(next.assignmentId, text, next.bobName, next.messageCount),
+        true,
+      );
+      window.setTimeout(() => router.refresh(), 400);
     } catch {
       setError("Network error.");
     } finally {
@@ -226,41 +288,69 @@ export function EmailCardActions({
     }
   }
 
+  async function dismissOne(
+    reason: EmailDismissReason,
+    item: {
+      channelKind?: string;
+      value?: string;
+      actionId?: string;
+      leadId?: string;
+      contactId?: string;
+      personId?: string;
+      missionId?: string;
+      companyId?: string;
+      words?: string | null;
+      draft?: string | null;
+      subject?: string | null;
+    },
+  ): Promise<{ ok: true; actionId: string | null; sentence?: string } | { ok: false; error: string }> {
+    const res = await fetch("/api/today/dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reason,
+        channelKind: item.channelKind || target.channelKind || "email",
+        value: item.value || target.value,
+        actionId: item.actionId,
+        leadId: item.leadId,
+        contactId: item.contactId || undefined,
+        personId: item.personId,
+        missionId: item.missionId,
+        companyId: item.companyId,
+        content: reason === "recorded_outside" ? item.words || undefined : undefined,
+        draft: reason === "recorded_outside" ? item.draft || undefined : undefined,
+        subject: item.subject || undefined,
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      actionId?: string | null;
+      sentence?: string;
+    };
+    if (!res.ok) {
+      return { ok: false, error: body.error ?? "Could not dismiss that." };
+    }
+    return { ok: true, actionId: body.actionId ?? null, sentence: body.sentence };
+  }
+
   async function dismiss(reason: EmailDismissReason) {
     setBusy(reason);
     setError(null);
     setOpenDismiss(false);
     try {
-      const res = await fetch("/api/today/dismiss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason,
-          channelKind: target.channelKind || "email",
-          value: target.value,
-          actionId: target.actionId,
-          leadId: target.leadId,
-          contactId: target.contactId || undefined,
-          personId: target.personId,
-          missionId: target.missionId,
-          companyId: target.companyId,
-          content: reason === "recorded_outside" ? target.words || undefined : undefined,
-          draft: reason === "recorded_outside" ? target.draft || undefined : undefined,
-          subject: target.subject || undefined,
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        actionId?: string | null;
-        sentence?: string;
-      };
-      if (!res.ok) {
-        setError(body.error ?? "Could not dismiss that.");
-        return;
+      const bundle = [target, ...(target.also ?? [])];
+      let last: { actionId: string | null; sentence?: string } | null = null;
+      for (const item of bundle) {
+        const result = await dismissOne(reason, item);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        last = result;
       }
       onRecorded({
-        actionId: body.actionId || target.actionId || "dismissed",
-        sentence: body.sentence ?? dismissSentence(reason),
+        actionId: last?.actionId || target.actionId || "dismissed",
+        sentence: last?.sentence ?? dismissSentence(reason),
         who: target.who,
       });
       router.refresh();
@@ -282,13 +372,16 @@ export function EmailCardActions({
             type="button"
             disabled={busy !== null}
             onClick={() =>
-              handoff?.openThread({
-                assignmentId: withBob.assignmentId,
-                title: withBob.title,
-                agentName: withBob.bobName,
-                messageCount: withBob.messageCount,
-                awaitingAgent: withBob.awaitingAgent,
-              })
+              openCaseThread(
+                threadFrom(
+                  withBob.assignmentId,
+                  withBob.title,
+                  withBob.bobName,
+                  withBob.messageCount,
+                  withBob.awaitingAgent,
+                ),
+                false,
+              )
             }
             className={t.thread}
           >
@@ -397,6 +490,10 @@ export function EmailCardActions({
                   Cancel
                 </button>
               </div>
+              <p className={`mt-2 ${t.note}`}>
+                Hand to Bob keeps this card. The answer returns here — Open thread opens on this
+                case.
+              </p>
             </div>
           )}
         </>
@@ -404,11 +501,18 @@ export function EmailCardActions({
       {!hideNote && (
         <p className={t.note}>
           {withBob
-            ? "Bob has this case. Open thread stays here, on the case."
+            ? "Bob has this case. The answer returns here — Open thread stays on this card."
             : EMAIL_CARD_NOTE}
         </p>
       )}
       {error && <p className={t.error}>{error}</p>}
+      {!handoff && (
+        <AssignmentThreadDrawer
+          key={fallbackThread?.assignmentId ?? "closed"}
+          thread={fallbackThread}
+          onClose={() => setFallbackThread(null)}
+        />
+      )}
     </div>
   );
 }

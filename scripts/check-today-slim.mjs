@@ -59,6 +59,7 @@ test('Ask Bob is present on the shared email card actions', () => {
   assert.match(emailActions, /Hand to Bob/);
   assert.match(emailActions, /\/api\/ask\/bob/);
   assert.match(emailActions, /Dismiss/);
+  assert.match(emailActions, /also:/);
 });
 
 test('primary email outcome buttons are off the Today rail', () => {
@@ -78,9 +79,27 @@ test('follow-up email rows no longer offer Sent a follow-up as the main path', (
   );
   assert.match(followUpFn, /isEmail/);
   assert.match(followUpFn, /EmailCardActions/);
+  assert.match(followUpFn, /isEmail && !compact/);
   // Later / outcome buttons remain only on the non-email branch.
   const emailBranch = followUpFn.slice(followUpFn.indexOf('{isEmail &&'));
   assert.doesNotMatch(emailBranch, /Sent a follow-up/);
+});
+
+test('grouped follow-ups have one Ask Bob at person level, not per role', () => {
+  const groupFn = todayMissions.slice(
+    todayMissions.indexOf('function FollowUpGroup'),
+    todayMissions.indexOf('function FollowUpRow'),
+  );
+  assert.match(groupFn, /EmailCardActions/);
+  assert.match(groupFn, /also:/);
+  assert.match(groupFn, /findWaitForAny/);
+  assert.match(groupFn, /Open mail/);
+  assert.match(groupFn, /compact/);
+  const compactRow = todayMissions.slice(
+    todayMissions.indexOf('function FollowUpRow'),
+    todayMissions.indexOf('function ReadyPerson'),
+  );
+  assert.match(compactRow, /isEmail && !compact/);
 });
 
 test('ready-to-contact email people use Ask Bob, not Sent', () => {

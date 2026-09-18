@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Loader2, Undo2, X } from "lucide-react";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
@@ -9,6 +10,8 @@ import type { ThreadTarget } from "@/components/modules/today-handoff-context";
 // Right-side drawer on Today. Open thread stays on the card's page; it does
 // not navigate to Workforce / What you handed out. Take back sits here, beside
 // what the employee has already done, for work that is still open.
+//
+// Portaled to document.body so overflow-hidden follow-up lists cannot clip it.
 
 export function AssignmentThreadDrawer({
   thread,
@@ -30,7 +33,7 @@ export function AssignmentThreadDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [thread, onClose]);
 
-  if (!thread) return null;
+  if (!thread || typeof document === "undefined") return null;
 
   async function takeBack(assignmentId: string) {
     setTaking(true);
@@ -55,7 +58,7 @@ export function AssignmentThreadDrawer({
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-40 flex justify-end">
       <button
         type="button"
@@ -81,7 +84,7 @@ export function AssignmentThreadDrawer({
               {thread.title}
             </h2>
             <p className="mt-0.5 text-[12px] text-slate-500">
-              {thread.agentName} · stays on this case
+              {thread.agentName} · the answer returns on this case
             </p>
             {error && <p className="mt-1 text-[12px] text-rose-600">{error}</p>}
           </div>
@@ -118,6 +121,7 @@ export function AssignmentThreadDrawer({
           />
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
