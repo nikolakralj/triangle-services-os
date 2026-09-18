@@ -735,8 +735,14 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
 
 - **Triage in bulk:** bulk decisions with structured reasons, once the queues
   make one-by-one review materially slow.
-- **Packet-send record:** check that the existing send record works on the first
-  real packet send; fix only the defects that send shows.
+- **Packet-send record:** the first real packet send showed three defects, now
+  fixed in code: Send from Triangle was text-only; the Today card hid when
+  Bob had the case so his Triangle write-up was not on it; the first match
+  was locked as who to put forward. Send from Triangle may attach the
+  anonymised Triangle profile (filename is the reference, never the name);
+  the same card stays with Bob's last Triangle thread message on it; a
+  person picks who to put forward. Human Send now. Bob still sends nothing.
+  Live mailbox / migration 049 / the send itself remain a person.
 
 ## Next, once the gate is moving
 

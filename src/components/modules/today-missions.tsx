@@ -918,6 +918,11 @@ export function InProgressWaits({
                 {wait.withLabel}
                 {wait.status === "active" ? " · working" : " · queued"}
               </p>
+              {wait.lastAgentBody && (
+                <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-slate-600">
+                  {wait.lastAgentBody}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <button
@@ -1094,6 +1099,11 @@ export function DoneSince({
               <span className="mt-0.5 block text-[12px] text-slate-500" suppressHydrationWarning>
                 {item.agentName} finished · {ago(item.completedAt)}
               </span>
+              {(item.lastAgentBody || item.resultSummary) && (
+                <span className="mt-1 block line-clamp-2 text-[12.5px] leading-snug text-slate-600">
+                  {item.lastAgentBody || item.resultSummary}
+                </span>
+              )}
             </span>
             <button
               type="button"

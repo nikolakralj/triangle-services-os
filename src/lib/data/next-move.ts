@@ -42,13 +42,9 @@ export interface NextMoveAction {
   /** Where the role is, so two roles with one title can be told apart. */
   country?: string | null;
   /** Who we would put forward, when the move is a reply about somebody. */
-  offering?: {
-    workerId: string;
-    name: string;
-    role: string | null;
-    why: string;
-    caveats: string[];
-  };
+  offering?: OfferWorker;
+  /** Other people on the books who also fit, so the first match is not locked. */
+  candidates?: OfferWorker[];
   personName: string;
   personRole: string | null;
   company: string | null;
@@ -64,6 +60,14 @@ export interface NextMoveAction {
   subject: string | null;
   /** Every previous attempt on this person, newest first. */
   history: ContactAttempt[];
+}
+
+export interface OfferWorker {
+  workerId: string;
+  name: string;
+  role: string | null;
+  why: string;
+  caveats: string[];
 }
 
 export interface NextMove {
@@ -164,6 +168,7 @@ export async function getNextMove(
     const best = leadMatches[0];
     const who = best.candidates[0];
     const others = leadMatches.length - 1;
+    const people = best.candidates.length;
     return {
       // The country is in the headline because one person sends one title for
       // different countries. Without it, answering "PLC Commissioning
@@ -180,6 +185,9 @@ export async function getNextMove(
           ? `They sent this role ${best.copies} times — one reply covers every copy.`
           : null,
         `${who.name} fits it: ${who.why}.`,
+        people > 1
+          ? `${people} people on the books fit it — pick who to put forward.`
+          : null,
         others > 0
           ? `${others} more open ${others === 1 ? "role" : "roles"} behind this one.`
           : null,
@@ -213,6 +221,13 @@ export async function getNextMove(
           caveats: who.caveats,
           workerId: who.id,
         },
+        candidates: best.candidates.map((c) => ({
+          workerId: c.id,
+          name: c.name,
+          role: c.role,
+          why: c.why,
+          caveats: c.caveats,
+        })),
       },
     };
   }

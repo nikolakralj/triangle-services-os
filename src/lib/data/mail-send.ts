@@ -4,6 +4,7 @@ import { logContactAttempt } from "@/lib/data/contact-log";
 import { recordRefusal } from "@/lib/data/refusals";
 import { pickSendableMailbox, SEND_NOT_ENABLED } from "@/lib/mail/send-policy";
 import { isPlainAddress, sendViaMailbox } from "@/lib/mail/smtp-send";
+import { buildAnonymisedCvAttachment } from "@/lib/mail/anonymised-cv-attachment";
 
 // ---------------------------------------------------------------------------
 // A person presses Send in Triangle (DEV-013).
@@ -36,6 +37,9 @@ export interface SendFromTriangleInput {
   mailAccountId?: string | null;
   /** The inbound message this answers, for threading. */
   inReplyTo?: string | null;
+  /** Attach the anonymised Triangle CV for this worker. Human ticks it. */
+  workerId?: string | null;
+  attachAnonymisedCv?: boolean;
 }
 
 export type SendFromTriangleResult =
@@ -46,6 +50,7 @@ export type SendFromTriangleResult =
       followUpAt: string | null;
       from: string;
       rfc822Id: string;
+      attachedFilename?: string | null;
     }
   | { ok: false; error: string; status: number };
 
@@ -127,12 +132,31 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
     return { ok: false, error: SEND_NOT_ENABLED, status: 403 };
   }
 
+  let attachedFilename: string | null = null;
+  const attachments: Array<{ filename: string; contentType: string; bytes: Buffer }> = [];
+  if (input.attachAnonymisedCv) {
+    const workerId = input.workerId?.trim();
+    if (!workerId) {
+      return { ok: false, error: "Pick who to put forward before attaching a profile.", status: 400 };
+    }
+    const file = await buildAnonymisedCvAttachment({
+      orgId: input.orgId,
+      workerId,
+    });
+    if (!file) {
+      return { ok: false, error: "Could not build the anonymised profile for that person.", status: 404 };
+    }
+    attachments.push(file);
+    attachedFilename = file.filename;
+  }
+
   const sent = await sendViaMailbox(mailbox, {
     to,
     subject,
     body,
     fromName: mailbox.display_name,
     inReplyTo: input.inReplyTo ?? null,
+    attachments,
   });
   if ("error" in sent) {
     await recordRefusal({
@@ -161,6 +185,9 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
     draft: input.draft ?? null,
     subject,
     sentFromTriangle: { mailAccountId: mailbox.id, rfc822Id: sent.rfc822Id },
+    note: attachedFilename
+      ? `Anonymised Triangle profile attached: ${attachedFilename}`
+      : undefined,
   });
   if (!logged.ok) {
     // The message is out; the books must say so even if the ledger write
@@ -180,5 +207,6 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
     followUpAt: logged.followUpAt,
     from: mailbox.email_address,
     rfc822Id: sent.rfc822Id,
+    attachedFilename,
   };
 }

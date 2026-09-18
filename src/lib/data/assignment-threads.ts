@@ -290,23 +290,53 @@ export async function takeThreadForBot(
 export async function countMessagesByAssignment(
   assignmentIds: string[],
   orgId: string,
-): Promise<Map<string, { total: number; awaitingAgent: number }>> {
-  const out = new Map<string, { total: number; awaitingAgent: number }>();
+): Promise<
+  Map<
+    string,
+    {
+      total: number;
+      awaitingAgent: number;
+      lastAgentBody: string | null;
+      lastAgentAt: string | null;
+    }
+  >
+> {
+  const out = new Map<
+    string,
+    {
+      total: number;
+      awaitingAgent: number;
+      lastAgentBody: string | null;
+      lastAgentAt: string | null;
+    }
+  >();
   const svc = createServiceSupabaseClient();
   if (!svc || assignmentIds.length === 0) return out;
 
   const { data } = await svc
     .from("assignment_messages")
-    .select("assignment_id, role, delivered_at")
+    .select("assignment_id, role, delivered_at, body, created_at")
     .in("assignment_id", assignmentIds)
     .eq("org_id", orgId);
 
   for (const r of data ?? []) {
     const key = r.assignment_id as string;
-    if (!out.has(key)) out.set(key, { total: 0, awaitingAgent: 0 });
+    if (!out.has(key)) {
+      out.set(key, {
+        total: 0,
+        awaitingAgent: 0,
+        lastAgentBody: null,
+        lastAgentAt: null,
+      });
+    }
     const entry = out.get(key)!;
     entry.total += 1;
     if (r.role === "human" && !r.delivered_at) entry.awaitingAgent += 1;
+    const at = (r.created_at as string) ?? "";
+    if (r.role === "agent" && r.body && (!entry.lastAgentAt || at > entry.lastAgentAt)) {
+      entry.lastAgentBody = String(r.body);
+      entry.lastAgentAt = at;
+    }
   }
   return out;
 }
