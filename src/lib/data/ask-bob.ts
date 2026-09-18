@@ -83,12 +83,15 @@ export async function askBob(params: {
     return { ok: false, error: blocked ?? "Nobody named Bob is on the workforce.", status: 409 };
   }
 
+  const channel = (params.context.value ?? "").trim().toLowerCase();
   const subject =
-    params.context.leadId ||
-    params.context.contactId ||
-    params.context.personId ||
-    params.context.missionId ||
-    "card";
+    channel.includes("@")
+      ? channel
+      : params.context.leadId ||
+        params.context.contactId ||
+        params.context.personId ||
+        params.context.missionId ||
+        "card";
   const baseKey = `ask-bob:${bob.id}:${subject}:${utcDayKey()}`;
   const attempt = await nextAttemptKey(params.orgId, baseKey);
   if ("openAssignmentId" in attempt) {
@@ -120,6 +123,21 @@ export async function askBob(params: {
   }
   if (params.context.missionId) {
     entityRefs.push({ type: "other", id: params.context.missionId, relation: "context" });
+  }
+  const seen = new Set(entityRefs.map((ref) => ref.id));
+  for (const extra of params.context.also ?? []) {
+    if (extra.leadId && !seen.has(extra.leadId)) {
+      entityRefs.push({ type: "job_lead", id: extra.leadId, relation: "target" });
+      seen.add(extra.leadId);
+    }
+    if (extra.contactId && !seen.has(extra.contactId)) {
+      entityRefs.push({ type: "contact", id: extra.contactId, relation: "target" });
+      seen.add(extra.contactId);
+    }
+    if (extra.personId && !seen.has(extra.personId)) {
+      entityRefs.push({ type: "contact", id: extra.personId, relation: "target" });
+      seen.add(extra.personId);
+    }
   }
 
   const created = await createAssignment({

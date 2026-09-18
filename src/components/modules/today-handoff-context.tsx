@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { InProgressWait } from "@/lib/data/today-handoff";
+import type { HandoffIds, InProgressWait } from "@/lib/data/today-handoff";
 
 export type ThreadTarget = Pick<
   InProgressWait,
@@ -14,7 +14,14 @@ export type ThreadTarget = Pick<
 
 type TodayHandoffApi = {
   openThread: (thread: ThreadTarget) => void;
-  announceHanded: (thread: ThreadTarget) => void;
+  /**
+   * After Ask Bob: keep this case on Today as With Bob and open the thread.
+   * `ids` pins every role on a grouped person card so it does not vanish
+   * into In progress before Open thread is obvious.
+   */
+  announceHanded: (thread: ThreadTarget, ids?: HandoffIds[]) => void;
+  /** True when this case was just handed over and should stay on the card. */
+  isPinned: (ids: HandoffIds) => boolean;
 };
 
 const TodayHandoffContext = createContext<TodayHandoffApi | null>(null);

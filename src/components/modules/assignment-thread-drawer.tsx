@@ -81,7 +81,7 @@ export function AssignmentThreadDrawer({
               {thread.title}
             </h2>
             <p className="mt-0.5 text-[12px] text-slate-500">
-              {thread.agentName} · stays on this case
+              {thread.agentName} · the answer returns on this case
             </p>
             {error && <p className="mt-1 text-[12px] text-rose-600">{error}</p>}
           </div>

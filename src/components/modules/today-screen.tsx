@@ -39,7 +39,7 @@ import {
   TodayHandoffProvider,
   type ThreadTarget,
 } from "@/components/modules/today-handoff-context";
-import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import { findWait, handoffKeys, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -125,6 +125,7 @@ export function TodayScreen({
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
   const [toast, setToast] = useState<ThreadTarget | null>(null);
+  const [pinnedKeys, setPinnedKeys] = useState<string[]>([]);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
   const nowAction = move.action;
@@ -174,10 +175,15 @@ export function TodayScreen({
           setThread(next);
           setToast(null);
         },
-        announceHanded: (next) => {
+        announceHanded: (next, ids) => {
           setToast(next);
-          setThread(null);
+          setThread(next);
+          if (ids && ids.length > 0) {
+            const extra = ids.flatMap(handoffKeys);
+            setPinnedKeys((prev) => Array.from(new Set([...prev, ...extra])));
+          }
         },
+        isPinned: (ids) => handoffKeys(ids).some((key) => pinnedKeys.includes(key)),
       }}
     >
     <div className="space-y-7">
@@ -273,11 +279,11 @@ export function TodayScreen({
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-30 flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] shadow-lg shadow-slate-900/10"
+          className="fixed bottom-5 left-5 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] shadow-lg shadow-slate-900/10"
         >
           <span>
             <span className="font-semibold text-slate-900">Handed to Bob</span>
-            {" · "}
+            {". The answer returns on this case. "}
             <button
               type="button"
               onClick={() => {

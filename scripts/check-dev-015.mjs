@@ -86,6 +86,7 @@ test('Ask Bob still carries entity ids so UI can show Bob working on the case', 
   assert.match(askBobSrc, /personId: params\.context\.personId/);
   assert.match(askBobSrc, /companyId: params\.context\.companyId/);
   assert.match(askBobSrc, /missionId: params\.context\.missionId/);
+  assert.match(askBobSrc, /params\.context\.also/);
   const text = askBobObjective({
     instruction: 'Follow up with Veronika Igic.',
     who: 'Veronika Igic',
@@ -137,6 +138,7 @@ const execution = read('ROADMAP_EXECUTION.md');
 const {
   matchesWait,
   findWait,
+  findWaitForAny,
   withLabelFor,
 } = moduleLoader()('src/lib/data/today-handoff.ts');
 
@@ -154,10 +156,17 @@ test('After Hand to Bob the card is With Bob with Open thread and Take back', ()
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
-test('Toast copy is Handed to Bob · Open thread', () => {
+test('Toast copy is Handed to Bob · Open thread, and the drawer opens on the case', () => {
   assert.match(todayScreen, /Handed to Bob/);
+  assert.match(todayScreen, /The answer returns on this case/);
   assert.match(todayScreen, /Open thread/);
-  assert.match(todayScreen, /announceHanded/);
+  const announce = todayScreen.slice(
+    todayScreen.indexOf('announceHanded'),
+    todayScreen.indexOf('isPinned'),
+  );
+  assert.match(announce, /setThread\(next\)/);
+  assert.doesNotMatch(announce, /setThread\(null\)/);
+  assert.match(todayMissions, /isPinned/);
 });
 
 test('Open thread is a right-side drawer on Today, reusing AssignmentThread', () => {
@@ -202,6 +211,29 @@ test('Handoff matching uses lead/contact/person ids, not assignment title', () =
   assert.equal(withLabelFor('inbox_coordinator', 'Ops'), 'With Bob');
   assert.equal(withLabelFor('project_researcher', 'Scout'), 'With Scout');
   assert.equal(withLabelFor('hr', 'Hanna'), 'With Hanna');
+});
+
+test('findWaitForAny matches any role on a grouped person card', () => {
+  const wait = {
+    assignmentId: 'a1',
+    title: 'Follow up',
+    agentName: 'Bob',
+    agentEmoji: '📦',
+    roleKey: 'inbox_coordinator',
+    withLabel: 'With Bob',
+    status: 'queued',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+    companyId: null,
+    missionId: null,
+    entityIds: ['lead-1', 'lead-2'],
+    messageCount: 1,
+    awaitingAgent: 0,
+    createdAt: '',
+  };
+  assert.equal(findWaitForAny([wait], [{ leadId: 'lead-2' }])?.assignmentId, 'a1');
+  assert.equal(findWaitForAny([wait], [{ leadId: 'lead-9' }]), null);
 });
 
 test('/today aliases /decisions', () => {

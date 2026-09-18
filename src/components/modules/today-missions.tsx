@@ -29,8 +29,8 @@ import {
 } from "@/lib/data/contact-channels";
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
-import { EMAIL_CARD_NOTE, EmailCardActions } from "@/components/modules/today-email-actions";
-import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import { EmailCardActions, type EmailCardTarget } from "@/components/modules/today-email-actions";
+import { findWait, findWaitForAny, type InProgressWait } from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
 // ---------------------------------------------------------------------------
@@ -84,10 +84,19 @@ export function ReadyForYou({
   waits?: InProgressWait[];
 }) {
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  const handoff = useTodayHandoff();
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
-  const due = followUps.filter(
-    (f) => !findWait(waits, { leadId: f.target.leadId, contactId: f.target.contactId, personId: f.target.personId }),
-  );
+  const due = followUps.filter((f) => {
+    const ids = {
+      leadId: f.target.leadId,
+      contactId: f.target.contactId,
+      personId: f.target.personId,
+    };
+    if (!findWait(waits, ids)) return true;
+    // Just handed to Bob: keep the same card as With Bob / Open thread so
+    // the result is not a black hole into collapsed In progress.
+    return handoff?.isPinned(ids) === true;
+  });
   const reachable = people.filter(
     (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
   );
@@ -188,7 +197,8 @@ function shortDate(iso: string): string {
  * A recruiter who sent four roles got four replies, and Today showed the same
  * name four times with four mail buttons for one mailbox. Grouped by the
  * address the follow-up would go to (or, without one, the name and company),
- * in the order Today already sorts them: most overdue first.
+ * in the order Today already sorts them: most overdue first. Ask Bob and
+ * Dismiss sit once on the person, not on every nested role.
  */
 function groupByPerson(items: FollowUp[]): FollowUp[][] {
   const groups = new Map<string, FollowUp[]>();
@@ -201,6 +211,22 @@ function groupByPerson(items: FollowUp[]): FollowUp[][] {
     else groups.set(key, [item]);
   }
   return Array.from(groups.values());
+}
+
+function followUpEmailTarget(item: FollowUp, who: string): EmailCardTarget {
+  return {
+    who,
+    about: item.about,
+    leadId: item.target.leadId,
+    contactId: item.target.contactId,
+    personId: item.target.personId,
+    actionId: item.actionId,
+    channelKind: item.channelKind,
+    value: item.value ?? "the address on record",
+    subject: item.subject,
+    words: item.sent,
+    draft: item.sent,
+  };
 }
 
 /** One card per person: who, where, one channel button, then a line per role. */
@@ -218,6 +244,20 @@ function FollowUpGroup({
   const overdue = mostOverdue > 0;
   const isPhone = first.channelKind === "phone";
   const isEmail = first.channelKind === "email";
+  const who = [first.who, first.company].filter(Boolean).join(" · ");
+  const alreadyWith = findWaitForAny(
+    waits,
+    items.map((item) => ({
+      leadId: item.target.leadId,
+      contactId: item.target.contactId,
+      personId: item.target.personId,
+    })),
+  );
+  const emailTarget: EmailCardTarget = {
+    ...followUpEmailTarget(first, who),
+    about: (items.map((item) => item.about).filter(Boolean).join("; ") || first.about)?.slice(0, 800),
+    also: items.slice(1).map((item) => followUpEmailTarget(item, who)),
+  };
 
   return (
     <li className="flex">
@@ -275,7 +315,13 @@ function FollowUpGroup({
           ))}
         </ul>
         {isEmail && (
-          <p className="px-4 pb-2.5 pt-1 text-[11px] text-slate-500">{EMAIL_CARD_NOTE}</p>
+          <div className="px-4 pb-2.5 pt-1">
+            <EmailCardActions
+              target={emailTarget}
+              onRecorded={onRecorded}
+              alreadyWith={alreadyWith}
+            />
+          </div>
         )}
       </div>
     </li>
@@ -489,24 +535,11 @@ function FollowUpRow({
             )}
           </div>
         </div>
-        {isEmail && (
+        {isEmail && !compact && (
           <div className="mt-2">
             <EmailCardActions
-              target={{
-                who,
-                about: item.about,
-                leadId: item.target.leadId,
-                contactId: item.target.contactId,
-                personId: item.target.personId,
-                actionId: item.actionId,
-                channelKind: item.channelKind,
-                value: item.value ?? "the address on record",
-                subject: item.subject,
-                words: item.sent,
-                draft: item.sent,
-              }}
+              target={followUpEmailTarget(item, who)}
               onRecorded={onRecorded}
-              hideNote={compact}
               alreadyWith={findWait(waits, {
                 leadId: item.target.leadId,
                 contactId: item.target.contactId,

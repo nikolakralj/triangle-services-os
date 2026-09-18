@@ -417,12 +417,14 @@ Checked signed in on localhost, 8/8; `check:dev-015` 15/15 and
 **Slice B done 16 September** (branch `claude/today-one-inbox`). Follow-ups for
 the same person are one card, grouped by the address the follow-up goes to (or
 name and company without one): the person, the oldest overdue date, the address
-and one Open mail or Dial on the card, then one line per role with its own Ask
-Bob or thread and Dismiss. A single follow-up still renders as before. Checked
-signed in on localhost, 4/4: Nicolas Preckler's two roles are one card with one
-Open mail and two Ask Bob actions, and his name appears once in Needs you.
-**Next: slice C.** Known: the "Open mail sends nothing" note repeats on each role
-line; one card shape should say it once.
+and one Open mail or Dial on the card, then one line per role. A single
+follow-up still renders as before. Checked signed in on localhost, 4/4: Nicolas
+Preckler's two roles are one card with one Open mail, and his name appears once
+in Needs you.
+**Follow-up 18 September:** Ask Bob and Dismiss sit once on the person, not on
+every nested role. After Hand to Bob the same card becomes With Bob with Open
+thread, the right-hand Today drawer opens, and the toast says the answer
+returns on this case. Waiting work stays quiet under In progress.
 
 **Slice C done 16 September** (branch `claude/today-one-inbox`). Every Needs you
 card now leads with its kind in the same place — Reply or Call on the hero card,
