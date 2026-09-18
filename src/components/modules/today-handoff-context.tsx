@@ -3,7 +3,12 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
-import { handoffKeys, type HandoffIds, type InProgressWait } from "@/lib/data/today-handoff";
+import {
+  handoffKeys,
+  type CaseRef,
+  type HandoffIds,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
 
 export type ThreadTarget = Pick<
   InProgressWait,
@@ -12,7 +17,15 @@ export type ThreadTarget = Pick<
   | "agentName"
   | "messageCount"
   | "awaitingAgent"
-> & { finished?: boolean };
+> & {
+  finished?: boolean;
+  /**
+   * The case this thread belongs to. Carried so the drawer can hand the
+   * resourcing half to Hanna without leaving the case — "ask Hanna for a bio"
+   * used to be a message Bob could not act on.
+   */
+  case?: CaseRef;
+};
 
 type TodayHandoffApi = {
   openThread: (thread: ThreadTarget) => void;
@@ -69,7 +82,11 @@ export function TodayHandoffProvider({ children }: { children: React.ReactNode }
           className="fixed bottom-5 left-5 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] shadow-lg shadow-slate-900/10"
         >
           <span>
-            <span className="font-semibold text-slate-900">Handed to Bob</span>
+            {/* Named, because Bob and Hanna now both take cases from Today
+                and "Handed to Bob" over a Hanna job is a lie about the owner. */}
+            <span className="font-semibold text-slate-900">
+              Handed to {toast.agentName || "Bob"}
+            </span>
             {". The answer returns on this case. "}
             <button
               type="button"

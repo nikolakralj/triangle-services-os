@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageSquare, Send } from "lucide-react";
+import { Loader2, MessageSquare } from "lucide-react";
 import type { AssignmentMessage } from "@/lib/data/assignment-threads";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,7 @@ export function AssignmentThread({
   finished,
   label,
   alwaysOpen = false,
+  composerHint,
 }: {
   assignmentId: string;
   messageCount: number;
@@ -37,6 +38,11 @@ export function AssignmentThread({
   label?: string;
   /** Skip the fold; used in the Today thread drawer. */
   alwaysOpen?: boolean;
+  /**
+   * Shown above the composer, given whatever is currently typed. The drawer
+   * uses it to notice an ask that belongs to a different colleague.
+   */
+  composerHint?: (draft: string) => React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(alwaysOpen);
@@ -212,6 +218,8 @@ export function AssignmentThread({
             </p>
           )}
 
+          {composerHint?.(draft)}
+
           <div className="flex items-end gap-2">
             <textarea
               value={draft}
@@ -231,16 +239,24 @@ export function AssignmentThread({
               type="button"
               disabled={sending || !draft.trim()}
               onClick={() => void send()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-900 bg-slate-900 px-3 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-900 bg-slate-900 px-3 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Send className="h-3.5 w-3.5" />
+                <MessageSquare className="h-3.5 w-3.5" />
               )}
-              Send
+              Message {recipient}
             </button>
           </div>
+
+          {/* On 18 September this button said "Send" beside a paper plane, in a
+              drawer opened from a mail card, and was read as sending the email.
+              It has never sent anything: it posts to the employee's queue. */}
+          <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+            This goes to {recipient} inside Triangle. Nothing is emailed — the
+            real Send is on the case.
+          </p>
 
           {notice && <p className="mt-1.5 text-xs text-slate-500">{notice}</p>}
           {error && <p className="mt-1.5 text-xs text-rose-600">{error}</p>}

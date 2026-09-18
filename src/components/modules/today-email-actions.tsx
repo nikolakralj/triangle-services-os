@@ -11,12 +11,25 @@ import {
 } from "@/lib/data/today-card-actions";
 import { useTodayHandoff, type ThreadTarget } from "@/components/modules/today-handoff-context";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
-import { type HandoffIds, type InProgressWait } from "@/lib/data/today-handoff";
+import { AskHannaAction } from "@/components/modules/ask-hanna-action";
+import {
+  type CaseRef,
+  type HandoffIds,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
-// Open mail stays on the channel bar. These two are the human judgments:
-// Ask Bob (hand the thread to Commercial Ops) and Dismiss (scoped, not a
-// blacklist). Sent / They replied / Later are off this rail.
+// Open mail stays on the channel bar. These are the human judgments:
+//
+//   Ask Bob     hand the thread to Commercial Ops — chase, dig, draft.
+//   Ask Hanna   hand the resourcing half to her — who we put forward, as a
+//               bio with initials or, when a person releases the identity,
+//               the full CV.
+//   Dismiss     scoped, not a blacklist.
+//
+// Ask Hanna stays available while Bob has the case. They are two halves of one
+// commercial move, not two owners of one job, and asking her must never mean
+// taking it off Bob. Sent / They replied / Later are off this rail.
 // ---------------------------------------------------------------------------
 
 export interface EmailCardAlsoTarget {
@@ -118,6 +131,18 @@ function defaultAsk(target: EmailCardTarget): string {
   return `Follow up with ${who}.`;
 }
 
+function caseRefOf(target: EmailCardTarget): CaseRef {
+  return {
+    who: target.who,
+    about: target.about ?? null,
+    leadId: target.leadId ?? null,
+    contactId: target.contactId ?? null,
+    personId: target.personId ?? null,
+    companyId: target.companyId ?? null,
+    missionId: target.missionId ?? null,
+  };
+}
+
 function handoffIdsOf(target: EmailCardTarget): HandoffIds[] {
   return [
     {
@@ -162,6 +187,9 @@ export function EmailCardActions({
   } | null>(null);
   const [fallbackThread, setFallbackThread] = useState<ThreadTarget | null>(null);
 
+  const isHannaHolding =
+    (alreadyWith?.agentName ?? "").trim().toLowerCase() === "hanna";
+
   const withBob = alreadyWith
     ? {
         assignmentId: alreadyWith.assignmentId,
@@ -187,7 +215,15 @@ export function EmailCardActions({
     messageCount: number,
     awaitingAgent = 0,
   ): ThreadTarget {
-    return { assignmentId, title, agentName, messageCount, awaitingAgent };
+    return {
+      assignmentId,
+      title,
+      agentName,
+      messageCount,
+      awaitingAgent,
+      // So Ask Hanna inside the drawer lands on this case, not a new one.
+      case: caseRefOf(target),
+    };
   }
 
   function openCaseThread(thread: ThreadTarget, pin: boolean) {
@@ -401,6 +437,10 @@ export function EmailCardActions({
             )}
             Take back
           </button>
+          {/* Bob having the chase does not mean he owns who we put forward. */}
+          {!isHannaHolding && (
+            <AskHannaAction caseRef={caseRefOf(target)} tone={tone} />
+          )}
         </div>
       ) : (
         <>
@@ -418,6 +458,7 @@ export function EmailCardActions({
               {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
               Ask Bob
             </button>
+            <AskHannaAction caseRef={caseRefOf(target)} tone={tone} />
             <div className="relative">
               <button
                 type="button"

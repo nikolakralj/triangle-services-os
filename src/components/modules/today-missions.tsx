@@ -30,7 +30,12 @@ import {
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { EmailCardActions, type EmailCardTarget } from "@/components/modules/today-email-actions";
-import { findWait, findWaitForAny, type InProgressWait } from "@/lib/data/today-handoff";
+import {
+  chaseWaits,
+  findWait,
+  findWaitForAny,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
 // ---------------------------------------------------------------------------
@@ -85,6 +90,9 @@ export function ReadyForYou({
 }) {
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const handoff = useTodayHandoff();
+  // Who owns the chase. A Hanna put-forward job on the same case is the other
+  // half and must not take the card out of Needs you.
+  const chase = chaseWaits(waits);
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
   const due = followUps.filter((f) => {
     const ids = {
@@ -92,13 +100,13 @@ export function ReadyForYou({
       contactId: f.target.contactId,
       personId: f.target.personId,
     };
-    if (!findWait(waits, ids)) return true;
+    if (!findWait(chase, ids)) return true;
     // Just handed to Bob: keep the same card as With Bob / Open thread so
     // the result is not a black hole into collapsed In progress.
     return handoff?.isPinned(ids) === true;
   });
   const reachable = people.filter(
-    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+    (p) => !findWait(chase, { personId: p.contactId, contactId: p.contactId }),
   );
 
   if (asking.length === 0 && reachable.length === 0 && due.length === 0 && !recorded) {
@@ -152,13 +160,13 @@ export function ReadyForYou({
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {groupByPerson(due).map((group) =>
               group.length === 1 ? (
-                <FollowUpRow key={group[0].actionId} item={group[0]} onRecorded={setRecorded} waits={waits} />
+                <FollowUpRow key={group[0].actionId} item={group[0]} onRecorded={setRecorded} waits={chase} />
               ) : (
                 <FollowUpGroup
                   key={group[0].actionId}
                   items={group}
                   onRecorded={setRecorded}
-                  waits={waits}
+                  waits={chase}
                 />
               ),
             )}
@@ -175,7 +183,7 @@ export function ReadyForYou({
       {reachable.length > 0 && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {reachable.map((p) => (
-            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={waits} />
+            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={chase} />
           ))}
         </ul>
       )}

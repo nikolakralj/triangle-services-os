@@ -35,7 +35,16 @@ import {
   SendFromTriangleReview,
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
-import { findDone, findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import {
+  chaseWaits,
+  findDone,
+  findWait,
+  matchesIds,
+  type CaseRef,
+  type InProgressWait,
+} from "@/lib/data/today-handoff";
+import type { PutForwardCase } from "@/lib/data/put-forward-cases";
+import { PutForwardBlock } from "@/components/modules/put-forward-block";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -100,6 +109,7 @@ export function TodayScreen({
   certs = [],
   sender = null,
   pool = [],
+  putForward = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -120,15 +130,21 @@ export function TodayScreen({
   sender?: { id: string; emailAddress: string } | null;
   /** People on the books a human may attach as an anonymised profile. */
   pool?: AttachableWorker[];
+  /** Open and recently finished "who we put forward" cases (Hanna's half). */
+  putForward?: PutForwardCase[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
   const nowAction = move.action;
+  // Who owns the chase. Hanna's who-we-put-forward job is the other half of
+  // the same case and has its own block on the card; counting it here would
+  // read as "somebody else is handling this" and take the card off Needs you.
+  const chase = chaseWaits(waits);
   const nowIds = nowAction
     ? { leadId: nowAction.leadId, contactId: nowAction.contactId }
     : null;
-  const nowWait = nowIds ? findWait(waits, nowIds) : null;
+  const nowWait = nowIds ? findWait(chase, nowIds) : null;
   // The same card stays when Bob has it (DEV-015). Needs you is only the
   // human decision — Send now, not the wait itself.
   const nowShowCard = Boolean(nowAction && !move.clear);
@@ -147,14 +163,14 @@ export function TodayScreen({
   const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
   const dueOpen = due.filter(
     (f) =>
-      !findWait(waits, {
+      !findWait(chase, {
         leadId: f.target.leadId,
         contactId: f.target.contactId,
         personId: f.target.personId,
       }),
   );
   const reachableOpen = ready.filter(
-    (p) => !findWait(waits, { personId: p.contactId, contactId: p.contactId }),
+    (p) => !findWait(chase, { personId: p.contactId, contactId: p.contactId }),
   );
   const needsYou =
     (nowNeedsYou ? 1 : 0) +
@@ -190,10 +206,11 @@ export function TodayScreen({
               key={cardKey}
               move={move}
               onLogged={setLogged}
-              waits={waits}
+              waits={chase}
               done={done}
               sender={sender}
               pool={pool}
+              putForward={putForward}
             />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
@@ -443,6 +460,7 @@ function NowCard({
   done,
   sender,
   pool,
+  putForward,
 }: {
   move: NextMove;
   onLogged: (logged: LoggedAttempt) => void;
@@ -450,6 +468,7 @@ function NowCard({
   done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
   pool: AttachableWorker[];
+  putForward: PutForwardCase[];
 }) {
   if (move.clear || !move.action) {
     return (
@@ -480,6 +499,7 @@ function NowCard({
         done={done}
         sender={sender}
         pool={pool}
+        putForward={putForward}
       />
     </div>
   );
@@ -506,6 +526,7 @@ function ActionPanel({
   done,
   sender,
   pool,
+  putForward,
 }: {
   action: NextMoveAction;
   onLogged: (logged: LoggedAttempt) => void;
@@ -514,6 +535,8 @@ function ActionPanel({
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
   pool: AttachableWorker[];
+  /** Hanna's who-we-put-forward cases, matched to this case below. */
+  putForward: PutForwardCase[];
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -570,6 +593,15 @@ function ActionPanel({
     leadId: action.leadId,
     contactId: action.contactId,
   });
+  const caseRef: CaseRef = {
+    who: action.personName,
+    about: action.personRole,
+    leadId: action.leadId,
+    contactId: action.contactId || null,
+  };
+  const putForwardHere = putForward.filter((item) =>
+    matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
+  );
 
   function pickWorker(nextId: string, next: OfferWorker | null) {
     setWorkerId(nextId);
@@ -693,6 +725,36 @@ function ActionPanel({
 
       <div className="space-y-4 px-6 py-5">
         <EmployeePrepared wait={nowWait} done={nowDone} />
+
+        {/* Hanna's half, on the same case. The handoff changed the owner of
+            who we put forward; it did not move the work anywhere else. */}
+        {putForwardHere.map((item) => (
+          <PutForwardBlock
+            key={item.assignmentId}
+            item={item}
+            caseRef={caseRef}
+            onPickWorker={(id) => {
+              const named = (action.candidates ?? []).find((c) => c.workerId === id);
+              const fromPool = pool.find((p) => p.workerId === id);
+              pickWorker(
+                id,
+                named ??
+                  (fromPool
+                    ? {
+                        workerId: fromPool.workerId,
+                        name: fromPool.name,
+                        role: fromPool.role,
+                        why: "",
+                        caveats:
+                          fromPool.status === "candidate"
+                            ? ["on file as a candidate"]
+                            : [],
+                      }
+                    : null),
+              );
+            }}
+          />
+        ))}
 
         {(offering || (action.candidates && action.candidates.length > 0) || pool.length > 0) && (
           <div>

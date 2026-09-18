@@ -1,4 +1,5 @@
 import { isBobRole } from "@/lib/data/ask-bob-policy";
+import { PUT_FORWARD_CASE_TYPE } from "@/lib/data/put-forward";
 
 // Client-safe: match a Today card to an open assignment so the same
 // company / person / requirement can show "With Bob" anywhere. Handoff
@@ -8,6 +9,18 @@ export interface HandoffIds {
   leadId?: string | null;
   contactId?: string | null;
   personId?: string | null;
+}
+
+/**
+ * Enough of a case to hand its resourcing half to somebody else without
+ * leaving it. Carried by the thread drawer so "ask Hanna for the bio", typed
+ * in Bob's thread, can become a real job on this same case.
+ */
+export interface CaseRef extends HandoffIds {
+  who: string;
+  about?: string | null;
+  companyId?: string | null;
+  missionId?: string | null;
 }
 
 export interface InProgressWait {
@@ -29,6 +42,20 @@ export interface InProgressWait {
   createdAt: string;
   /** Last thing the employee wrote in the Triangle thread. Not a Grok chat. */
   lastAgentBody: string | null;
+  /** `constraints.case_type` — which half of the case this owns. */
+  caseType: string | null;
+}
+
+/**
+ * The waits that own the chase on a case.
+ *
+ * Who we put forward is the other half, and it has its own place on the card.
+ * Without this split, asking Hanna for a bio made the card read "With Hanna",
+ * hid Ask Bob, and dropped a follow-up out of Needs you — the handoff eating
+ * the case, which is the bug DEV-015 exists to prevent.
+ */
+export function chaseWaits(waits: InProgressWait[]): InProgressWait[] {
+  return waits.filter((wait) => wait.caseType !== PUT_FORWARD_CASE_TYPE);
 }
 
 export function withLabelFor(roleKey: string, displayName: string): string {

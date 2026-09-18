@@ -96,6 +96,7 @@ export async function listInProgressWaits(
       awaitingAgent: thread?.awaitingAgent ?? 0,
       createdAt: (row.created_at as string) ?? "",
       lastAgentBody: thread?.lastAgentBody ?? null,
+      caseType: asId(constraints.case_type),
     });
     if (waits.length >= limit) break;
   }
