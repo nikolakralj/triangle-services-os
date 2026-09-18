@@ -109,6 +109,7 @@ export function TodayScreen({
   done,
   certs = [],
   sender = null,
+  senders = [],
   pool = [],
   putForward = [],
 }: {
@@ -129,6 +130,8 @@ export function TodayScreen({
   certs?: CertAlertRow[];
   /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
   sender?: { id: string; emailAddress: string } | null;
+  /** Every address this person may send from, when they own more than one. */
+  senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   /** People on the books a human may attach as an anonymised profile. */
   pool?: AttachableWorker[];
   /** Open and recently finished "who we put forward" cases (Hanna's half). */
@@ -210,6 +213,7 @@ export function TodayScreen({
               waits={chase}
               done={done}
               sender={sender}
+              senders={senders}
               pool={pool}
               putForward={putForward}
             />
@@ -482,6 +486,7 @@ function NowCard({
   waits,
   done,
   sender,
+  senders,
   pool,
   putForward,
 }: {
@@ -490,6 +495,7 @@ function NowCard({
   waits: InProgressWait[];
   done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
+  senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   pool: AttachableWorker[];
   putForward: PutForwardCase[];
 }) {
@@ -521,6 +527,7 @@ function NowCard({
         waits={waits}
         done={done}
         sender={sender}
+        senders={senders}
         pool={pool}
         putForward={putForward}
       />
@@ -548,6 +555,7 @@ function ActionPanel({
   waits,
   done,
   sender,
+  senders,
   pool,
   putForward,
 }: {
@@ -557,6 +565,7 @@ function ActionPanel({
   done: DoneItem[];
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
+  senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   pool: AttachableWorker[];
   /** Hanna's who-we-put-forward cases, matched to this case below. */
   putForward: PutForwardCase[];
@@ -890,6 +899,7 @@ function ActionPanel({
           <SendFromTriangleReview
             target={sendTarget}
             sender={sender}
+            senders={senders}
             pool={pool}
             pack={attachable}
             onPickWorker={(id) => {

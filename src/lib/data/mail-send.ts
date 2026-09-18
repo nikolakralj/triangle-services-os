@@ -2,7 +2,11 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { logContactAttempt } from "@/lib/data/contact-log";
 import { recordRefusal } from "@/lib/data/refusals";
-import { pickSendableMailbox, SEND_NOT_ENABLED } from "@/lib/mail/send-policy";
+import {
+  pickSendableMailbox,
+  sendableMailboxes,
+  SEND_NOT_ENABLED,
+} from "@/lib/mail/send-policy";
 import { isPlainAddress, sendViaMailbox } from "@/lib/mail/smtp-send";
 import { buildPackAttachment } from "@/lib/mail/pack-attachment";
 import { approvedPackForSend } from "@/lib/data/put-forward-cases";
@@ -70,26 +74,69 @@ interface MailboxRow {
   credential_ref: string | null;
 }
 
+export interface SendableMailboxOption {
+  id: string;
+  emailAddress: string;
+  /** What the recipient sees in front of the address, when one is set. */
+  displayName: string | null;
+}
+
+type MailboxPickRow = {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  owner_user_id: string | null;
+  can_send: boolean | null;
+  status: string | null;
+};
+
+async function ownMailboxRows(
+  orgId: string,
+  userId: string,
+): Promise<MailboxPickRow[] | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data, error } = await svc
+    .from("mail_accounts")
+    .select("id, email_address, display_name, owner_user_id, can_send, status")
+    .eq("org_id", orgId)
+    .eq("owner_user_id", userId);
+  // Before migration 049 the column does not exist; then nobody may send.
+  if (error || !data) return null;
+  return data as MailboxPickRow[];
+}
+
+/**
+ * Every address this person may send from.
+ *
+ * A person with a personal mailbox and a company one has two identities, and
+ * which one a first approach leaves from is a commercial decision — a
+ * recruiter reading `@gmail.com` is being told something different from one
+ * reading the company domain. Triangle used to choose the first row for
+ * them and show it as a fact.
+ */
+export async function sendableMailboxesFor(
+  orgId: string,
+  userId: string,
+): Promise<SendableMailboxOption[]> {
+  const rows = await ownMailboxRows(orgId, userId);
+  if (!rows) return [];
+  return sendableMailboxes(rows, userId).map((row) => ({
+    id: row.id,
+    emailAddress: row.email_address,
+    displayName: row.display_name,
+  }));
+}
+
 /** The mailbox this person may send from, if any. Never a colleague's. */
 export async function sendableMailboxFor(
   orgId: string,
   userId: string,
   preferredId: string | null = null,
 ): Promise<{ id: string; emailAddress: string } | null> {
-  const svc = createServiceSupabaseClient();
-  if (!svc) return null;
-  const { data, error } = await svc
-    .from("mail_accounts")
-    .select("id, email_address, owner_user_id, can_send, status")
-    .eq("org_id", orgId)
-    .eq("owner_user_id", userId);
-  // Before migration 049 the column does not exist; then nobody may send.
-  if (error || !data) return null;
-  const picked = pickSendableMailbox(
-    data as Array<{ id: string; email_address: string; owner_user_id: string | null; can_send: boolean | null; status: string | null }>,
-    userId,
-    preferredId,
-  );
+  const rows = await ownMailboxRows(orgId, userId);
+  if (!rows) return null;
+  const picked = pickSendableMailbox(rows, userId, preferredId);
   return picked ? { id: picked.id, emailAddress: picked.email_address } : null;
 }
 

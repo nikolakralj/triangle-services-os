@@ -102,6 +102,8 @@ const TONE = {
     error: "mt-2 text-[13px] text-rose-400",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-200",
+    select:
+      "rounded-lg border border-white/15 bg-black/30 px-2 py-1 font-mono text-[12.5px] text-slate-100 focus:border-white/30 focus:outline-none",
   },
   light: {
     button:
@@ -119,6 +121,8 @@ const TONE = {
     error: "mt-2 text-[12.5px] text-rose-600",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-800",
+    select:
+      "rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-[12.5px] text-slate-900 focus:border-slate-400 focus:outline-none",
   },
 } as const;
 
@@ -155,6 +159,7 @@ export function SendFromTriangleButton({
 export function SendFromTriangleReview({
   target,
   sender,
+  senders = [],
   tone = "dark",
   pool = [],
   pack = null,
@@ -164,6 +169,8 @@ export function SendFromTriangleReview({
 }: {
   target: SendTarget;
   sender: { id: string; emailAddress: string };
+  /** Every address this person may send from. One means no choice to make. */
+  senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   tone?: keyof typeof TONE;
   pool?: PoolWorker[];
   /** What Hanna prepared on this case, and whether anybody approved it. */
@@ -174,6 +181,13 @@ export function SendFromTriangleReview({
 }) {
   const router = useRouter();
   const t = TONE[tone];
+  const [mailAccountId, setMailAccountId] = useState(sender.id);
+  const from =
+    senders.find((box) => box.id === mailAccountId) ?? {
+      id: sender.id,
+      emailAddress: sender.emailAddress,
+      displayName: null,
+    };
   const [subject, setSubject] = useState(target.subject ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,7 +245,7 @@ export function SendFromTriangleReview({
           leadId: target.leadId,
           contactId: target.contactId || undefined,
           personId: target.personId,
-          mailAccountId: sender.id,
+          mailAccountId,
           attachPack: attach && canAttach,
           putForwardAssignmentId: attach && canAttach ? pack?.assignmentId : undefined,
         }),
@@ -251,8 +265,8 @@ export function SendFromTriangleReview({
       onSent({
         actionId: data.actionId,
         sentence: attached
-          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}, with ${attached}.`
-          : `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}.`,
+          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}, with ${attached}.`
+          : `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}.`,
         who: target.who,
         followUpAt: data.followUpAt ?? null,
         attachedFilename: attached,
@@ -272,7 +286,30 @@ export function SendFromTriangleReview({
         <dt className={`${t.line} ${t.muted}`}>To</dt>
         <dd className={`${t.line} font-mono`}>{target.to}</dd>
         <dt className={`${t.line} ${t.muted}`}>From</dt>
-        <dd className={`${t.line} font-mono`}>{sender.emailAddress}</dd>
+        <dd className={`${t.line} font-mono`}>
+          {/* Which identity this goes out under is a commercial decision, not
+              whichever mailbox the database listed first. With one address
+              there is nothing to choose and it stays a plain line. */}
+          {senders.length > 1 ? (
+            <select
+              value={mailAccountId}
+              onChange={(e) => setMailAccountId(e.target.value)}
+              disabled={busy}
+              aria-label="Send from"
+              className={t.select}
+            >
+              {senders.map((box) => (
+                <option key={box.id} value={box.id}>
+                  {box.displayName
+                    ? `${box.displayName} <${box.emailAddress}>`
+                    : box.emailAddress}
+                </option>
+              ))}
+            </select>
+          ) : (
+            from.emailAddress
+          )}
+        </dd>
       </dl>
       <label className="mt-2 block">
         <span className={`${t.line} ${t.muted}`}>Subject</span>
@@ -338,9 +375,9 @@ export function SendFromTriangleReview({
       />
 
       <p className={t.note}>
-        Leaves from your own mailbox. Triangle records the text as sent, the draft as
-        written, and sets the follow-up date. If your mail server refuses, nothing is
-        recorded as sent.
+        Leaves from {from.emailAddress}, your own mailbox. Triangle records the text as
+        sent, the draft as written, and sets the follow-up date. If your mail server
+        refuses, nothing is recorded as sent.
       </p>
       {error && <p className={t.error}>{error}</p>}
       <div className="mt-3 flex items-center gap-2">

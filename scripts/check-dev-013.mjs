@@ -66,7 +66,8 @@ async function run() {
 }
 
 // ── plain modules ───────────────────────────────────────────────────────────
-const { pickSendableMailbox, SEND_NOT_ENABLED } = moduleLoader()('src/lib/mail/send-policy.ts');
+const { pickSendableMailbox, sendableMailboxes, SEND_NOT_ENABLED } =
+  moduleLoader()('src/lib/mail/send-policy.ts');
 const { buildMime, dotStuff, defaultSmtpHost, isPlainAddress, sendViaMailbox } = moduleLoader({
   '@/lib/job-intake/credentials': {
     resolveMailboxPassword: (a) => {
@@ -89,6 +90,36 @@ test('only the owner of a mailbox with sending on may send; a colleague never', 
   assert.equal(pickSendableMailbox(accounts, 'colleague').id, 'b');
   assert.equal(pickSendableMailbox(accounts, 'employee-bot'), null);
   assert.equal(pickSendableMailbox([accounts[2]], 'owner'), null, 'default is off');
+});
+
+test('a person with two addresses is offered both, in a stable order', () => {
+  const accounts = [
+    { id: 'g', email_address: 'nikola@gmail.com', owner_user_id: 'owner', can_send: true, status: 'active' },
+    { id: 'c', email_address: 'nikola@triangle-services.com', owner_user_id: 'owner', can_send: true, status: 'active' },
+    { id: 'x', email_address: 'colleague@x.com', owner_user_id: 'colleague', can_send: true, status: 'active' },
+    { id: 'o', email_address: 'ingest@x.com', owner_user_id: 'owner', can_send: false, status: 'active' },
+  ];
+  const mine = sendableMailboxes(accounts, 'owner');
+  assert.deepEqual(
+    mine.map((a) => a.id),
+    ['g', 'c'],
+    'both of the owner\'s sendable addresses, by address so the order never moves',
+  );
+  assert.deepEqual(sendableMailboxes(accounts, 'colleague').map((a) => a.id), ['x']);
+  assert.deepEqual(sendableMailboxes(accounts, 'employee-bot'), []);
+  // The picker still answers with one, and still honours a deliberate choice.
+  assert.equal(pickSendableMailbox(accounts, 'owner', 'c').id, 'c');
+});
+
+test('the From line is a choice when there is one, and the server is told which', () => {
+  const comp = read('src/components/modules/send-from-triangle.tsx');
+  assert.match(comp, /senders\.length > 1 \?/);
+  assert.match(comp, /aria-label="Send from"/);
+  assert.match(comp, /setMailAccountId\(e\.target\.value\)/);
+  assert.match(comp, /mailAccountId,/, 'the picked mailbox is what /api/mail/send is given');
+  const page = read('src/app/(app)/decisions/page.tsx');
+  assert.match(page, /sendableMailboxesFor\(org, session\.userId\)/);
+  assert.match(page, /senders=\{senders\}/);
 });
 
 test('MIME: headers, threading, non-ASCII subject, dot-stuffing', () => {
@@ -572,7 +603,7 @@ test('Today card: Send from Triangle only with a sender; Open mail stays; review
   assert.match(screen, /Open mail/);
   assert.match(screen, /sendableMailboxFor|sender=\{sender\}/);
   const page = read('src/app/(app)/decisions/page.tsx');
-  assert.match(page, /sendableMailboxFor\(org, session\.userId\)/);
+  assert.match(page, /sendableMailboxesFor\(org, session\.userId\)/);
   const comp = read('src/components/modules/send-from-triangle.tsx');
   assert.match(comp, /if \(!sender\) return null;/);
   assert.match(comp, /Send now/);
