@@ -231,7 +231,7 @@ export async function askHanna(params: {
  * name is enough when exactly one person on the books answers to it, and two
  * Matejs bind nobody and come back as a question.
  */
-async function resolveWorker(params: {
+export async function resolveWorker(params: {
   orgId: string;
   workerId: string | null;
   text: string;

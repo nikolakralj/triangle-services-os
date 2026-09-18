@@ -149,18 +149,18 @@ test('Hand to Bob does not dismiss the Today card', () => {
   assert.match(askBobRoute, /does not dismiss the card/i);
 });
 
-test('After Hand to Bob the card is With Bob with Open thread and Take back', () => {
-  assert.match(emailActions, /With Bob|withLabel/);
-  assert.match(emailActions, /Open thread/);
-  assert.match(emailActions, /Take back/);
-  assert.match(emailActions, /\/api\/agents\/assignments/);
+test('After an Ask the card says who has it; the chip opens the thread, where Take back lives', () => {
+  assert.match(emailActions, /withLabel/);
+  assert.match(emailActions, /openCaseThread\(threadOf\(holder\), false\)/);
+  assert.match(drawer, /Take back/);
+  assert.match(drawer, /\/api\/agents\/assignments/);
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
 test('Toast copy is Handed to <employee> · Open thread, and the drawer opens on the case', () => {
   // Named rather than literally "Bob": Hanna takes cases from Today too, and
   // the toast must not claim the wrong owner (DEV-021).
-  assert.match(handoffCtx, /Handed to \{toast\.agentName/);
+  assert.match(handoffCtx, /Handed to \{toast\.handedTo \|\| toast\.agentName/);
   assert.match(handoffCtx, /The answer returns on this case/);
   assert.match(handoffCtx, /Open thread/);
   const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));

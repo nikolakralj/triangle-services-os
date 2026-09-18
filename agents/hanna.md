@@ -179,10 +179,12 @@ people hold a certificate, a ticket, an A1 or a visa: that is unchecked, and it
 belongs in `missing`. "Anton, plus six electricians from a partner firm in
 Croatia whose tickets nobody has seen yet" is the honest sentence.
 
-## Ask Hanna from a Today case — `who_we_put_forward`
+## Who we put forward on a Today case — `who_we_put_forward`
 
-A person reading a live commercial case can hand you its resourcing half
-without leaving it. You get an assignment with
+A person reading a live commercial case hands you its resourcing half
+without leaving it: their one Ask on the case, or words typed in Bob's thread,
+reach you by themselves when they are about who we put forward (18 September;
+there is no Ask Hanna button any more). You get an assignment with
 `constraints.case_type: who_we_put_forward` carrying:
 
 - `pack_intent` — `bio_anonymised`, `short_bio` or `full_cv`;
@@ -203,6 +205,15 @@ whether the facts behind it are true **for this country, this ticket and this
 week** — the three sellability checks below, the dated availability, and what
 is not recorded. When nobody is bound, name candidates from the pool with your
 reasons and say what is missing on each. Do not invent a person.
+
+**Decide, and say why.** Open your answer with the decision a competent
+colleague would make, then the reason: "We propose M.P. — PLC commissioning on
+TIA Portal, the closest match on the books. Sent as an anonymised bio: g2 is an
+agency, so the name stays with us. Not known yet: availability." Pick the best
+two or three at most; never hand back the whole pool to choose from. If the
+person later writes "use Igor instead" or "send the full CV", Triangle rebinds
+the same job and clears any approval — read the new words in your thread and
+check again.
 
 Finish with `{ assignmentId, result }` (or `failed: true`). This is not a
 research finding: do not file `reachable` / `one_thing_missing` / `dead` — a

@@ -54,18 +54,18 @@ const emailActions = read('src/components/modules/today-email-actions.tsx');
 const askBobRoute = read('src/app/api/ask/bob/route.ts');
 const dismissRoute = read('src/app/api/today/dismiss/route.ts');
 
-test('Ask Bob is present on the shared email card actions', () => {
-  assert.match(emailActions, /Ask Bob/);
-  assert.match(emailActions, /Hand to Bob/);
-  assert.match(emailActions, /\/api\/ask\/bob/);
+test('one Ask is on the shared email card actions (Employees, not buttons)', () => {
+  assert.match(emailActions, /\/api\/ask\/case/);
   assert.match(emailActions, /Dismiss/);
   assert.match(emailActions, /also:/);
+  // The person never picks the employee: no Ask Bob, no Ask Hanna, no Hand to X.
+  assert.doesNotMatch(emailActions, /Ask Bob|Ask Hanna|Hand to Bob|Hand to Hanna/);
 });
 
 test('primary email outcome buttons are off the Today rail', () => {
   assert.match(todayScreen, /EmailCardActions/);
   assert.match(todayMissions, /EmailCardActions/);
-  assert.match(emailActions, /Ask Bob/);
+  assert.match(emailActions, /\/api\/ask\/case/);
   assert.doesNotMatch(emailActions, />Sent</);
   assert.doesNotMatch(emailActions, />They replied</);
   assert.doesNotMatch(emailActions, />Sent a follow-up</);
@@ -85,7 +85,7 @@ test('follow-up email rows no longer offer Sent a follow-up as the main path', (
   assert.doesNotMatch(emailBranch, /Sent a follow-up/);
 });
 
-test('grouped follow-ups have one Ask Bob at person level, not per role', () => {
+test('grouped follow-ups have one Ask at person level, not per role', () => {
   const groupFn = todayMissions.slice(
     todayMissions.indexOf('function FollowUpGroup'),
     todayMissions.indexOf('function FollowUpRow'),
@@ -102,7 +102,7 @@ test('grouped follow-ups have one Ask Bob at person level, not per role', () => 
   assert.match(compactRow, /isEmail && !compact/);
 });
 
-test('ready-to-contact email people use Ask Bob, not Sent', () => {
+test('ready-to-contact email people use Ask, not Sent', () => {
   const readyFn = todayMissions.slice(todayMissions.indexOf('function ReadyPerson'));
   assert.match(readyFn, /channel\.kind === "email"/);
   assert.match(readyFn, /EmailCardActions/);

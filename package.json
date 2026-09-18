@@ -15,6 +15,7 @@
     "check:dev-015": "node scripts/check-dev-015.mjs",
     "check:dev-011": "node scripts/check-dev-011.mjs",
     "check:ask-hanna": "node scripts/check-ask-hanna.mjs",
+    "check:one-ask": "node scripts/check-one-ask.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

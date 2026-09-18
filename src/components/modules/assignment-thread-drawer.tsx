@@ -6,12 +6,16 @@ import { useRouter } from "next/navigation";
 import { Loader2, Undo2, X } from "lucide-react";
 import { AssignmentThread } from "@/components/modules/assignment-thread";
 import type { ThreadTarget } from "@/components/modules/today-handoff-context";
-import { AskHannaAction } from "@/components/modules/ask-hanna-action";
 import { asksForAPutForward } from "@/lib/data/put-forward";
 
 // Right-side drawer on Today. Open thread stays on the card's page; it does
 // not navigate to Workforce / What you handed out. Take back sits here, beside
 // what the employee has already done, for work that is still open.
+//
+// There is no second Ask in here. Words typed in Bob's thread that are about
+// who we put forward reach Hanna on the same case by themselves — the server
+// routes them — so nobody has to know whose half it is ("Employees, not
+// buttons", 18 September).
 //
 // Portaled to document.body so overflow-hidden follow-up lists cannot clip it.
 
@@ -37,8 +41,7 @@ export function AssignmentThreadDrawer({
 
   if (!thread || typeof document === "undefined") return null;
 
-  // Hanna already owns this half when the thread is hers; offering to hand it
-  // to herself would be the second-chat problem with a new name.
+  // Hanna already owns who we put forward when the thread is hers.
   const caseRef = thread.case ?? null;
   const isHanna = thread.agentName.trim().toLowerCase() === "hanna";
 
@@ -128,26 +131,13 @@ export function AssignmentThreadDrawer({
             composerHint={(draft) =>
               caseRef && !isHanna && asksForAPutForward(draft) ? (
                 <p className="mb-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-2 text-[12px] leading-snug text-violet-900">
-                  That reads like who we put forward, which is Hanna&apos;s half.{" "}
-                  {thread.agentName} cannot prepare a bio or a CV. Use Ask Hanna below —
-                  it stays on this case.
+                  Hanna gets this too — it reads like who we put forward, and she
+                  prepares that on this same case.
                 </p>
               ) : null
             }
           />
         </div>
-        {caseRef && !isHanna && (
-          <div className="border-t border-slate-100 px-4 py-3">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-700">
-              Who we put forward
-            </p>
-            <AskHannaAction
-              caseRef={caseRef}
-              fromAssignmentId={thread.assignmentId}
-              label="Ask Hanna"
-            />
-          </div>
-        )}
       </aside>
     </div>,
     document.body,

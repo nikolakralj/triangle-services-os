@@ -95,16 +95,25 @@ const FULL_MARKERS: RegExp[] = [
 ];
 
 /**
+ * The form the words ask for, or null when they do not say. One Ask on the
+ * case uses this to tell "change it to the full CV" from words that leave the
+ * form where the employee put it.
+ */
+export function explicitPackIntent(text: string | null | undefined): PackIntent | null {
+  const lower = (text ?? "").toLowerCase();
+  if (!lower.trim()) return null;
+  if (SHORT_MARKERS.some((re) => re.test(lower))) return "short_bio";
+  if (BIO_MARKERS.some((re) => re.test(lower))) return "bio_anonymised";
+  if (FULL_MARKERS.some((re) => re.test(lower))) return "full_cv";
+  return null;
+}
+
+/**
  * What the human asked for, from the words they wrote. Defaults to the
  * anonymised packet — including when they wrote nothing recognisable.
  */
 export function parsePackIntent(text: string | null | undefined): PackIntent {
-  const lower = (text ?? "").toLowerCase();
-  if (!lower.trim()) return DEFAULT_PACK_INTENT;
-  if (SHORT_MARKERS.some((re) => re.test(lower))) return "short_bio";
-  if (BIO_MARKERS.some((re) => re.test(lower))) return "bio_anonymised";
-  if (FULL_MARKERS.some((re) => re.test(lower))) return "full_cv";
-  return DEFAULT_PACK_INTENT;
+  return explicitPackIntent(text) ?? DEFAULT_PACK_INTENT;
 }
 
 export function isPackIntent(value: unknown): value is PackIntent {

@@ -824,6 +824,70 @@ approve a pack on a case and confirm the tick appears; send with it and
 confirm the recorded note names the file; try to send with an unapproved pack
 and confirm the refusal is in Settings → Diagnostics.
 
+### DEV-023 - One Ask on the case: the team decides who takes it - `IN_PROGRESS` (Claude, branch `claude/one-ask-on-the-case`, on top of DEV-022)
+
+**Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The
+Oliver Hall card asked the CEO to choose between Ask Bob and Ask Hanna, to pick
+a candidate from radio buttons, to pick bio or CV, and to read Drive and thread
+ids. An audit of Today on Production the same day counted about fifty buttons,
+three radio buttons over the pool, five raw ids and ten Drive file ids on one
+screen. The CEO does not care which employee does it; he wants the decision
+and its reason back on the card.
+
+**Slices, so another agent can continue:**
+
+- **A — One Ask. DONE on the branch (not merged).** The mail card has one Ask
+  and Dismiss. Ask opens one box, prefilled with a one-click default ("Take
+  this on: decide who we propose and in which form, and draft the reply.");
+  "Give it to the team" posts to `POST /api/ask/case`. `routeCaseAsk`
+  (`src/lib/data/case-ask-routing.ts`, pure) sends conversation words to Bob,
+  who-we-put-forward words to Hanna, both when both, and anything else to Bob.
+  A question about what already happened ("was the profile already sent?")
+  stays Bob's. Naming somebody on the books is Hanna's half; the recipient's
+  own name never binds a worker. `askTheTeam` (`src/lib/data/case-ask.ts`)
+  puts the words into the employee's thread already on this case (within 30
+  days; a finished thread reopens and wakes) instead of opening a second job —
+  a same-day second Ask Bob used to be dropped silently — and otherwise opens
+  the job through `askBob` / `askHanna`. When the words change the person or
+  the form, Hanna's case is rebound (`worker_id`, `pack_intent`, title, worker
+  entity) and **its approval is cleared**, because the send gate reads the
+  person and form from the case at send time. Words typed in Bob's thread that
+  are about who we put forward reach Hanna by themselves
+  (`routeThreadWords`, from `POST /api/assignments/[id]/messages`, signed-in
+  people only). "With Bob" / "With Hanna" on the card opens that thread; Take
+  back lives in the drawer. Removed: Ask Bob, Ask Hanna, Hand to Bob / Hanna,
+  the bio / short bio / CV radio, the drawer's Ask Hanna block, and
+  `ask-hanna-action.tsx`. `/api/ask/bob` and `/api/ask/hanna` stay as
+  internal paths.
+- **B — The team's decision instead of a radio list. NEXT.** Replace "Who we
+  put forward" radios, the pool search box and the "Bob prepared" wall with
+  one decision block: who we propose and why (Hanna's bound worker when her
+  case exists, else Triangle's top match, labelled as Triangle's pick until
+  she checks), in which form and why (an agency gets the anonymised bio), what
+  is not known yet, and the document to open. Bob's write-up shows its first
+  lines with ids stripped; the rest folds under Evidence. Approve stays one
+  button on the document (DEV-022's gate), "Not this one" becomes words in the
+  Ask. Same block on follow-up cards.
+- **C — Send decided, not picked. NEXT.** In the Send review: drop "Who the
+  reply is about" radios and the pool search (the decision block already says
+  it); pick the From address by rule — the mailbox the conversation is in,
+  said in words — instead of a select; attach the approved document named in
+  one line. Demote Open mail to a link; drop Copy pitch and "Copy what they
+  wrote".
+- **D — Employees start by themselves. LATER.** When an agency requirement
+  arrives, open Hanna's put-forward job and Bob's reply draft without a click,
+  so the card arrives already decided. Needs the wake-up cost and the bots'
+  schedules agreed first.
+
+**Acceptance (whole item):** on Oliver Hall's card a person types or accepts
+one Ask; the answer comes back on the card as a decision with its reason; they
+approve the document and press Send — without choosing an employee, a form or
+a candidate from a control, and with fewer primary buttons than before.
+
+**Checks:** `npm run check:one-ask` (16/16 at slice A). `check:ask-hanna`,
+`check:dev-015` and `check:today-slim` were updated from the old buttons to
+the one Ask. No migration and no SQL. Triangle still sends nothing.
+
 ### DEV-018 - Engineering out of the workforce - `DONE` (live, 17 September; SQL file not used as-is)
 
 **Why:** on 16 September Scout's HVAC EPC EU step asked the CEO "Promote Eng

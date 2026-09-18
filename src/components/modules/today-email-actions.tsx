@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Loader2, MessageSquare, Undo2 } from "lucide-react";
+import { ChevronDown, Loader2, MessageSquare } from "lucide-react";
 import {
   EMAIL_DISMISS_ADVANCED,
   EMAIL_DISMISS_OPTIONS,
@@ -11,25 +11,26 @@ import {
 } from "@/lib/data/today-card-actions";
 import { useTodayHandoff, type ThreadTarget } from "@/components/modules/today-handoff-context";
 import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
-import { AskHannaAction } from "@/components/modules/ask-hanna-action";
+import { DEFAULT_CASE_ASK } from "@/lib/data/case-ask-routing";
 import {
+  withLabelFor,
   type CaseRef,
   type HandoffIds,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
-// Open mail stays on the channel bar. These are the human judgments:
+// The judgments on a mail card: one Ask, and Dismiss.
 //
-//   Ask Bob     hand the thread to Commercial Ops — chase, dig, draft.
-//   Ask Hanna   hand the resourcing half to her — who we put forward, as a
-//               bio with initials or, when a person releases the identity,
-//               the full CV.
-//   Dismiss     scoped, not a blacklist.
+//   Ask       say what you want, once. Triangle decides who takes it — Bob
+//             for the conversation, Hanna for who we put forward and in which
+//             form, both when the words need both — and the answer comes back
+//             on this card ("Employees, not buttons", 18 September).
+//   Dismiss   scoped, not a blacklist.
 //
-// Ask Hanna stays available while Bob has the case. They are two halves of one
-// commercial move, not two owners of one job, and asking her must never mean
-// taking it off Bob. Sent / They replied / Later are off this rail.
+// Who has the case shows as "With Bob" / "With Hanna"; pressing it opens that
+// thread, where Take back lives. Nothing here sends anything: Send is a
+// person, on the card.
 // ---------------------------------------------------------------------------
 
 export interface EmailCardAlsoTarget {
@@ -62,7 +63,7 @@ export interface EmailCardTarget {
   subject?: string | null;
   words?: string | null;
   draft?: string | null;
-  /** Other roles on the same person/case. One Ask Bob / Dismiss covers them. */
+  /** Other roles on the same person/case. One Ask / Dismiss covers them. */
   also?: EmailCardAlsoTarget[];
 }
 
@@ -72,9 +73,35 @@ interface Recorded {
   who: string;
 }
 
+/** One employee holding part of this case, as the card shows it. */
+interface Holder {
+  assignmentId: string;
+  agentName: string;
+  label: string;
+  title: string;
+  messageCount: number;
+  awaitingAgent: number;
+}
+
+/** What POST /api/ask/case answers. */
+interface AskAnswer {
+  error?: string;
+  handed?: Array<{
+    employee: string;
+    half: "chase" | "put_forward";
+    assignmentId: string;
+    how: "new" | "thread";
+    notice: string;
+    changed: string[];
+  }>;
+  refused?: Array<{ employee: string; error: string }>;
+  ambiguous?: string[];
+  sentence?: string;
+}
+
 const TONE = {
   dark: {
-    ask: "rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400 disabled:opacity-40",
+    ask: "inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3.5 py-2 text-[13px] font-semibold text-sky-950 transition hover:bg-sky-400 disabled:opacity-40",
     dismiss:
       "inline-flex items-center gap-1 rounded-lg border border-white/15 px-3.5 py-2 text-[13px] font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-40",
     menu: "absolute right-0 z-20 mt-1 w-72 overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-xl shadow-slate-950/40",
@@ -89,13 +116,11 @@ const TONE = {
     cancel: "rounded-lg px-2 py-1.5 text-[12.5px] text-slate-400 transition hover:text-slate-200",
     error: "text-[13px] text-rose-400",
     note: "text-[11px] text-slate-500",
-    with: "rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-[12.5px] font-semibold text-sky-100",
-    thread:
-      "inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-[12.5px] font-semibold text-sky-950 transition hover:bg-sky-400 disabled:opacity-40",
-    back: "inline-flex items-center gap-1 rounded-lg border border-white/15 px-3 py-1.5 text-[12.5px] font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-40",
+    said: "text-[12.5px] leading-snug text-sky-100",
+    with: "inline-flex items-center gap-1.5 rounded-lg border border-sky-400/40 bg-sky-400/10 px-3 py-1.5 text-[12.5px] font-semibold text-sky-100 transition hover:bg-sky-400/20",
   },
   light: {
-    ask: "rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40",
+    ask: "inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40",
     dismiss:
       "inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40",
     menu: "absolute right-0 z-20 mt-1 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-900/10",
@@ -110,26 +135,16 @@ const TONE = {
     cancel: "rounded-lg px-2 py-1.5 text-[12.5px] text-slate-500 transition hover:text-slate-800",
     error: "text-[12px] text-rose-600",
     note: "text-[11px] text-slate-500",
-    with: "rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-[12.5px] font-semibold text-sky-900",
-    thread:
-      "inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-[12.5px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40",
-    back: "inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40",
+    said: "text-[12.5px] leading-snug text-slate-700",
+    with: "inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-[12.5px] font-semibold text-sky-900 transition hover:bg-sky-100",
   },
 } as const;
 
 export const EMAIL_CARD_NOTE =
-  "Open mail sends nothing. Send from Triangle leaves from your own mailbox and records itself. They replied comes off this rail until the mailbox can observe it. Recorded outside Triangle is under Dismiss if you already handled this.";
+  "Ask says what you want — the team decides who takes it, and the answer comes back on this card. Nothing leaves Triangle until you press Send.";
 
-function defaultAsk(target: EmailCardTarget): string {
-  const who = target.who.trim() || "this person";
-  const roles = [
-    target.about,
-    ...(target.also ?? []).map((item) => item.about),
-  ].filter((value): value is string => Boolean(value && value.trim()));
-  const unique = [...new Set(roles.map((value) => value.trim()))];
-  if (unique.length > 0) return `Follow up with ${who} about ${unique.join("; ")}.`;
-  return `Follow up with ${who}.`;
-}
+const ASK_PLACEHOLDER =
+  "Say what you want — “propose Matej as a bio”, “did Oliver answer?”, “follow up on Saxony, don't send”.";
 
 function caseRefOf(target: EmailCardTarget): CaseRef {
   return {
@@ -158,6 +173,23 @@ function handoffIdsOf(target: EmailCardTarget): HandoffIds[] {
   ];
 }
 
+/** The sentence under the card after an Ask: who has it, and anything the words changed or could not settle. */
+function answerSentence(body: AskAnswer): string {
+  const parts = [body.sentence ?? ""];
+  for (const handed of body.handed ?? []) {
+    if (handed.changed.length > 0) {
+      parts.push(`${handed.employee}'s part now: ${handed.changed.join(", ")}.`);
+    }
+  }
+  if ((body.ambiguous ?? []).length > 0) {
+    parts.push(`More than one person matched (${(body.ambiguous ?? []).join(", ")}) — say which.`);
+  }
+  for (const refused of body.refused ?? []) {
+    parts.push(`${refused.employee} could not take it: ${refused.error}`);
+  }
+  return parts.filter(Boolean).join(" ");
+}
+
 export function EmailCardActions({
   target,
   tone = "light",
@@ -176,75 +208,59 @@ export function EmailCardActions({
   const handoff = useTodayHandoff();
   const t = TONE[tone];
   const [asking, setAsking] = useState(false);
-  const [instruction, setInstruction] = useState(defaultAsk(target));
+  const [instruction, setInstruction] = useState(alreadyWith ? "" : DEFAULT_CASE_ASK);
   const [openDismiss, setOpenDismiss] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [handed, setHanded] = useState<{
-    assignmentId: string;
-    bobName: string;
-    messageCount: number;
-  } | null>(null);
+  const [handed, setHanded] = useState<Holder[]>([]);
+  const [said, setSaid] = useState<string | null>(null);
   const [fallbackThread, setFallbackThread] = useState<ThreadTarget | null>(null);
 
-  const isHannaHolding =
-    (alreadyWith?.agentName ?? "").trim().toLowerCase() === "hanna";
+  const holders: Holder[] = [];
+  if (alreadyWith) {
+    holders.push({
+      assignmentId: alreadyWith.assignmentId,
+      agentName: alreadyWith.agentName,
+      label: alreadyWith.withLabel,
+      title: alreadyWith.title,
+      messageCount: alreadyWith.messageCount,
+      awaitingAgent: alreadyWith.awaitingAgent,
+    });
+  }
+  for (const holder of handed) {
+    if (!holders.some((h) => h.assignmentId === holder.assignmentId)) holders.push(holder);
+  }
 
-  const withBob = alreadyWith
-    ? {
-        assignmentId: alreadyWith.assignmentId,
-        bobName: alreadyWith.agentName,
-        messageCount: alreadyWith.messageCount,
-        awaitingAgent: alreadyWith.awaitingAgent,
-        title: alreadyWith.title,
-      }
-    : handed
-      ? {
-          assignmentId: handed.assignmentId,
-          bobName: handed.bobName,
-          messageCount: handed.messageCount,
-          awaitingAgent: 0,
-          title: instruction.trim() || defaultAsk(target),
-        }
-      : null;
-
-  function threadFrom(
-    assignmentId: string,
-    title: string,
-    agentName: string,
-    messageCount: number,
-    awaitingAgent = 0,
-  ): ThreadTarget {
+  function threadOf(holder: Holder): ThreadTarget {
     return {
-      assignmentId,
-      title,
-      agentName,
-      messageCount,
-      awaitingAgent,
-      // So Ask Hanna inside the drawer lands on this case, not a new one.
+      assignmentId: holder.assignmentId,
+      title: holder.title,
+      agentName: holder.agentName,
+      messageCount: holder.messageCount,
+      awaitingAgent: holder.awaitingAgent,
       case: caseRefOf(target),
     };
   }
 
-  function openCaseThread(thread: ThreadTarget, pin: boolean) {
+  function openCaseThread(thread: ThreadTarget, pin: boolean, handedTo?: string) {
     if (handoff) {
-      if (pin) handoff.announceHanded(thread, handoffIdsOf(target));
+      if (pin) handoff.announceHanded({ ...thread, handedTo }, handoffIdsOf(target));
       else handoff.openThread(thread);
       return;
     }
     setFallbackThread(thread);
   }
 
-  async function askBob() {
+  async function askTeam() {
     const text = instruction.trim();
     if (text.length < 2) {
-      setError("Write what Bob should do.");
+      setError("Write what the team should do.");
       return;
     }
     setBusy("ask");
     setError(null);
     try {
-      const res = await fetch("/api/ask/bob", {
+      const res = await fetch("/api/ask/case", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -267,58 +283,37 @@ export function EmailCardActions({
             .filter((item) => item.leadId || item.contactId || item.personId),
         }),
       });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        assignmentId?: string;
-        alreadyOut?: boolean;
-        notice?: string;
-        bobName?: string;
-      };
-      if (!res.ok) {
-        setError(body.error ?? "Bob could not take that.");
+      const body = (await res.json().catch(() => ({}))) as AskAnswer;
+      if (!res.ok || !body.handed?.length) {
+        setError(body.error ?? "The team could not take that.");
         return;
       }
-      if (!body.assignmentId) {
-        setError("Bob took it, but no thread came back.");
-        return;
-      }
-      const next = {
-        assignmentId: body.assignmentId,
-        bobName: body.bobName || "Bob",
+      const next: Holder[] = body.handed.map((h) => ({
+        assignmentId: h.assignmentId,
+        agentName: h.employee,
+        label: withLabelFor("", h.employee),
+        title: text,
         messageCount: 1,
-      };
-      setHanded(next);
+        awaitingAgent: 1,
+      }));
+      setHanded((prev) => [
+        ...prev.filter((p) => !next.some((n) => n.assignmentId === p.assignmentId)),
+        ...next,
+      ]);
+      setSaid(answerSentence(body));
       setAsking(false);
+      setInstruction("");
+      // The conversation's thread first: that is where the reply is drafted.
+      const primary =
+        next[body.handed.findIndex((h) => h.half === "chase")] ?? next[0];
       openCaseThread(
-        threadFrom(next.assignmentId, text, next.bobName, next.messageCount),
+        threadOf(primary),
         true,
+        [...new Set(body.handed.map((h) => h.employee))].join(" and "),
       );
       window.setTimeout(() => router.refresh(), 400);
     } catch {
-      setError("Network error.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function takeBack(assignmentId: string) {
-    setBusy("back");
-    setError(null);
-    try {
-      const res = await fetch("/api/agents/assignments", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(body.error ?? "Could not take it back.");
-        return;
-      }
-      setHanded(null);
-      router.refresh();
-    } catch {
-      setError("Network error.");
+      setError("Network error. Nothing was handed over.");
     } finally {
       setBusy(null);
     }
@@ -399,88 +394,71 @@ export function EmailCardActions({
 
   return (
     <div className="space-y-2">
-      {withBob ? (
-        <>
+      {holders.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={t.with}>
-            {alreadyWith?.withLabel ?? `With ${withBob.bobName}`}
-          </span>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() =>
-              openCaseThread(
-                threadFrom(
-                  withBob.assignmentId,
-                  withBob.title,
-                  withBob.bobName,
-                  withBob.messageCount,
-                  withBob.awaitingAgent,
-                ),
-                false,
-              )
-            }
-            className={t.thread}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            Open thread
-          </button>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void takeBack(withBob.assignmentId)}
-            className={t.back}
-          >
-            {busy === "back" ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Undo2 className="h-3 w-3" />
-            )}
-            Take back
-          </button>
+          {holders.map((holder) => (
+            <button
+              key={holder.assignmentId}
+              type="button"
+              disabled={busy !== null}
+              onClick={() => openCaseThread(threadOf(holder), false)}
+              title={`Open ${holder.agentName}'s thread on this case`}
+              className={t.with}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              {holder.label || withLabelFor("", holder.agentName)}
+            </button>
+          ))}
         </div>
-          {!isHannaHolding && (
-            <AskHannaAction
-              caseRef={caseRefOf(target)}
-              fromAssignmentId={withBob.assignmentId}
-              tone={tone}
-            />
-          )}
-        </>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-1.5">
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          disabled={busy !== null}
+          aria-expanded={asking}
+          onClick={() => {
+            setAsking((v) => !v);
+            setOpenDismiss(false);
+            setError(null);
+          }}
+          className={t.ask}
+        >
+          {busy === "ask" && <Loader2 className="h-3 w-3 animate-spin" />}
+          Ask
+        </button>
+        {holders.length === 0 && (
+          <div className="relative">
             <button
               type="button"
               disabled={busy !== null}
+              aria-expanded={openDismiss}
               onClick={() => {
-                setAsking((v) => !v);
-                setOpenDismiss(false);
-                setError(null);
+                setOpenDismiss((v) => !v);
+                setAsking(false);
               }}
-              className={t.ask}
+              className={t.dismiss}
             >
-              {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-              Ask Bob
+              Dismiss
+              <ChevronDown className="h-3 w-3" />
             </button>
-            <AskHannaAction caseRef={caseRefOf(target)} tone={tone} />
-            <div className="relative">
-              <button
-                type="button"
-                disabled={busy !== null}
-                aria-expanded={openDismiss}
-                onClick={() => {
-                  setOpenDismiss((v) => !v);
-                  setAsking(false);
-                }}
-                className={t.dismiss}
-              >
-                Dismiss
-                <ChevronDown className="h-3 w-3" />
-              </button>
-              {openDismiss && (
-                <div role="menu" className={t.menu}>
-                  {EMAIL_DISMISS_OPTIONS.map((opt) => (
+            {openDismiss && (
+              <div role="menu" className={t.menu}>
+                {EMAIL_DISMISS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.reason}
+                    type="button"
+                    role="menuitem"
+                    disabled={busy !== null}
+                    onClick={() => void dismiss(opt.reason)}
+                    className={t.item}
+                  >
+                    <span className={t.label}>{opt.label}</span>
+                    <span className={t.hint}>{opt.hint}</span>
+                  </button>
+                ))}
+                <div className={t.advanced}>
+                  {EMAIL_DISMISS_ADVANCED.map((opt) => (
                     <button
                       key={opt.reason}
                       type="button"
@@ -493,61 +471,46 @@ export function EmailCardActions({
                       <span className={t.hint}>{opt.hint}</span>
                     </button>
                   ))}
-                  <div className={t.advanced}>
-                    {EMAIL_DISMISS_ADVANCED.map((opt) => (
-                      <button
-                        key={opt.reason}
-                        type="button"
-                        role="menuitem"
-                        disabled={busy !== null}
-                        onClick={() => void dismiss(opt.reason)}
-                        className={t.item}
-                      >
-                        <span className={t.label}>{opt.label}</span>
-                        <span className={t.hint}>{opt.hint}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-          {asking && (
-            <div className={t.box}>
-              <textarea
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                rows={3}
-                disabled={busy !== null}
-                placeholder="What should Bob do?"
-                className={t.input}
-              />
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy !== null || instruction.trim().length < 2}
-                  onClick={() => void askBob()}
-                  className={t.send}
-                >
-                  {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-                  Hand to Bob
-                </button>
-                <button type="button" onClick={() => setAsking(false)} className={t.cancel}>
-                  Cancel
-                </button>
               </div>
-              <p className={`mt-2 ${t.note}`}>
-                Hand to Bob keeps this card. The answer returns here — Open thread opens on this
-                case.
-              </p>
-            </div>
-          )}
-        </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {asking && (
+        <div className={t.box}>
+          <textarea
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            rows={3}
+            disabled={busy !== null}
+            placeholder={ASK_PLACEHOLDER}
+            aria-label="What the team should do"
+            className={t.input}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy !== null || instruction.trim().length < 2}
+              onClick={() => void askTeam()}
+              className={t.send}
+            >
+              {busy === "ask" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+              Give it to the team
+            </button>
+            <button type="button" onClick={() => setAsking(false)} className={t.cancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
+
+      {said && <p className={t.said}>{said}</p>}
       {!hideNote && (
         <p className={t.note}>
-          {withBob
-            ? "Bob has this case. The answer returns here — Open thread stays on this card."
+          {holders.length > 0
+            ? "The team has this case. What they decide comes back on this card — Ask again to change it."
             : EMAIL_CARD_NOTE}
         </p>
       )}

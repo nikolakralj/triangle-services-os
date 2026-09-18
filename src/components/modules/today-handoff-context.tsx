@@ -19,6 +19,8 @@ export type ThreadTarget = Pick<
   | "awaitingAgent"
 > & {
   finished?: boolean;
+  /** Everyone the last Ask went to — "Bob and Hanna" — for the toast only. */
+  handedTo?: string;
   /**
    * The case this thread belongs to. Carried so the drawer can hand the
    * resourcing half to Hanna without leaving the case — "ask Hanna for a bio"
@@ -85,7 +87,7 @@ export function TodayHandoffProvider({ children }: { children: React.ReactNode }
             {/* Named, because Bob and Hanna now both take cases from Today
                 and "Handed to Bob" over a Hanna job is a lie about the owner. */}
             <span className="font-semibold text-slate-900">
-              Handed to {toast.agentName || "Bob"}
+              Handed to {toast.handedTo || toast.agentName || "the team"}
             </span>
             {". The answer returns on this case. "}
             <button

@@ -74,7 +74,9 @@ const filenames = load('src/lib/data/anonymised-cv-filename.ts');
 const askHannaSrc = read('src/lib/data/ask-hanna.ts');
 const policySrc = read('src/lib/data/ask-hanna-policy.ts');
 const routeSrc = read('src/app/api/ask/hanna/route.ts');
-const actionSrc = read('src/components/modules/ask-hanna-action.tsx');
+// The Ask Hanna button left the card on 18 September ("Employees, not
+// buttons"): her half is reached through the one Ask on the case.
+const actionSrc = read('src/lib/data/case-ask.ts');
 const drawerSrc = read('src/components/modules/assignment-thread-drawer.tsx');
 const threadSrc = read('src/components/modules/assignment-thread.tsx');
 const emailActionsSrc = read('src/components/modules/today-email-actions.tsx');
@@ -373,26 +375,27 @@ test('Today and the follow-up rail both decide ownership on the chase half', () 
   assert.match(todayScreenSrc, /<InProgressByEmployee waits=\{waits\}/);
 });
 
-test('Ask Hanna is on the card, and stays there while Bob has the chase', () => {
-  assert.match(emailActionsSrc, /AskHannaAction/);
-  assert.match(emailActionsSrc, /isHannaHolding/);
-  const from = emailActionsSrc.indexOf('{withBob ? (');
-  const to = emailActionsSrc.indexOf('\n      ) : (', from);
-  assert.notEqual(from, -1);
-  assert.ok(to > from, 'withBob branch not found');
-  assert.match(emailActionsSrc.slice(from, to), /AskHannaAction/);
+test('Hanna is reached through the one Ask, which stays on the card while Bob has the chase', () => {
+  assert.match(emailActionsSrc, /\/api\/ask\/case/);
+  assert.doesNotMatch(emailActionsSrc, /AskHannaAction|Ask Hanna/);
+  // The Ask button is not hidden when somebody already holds the case.
+  const askButton = emailActionsSrc.indexOf('aria-expanded={asking}');
+  assert.notEqual(askButton, -1);
+  const guard = emailActionsSrc.lastIndexOf('holders.length === 0 && (', askButton);
+  const holdersRow = emailActionsSrc.lastIndexOf('holders.length > 0 && (', askButton);
+  assert.ok(guard === -1 || guard < holdersRow, 'Ask must not sit behind the no-holder guard');
 });
 
-test('Ask Hanna posts a handoff, not an email, and defaults to the bio', () => {
-  assert.match(actionSrc, /\/api\/ask\/hanna/);
-  assert.match(actionSrc, /parsePackIntent/);
-  assert.match(actionSrc, /Hand to Hanna/);
-  assert.match(actionSrc, /you still press Send/i);
+test('Hanna\'s half posts a handoff, not an email, and defaults to the bio', () => {
+  assert.match(actionSrc, /askHanna\(/);
+  assert.match(actionSrc, /explicitPackIntent/);
+  assert.match(actionSrc, /intent \?\? DEFAULT_PACK_INTENT/);
   assert.doesNotMatch(actionSrc, /\/api\/mail\/send/);
   assert.match(routeSrc, /refuseUnlessHuman/);
   assert.match(routeSrc, /parsePackIntent/);
   assert.match(routeSrc, /DEFAULT_PACK_INTENT/);
-  assert.match(emailActionsSrc, /fromAssignmentId=\{withBob\.assignmentId\}/);
+  // The two halves stay joined: Hanna's job carries Bob's thread on the case.
+  assert.match(actionSrc, /fromAssignmentId: params\.chaseThread/);
 });
 
 test('the result returns on the same case, not a second chat', () => {
@@ -424,12 +427,15 @@ test('the thread composer says it messages the employee, and emails nobody', () 
   assert.doesNotMatch(threadSrc, /^\s*Send\s*$/m);
   assert.match(drawerSrc, /composerHint/);
   assert.match(drawerSrc, /asksForAPutForward/);
-  assert.match(drawerSrc, /Ask Hanna/);
+  assert.match(drawerSrc, /Hanna gets this too/);
+  assert.doesNotMatch(drawerSrc, /AskHannaAction/);
+  // Words typed in Bob's thread reach Hanna by themselves.
+  assert.match(read('src/app/api/assignments/[id]/messages/route.ts'), /routeThreadWords/);
 });
 
 test('the toast names the employee who took it', () => {
   const ctx = read('src/components/modules/today-handoff-context.tsx');
-  assert.match(ctx, /Handed to \{toast\.agentName/);
+  assert.match(ctx, /Handed to \{toast\.handedTo \|\| toast\.agentName/);
   assert.match(ctx, /The answer returns on this case/);
 });
 
@@ -453,7 +459,8 @@ test('the role files tell Bob and Hanna whose half this is', () => {
   assert.match(hannaMd, /do not file `reachable`/i);
   const bobMd = read('agents/bob.md');
   assert.match(bobMd, /Who we put forward is Hanna's/);
-  assert.match(bobMd, /Ask Hanna/);
+  // No button to press for her half: the one Ask and Bob's thread reach her.
+  assert.match(bobMd, /reaches Hanna by itself/);
   const inbox = read('src/app/api/agent/inbox/route.ts');
   assert.match(inbox, /who_we_put_forward/);
   assert.match(inbox, /pack_intent/);
