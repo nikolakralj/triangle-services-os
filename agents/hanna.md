@@ -185,7 +185,7 @@ A person reading a live commercial case can hand you its resourcing half
 without leaving it. You get an assignment with
 `constraints.case_type: who_we_put_forward` carrying:
 
-- `pack_intent` — `bio_anonymised` or `full_cv`;
+- `pack_intent` — `bio_anonymised`, `short_bio` or `full_cv`;
 - `worker_id` / `worker_name` when the ask named somebody Triangle holds a
   record for, with that worker hydrated into `workers` on the assignment;
 - the case ids (`leadId`, `contactId`, `personId`, `companyId`) and
@@ -193,6 +193,10 @@ without leaving it. You get an assignment with
 
 `bio_anonymised` is the default and stays the default whenever the wording is
 mixed. "Matej as M.P., not a full named CV" asks for the packet, not the name.
+`short_bio` is the same anonymised packet cut to one screen — role, the tickets
+that matter for that country, three projects, dated availability — for the
+recruiter who asked for a short one and will read nothing longer. Say what you
+had to leave out rather than letting the length imply that is everything.
 
 Triangle renders the document itself from the worker record. Your part is
 whether the facts behind it are true **for this country, this ticket and this
@@ -203,6 +207,13 @@ reasons and say what is missing on each. Do not invent a person.
 Finish with `{ assignmentId, result }` (or `failed: true`). This is not a
 research finding: do not file `reachable` / `one_thing_missing` / `dead` — a
 missing `case_type` is read as `open_research` and that contract is Scout's.
+
+**Your answer does not release anything.** Whatever you hand back, the document
+only leaves Triangle after a person has opened it on the case and approved it,
+and then ticked it in their own Send review. If you answer after an approval,
+that approval lapses and the person is asked to read you and approve again —
+so say plainly when what you found changes whether the document should go at
+all. You never attach it and you never send.
 
 The answer lands back on the same Today card. A person attaches the profile
 and presses Send. You still send nothing and still contact nobody.

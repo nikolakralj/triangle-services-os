@@ -755,7 +755,74 @@ waiting for her next scheduled inbox read. Until it is set the case says so
 in words rather than pretending she was woken.
 
 **Follow-up, deliberately not here:** the dual From picker (gmail vs
-triangle-services.com) and autonomous send.
+triangle-services.com) and autonomous send. The From picker is now DEV-022
+below; autonomous send stays out.
+
+### DEV-022 - Approve before attach, the short bio, and which address it leaves from - `DONE` (code; Preview smoke owed)
+
+**Why now (18 September, on top of DEV-021):** DEV-021 shipped the loop, and a
+read of it found the release gate missing. In the Send review, picking who to
+put forward switched the attach on for you, and the tick was the whole gate:
+`/api/mail/send` took the boolean, built a profile for whatever `workerId`
+arrived, and sent it. Nothing checked that a person had opened the document,
+nothing tied the attachment to the case, and the builder passed
+`includeIdentity: false` unconditionally — so a case asked for as a full CV
+attached the anonymised one under a checkbox that promised either. Two smaller
+gaps from the same law: "just a short bio" produced the long bio, and a person
+who owns two sendable mailboxes had one of them chosen for them.
+
+**Law (Nikola, 18 September):** a person must open Hanna's Triangle version on
+the case and **approve** it before it can be attached on Send. No silent
+auto-attach.
+
+**Depends on:** DEV-021 (the put-forward case), DEV-013 (human Send),
+migration 042 (human review columns on an assignment).
+
+**Acceptance:**
+1. The case carries an approval state: `not_checked`, `approved`,
+   `superseded`, `not_used`. Only `approved` may be attached.
+2. Approving is a person on the case: `PATCH /api/put-forward` records
+   `review_outcome` + `reviewed_by` + `reviewed_at`, and writes back what was
+   approved — which version, which filename, and whether Hanna's check was in.
+   Ruling one out costs a reason. Machine keys and viewers are refused.
+3. **The server is the gate.** `sendFromTriangle` re-reads the approval from
+   the record: unapproved, superseded, or approved on a different case are
+   refusals in the ledger, and nothing is sent — not even the words.
+4. The attach tick starts off, exists only once an approval stands, and names
+   the exact file. Picking who the reply is about no longer ticks it.
+5. What goes out is the version that was approved: a case approved as
+   `full_cv` attaches the named CV, not the bio.
+6. An approval lapses when Hanna answers after it. The card says so and asks
+   for it again.
+7. `short_bio` is a third version — anonymised, one screen, its own
+   `-short-profile.pdf` — parsed before the bio markers because "short bio"
+   contains "bio".
+8. Today loads every address the signed-in person may send from; with more
+   than one the Send review offers a From picker. The owner-only rule is
+   unchanged.
+9. The thread drawer opens on a status read from the record (queued / working
+   / answered / stopped, with "not picked up yet" counted honestly), then the
+   last word; earlier messages are folded, and a reply longer than a screen
+   is folded to its opening with a way to read all of it.
+
+**Done 18 September (code).** `put-forward.ts` (approval law, `short_bio`),
+`anonymised-cv-filename.ts` (one filename for card and wire),
+`put-forward-cases.ts` (`getPutForwardCase`, `decidePutForwardPack`,
+`approvedPackForSend`), `PATCH /api/put-forward`, `pack-attachment.ts`
+(replaces `anonymised-cv-attachment.ts`, builds the approved version),
+`mail-send.ts`, `send-from-triangle.tsx`, `put-forward-block.tsx`,
+`send-policy.ts` (`sendableMailboxes`), `case-work-status.ts` +
+`assignment-work.ts` + `assignment-thread.tsx` (the drawer's status and
+fold). Checks: `npm run check:ask-hanna` 37/37, `npm run check:dev-013`
+32/32, `npm run check:dev-015` 20/20.
+
+**No migration and no SQL.** The approval reuses migration 042's review
+columns, where "acknowledged" already means a person read it and agrees.
+
+**Still owed (Nikola):** the same signed-in Preview smoke as DEV-021, plus:
+approve a pack on a case and confirm the tick appears; send with it and
+confirm the recorded note names the file; try to send with an unapproved pack
+and confirm the refusal is in Settings → Diagnostics.
 
 ### DEV-018 - Engineering out of the workforce - `DONE` (live, 17 September; SQL file not used as-is)
 

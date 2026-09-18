@@ -2,21 +2,50 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Send } from "lucide-react";
+import { FileText, Loader2, Send } from "lucide-react";
+import {
+  mayAttachPack,
+  PACK_NOT_APPROVED,
+  PACK_SUPERSEDED,
+  type PackApproval,
+  type PackIntent,
+} from "@/lib/data/put-forward";
 
 // ---------------------------------------------------------------------------
 // Send from Triangle (DEV-013 + packet attach).
 //
 // Review, edit, press Send. The words in the card's editor are what goes;
 // the person sees To / From / Subject and the text once more, then presses
-// Send now. They may attach the anonymised Triangle profile for the person
-// they picked — filename is the Triangle reference, never the name. The
-// server sends through the person's own mailbox and only then records it.
-// If the mailbox's server refuses, nothing is recorded as sent.
+// Send now. The server sends through the person's own mailbox and only then
+// records it. If the mailbox's server refuses, nothing is recorded as sent.
+//
+// The attachment is the part that had to change. Picking somebody here used
+// to tick the attach for you, and the tick was the whole gate: the server
+// took the boolean, built a profile for whatever worker id arrived, and sent
+// it. So a person's profile could leave Triangle without anyone having
+// opened it.
+//
+// Now the tick only exists for a profile a person has already approved on
+// this case, it starts off, and the server re-reads the approval anyway.
+// With nothing approved, this says what is missing instead of offering a
+// checkbox that cannot work.
 //
 // Rendered only when the person has a mailbox with sending turned on; with
 // none, Open mail stays the way out and this component renders nothing.
 // ---------------------------------------------------------------------------
+
+/** The approved profile on this case, as the Send review needs to know it. */
+export interface AttachablePack {
+  assignmentId: string;
+  approval: PackApproval;
+  intent: PackIntent;
+  /** "M. P." on a bio; the name once identity has been released. */
+  who: string;
+  filename: string;
+  href: string;
+  agentName: string;
+  approvedAt: string | null;
+}
 
 export interface OfferChoice {
   workerId: string;
@@ -73,6 +102,8 @@ const TONE = {
     error: "mt-2 text-[13px] text-rose-400",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-200",
+    select:
+      "rounded-lg border border-white/15 bg-black/30 px-2 py-1 font-mono text-[12.5px] text-slate-100 focus:border-white/30 focus:outline-none",
   },
   light: {
     button:
@@ -90,6 +121,8 @@ const TONE = {
     error: "mt-2 text-[12.5px] text-rose-600",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-800",
+    select:
+      "rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-[12.5px] text-slate-900 focus:border-slate-400 focus:outline-none",
   },
 } as const;
 
@@ -126,35 +159,46 @@ export function SendFromTriangleButton({
 export function SendFromTriangleReview({
   target,
   sender,
+  senders = [],
   tone = "dark",
   pool = [],
+  pack = null,
   onSent,
   onCancel,
   onPickWorker,
 }: {
   target: SendTarget;
   sender: { id: string; emailAddress: string };
+  /** Every address this person may send from. One means no choice to make. */
+  senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   tone?: keyof typeof TONE;
   pool?: PoolWorker[];
+  /** What Hanna prepared on this case, and whether anybody approved it. */
+  pack?: AttachablePack | null;
   onSent: (sent: SentRecord) => void;
   onCancel: () => void;
   onPickWorker?: (workerId: string) => void;
 }) {
   const router = useRouter();
   const t = TONE[tone];
+  const [mailAccountId, setMailAccountId] = useState(sender.id);
+  const from =
+    senders.find((box) => box.id === mailAccountId) ?? {
+      id: sender.id,
+      emailAddress: sender.emailAddress,
+      displayName: null,
+    };
   const [subject, setSubject] = useState(target.subject ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workerId, setWorkerId] = useState(target.workerId ?? "");
-  const [attach, setAttach] = useState(Boolean(target.workerId));
+  // Never pre-ticked. Nothing about a real person goes out because the page
+  // decided it for you.
+  const [attach, setAttach] = useState(false);
   const [query, setQuery] = useState("");
   const body = target.body.trim();
-  const canAttach = Boolean(workerId);
-  const ready =
-    !busy &&
-    subject.trim().length > 0 &&
-    body.length >= 2 &&
-    (!attach || canAttach);
+  const canAttach = Boolean(pack && mayAttachPack(pack.approval));
+  const ready = !busy && subject.trim().length > 0 && body.length >= 2;
 
   const choices = useMemo(() => {
     const seen = new Set<string>();
@@ -177,9 +221,11 @@ export function SendFromTriangleReview({
     return out;
   }, [target.candidates, pool, query]);
 
+  // Picking who the words are about does not decide what is attached. Those
+  // were one control until 18 September, which is how a profile could ride
+  // out on a message nobody had approved it for.
   function pick(id: string) {
     setWorkerId(id);
-    if (id) setAttach(true);
     onPickWorker?.(id);
   }
 
@@ -199,9 +245,9 @@ export function SendFromTriangleReview({
           leadId: target.leadId,
           contactId: target.contactId || undefined,
           personId: target.personId,
-          mailAccountId: sender.id,
-          workerId: attach && workerId ? workerId : undefined,
-          attachAnonymisedCv: attach && Boolean(workerId),
+          mailAccountId,
+          attachPack: attach && canAttach,
+          putForwardAssignmentId: attach && canAttach ? pack?.assignmentId : undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -219,8 +265,8 @@ export function SendFromTriangleReview({
       onSent({
         actionId: data.actionId,
         sentence: attached
-          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}, with ${attached}.`
-          : `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}.`,
+          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}, with ${attached}.`
+          : `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}.`,
         who: target.who,
         followUpAt: data.followUpAt ?? null,
         attachedFilename: attached,
@@ -233,8 +279,6 @@ export function SendFromTriangleReview({
     }
   }
 
-  const selected = choices.find((c) => c.workerId === workerId);
-
   return (
     <div className={t.box} role="dialog" aria-label="Review before sending">
       <p className={t.label}>Once more before it goes</p>
@@ -242,7 +286,30 @@ export function SendFromTriangleReview({
         <dt className={`${t.line} ${t.muted}`}>To</dt>
         <dd className={`${t.line} font-mono`}>{target.to}</dd>
         <dt className={`${t.line} ${t.muted}`}>From</dt>
-        <dd className={`${t.line} font-mono`}>{sender.emailAddress}</dd>
+        <dd className={`${t.line} font-mono`}>
+          {/* Which identity this goes out under is a commercial decision, not
+              whichever mailbox the database listed first. With one address
+              there is nothing to choose and it stays a plain line. */}
+          {senders.length > 1 ? (
+            <select
+              value={mailAccountId}
+              onChange={(e) => setMailAccountId(e.target.value)}
+              disabled={busy}
+              aria-label="Send from"
+              className={t.select}
+            >
+              {senders.map((box) => (
+                <option key={box.id} value={box.id}>
+                  {box.displayName
+                    ? `${box.displayName} <${box.emailAddress}>`
+                    : box.emailAddress}
+                </option>
+              ))}
+            </select>
+          ) : (
+            from.emailAddress
+          )}
+        </dd>
       </dl>
       <label className="mt-2 block">
         <span className={`${t.line} ${t.muted}`}>Subject</span>
@@ -256,9 +323,11 @@ export function SendFromTriangleReview({
       </label>
       <pre className={t.pre}>{body}</pre>
 
+      {/* Who the words name. Changing it rewrites the background line in the
+          reply; it does not attach anything. */}
       {(target.candidates?.length || pool.length > 0) && (
         <div className="mt-3">
-          <p className={`${t.line} ${t.muted}`}>Who to put forward</p>
+          <p className={`${t.line} ${t.muted}`}>Who the reply is about</p>
           <div className="mt-1.5 space-y-1">
             {choices.map((c) => (
               <label
@@ -297,32 +366,18 @@ export function SendFromTriangleReview({
         </div>
       )}
 
-      <label className={t.check}>
-        <input
-          type="checkbox"
-          checked={attach}
-          onChange={(e) => setAttach(e.target.checked)}
-          disabled={busy}
-          className="mt-1"
-        />
-        <span>
-          Attach the anonymised Triangle profile (PDF). The filename is the
-          Triangle reference, never their name. Bob does not send.
-        </span>
-      </label>
-      {attach && !workerId && (
-        <p className={t.error}>Pick who to put forward before attaching a profile.</p>
-      )}
-      {attach && selected && (
-        <p className={t.note}>
-          {selected.name} — initials and no contact details. Named CVs stay in Talent.
-        </p>
-      )}
+      <AttachRow
+        pack={pack}
+        attach={attach}
+        onAttach={setAttach}
+        busy={busy}
+        tone={tone}
+      />
 
       <p className={t.note}>
-        Leaves from your own mailbox. Triangle records the text as sent, the draft as
-        written, and sets the follow-up date. If your mail server refuses, nothing is
-        recorded as sent.
+        Leaves from {from.emailAddress}, your own mailbox. Triangle records the text as
+        sent, the draft as written, and sets the follow-up date. If your mail server
+        refuses, nothing is recorded as sent.
       </p>
       {error && <p className={t.error}>{error}</p>}
       <div className="mt-3 flex items-center gap-2">
@@ -335,5 +390,83 @@ export function SendFromTriangleReview({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The attachment, and only in the state where attaching is a real option.
+ *
+ * Every other state says what is missing and where to go, rather than
+ * offering a tick that the server would refuse. An unapproved profile has no
+ * checkbox at all — a disabled one still reads as "almost allowed".
+ */
+function AttachRow({
+  pack,
+  attach,
+  onAttach,
+  busy,
+  tone,
+}: {
+  pack: AttachablePack | null;
+  attach: boolean;
+  onAttach: (next: boolean) => void;
+  busy: boolean;
+  tone: keyof typeof TONE;
+}) {
+  const t = TONE[tone];
+
+  if (!pack) {
+    return (
+      <p className={t.note}>
+        Nothing is attached. To put somebody forward, ask Hanna on this case and
+        approve what she prepares.
+      </p>
+    );
+  }
+
+  const preview = (
+    <a
+      href={pack.href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+    >
+      <FileText className="h-3 w-3" />
+      Open {pack.filename}
+    </a>
+  );
+
+  if (!mayAttachPack(pack.approval)) {
+    return (
+      <p className={t.note}>
+        {pack.approval === "superseded" ? PACK_SUPERSEDED : PACK_NOT_APPROVED} {preview}
+      </p>
+    );
+  }
+
+  const what =
+    pack.intent === "full_cv"
+      ? "the full named CV"
+      : pack.intent === "short_bio"
+        ? "the short bio — initials, one screen, no contact details"
+        : "the anonymised bio — initials, no contact details";
+
+  return (
+    <>
+      <label className={t.check}>
+        <input
+          type="checkbox"
+          checked={attach}
+          onChange={(e) => onAttach(e.target.checked)}
+          disabled={busy}
+          className="mt-1"
+        />
+        <span>
+          Attach {pack.filename} — {what} for {pack.who}. You approved this on the
+          case; it goes only because you tick it.
+        </span>
+      </label>
+      <p className={t.note}>{preview}</p>
+    </>
   );
 }

@@ -33,6 +33,7 @@ import { EmailCardActions } from "@/components/modules/today-email-actions";
 import {
   SendFromTriangleButton,
   SendFromTriangleReview,
+  type AttachablePack,
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
 import {
@@ -43,7 +44,7 @@ import {
   type CaseRef,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
-import type { PutForwardCase } from "@/lib/data/put-forward";
+import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { PutForwardBlock } from "@/components/modules/put-forward-block";
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ export function TodayScreen({
   done,
   certs = [],
   sender = null,
+  senders = [],
   pool = [],
   putForward = [],
 }: {
@@ -128,6 +130,8 @@ export function TodayScreen({
   certs?: CertAlertRow[];
   /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
   sender?: { id: string; emailAddress: string } | null;
+  /** Every address this person may send from, when they own more than one. */
+  senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   /** People on the books a human may attach as an anonymised profile. */
   pool?: AttachableWorker[];
   /** Open and recently finished "who we put forward" cases (Hanna's half). */
@@ -209,6 +213,7 @@ export function TodayScreen({
               waits={chase}
               done={done}
               sender={sender}
+              senders={senders}
               pool={pool}
               putForward={putForward}
             />
@@ -481,6 +486,7 @@ function NowCard({
   waits,
   done,
   sender,
+  senders,
   pool,
   putForward,
 }: {
@@ -489,6 +495,7 @@ function NowCard({
   waits: InProgressWait[];
   done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
+  senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   pool: AttachableWorker[];
   putForward: PutForwardCase[];
 }) {
@@ -520,6 +527,7 @@ function NowCard({
         waits={waits}
         done={done}
         sender={sender}
+        senders={senders}
         pool={pool}
         putForward={putForward}
       />
@@ -547,6 +555,7 @@ function ActionPanel({
   waits,
   done,
   sender,
+  senders,
   pool,
   putForward,
 }: {
@@ -556,6 +565,7 @@ function ActionPanel({
   done: DoneItem[];
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
+  senders: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   pool: AttachableWorker[];
   /** Hanna's who-we-put-forward cases, matched to this case below. */
   putForward: PutForwardCase[];
@@ -624,6 +634,9 @@ function ActionPanel({
   const putForwardHere = putForward.filter((item) =>
     matchesIds(item, { leadId: action.leadId, contactId: action.contactId }),
   );
+  // What the Send review may offer to attach: an approved pack on this case,
+  // or the nearest one so the review can say what is still missing.
+  const attachable = attachablePackFrom(putForwardHere);
 
   function pickWorker(nextId: string, next: OfferWorker | null) {
     setWorkerId(nextId);
@@ -886,7 +899,9 @@ function ActionPanel({
           <SendFromTriangleReview
             target={sendTarget}
             sender={sender}
+            senders={senders}
             pool={pool}
+            pack={attachable}
             onPickWorker={(id) => {
               const next =
                 (action.candidates ?? []).find((c) => c.workerId === id) ??
@@ -1001,6 +1016,28 @@ function ActionPanel({
       </div>
     </div>
   );
+}
+
+/**
+ * The pack the Send review should talk about: an approved one if there is
+ * one, otherwise the newest with a document, so the review can name what is
+ * still missing rather than going quiet.
+ */
+function attachablePackFrom(items: PutForwardCase[]): AttachablePack | null {
+  const withDocument = items.filter((item) => item.pack !== null);
+  const chosen =
+    withDocument.find((item) => mayAttachPack(item.approval)) ?? withDocument[0];
+  if (!chosen?.pack) return null;
+  return {
+    assignmentId: chosen.assignmentId,
+    approval: chosen.approval,
+    intent: chosen.intent,
+    who: chosen.pack.displayName,
+    filename: chosen.pack.filename,
+    href: chosen.pack.href,
+    agentName: chosen.agentName,
+    approvedAt: chosen.approvedAt,
+  };
 }
 
 function rewriteBackground(script: string, why: string): string {

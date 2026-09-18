@@ -5,11 +5,14 @@
 // and the offline check all read the same rules, so the button a person sees
 // and the row the database gets cannot disagree.
 //
-// Two shapes only:
+// Three shapes:
 //
 //   bio_anonymised  the capability packet — initials, role, tickets, languages,
 //                   right-to-work, dated availability. No name, no contact
 //                   details, no rate. The filename is the Triangle reference.
+//   short_bio       the same packet cut to one screen, for the recruiter who
+//                   asked for "just a short bio" and will read nothing longer.
+//                   Still initials, still no contact details.
 //   full_cv         identity released. A deliberate human choice for a buyer
 //                   who has actually committed to something.
 //
@@ -19,13 +22,26 @@
 // the name. So a bio marker anywhere wins, every time. The cost of being
 // wrong in that direction is a re-ask; the cost of being wrong in the other
 // direction is a candidate's identity in a stranger's inbox.
+//
+// Short is read before either, because "short bio" contains "bio" and the two
+// are not the same document. Both are anonymised, so getting that pair wrong
+// costs a length, not an identity.
 // ---------------------------------------------------------------------------
 
-export type PackIntent = "bio_anonymised" | "full_cv";
+export type PackIntent = "bio_anonymised" | "short_bio" | "full_cv";
 
 export const DEFAULT_PACK_INTENT: PackIntent = "bio_anonymised";
 
-export const PACK_INTENTS: readonly PackIntent[] = ["bio_anonymised", "full_cv"];
+export const PACK_INTENTS: readonly PackIntent[] = [
+  "bio_anonymised",
+  "short_bio",
+  "full_cv",
+];
+
+/** The versions that must never carry a name or contact details. */
+export function isAnonymisedIntent(intent: PackIntent): boolean {
+  return intent !== "full_cv";
+}
 
 /**
  * Who we put forward is resourcing work, not a research finding. Migration
@@ -52,6 +68,22 @@ const BIO_MARKERS: RegExp[] = [
   /\b[A-Za-z]\.\s?[A-Za-z]\.(?!\w)/,
 ];
 
+/**
+ * Wording that asks for the cut-down version. Read before everything else:
+ * "short bio" is also a bio, and the longer one is the wrong document for
+ * somebody who said short.
+ */
+const SHORT_MARKERS: RegExp[] = [
+  /\bshort(er)?\s+(bios?|profiles?|versions?|packs?|summar)/,
+  /\bbios?\s+\(?short\)?\b/,
+  /\bone[\s-]?pagers?\b/,
+  /\bone[\s-]?page\b/,
+  /\b1[\s-]?pagers?\b/,
+  /\bbrief\s+(bios?|profiles?|versions?|summar)/,
+  /\b(cut|trim|keep)\s+it\s+short\b/,
+  /\bjust\s+the\s+headlines?\b/,
+];
+
 /** Identity-released wording. Only read when no bio marker is present. */
 const FULL_MARKERS: RegExp[] = [
   /\bfull\s+(named\s+)?cvs?\b/,
@@ -69,28 +101,155 @@ const FULL_MARKERS: RegExp[] = [
 export function parsePackIntent(text: string | null | undefined): PackIntent {
   const lower = (text ?? "").toLowerCase();
   if (!lower.trim()) return DEFAULT_PACK_INTENT;
+  if (SHORT_MARKERS.some((re) => re.test(lower))) return "short_bio";
   if (BIO_MARKERS.some((re) => re.test(lower))) return "bio_anonymised";
   if (FULL_MARKERS.some((re) => re.test(lower))) return "full_cv";
   return DEFAULT_PACK_INTENT;
 }
 
 export function isPackIntent(value: unknown): value is PackIntent {
-  return value === "bio_anonymised" || value === "full_cv";
+  return (
+    value === "bio_anonymised" || value === "short_bio" || value === "full_cv"
+  );
 }
 
 export function packIntentLabel(intent: PackIntent): string {
-  return intent === "full_cv" ? "Full named CV" : "Bio — initials only";
+  if (intent === "full_cv") return "Full named CV";
+  if (intent === "short_bio") return "Short bio — one screen";
+  return "Bio — initials only";
 }
 
 /** One line on a card: what Hanna is preparing, in the CEO's words. */
 export function packIntentSentence(intent: PackIntent): string {
-  return intent === "full_cv"
-    ? "Full named CV. Identity released — a person chose that."
-    : "Anonymised profile: initials, no contact details, filename is the Triangle reference.";
+  if (intent === "full_cv") {
+    return "Full named CV. Identity released — a person chose that.";
+  }
+  if (intent === "short_bio") {
+    return "Anonymised, cut to one screen: initials, tickets, three projects, dated availability.";
+  }
+  return "Anonymised profile: initials, no contact details, filename is the Triangle reference.";
 }
 
 export function packIntentVerb(intent: PackIntent): string {
-  return intent === "full_cv" ? "preparing the full CV" : "preparing the bio";
+  if (intent === "full_cv") return "preparing the full CV";
+  if (intent === "short_bio") return "preparing the short bio";
+  return "preparing the bio";
+}
+
+/** The words the gate and the Send review use for one version. */
+export function packIntentNoun(intent: PackIntent): string {
+  if (intent === "full_cv") return "full named CV";
+  if (intent === "short_bio") return "short bio";
+  return "bio";
+}
+
+// ── the human review gate ───────────────────────────────────────────────────
+//
+// Nothing about a real person leaves Triangle because a checkbox was already
+// ticked. Before this, picking somebody in the Send review turned the attach
+// on for you, and the server took the tick on trust: it never looked at the
+// case, never checked that anyone had read the document, and built an
+// anonymised profile even when the case said a full CV had been asked for.
+//
+// So the tick is now the last step of a decision, not the decision. A person
+// opens the document, approves it on the case, and only then may it be
+// attached — and only to the case it was approved on, in the version it was
+// approved as.
+//
+// The approval is recorded in migration 042's review columns, with who and
+// when. "acknowledged" there already means "a person read this and agrees",
+// kept beside the employee's own claim rather than over it, which is exactly
+// what this is.
+
+export const PACK_APPROVED_OUTCOME = "acknowledged";
+export const PACK_NOT_USED_OUTCOME = "discarded";
+
+/**
+ * `not_checked`  nobody has approved it — it cannot be attached
+ * `approved`     a person opened it and approved it
+ * `superseded`   approved, then the employee said something after that
+ * `not_used`     a person ruled it out, with a reason
+ */
+export type PackApproval = "not_checked" | "approved" | "superseded" | "not_used";
+
+export function packApprovalOf(params: {
+  reviewOutcome: string | null | undefined;
+  reviewedAt: string | null | undefined;
+  /** When the employee handed her check in. */
+  completedAt: string | null | undefined;
+}): PackApproval {
+  if (params.reviewOutcome === PACK_NOT_USED_OUTCOME) return "not_used";
+  if (params.reviewOutcome !== PACK_APPROVED_OUTCOME) return "not_checked";
+  // Approving the document Triangle already holds does not have to wait for
+  // Hanna. But if she answered afterwards, what was approved is not what the
+  // case now says, and a stale approval must not carry an attachment.
+  if (
+    params.completedAt &&
+    params.reviewedAt &&
+    params.completedAt > params.reviewedAt
+  ) {
+    return "superseded";
+  }
+  return "approved";
+}
+
+/** The one state in which a document may ride on a message. */
+export function mayAttachPack(approval: PackApproval): boolean {
+  return approval === "approved";
+}
+
+export const PACK_NOT_APPROVED =
+  "Nobody has approved this one for sending. Open it on the case and approve it first.";
+
+export const PACK_SUPERSEDED =
+  "This was approved, and then Hanna answered. Read what she said and approve it again before it goes.";
+
+export const PACK_WRONG_CASE =
+  "That was approved on a different case. Ask Hanna for one on this case.";
+
+/** What the card says about where the approval stands. */
+export function packApprovalSentence(params: {
+  approval: PackApproval;
+  agentName: string;
+  finished: boolean;
+  intent: PackIntent;
+}): string {
+  const what = packIntentNoun(params.intent);
+  switch (params.approval) {
+    case "approved":
+      return `Approved. Tick it in the Send review to attach the ${what}.`;
+    case "superseded":
+      return PACK_SUPERSEDED;
+    case "not_used":
+      return "Ruled out. It cannot be attached.";
+    default:
+      return params.finished
+        ? `${params.agentName} has checked it. Open it, then approve it — nothing attaches until you do.`
+        : `${params.agentName} has not checked the facts yet. You can still open this and approve it; nothing attaches until you do.`;
+  }
+}
+
+/**
+ * What a person is recorded as having approved. Written into `review_note`
+ * so the decision survives without a second table, and so "he approved it"
+ * can be read back as a sentence months later.
+ */
+export function packApprovalNote(params: {
+  intent: PackIntent;
+  who: string;
+  filename: string;
+  agentName: string;
+  finished: boolean;
+}): string {
+  const what =
+    params.intent === "full_cv"
+      ? "full named CV"
+      : `anonymised ${packIntentNoun(params.intent)}`;
+  return `Approved the ${what} for ${params.who} (${params.filename}). ${
+    params.finished
+      ? `${params.agentName}'s check was in.`
+      : `${params.agentName} had not checked the facts yet.`
+  }`.slice(0, 1000);
 }
 
 /**
@@ -140,13 +299,16 @@ export function defaultPutForwardAsk(params: {
   workerName?: string | null;
   intent: PackIntent;
 }): string {
+  const what =
+    params.intent === "full_cv"
+      ? "the full CV"
+      : params.intent === "short_bio"
+        ? "the short bio"
+        : "the anonymised bio";
+  const tail = params.intent === "full_cv" ? "" : " — initials only";
   const subject = params.workerName?.trim()
-    ? params.intent === "full_cv"
-      ? `the full CV for ${params.workerName.trim()}`
-      : `the anonymised bio for ${params.workerName.trim()} — initials only`
-    : params.intent === "full_cv"
-      ? "the full CV for whoever fits"
-      : "the anonymised bio for whoever fits — initials only";
+    ? `${what} for ${params.workerName.trim()}${tail}`
+    : `${what} for whoever fits${tail}`;
   const to = params.who?.trim() ? ` for ${params.who.trim()}` : "";
   const about = params.about?.trim() ? ` about ${params.about.trim()}` : "";
   return `Prepare ${subject}${to}${about}. Say what is not recorded before it goes out.`;
@@ -200,4 +362,9 @@ export interface PutForwardCase {
   completedAt: string | null;
   pack: PutForwardPack | null;
   nobodyBound: boolean;
+  /** Where the human review gate stands. Only `approved` may be attached. */
+  approval: PackApproval;
+  approvedAt: string | null;
+  /** What the person wrote when they approved it or ruled it out. */
+  decidedNote: string | null;
 }

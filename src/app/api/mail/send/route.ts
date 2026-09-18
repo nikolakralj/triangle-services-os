@@ -28,8 +28,10 @@ const bodySchema = z
     personId: z.string().uuid().optional(),
     mailAccountId: z.string().uuid().optional().nullable(),
     inReplyTo: z.string().trim().max(998).optional().nullable(),
-    workerId: z.string().uuid().optional().nullable(),
-    attachAnonymisedCv: z.boolean().optional(),
+    // Attaching a person's profile takes both: the tick, and the case whose
+    // approval the server reads. Neither is believed on its own.
+    attachPack: z.boolean().optional(),
+    putForwardAssignmentId: z.string().uuid().optional().nullable(),
   })
   .refine((v) => Boolean(v.contactId || v.leadId || v.personId), {
     message: "Say who this is about: a contactId, a leadId or a personId.",
