@@ -149,6 +149,25 @@ Today's structure: **Needs you | In progress | Missions…**
 Why: handing Veronika to Bob and then hunting her under Workforce made the
 CEO the transport layer between the case and the employee.
 
+### 2026-09-18: Bob's work is the Triangle thread on the same Today card; Send may attach the anonymised profile
+
+Locked against the Oliver Hall / anonymised-profile miss. Grok chat is not
+Triangle truth. After Ask Bob:
+
+1. The **same Today card** stays. Needs you does not count it while Bob has
+   it; In progress stays quiet. The card shows the last thing Bob wrote in
+   the Triangle thread, or that nothing is in the thread yet.
+2. When Bob finishes, the **business situation** returns to Needs you with
+   that write-up still on the card — not "assignment completed" as the object.
+3. **Send from Triangle** may attach the anonymised Triangle profile for the
+   person the human picked. Filename is the Triangle reference, never their
+   name. Named CVs stay in Talent.
+4. Bob still **sends nothing**. `SENT_MESSAGES_RECORDED` stays false. Human
+   Send now.
+
+This is the Phase 0 packet-send defect list, not a new DEV ticket and not
+DEV-014.
+
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 
 CEO accepted the external expert amendment on 16 September 2026. Direction is

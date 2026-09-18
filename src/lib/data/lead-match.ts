@@ -272,7 +272,7 @@ export async function matchOpenLeads(
       rateText: (lead.rate_text as string | null) ?? null,
       headcountText: (lead.headcount_text as string | null) ?? null,
       receivedAt: lead.created_at as string,
-      candidates: candidates.slice(0, 3),
+      candidates: candidates.slice(0, 8),
       copies: 1,
     };
     matches.push(card);

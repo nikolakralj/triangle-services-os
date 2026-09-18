@@ -27,6 +27,8 @@ export interface InProgressWait {
   messageCount: number;
   awaitingAgent: number;
   createdAt: string;
+  /** Last thing the employee wrote in the Triangle thread. Not a Grok chat. */
+  lastAgentBody: string | null;
 }
 
 export function withLabelFor(roleKey: string, displayName: string): string {
@@ -46,14 +48,22 @@ function idsOf(ids: HandoffIds): string[] {
   );
 }
 
-/** True when this wait is the same business situation as the card. */
-export function matchesWait(wait: InProgressWait, ids: HandoffIds): boolean {
+/** True when this row is the same business situation as the card. */
+export function matchesIds(
+  row: HandoffIds & { entityIds?: string[] },
+  ids: HandoffIds,
+): boolean {
   const candidates = idsOf(ids);
   if (candidates.length === 0) return false;
-  if (wait.leadId && candidates.includes(wait.leadId)) return true;
-  if (wait.contactId && candidates.includes(wait.contactId)) return true;
-  if (wait.personId && candidates.includes(wait.personId)) return true;
-  return wait.entityIds.some((id) => candidates.includes(id));
+  if (row.leadId && candidates.includes(row.leadId)) return true;
+  if (row.contactId && candidates.includes(row.contactId)) return true;
+  if (row.personId && candidates.includes(row.personId)) return true;
+  return (row.entityIds ?? []).some((id) => candidates.includes(id));
+}
+
+/** True when this wait is the same business situation as the card. */
+export function matchesWait(wait: InProgressWait, ids: HandoffIds): boolean {
+  return matchesIds(wait, ids);
 }
 
 export function findWait(
@@ -61,4 +71,11 @@ export function findWait(
   ids: HandoffIds,
 ): InProgressWait | null {
   return waits.find((w) => matchesWait(w, ids)) ?? null;
+}
+
+export function findDone<T extends HandoffIds>(
+  items: T[],
+  ids: HandoffIds,
+): T | null {
+  return items.find((item) => matchesIds(item, ids)) ?? null;
 }
