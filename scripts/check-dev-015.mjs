@@ -128,6 +128,7 @@ const emailActions = read('src/components/modules/today-email-actions.tsx');
 const askBobRoute = read('src/app/api/ask/bob/route.ts');
 const todayScreen = read('src/components/modules/today-screen.tsx');
 const todayMissions = read('src/components/modules/today-missions.tsx');
+const handoffCtx = read('src/components/modules/today-handoff-context.tsx');
 const drawer = read('src/components/modules/assignment-thread-drawer.tsx');
 const thread = read('src/components/modules/assignment-thread.tsx');
 const decisionsPage = read('src/app/(app)/decisions/page.tsx');
@@ -157,25 +158,28 @@ test('After Hand to Bob the card is With Bob with Open thread and Take back', ()
 });
 
 test('Toast copy is Handed to Bob · Open thread, and the drawer opens on the case', () => {
-  assert.match(todayScreen, /Handed to Bob/);
-  assert.match(todayScreen, /The answer returns on this case/);
-  assert.match(todayScreen, /Open thread/);
-  const announce = todayScreen.slice(
-    todayScreen.indexOf('announceHanded'),
-    todayScreen.indexOf('isPinned'),
-  );
+  assert.match(handoffCtx, /Handed to Bob/);
+  assert.match(handoffCtx, /The answer returns on this case/);
+  assert.match(handoffCtx, /Open thread/);
+  const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));
+  const announce = impl.slice(impl.indexOf('announceHanded'), impl.indexOf('isPinned'));
   assert.match(announce, /setThread\(next\)/);
   assert.doesNotMatch(announce, /setThread\(null\)/);
   assert.match(todayMissions, /isPinned/);
+  assert.match(emailActions, /openCaseThread/);
+  assert.match(emailActions, /AssignmentThreadDrawer/);
 });
 
 test('Open thread is a right-side drawer on Today, reusing AssignmentThread', () => {
+  assert.match(drawer, /createPortal/);
+  assert.match(drawer, /document\.body/);
   assert.match(drawer, /role="dialog"/);
   assert.match(drawer, /max-w-md/);
   assert.match(drawer, /AssignmentThread/);
   assert.match(drawer, /alwaysOpen/);
   assert.match(thread, /alwaysOpen/);
-  assert.match(todayScreen, /AssignmentThreadDrawer/);
+  assert.match(handoffCtx, /AssignmentThreadDrawer/);
+  assert.match(todayScreen, /TodayHandoffProvider/);
   assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
 });
 

@@ -9,7 +9,8 @@ import {
   dismissSentence,
   type EmailDismissReason,
 } from "@/lib/data/today-card-actions";
-import { useTodayHandoff } from "@/components/modules/today-handoff-context";
+import { useTodayHandoff, type ThreadTarget } from "@/components/modules/today-handoff-context";
+import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
 import { type HandoffIds, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
@@ -159,6 +160,7 @@ export function EmailCardActions({
     bobName: string;
     messageCount: number;
   } | null>(null);
+  const [fallbackThread, setFallbackThread] = useState<ThreadTarget | null>(null);
 
   const withBob = alreadyWith
     ? {
@@ -177,6 +179,25 @@ export function EmailCardActions({
           title: instruction.trim() || defaultAsk(target),
         }
       : null;
+
+  function threadFrom(
+    assignmentId: string,
+    title: string,
+    agentName: string,
+    messageCount: number,
+    awaitingAgent = 0,
+  ): ThreadTarget {
+    return { assignmentId, title, agentName, messageCount, awaitingAgent };
+  }
+
+  function openCaseThread(thread: ThreadTarget, pin: boolean) {
+    if (handoff) {
+      if (pin) handoff.announceHanded(thread, handoffIdsOf(target));
+      else handoff.openThread(thread);
+      return;
+    }
+    setFallbackThread(thread);
+  }
 
   async function askBob() {
     const text = instruction.trim();
@@ -232,15 +253,11 @@ export function EmailCardActions({
       };
       setHanded(next);
       setAsking(false);
-      const thread = {
-        assignmentId: next.assignmentId,
-        title: text,
-        agentName: next.bobName,
-        messageCount: next.messageCount,
-        awaitingAgent: 0,
-      };
-      handoff?.announceHanded(thread, handoffIdsOf(target));
-      router.refresh();
+      openCaseThread(
+        threadFrom(next.assignmentId, text, next.bobName, next.messageCount),
+        true,
+      );
+      window.setTimeout(() => router.refresh(), 400);
     } catch {
       setError("Network error.");
     } finally {
@@ -355,13 +372,16 @@ export function EmailCardActions({
             type="button"
             disabled={busy !== null}
             onClick={() =>
-              handoff?.openThread({
-                assignmentId: withBob.assignmentId,
-                title: withBob.title,
-                agentName: withBob.bobName,
-                messageCount: withBob.messageCount,
-                awaitingAgent: withBob.awaitingAgent,
-              })
+              openCaseThread(
+                threadFrom(
+                  withBob.assignmentId,
+                  withBob.title,
+                  withBob.bobName,
+                  withBob.messageCount,
+                  withBob.awaitingAgent,
+                ),
+                false,
+              )
             }
             className={t.thread}
           >
@@ -470,6 +490,10 @@ export function EmailCardActions({
                   Cancel
                 </button>
               </div>
+              <p className={`mt-2 ${t.note}`}>
+                Hand to Bob keeps this card. The answer returns here — Open thread opens on this
+                case.
+              </p>
             </div>
           )}
         </>
@@ -482,6 +506,13 @@ export function EmailCardActions({
         </p>
       )}
       {error && <p className={t.error}>{error}</p>}
+      {!handoff && (
+        <AssignmentThreadDrawer
+          key={fallbackThread?.assignmentId ?? "closed"}
+          thread={fallbackThread}
+          onClose={() => setFallbackThread(null)}
+        />
+      )}
     </div>
   );
 }

@@ -34,12 +34,8 @@ import {
   SendFromTriangleButton,
   SendFromTriangleReview,
 } from "@/components/modules/send-from-triangle";
-import { AssignmentThreadDrawer } from "@/components/modules/assignment-thread-drawer";
-import {
-  TodayHandoffProvider,
-  type ThreadTarget,
-} from "@/components/modules/today-handoff-context";
-import { findWait, handoffKeys, type InProgressWait } from "@/lib/data/today-handoff";
+import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
+import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -123,9 +119,6 @@ export function TodayScreen({
   sender?: { id: string; emailAddress: string } | null;
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
-  const [thread, setThread] = useState<ThreadTarget | null>(null);
-  const [toast, setToast] = useState<ThreadTarget | null>(null);
-  const [pinnedKeys, setPinnedKeys] = useState<string[]>([]);
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
   const nowAction = move.action;
@@ -169,23 +162,7 @@ export function TodayScreen({
   const cardKey = move.action?.leadId || move.action?.contactId || move.headline;
 
   return (
-    <TodayHandoffProvider
-      value={{
-        openThread: (next) => {
-          setThread(next);
-          setToast(null);
-        },
-        announceHanded: (next, ids) => {
-          setToast(next);
-          setThread(next);
-          if (ids && ids.length > 0) {
-            const extra = ids.flatMap(handoffKeys);
-            setPinnedKeys((prev) => Array.from(new Set([...prev, ...extra])));
-          }
-        },
-        isPinned: (ids) => handoffKeys(ids).some((key) => pinnedKeys.includes(key)),
-      }}
-    >
+    <TodayHandoffProvider>
     <div className="space-y-7">
       <Pulse
         needsYou={needsYou}
@@ -275,41 +252,6 @@ export function TodayScreen({
           )}
         </DoneSince>
       </Zone>
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-5 left-5 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] shadow-lg shadow-slate-900/10"
-        >
-          <span>
-            <span className="font-semibold text-slate-900">Handed to Bob</span>
-            {". The answer returns on this case. "}
-            <button
-              type="button"
-              onClick={() => {
-                setThread(toast);
-                setToast(null);
-              }}
-              className="font-semibold text-sky-700 hover:text-sky-900"
-            >
-              Open thread
-            </button>
-          </span>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            aria-label="Dismiss"
-            className="rounded p-1 text-slate-400 hover:text-slate-700"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-      <AssignmentThreadDrawer
-        key={thread?.assignmentId ?? "closed"}
-        thread={thread}
-        onClose={() => setThread(null)}
-      />
     </div>
     </TodayHandoffProvider>
   );
