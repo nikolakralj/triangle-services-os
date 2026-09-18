@@ -40,6 +40,11 @@ export async function GET(
   const { id } = await params;
   if (access.demo) return NextResponse.json({ drafts: [] });
 
+  const lead = await getJobLead(id, access.organizationId, access.userId);
+  if (!lead) {
+    return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+  }
+
   return NextResponse.json({
     drafts: await listReplyDrafts(id, access.organizationId),
   });
@@ -61,7 +66,7 @@ export async function POST(
     );
   }
 
-  const lead = await getJobLead(id, access.organizationId);
+  const lead = await getJobLead(id, access.organizationId, access.userId);
   if (!lead) {
     return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   }
@@ -195,7 +200,7 @@ async function markReplySent(
   if (refused) return refused;
 
   const [lead, drafts] = await Promise.all([
-    getJobLead(leadId, access.organizationId),
+    getJobLead(leadId, access.organizationId, access.userId),
     listReplyDrafts(leadId, access.organizationId),
   ]);
   if (!lead) {

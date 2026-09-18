@@ -1,6 +1,8 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { contactChannels, type ChannelKind } from "@/lib/data/contact-channels";
+import { canViewLead } from "@/lib/mail/mailbox-space";
+import { leadSpacesFor } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
 // Who is waiting to hear from us again.
@@ -60,6 +62,7 @@ type Row = Record<string, unknown>;
 export async function listFollowUpsDue(
   orgId: string,
   limit = 8,
+  viewerUserId?: string | null,
 ): Promise<{ items: FollowUp[]; total: number }> {
   const none = { items: [], total: 0 };
   const svc = createServiceSupabaseClient();
@@ -265,5 +268,18 @@ export async function listFollowUpsDue(
     });
   }
 
-  return { items: items.slice(0, limit), total: items.length };
+  const leadIdsOnItems = Array.from(
+    new Set(items.map((i) => i.target.leadId).filter((id): id is string => Boolean(id))),
+  );
+  const spaces = await leadSpacesFor(orgId, leadIdsOnItems);
+  const visible = items.filter((item) => {
+    if (!item.target.leadId) return true;
+    const space = spaces.get(item.target.leadId) ?? {
+      sharedAt: undefined,
+      mailboxOwnerUserId: null,
+    };
+    return canViewLead(space, viewerUserId ?? null);
+  });
+
+  return { items: visible.slice(0, limit), total: visible.length };
 }

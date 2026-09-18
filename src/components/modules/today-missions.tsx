@@ -30,6 +30,7 @@ import {
 import { EditableWords } from "@/components/modules/editable-words";
 import { MissionMark, StateGlyph } from "@/components/missions/mission-state";
 import { EMAIL_CARD_NOTE, EmailCardActions } from "@/components/modules/today-email-actions";
+import { ShareLeadButton } from "@/components/modules/share-lead-button";
 import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
 
@@ -171,6 +172,105 @@ export function ReadyForYou({
         </ul>
       )}
     </div>
+  );
+}
+
+export interface YourMailItem {
+  id: string;
+  roleTitle: string;
+  contactName: string | null;
+  agencyName: string | null;
+  contactEmail: string | null;
+  country: string | null;
+  subject: string | null;
+  sourceMailbox: string | null;
+  canShare: boolean;
+}
+
+/**
+ * Mail that arrived in this person's inbox and is not yet in the shared space.
+ * Share puts it where the rest of the team (and Bob) can see it. Today still
+ * has Open mail · Ask Bob · Dismiss — no Sent / They replied.
+ */
+export function YourMail({
+  items,
+  waits = [],
+}: {
+  items: YourMailItem[];
+  waits?: InProgressWait[];
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div>
+      <p className="mb-1.5 px-1 text-[11.5px] font-medium uppercase tracking-wider text-slate-500">
+        Your mail
+      </p>
+      <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {items.map((item) => (
+          <YourMailRow key={item.id} item={item} waits={waits} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function YourMailRow({ item, waits }: { item: YourMailItem; waits: InProgressWait[] }) {
+  const who = item.contactName ?? item.agencyName ?? "the sender";
+  const about = [item.roleTitle, item.country].filter(Boolean).join(" — ");
+  const href = item.contactEmail
+    ? mailtoHref(
+        item.contactEmail,
+        item.subject ? `Re: ${item.subject.replace(/^re:\s*/i, "")}` : about,
+      )
+    : null;
+  const alreadyWith = findWait(waits, { leadId: item.id });
+
+  return (
+    <li className="flex">
+      <span aria-hidden className="w-[3px] shrink-0 bg-slate-400" />
+      <div className="min-w-0 grow px-4 py-2.5">
+        <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
+          <KindChip kind="Your mail" />
+          <span className="font-semibold tracking-[-0.01em] text-slate-900">{who}</span>
+          {item.agencyName && item.agencyName !== who ? (
+            <span className="text-slate-700">· {item.agencyName}</span>
+          ) : null}
+          {about ? <span className="text-slate-500">— {about}</span> : null}
+        </p>
+        <p className="mt-0.5 text-[12px] text-slate-500">
+          Arrived in your inbox
+          {item.sourceMailbox ? ` · ${item.sourceMailbox}` : ""}. Share it if the
+          team should work it.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {href ? (
+            <a
+              href={href}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Open mail
+            </a>
+          ) : null}
+          {item.canShare ? <ShareLeadButton leadId={item.id} compact /> : null}
+        </div>
+        <div className="mt-2">
+          <EmailCardActions
+            target={{
+              who,
+              about,
+              leadId: item.id,
+              value: item.contactEmail ?? "",
+              subject: item.subject,
+            }}
+            onRecorded={() => undefined}
+            alreadyWith={alreadyWith}
+            hideNote
+          />
+        </div>
+      </div>
+    </li>
   );
 }
 

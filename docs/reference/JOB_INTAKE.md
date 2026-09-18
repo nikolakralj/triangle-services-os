@@ -49,7 +49,8 @@ IMAP mailbox
   → LLM: classify + extract + score
   → store (bodies kept ONLY for opportunities)
   → dedupe (same agency + role within 14 days)
-  → user reads, drafts reply, sends it themselves
+  → observe INBOX + Sent (envelopes only, no LLM): record sent/replied
+  → user reads, drafts reply, shares into the common space, or Send from Triangle
 ```
 
 ## Data model
@@ -58,25 +59,27 @@ IMAP mailbox
 |---|---|
 | `mail_accounts` | One row per connected mailbox. Password is AES-256-GCM encrypted in `credential_encrypted`. `credential_ref` is a legacy env-var name, still honoured. |
 | `inbound_emails` | One row per ingested message. Unique on `(org_id, provider_message_id)` — this is what makes ingestion idempotent. `body_text` is **NULL** for anything not classified `job_opportunity`. |
-| `job_leads` | The structured opportunity. `team_potential` 0–100, `missing_fields[]` drives the reply, `duplicate_of_id` links repeats. |
+| `job_leads` | The structured opportunity. `team_potential` 0–100, `missing_fields[]` drives the reply, `duplicate_of_id` links repeats. `shared_at` / `shared_by` (migration 051): null = still personal to the mailbox owner; set when a person puts it in the common space. Existing rows are backfilled on first apply. |
 | `lead_reply_drafts` | AI-drafted replies. `status` draft/sent/archived — "sent" only records that a human sent it. `ai_subject`/`ai_body` keep the draft as Triangle wrote it; edits change `subject`/`body` only (migration 048). |
 | `job_intake_rules` | One editable text block per org, injected into the classification prompt. |
 | `organizations` profile columns | Tenant business/offer model, approved positioning, sign-off, currency, and timezone used by commercial AI. |
 
 Migrations: `013_job_intake.sql`, `014_mail_account_credentials.sql`,
 `015_lead_reply_drafts.sql`, `016_job_intake_rules.sql`,
-`020_job_intake_reply_style.sql`, and
-`027_organization_operating_profile.sql`. Migrations through `020` are known
-applied to the live Supabase project. Migration `027` exists in the repository
-but production application is not verified. RLS protects intake tables; the
-organization profile API verifies membership then uses the service client for
-the scoped organization row.
+`020_job_intake_reply_style.sql`,
+`027_organization_operating_profile.sql`, `049_send_from_triangle.sql`,
+`050_mailbox_observe.sql`, and `051_mailbox_space.sql`. Migrations through
+`020` are known applied to the live Supabase project. 049 is applied
+(17 September). 050 and 051 are applied (18 September, `NOTIFY` after
+confirm). First-apply of 051 stamped 38/38 existing `job_leads` into the
+shared space (0 left personal). Re-applying does not stamp new personal
+leads. Code for personal vs shared is PR #29, not on Production.
 
 ## Files
 
 ```
 src/lib/job-intake/
-  mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later.
+  mail-source.ts    IMAP via imapflow. MailSource interface so Gmail API can slot in later. fetchForObserve reads INBOX + Sent without bodies.
   clean-email.ts    HTML→text + signature stripping. Pure, no server imports.
   extract.ts        Classify + extract + score. Holds the prompt and the score bands.
   contact-email.ts  Recruiter address: never the receiving mailbox or a forwarder.
@@ -84,7 +87,9 @@ src/lib/job-intake/
   credentials.ts    AES-256-GCM encrypt/decrypt, resolveMailboxPassword, safeEqual.
   ingest.ts         Orchestrates a run. Idempotent, never throws.
 
-src/lib/data/job-intake.ts        Data layer (leads, counts, drafts, rules).
+src/lib/mail/mailbox-space.ts     Personal vs shared (pure).
+src/lib/mail/send-policy.ts       Who may press Send (owner + can_send).
+src/lib/data/job-intake.ts        Data layer (leads, visibility, share, counts, drafts, rules).
 src/lib/data/organization-profile.ts Tenant operating profile data boundary.
 src/app/(app)/job-intake/page.tsx The list, stat tiles, filters, sorting.
 src/app/api/job-intake/
@@ -93,6 +98,7 @@ src/app/api/job-intake/
   rules/            GET/PUT — the org's own scoring rules.
   export/           GET — CSV, honours current filter + sort.
   leads/[id]/reply/ GET/POST/PATCH — draft, edit, mark sent.
+  leads/[id]/share/ POST — put a personal lead in the common space (human).
   ../settings/organization-profile/ GET/PUT — tenant identity and positioning.
 ```
 
@@ -129,9 +135,11 @@ in a vendor's silo.
 **This is also the multi-user answer.** Bots are per-person assistants; two people
 running two separate bots would otherwise have two disconnected views. Both post here
 instead, `mailbox` records whose inbox each lead came through (a `mail_accounts` row
-with `provider='external'` and no credentials), and both people open the same ranked
-pipeline. The "via <mailbox>" label only renders once leads arrive from more than one
-mailbox, so it stays quiet for a single user.
+with `provider='external'` and no credentials). If that address matches a person in
+the org, the row is owned by them and stays personal until Share. An address nobody
+owns (the company intake box) stays unowned and org-visible. Each person sees mail
+from their own inbox first. Share puts a lead in the common space. The "via <mailbox>" label
+only renders once leads arrive from more than one mailbox.
 
 Verified 2026-08-25: a bot-shaped payload with one real opportunity and one newsletter
 returned `opportunities: 1, noiseDiscarded: 1`, scored the Austria rail depot lead
@@ -239,7 +247,8 @@ The follow-up appears on Today until something newer is recorded for that lead.
 2. Settings → Job Intake mailboxes → Connect a mailbox. Gmail needs a Google **app
    password** (Account → Security → 2-Step Verification → App passwords), not the
    normal password. Company domains use the ordinary mailbox password.
-3. Job Intake → **Sync now**, or "Read older mail…" for a backfill.
+3. Job Intake → **Sync now** (reads *your* mailbox), or "Read older mail…" for a backfill.
+   The scheduled job still reads every connected inbox.
 4. Scheduled: `vercel.json` currently schedules sync daily at 06:00 UTC. Needs
    `CRON_SECRET` and `CRON_ORGANIZATION_ID`.
 
@@ -294,4 +303,6 @@ three real opportunities from the same domain and was classified `other`.
   product item after current high-priority leads are worked and real
   qualification conversations reveal the required fields.
 - **Parallel classification** — currently sequential, ~2s per email.
-- **Ralph's mailbox** — not connected. He connects it himself; nobody sees his password.
+- **A second person's mailbox** — they connect it themselves; nobody sees their password.
+  New mail stays on their Today until they share it. Sending from Triangle is optional
+  and off until they tick it on their mailbox.

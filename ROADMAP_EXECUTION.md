@@ -41,10 +41,10 @@ These unblock the Phase 0 exit gate below; none of them counts toward it.
 **Operating shell (16 September; locked when Nikola merges its pull request):**
 build in this order — **DEV-016** refusal ledger off Today → **DEV-017** Today
 as one inbox → **DEV-012** Team in Settings → **DEV-011** menu Today · Missions
-· Talent → **DEV-010** context-aware Ask → mailbox observed (Next) →
-**DEV-013** Send from Triangle. **DEV-018** is Nikola's, in parallel. DEV-009
-and DEV-015 are `DONE`. Do not invent Work Items. Do not implement the Send
-button unless you are on DEV-013. Decision: "The operating shell" in
+· Talent → **DEV-010** context-aware Ask → **DEV-013** Send from Triangle →
+**DEV-019** mailbox-observed sent/replied → **DEV-020** personal mailbox vs shared space → **DEV-014** later.
+**DEV-018** is Nikola's, in parallel. DEV-009 and DEV-015 are `DONE`. Do not
+invent Work Items. Decision: "The operating shell" in
 `DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html`.
 
 ### DEV-001 — Sent-message record · `DONE`
@@ -334,9 +334,9 @@ slims Today email cards (no Sent / They replied on the primary rail). It did
 Send button. Those are DEV-010 onwards, ordered below. "Triangle still sends
 nothing" here is this slice, not the standing send-from-Triangle law.
 
-**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied.
-DEV-015 (context-preserving handoff) is the Today destination for Hand to Bob.
-Ask context and intent routing are DEV-010 and DEV-014.
+**NEXT (not this item):** provider createDraft; mailbox-derived sent/replied
+is **DEV-019**. DEV-015 (context-preserving handoff) is the Today destination
+for Hand to Bob. Ask context and intent routing are DEV-010 and DEV-014.
 
 ### DEV-015 — Context-preserving handoff — `DONE` (live: `commercial_follow_through` backfill complete, 17 September)
 
@@ -699,9 +699,76 @@ Oliver Hall reply → Send from Triangle → review → Send now → the card sh
 inbox, and the follow-up appears on Today in three days. Then press it on a
 mailbox with sending off to see the refusal.
 
+### DEV-019 - Mailbox-observed sent / replied - `DONE` (code in #29; migration 050 applied 18 September; Production still owed)
+
+**Why:** DEV-009 took Sent / They replied off Today so a person would not
+type the weather. The connected mailbox already knows: outgoing mail is in
+Sent; a reply lands in INBOX with In-Reply-To pointing at our Message-ID
+(DEV-013 stored that id). Until this item, the ledger still waited for
+Recorded outside Triangle.
+
+**Acceptance:** mail sync reads INBOX and Sent (envelopes, no LLM, INBOX even
+when job intake uses a watch label); a send to someone we are working is
+recorded (`sent_via = outside`, Message-ID, follow-up from the message date);
+a reply is recorded when In-Reply-To / References / Gmail thread / subject
+after a send match; a new job email from the same recruiter is not a reply;
+already-recorded Message-IDs (including DEV-013) are skipped; Today keeps
+Open mail · Ask Bob · Dismiss — no Sent / They replied buttons; nothing is
+sent; `SENT_MESSAGES_RECORDED` stays false.
+
+**Done 17 September (code).** After job-intake classify, `observeAccount`
+(`src/lib/data/mailbox-observe.ts`) fetches INBOX + Sent on one IMAP
+connection (`fetchForObserve`, no bodies). Matching is pure
+(`src/lib/mail/observe-policy.ts`). Hits go through `logContactAttempt` as
+the mailbox owner, `sent_via = outside`, Message-ID for idempotency. Job
+intake still classifies only the watch folder; Sent is never an LLM pass.
+Migration `050_mailbox_observe.sql` (idempotent, changes no rows) adds
+`inbound_emails.in_reply_to` / `references_header` / `folder` and
+`outreach_drafts.outbound_thread_id`. **Applied 18 September** on the live
+shared database; `NOTIFY pgrst, 'reload schema'` run after confirm.
+
+Checked: `npm run check:dev-019` 21/21; lint 0; type check 0;
+tenant-identity 0; production build 0. Code is PR #29, not on Production
+(`a191b2b`). After #29 is promoted: Sync now on the connected mailbox; a
+Gmail send to a person already on Today should leave the ready-to-contact
+list and show as a follow-up without pressing Sent; their reply should take
+the follow-up off Today without pressing They replied.
+
+### DEV-020 - Personal mailbox vs shared space - `DONE` (code in #29; migration 051 applied 18 September; Production still owed)
+
+**Why:** two people, two inboxes. Each person signs in and sees what arrived
+in their connected mailbox. They can put a lead into the common shared space
+when the team should work it. Send from Triangle already leaves from that
+person's own address (DEV-013); sending stays optional and off until they
+tick it.
+
+**Acceptance:** new ingest is personal (`shared_at` null); existing leads are
+backfilled into the shared space on first apply of 051 so live follow-ups
+do not vanish; Today and Job Intake Mine show this person's mailbox; Shared
+is the common space; Share is a human action; person Sync now reads only
+their mailbox (cron still all); Bob does not wake on unshared personal
+ingest; Send remains owner + `can_send`; Today keeps Open mail · Ask Bob ·
+Dismiss — no Sent / They replied; nothing is sent; DEV-014 stays later.
+
+**Done 17 September (code).** Policy in `src/lib/mail/mailbox-space.ts`.
+Migration `051_mailbox_space.sql` (idempotent after first apply). Data
+layer filters by viewer. `POST /api/job-intake/leads/[id]/share`. Today
+Your mail. Job Intake Mine | Shared.
+
+**Live 18 September (database).** 051 applied; first-apply backfill stamped
+38/38 existing leads into the shared space (0 left personal). Code is still
+PR #29 — Production `/api/version` reports `a191b2b`. This agent cannot
+merge or promote.
+
+Checked: `npm run check:dev-020` 23/23; lint 0; type check 0; tenant-identity 0;
+production build 0. After #29 is on Production: each person connects their
+own mailbox; Sync now reads yours; Share puts a lead where the other person
+can see it. DEV-014 stays later.
+
 ### DEV-014 - Scout / Hanna / Bob intent routing on cards and voice - later
 
-**Not READY.** After mailbox-observed sent/replied. Typed / voice Ask Triangle
+**Not READY.** After mailbox-observed sent/replied and personal vs shared
+mail. Typed / voice Ask Triangle
 routes by intent ("investigate the end client" -> Scout) without fake Scout
 buttons on the Today mail card. DEV-010 is done; do not start this to skip
 mailbox observation.
@@ -744,14 +811,16 @@ smoke task is cancelled; production's `/api/version` reports a merged commit.
 - Budget and cost per mission.
 - Separate research and communications computers for bots (see the
   [architecture study](docs/reviews/WORKFORCE_ARCHITECTURE_2026-09-13.html)).
+- Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons
+  — **DEV-019** done in code. Migration 050 applied 18 September. Code is
+  PR #29; live Sync now after it is on Production.
+- Personal mailbox vs shared space — **DEV-020** done in code. Migration 051
+  applied 18 September (38/38 existing leads stamped shared). Code is PR #29,
+  not on Production. After promote: each person connects their mailbox, Sync
+  now, Share when the other person should see it. Send from Triangle stays
+  that person's address, optional, off by default. A Today per person of
+  *owned cases* stays later.
 - Provider createDraft in Gmail / Outlook (Today Open mail stays a mailto until then).
-- Mailbox-derived sent / replied so Today does not wait for CEO outcome buttons.
-  Start from each person's connected mailbox: Nikola replies from
-  `nikola.kralj86@gmail.com` (connected); Ralph connects his own in Settings.
-  On 16 September no stored message in the last 14 days was a reply, so check
-  first that replies and the Sent folder reach Triangle.
-- A Today per person: Needs you filtered to the cases each person owns (Ralph
-  may get his own), once work carries a human owner consistently.
 - Answer a mission's question on Today, in the card, instead of opening the
   mission (the remaining step to one card shape from DEV-017).
 - Typed / voice Ask Triangle that routes Scout / Hanna / Bob by intent

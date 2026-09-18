@@ -1,6 +1,17 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import type { EmailClassification, ExtractedLead } from "@/lib/job-intake/extract";
+import {
+  canShareLead,
+  canViewLead,
+  isInSharedSpace,
+  isPersonalUnshared,
+  SHARE_ALREADY,
+  SHARE_NEEDS_MIGRATION,
+  SHARE_NOT_YOURS,
+  type LeadSpace,
+  type MailSpace,
+} from "@/lib/mail/mailbox-space";
 
 // ---------------------------------------------------------------------------
 // Data layer for Job Intake: inbound agency mail and the leads extracted
@@ -40,6 +51,11 @@ export interface JobLead {
   emailBody: string | null;
   /** Which mailbox this arrived through — matters once two people feed it. */
   sourceMailbox: string | null;
+  /** When it entered the shared space. Null = still personal. Undefined = pre-051. */
+  sharedAt: string | null | undefined;
+  mailboxOwnerUserId: string | null;
+  /** The signed-in person may put this in the common space. */
+  canShare: boolean;
 }
 
 export interface IntakeCounts {
@@ -57,7 +73,15 @@ function rowToLead(
   row: LeadRow,
   email?: Record<string, unknown> | null,
   sourceMailbox?: string | null,
+  space?: LeadSpace,
+  viewerUserId?: string | null,
 ): JobLead {
+  const sharedAt =
+    space?.sharedAt !== undefined
+      ? space.sharedAt
+      : ((row.shared_at as string | null | undefined) ?? undefined);
+  const mailboxOwnerUserId = space?.mailboxOwnerUserId ?? null;
+  const resolved: LeadSpace = { sharedAt, mailboxOwnerUserId };
   return {
     id: String(row.id),
     inboundEmailId: (row.inbound_email_id as string) ?? null,
@@ -90,12 +114,50 @@ function rowToLead(
     receivedAt: (email?.sent_at as string) ?? null,
     emailBody: (email?.body_text as string) ?? null,
     sourceMailbox: sourceMailbox ?? null,
+    sharedAt,
+    mailboxOwnerUserId,
+    canShare: Boolean(viewerUserId && canShareLead(resolved, viewerUserId)),
   };
+}
+
+function spaceOfLeadRow(
+  row: LeadRow,
+  spaces: Map<string, LeadSpace>,
+): LeadSpace {
+  return (
+    spaces.get(String(row.id)) ?? {
+      sharedAt: (row.shared_at as string | null | undefined) ?? undefined,
+      mailboxOwnerUserId: null,
+    }
+  );
+}
+
+function viewerMaySeeLead(
+  space: LeadSpace,
+  viewerUserId: string | null,
+  mailSpace?: MailSpace,
+): boolean {
+  if (!canViewLead(space, viewerUserId)) return false;
+  if (mailSpace === "shared") {
+    const owned = Boolean(space.mailboxOwnerUserId);
+    if (!isInSharedSpace(space.sharedAt) && owned) return false;
+  }
+  if (
+    mailSpace === "mine" &&
+    viewerUserId &&
+    space.mailboxOwnerUserId !== viewerUserId
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
  * List leads for the org, best crew opportunities first. Duplicates are
  * hidden by default — they're linked to the original instead.
+ *
+ * Visibility (personal vs shared) is applied while paging, then the limit.
+ * A colleague's unshared mail must not consume the page and leave Mine empty.
  */
 export type LeadSort = "score" | "newest" | "oldest";
 
@@ -105,25 +167,68 @@ export async function listJobLeads(
     status?: string;
     includeDuplicates?: boolean;
     limit?: number;
+    /** Skip this many already-visible leads (used to page Mine / Your mail). */
+    offset?: number;
     sort?: LeadSort;
+    /** Required for a person-facing list: shared + this mailbox. */
+    viewerUserId?: string | null;
+    /** Mine = this mailbox; shared = common space; omit = everything visible. */
+    space?: MailSpace;
   } = {},
 ): Promise<JobLead[]> {
   const svc = createServiceSupabaseClient();
   if (!svc) return [];
 
-  let query = svc
-    .from("job_leads")
-    .select("*")
-    .eq("org_id", orgId)
-    .order("team_potential", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(opts.limit ?? 200);
+  const viewerUserId = opts.viewerUserId ?? null;
+  const take = opts.limit ?? 200;
+  const skip = opts.offset ?? 0;
+  const need = skip + take;
+  const PAGE = 100;
+  const SCAN_CAP = 5000;
+  const sort = opts.sort ?? "score";
+  const collected: LeadRow[] = [];
+  let dbOffset = 0;
 
-  if (opts.status) query = query.eq("status", opts.status);
-  if (!opts.includeDuplicates) query = query.is("duplicate_of_id", null);
+  while (collected.length < need && dbOffset < SCAN_CAP) {
+    let query = svc.from("job_leads").select("*").eq("org_id", orgId);
+    if (sort === "oldest") {
+      query = query.order("created_at", { ascending: true });
+    } else if (sort === "newest") {
+      query = query.order("created_at", { ascending: false });
+    } else {
+      query = query
+        .order("team_potential", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+    }
+    if (opts.status) query = query.eq("status", opts.status);
+    if (!opts.includeDuplicates) query = query.is("duplicate_of_id", null);
+    query = query.range(dbOffset, dbOffset + PAGE - 1);
 
-  const { data, error } = await query;
-  if (error || !data) return [];
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) break;
+
+    const spaces = await leadSpacesFor(
+      orgId,
+      data.map((r) => String(r.id)),
+    );
+    for (const row of data as LeadRow[]) {
+      if (!viewerMaySeeLead(spaceOfLeadRow(row, spaces), viewerUserId, opts.space)) {
+        continue;
+      }
+      collected.push(row);
+      if (collected.length >= need) break;
+    }
+    dbOffset += data.length;
+    if (data.length < PAGE) break;
+  }
+
+  const data = collected.slice(skip, skip + take);
+  if (data.length === 0) return [];
+
+  const spaces = await leadSpacesFor(
+    orgId,
+    data.map((r) => String(r.id)),
+  );
 
   // Enrich with the originating email's subject + received date.
   const emailIds = data
@@ -157,19 +262,21 @@ export async function listJobLeads(
   }
 
   const leads = data.map((row) => {
+    const space = spaceOfLeadRow(row, spaces);
     const email = emailMap.get(String(row.inbound_email_id));
     const accountId = email?.mail_account_id as string | undefined;
     return rowToLead(
       row,
       email,
       accountId ? mailboxMap.get(accountId) ?? null : null,
+      space,
+      viewerUserId,
     );
   });
 
   // Date ordering happens here rather than in SQL: the date that matters is
   // when the recruiter sent the mail, which lives on inbound_emails, not on
   // the lead row. Falls back to createdAt when a lead has no linked email.
-  const sort = opts.sort ?? "score";
   if (sort === "score") return leads;
 
   const timeOf = (l: JobLead) =>
@@ -180,7 +287,10 @@ export async function listJobLeads(
   );
 }
 
-export async function getIntakeCounts(orgId: string): Promise<IntakeCounts> {
+export async function getIntakeCounts(
+  orgId: string,
+  viewerUserId?: string | null,
+): Promise<IntakeCounts> {
   const svc = createServiceSupabaseClient();
   const empty: IntakeCounts = {
     leads: 0, newLeads: 0, highPotential: 0,
@@ -188,28 +298,69 @@ export async function getIntakeCounts(orgId: string): Promise<IntakeCounts> {
   };
   if (!svc) return empty;
 
-  const head = { count: "exact" as const, head: true };
-  const leadsQ = () => svc.from("job_leads").select("id", head).eq("org_id", orgId);
-  const mailQ = () => svc.from("inbound_emails").select("id", head).eq("org_id", orgId);
+  const { data: leadRows } = await svc
+    .from("job_leads")
+    .select("id, status, team_potential, duplicate_of_id, inbound_email_id, shared_at")
+    .eq("org_id", orgId);
+  const rows = (leadRows ?? []) as LeadRow[];
+  const spaces = await leadSpacesFor(orgId, rows.map((r) => String(r.id)));
+  const visible = rows.filter((r) =>
+    canViewLead(
+      spaces.get(String(r.id)) ?? {
+        sharedAt: (r.shared_at as string | null | undefined) ?? undefined,
+        mailboxOwnerUserId: null,
+      },
+      viewerUserId ?? null,
+    ),
+  );
+  const unique = visible.filter((r) => !r.duplicate_of_id);
 
-  const [leads, newLeads, highPotential, duplicates, emailsProcessed, noiseRejected] =
-    await Promise.all([
-      leadsQ().is("duplicate_of_id", null),
-      leadsQ().eq("status", "new").is("duplicate_of_id", null),
-      leadsQ().gte("team_potential", 70).is("duplicate_of_id", null),
-      leadsQ().not("duplicate_of_id", "is", null),
-      mailQ(),
-      mailQ().neq("classification", "job_opportunity"),
-    ]);
+  const mailboxIds = await mailboxIdsForViewer(orgId, viewerUserId ?? null);
+  if (viewerUserId && mailboxIds && mailboxIds.length === 0) {
+    return {
+      leads: unique.length,
+      newLeads: unique.filter((r) => r.status === "new").length,
+      highPotential: unique.filter((r) => Number(r.team_potential ?? 0) >= 70).length,
+      duplicates: visible.filter((r) => r.duplicate_of_id).length,
+      emailsProcessed: 0,
+      noiseRejected: 0,
+    };
+  }
+  const mailQ = () => svc.from("inbound_emails").select("id", { count: "exact", head: true }).eq("org_id", orgId);
+  const scopedMail = mailboxIds
+    ? mailQ().in("mail_account_id", mailboxIds)
+    : mailQ();
+  const [emailsProcessed, noiseRejected] = await Promise.all([
+    scopedMail,
+    mailboxIds
+      ? mailQ().in("mail_account_id", mailboxIds).neq("classification", "job_opportunity")
+      : mailQ().neq("classification", "job_opportunity"),
+  ]);
 
   return {
-    leads: leads.count ?? 0,
-    newLeads: newLeads.count ?? 0,
-    highPotential: highPotential.count ?? 0,
-    duplicates: duplicates.count ?? 0,
+    leads: unique.length,
+    newLeads: unique.filter((r) => r.status === "new").length,
+    highPotential: unique.filter((r) => Number(r.team_potential ?? 0) >= 70).length,
+    duplicates: visible.filter((r) => r.duplicate_of_id).length,
     emailsProcessed: emailsProcessed.count ?? 0,
     noiseRejected: noiseRejected.count ?? 0,
   };
+}
+
+/** Mailboxes this person owns. Null viewer / cron: no personal restriction (caller must not use this to leak). */
+async function mailboxIdsForViewer(
+  orgId: string,
+  viewerUserId: string | null,
+): Promise<string[] | null> {
+  if (!viewerUserId) return null;
+  const svc = createServiceSupabaseClient();
+  if (!svc) return [];
+  const { data } = await svc
+    .from("mail_accounts")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("owner_user_id", viewerUserId);
+  return (data ?? []).map((r) => r.id as string);
 }
 
 /**
@@ -232,6 +383,9 @@ export async function recordInboundEmail(params: {
   reason: string;
   /** Pass null for anything that isn't a real opportunity — we discard it. */
   bodyText: string | null;
+  inReplyTo?: string | null;
+  referencesHeader?: string | null;
+  folder?: "inbox" | "sent";
 }): Promise<{ id: string; alreadyExisted: boolean } | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -245,27 +399,39 @@ export async function recordInboundEmail(params: {
 
   if (existing) return { id: existing.id as string, alreadyExisted: true };
 
-  const { data, error } = await svc
+  const base = {
+    org_id: params.orgId,
+    mail_account_id: params.mailAccountId,
+    provider_message_id: params.providerMessageId,
+    provider_thread_id: params.providerThreadId,
+    sender_email: params.senderEmail,
+    sender_name: params.senderName,
+    recipient_email: params.recipientEmail,
+    subject: params.subject,
+    sent_at: params.sentAt,
+    body_text: params.bodyText,
+    body_discarded: params.bodyText === null,
+    classification: params.classification,
+    classification_confidence: params.confidence,
+    classification_reason: params.reason,
+    processed_at: new Date().toISOString(),
+  };
+  const extra = {
+    in_reply_to: params.inReplyTo ?? null,
+    references_header: params.referencesHeader ?? null,
+    folder: params.folder ?? "inbox",
+  };
+
+  let { data, error } = await svc
     .from("inbound_emails")
-    .insert({
-      org_id: params.orgId,
-      mail_account_id: params.mailAccountId,
-      provider_message_id: params.providerMessageId,
-      provider_thread_id: params.providerThreadId,
-      sender_email: params.senderEmail,
-      sender_name: params.senderName,
-      recipient_email: params.recipientEmail,
-      subject: params.subject,
-      sent_at: params.sentAt,
-      body_text: params.bodyText,
-      body_discarded: params.bodyText === null,
-      classification: params.classification,
-      classification_confidence: params.confidence,
-      classification_reason: params.reason,
-      processed_at: new Date().toISOString(),
-    })
+    .insert({ ...base, ...extra })
     .select("id")
     .maybeSingle();
+  if (error) {
+    const retry = await svc.from("inbound_emails").insert(base).select("id").maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) return null;
   return { id: data.id as string, alreadyExisted: false };
@@ -284,35 +450,47 @@ export async function createJobLead(params: {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
 
-  const duplicateOfId = await findDuplicateLead(params.orgId, params.lead);
+  const mailAccountId = await mailAccountIdForEmail(params.orgId, params.inboundEmailId);
+  const duplicateOfId = await findDuplicateLead(params.orgId, params.lead, {
+    mailAccountId,
+    onlyShared: false,
+  });
 
-  const { data, error } = await svc
+  const row = {
+    org_id: params.orgId,
+    inbound_email_id: params.inboundEmailId,
+    agency_name: params.lead.agencyName,
+    contact_name: params.lead.contactName,
+    contact_email: params.lead.contactEmail ?? params.contactEmail,
+    client_company: params.lead.clientCompany,
+    role_title: params.lead.roleTitle,
+    country: params.lead.country,
+    city: params.lead.city,
+    sector: params.lead.sector,
+    technologies: params.lead.technologies,
+    duration_months: params.lead.durationMonths,
+    start_date_text: params.lead.startDateText,
+    rate_text: params.lead.rateText,
+    headcount_text: params.lead.headcountText,
+    work_mode: params.lead.workMode,
+    team_potential: params.lead.teamPotential,
+    team_rationale: params.lead.teamRationale,
+    requested_documents: params.lead.requestedDocuments,
+    missing_fields: params.lead.missingFields,
+    duplicate_of_id: duplicateOfId,
+  };
+
+  // Personal until a person shares it. If 051 is not applied, drop shared_at.
+  let { data, error } = await svc
     .from("job_leads")
-    .insert({
-      org_id: params.orgId,
-      inbound_email_id: params.inboundEmailId,
-      agency_name: params.lead.agencyName,
-      contact_name: params.lead.contactName,
-      contact_email: params.lead.contactEmail ?? params.contactEmail,
-      client_company: params.lead.clientCompany,
-      role_title: params.lead.roleTitle,
-      country: params.lead.country,
-      city: params.lead.city,
-      sector: params.lead.sector,
-      technologies: params.lead.technologies,
-      duration_months: params.lead.durationMonths,
-      start_date_text: params.lead.startDateText,
-      rate_text: params.lead.rateText,
-      headcount_text: params.lead.headcountText,
-      work_mode: params.lead.workMode,
-      team_potential: params.lead.teamPotential,
-      team_rationale: params.lead.teamRationale,
-      requested_documents: params.lead.requestedDocuments,
-      missing_fields: params.lead.missingFields,
-      duplicate_of_id: duplicateOfId,
-    })
+    .insert({ ...row, shared_at: null })
     .select("id")
     .maybeSingle();
+  if (error) {
+    const retry = await svc.from("job_leads").insert(row).select("id").maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) return null;
   return data.id as string;
@@ -326,6 +504,10 @@ export async function createJobLead(params: {
 async function findDuplicateLead(
   orgId: string,
   lead: ExtractedLead,
+  scope: { mailAccountId: string | null; onlyShared: boolean } = {
+    mailAccountId: null,
+    onlyShared: false,
+  },
 ): Promise<string | null> {
   const svc = createServiceSupabaseClient();
   if (!svc || !lead.agencyName) return null;
@@ -339,15 +521,21 @@ async function findDuplicateLead(
   const agency = lead.agencyName.replace(/[\\%_]/g, (c) => `\\${c}`);
   const { data } = await svc
     .from("job_leads")
-    .select("id, role_title, country")
+    .select("id, role_title, country, inbound_email_id, shared_at")
     .eq("org_id", orgId)
     .ilike("agency_name", agency)
     .is("duplicate_of_id", null)
     .gte("created_at", since);
 
+  const candidates = (data ?? []) as LeadRow[];
+  const spaces = await leadSpacesFor(
+    orgId,
+    candidates.map((r) => String(r.id)),
+  );
+
   const target = normaliseTitle(lead.roleTitle);
   const country = normaliseCountry(lead.country);
-  for (const row of data ?? []) {
+  for (const row of candidates) {
     if (normaliseTitle(String(row.role_title)) !== target) continue;
     // The country is part of the role. Matching on title alone filed two
     // Germany PLC commissioning roles as copies of an Ireland one. Unknown on
@@ -355,9 +543,42 @@ async function findDuplicateLead(
     // location, not change it.
     const rowCountry = normaliseCountry(row.country as string | null);
     if (country && rowCountry && country !== rowCountry) continue;
+
+    const space = spaces.get(String(row.id)) ?? {
+      sharedAt: (row.shared_at as string | null | undefined) ?? undefined,
+      mailboxOwnerUserId: null,
+      mailAccountId: null,
+    };
+    const sameMailbox =
+      Boolean(scope.mailAccountId) && space.mailAccountId === scope.mailAccountId;
+    const shared = isInSharedSpace(space.sharedAt);
+    // A personal copy in another mailbox is not a duplicate of yours until
+    // someone puts it in the shared space — otherwise you would not see
+    // mail that arrived in your inbox.
+    if (scope.onlyShared) {
+      if (!shared) continue;
+    } else if (!sameMailbox && !shared) {
+      continue;
+    }
     return row.id as string;
   }
   return null;
+}
+
+async function mailAccountIdForEmail(
+  orgId: string,
+  inboundEmailId: string | null,
+): Promise<string | null> {
+  if (!inboundEmailId) return null;
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data } = await svc
+    .from("inbound_emails")
+    .select("mail_account_id")
+    .eq("org_id", orgId)
+    .eq("id", inboundEmailId)
+    .maybeSingle();
+  return (data?.mail_account_id as string | null) ?? null;
 }
 
 function normaliseTitle(title: string): string {
@@ -498,10 +719,11 @@ function rowToDraft(row: Record<string, unknown>): LeadReplyDraft {
   };
 }
 
-/** Get a single lead (used by the draft endpoint). */
+/** Get a single lead (used by the draft endpoint). Hidden if the viewer cannot see it. */
 export async function getJobLead(
   leadId: string,
   orgId: string,
+  viewerUserId?: string | null,
 ): Promise<JobLead | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -515,16 +737,227 @@ export async function getJobLead(
 
   if (error || !data) return null;
 
+  const spaces = await leadSpacesFor(orgId, [leadId]);
+  const space = spaces.get(leadId) ?? {
+    sharedAt: (data.shared_at as string | null | undefined) ?? undefined,
+    mailboxOwnerUserId: null,
+  };
+  if (!canViewLead(space, viewerUserId ?? null)) return null;
+
   let email: Record<string, unknown> | null = null;
+  let sourceMailbox: string | null = null;
   if (data.inbound_email_id) {
     const { data: e } = await svc
       .from("inbound_emails")
-      .select("id, subject, sent_at, body_text")
+      .select("id, subject, sent_at, body_text, mail_account_id")
       .eq("id", data.inbound_email_id as string)
       .maybeSingle();
     email = e ?? null;
+    if (e?.mail_account_id) {
+      const { data: account } = await svc
+        .from("mail_accounts")
+        .select("email_address")
+        .eq("id", e.mail_account_id as string)
+        .maybeSingle();
+      sourceMailbox = (account?.email_address as string | null) ?? null;
+    }
   }
-  return rowToLead(data, email);
+  return rowToLead(data, email, sourceMailbox, space, viewerUserId ?? null);
+}
+
+/**
+ * Unshared mail that arrived in this person's mailbox — Today "Your mail".
+ */
+export async function listPersonalInbox(
+  orgId: string,
+  viewerUserId: string,
+  limit = 8,
+): Promise<JobLead[]> {
+  const PAGE = 40;
+  const out: JobLead[] = [];
+  let offset = 0;
+  while (out.length < limit) {
+    const batch = await listJobLeads(orgId, {
+      viewerUserId,
+      space: "mine",
+      sort: "newest",
+      limit: PAGE,
+      offset,
+    });
+    if (batch.length === 0) break;
+    offset += batch.length;
+    for (const l of batch) {
+      if (
+        isPersonalUnshared(
+          { sharedAt: l.sharedAt, mailboxOwnerUserId: l.mailboxOwnerUserId },
+          viewerUserId,
+        ) &&
+        (l.status === "new" || l.status === "reviewing")
+      ) {
+        out.push(l);
+        if (out.length >= limit) break;
+      }
+    }
+    if (batch.length < PAGE) break;
+  }
+  return out;
+}
+
+export async function shareJobLead(params: {
+  orgId: string;
+  leadId: string;
+  userId: string;
+}): Promise<
+  | { ok: true; lead: JobLead; already: boolean }
+  | { ok: false; error: string; status: number }
+> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return { ok: false, error: "Database unavailable.", status: 503 };
+
+  const { data: row, error } = await svc
+    .from("job_leads")
+    .select("*")
+    .eq("id", params.leadId)
+    .eq("org_id", params.orgId)
+    .maybeSingle();
+  if (error || !row) return { ok: false, error: "Lead not found.", status: 404 };
+
+  const spaces = await leadSpacesFor(params.orgId, [params.leadId]);
+  const space = spaces.get(params.leadId) ?? {
+    sharedAt: (row.shared_at as string | null | undefined) ?? undefined,
+    mailboxOwnerUserId: null,
+  };
+  if (!canViewLead(space, params.userId)) {
+    return { ok: false, error: "Lead not found.", status: 404 };
+  }
+  if (isInSharedSpace(space.sharedAt)) {
+    const lead = await getJobLead(params.leadId, params.orgId, params.userId);
+    if (!lead) return { ok: false, error: SHARE_ALREADY, status: 409 };
+    return { ok: true, lead, already: true };
+  }
+  if (!canShareLead(space, params.userId)) {
+    return { ok: false, error: SHARE_NOT_YOURS, status: 403 };
+  }
+
+  const now = new Date().toISOString();
+  const { error: writeError } = await svc
+    .from("job_leads")
+    .update({ shared_at: now, shared_by: params.userId })
+    .eq("id", params.leadId)
+    .eq("org_id", params.orgId);
+  if (writeError) {
+    return { ok: false, error: SHARE_NEEDS_MIGRATION, status: 503 };
+  }
+
+  const duplicateOfId = await findDuplicateLead(
+    params.orgId,
+    {
+      agencyName: (row.agency_name as string | null) ?? null,
+      contactName: (row.contact_name as string | null) ?? null,
+      contactEmail: (row.contact_email as string | null) ?? null,
+      clientCompany: (row.client_company as string | null) ?? null,
+      roleTitle: String(row.role_title ?? ""),
+      country: (row.country as string | null) ?? null,
+      city: (row.city as string | null) ?? null,
+      sector: (row.sector as string | null) ?? null,
+      technologies: Array.isArray(row.technologies) ? (row.technologies as string[]) : [],
+      durationMonths: (row.duration_months as number | null) ?? null,
+      startDateText: (row.start_date_text as string | null) ?? null,
+      rateText: (row.rate_text as string | null) ?? null,
+      headcountText: (row.headcount_text as string | null) ?? null,
+      workMode: (row.work_mode as string | null) ?? null,
+      teamPotential: Number(row.team_potential ?? 0),
+      teamRationale: String(row.team_rationale ?? ""),
+      requestedDocuments: Array.isArray(row.requested_documents)
+        ? (row.requested_documents as string[])
+        : [],
+      missingFields: Array.isArray(row.missing_fields) ? (row.missing_fields as string[]) : [],
+    },
+    { mailAccountId: space.mailAccountId ?? null, onlyShared: true },
+  );
+  if (duplicateOfId && duplicateOfId !== params.leadId) {
+    await svc
+      .from("job_leads")
+      .update({ duplicate_of_id: duplicateOfId })
+      .eq("id", params.leadId)
+      .eq("org_id", params.orgId);
+  }
+
+  const lead = await getJobLead(params.leadId, params.orgId, params.userId);
+  if (!lead) return { ok: false, error: "Lead not found after sharing.", status: 500 };
+  return { ok: true, lead, already: false };
+}
+
+/**
+ * Visibility facts for a batch of leads. Missing shared_at (pre-051) is
+ * undefined, which `canViewLead` treats as already shared.
+ */
+export async function leadSpacesFor(
+  orgId: string,
+  leadIds: string[],
+): Promise<Map<string, LeadSpace>> {
+  const out = new Map<string, LeadSpace>();
+  if (leadIds.length === 0) return out;
+  const svc = createServiceSupabaseClient();
+  if (!svc) return out;
+
+  let rows: LeadRow[] | null = null;
+  const withShared = await svc
+    .from("job_leads")
+    .select("id, inbound_email_id, shared_at")
+    .eq("org_id", orgId)
+    .in("id", leadIds);
+  if (withShared.error) {
+    const fallback = await svc
+      .from("job_leads")
+      .select("id, inbound_email_id")
+      .eq("org_id", orgId)
+      .in("id", leadIds);
+    rows = (fallback.data ?? []) as LeadRow[];
+  } else {
+    rows = (withShared.data ?? []) as LeadRow[];
+  }
+
+  const emailIds = rows
+    .map((r) => r.inbound_email_id as string | null)
+    .filter((id): id is string => Boolean(id));
+  const emailToAccount = new Map<string, string | null>();
+  if (emailIds.length > 0) {
+    const { data: emails } = await svc
+      .from("inbound_emails")
+      .select("id, mail_account_id")
+      .in("id", emailIds);
+    for (const e of emails ?? []) {
+      emailToAccount.set(e.id as string, (e.mail_account_id as string | null) ?? null);
+    }
+  }
+
+  const accountIds = Array.from(
+    new Set(Array.from(emailToAccount.values()).filter((id): id is string => Boolean(id))),
+  );
+  const ownerByAccount = new Map<string, string | null>();
+  if (accountIds.length > 0) {
+    const { data: accounts } = await svc
+      .from("mail_accounts")
+      .select("id, owner_user_id")
+      .in("id", accountIds);
+    for (const a of accounts ?? []) {
+      ownerByAccount.set(a.id as string, (a.owner_user_id as string | null) ?? null);
+    }
+  }
+
+  for (const row of rows) {
+    const emailId = (row.inbound_email_id as string | null) ?? null;
+    const mailAccountId = emailId ? (emailToAccount.get(emailId) ?? null) : null;
+    const sharedAt =
+      "shared_at" in row ? ((row.shared_at as string | null) ?? null) : undefined;
+    out.set(String(row.id), {
+      sharedAt,
+      mailboxOwnerUserId: mailAccountId ? (ownerByAccount.get(mailAccountId) ?? null) : null,
+      mailAccountId,
+    });
+  }
+  return out;
 }
 
 export async function listReplyDrafts(

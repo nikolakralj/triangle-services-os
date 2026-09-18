@@ -1,8 +1,9 @@
 // Client-safe: what a Today email card may ask a human to do.
 //
-// Machines will eventually observe sent / replied / follow-up due from the
-// mailbox. Until then the primary rail is Open mail, Ask Bob, and a scoped
-// Dismiss — not a row of "report what happened" buttons.
+// Machines observe sent / replied / follow-up due from the connected mailbox
+// (DEV-019). The primary rail is Open mail, Ask Bob, and a scoped Dismiss —
+// not a row of "report what happened" buttons. Recorded outside Triangle
+// remains under Dismiss when the mailbox has not caught up.
 
 export const EMAIL_DISMISS_REASONS = [
   "not_now",

@@ -2,6 +2,8 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { canWorkIn } from "@/lib/data/work-authorisation";
 import { isInternalMailbox } from "@/lib/job-intake/contact-email";
+import { canViewLead } from "@/lib/mail/mailbox-space";
+import { leadSpacesFor } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
 // The warm demand nobody was looking at.
@@ -96,6 +98,74 @@ function terms(...parts: (string | null | undefined)[]): Set<string> {
 }
 
 /**
+ * Open requisitions this viewer may see, newest first. Pages past a
+ * colleague's unshared mail instead of stopping at the first 40 org rows.
+ */
+async function fetchVisibleOpenLeads(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  orgId: string,
+  viewerUserId: string | null,
+  want: number,
+): Promise<Array<Record<string, unknown>>> {
+  const PAGE = 40;
+  const visible: Array<Record<string, unknown>> = [];
+  let offset = 0;
+  let withShared = true;
+
+  while (visible.length < want) {
+    const ranged = withShared
+      ? svc
+          .from("job_leads")
+          .select(
+            "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at, inbound_email_id, shared_at",
+          )
+          .eq("org_id", orgId)
+          .in("status", ["new", "reviewing"])
+          .not("contact_email", "is", null)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE - 1)
+      : svc
+          .from("job_leads")
+          .select(
+            "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at, inbound_email_id",
+          )
+          .eq("org_id", orgId)
+          .in("status", ["new", "reviewing"])
+          .not("contact_email", "is", null)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE - 1);
+    const { data, error } = await ranged;
+    if (error && withShared) {
+      withShared = false;
+      continue;
+    }
+    const batch = (data ?? []) as unknown as Array<Record<string, unknown>>;
+    if (batch.length === 0) break;
+    const spaces = await leadSpacesFor(
+      orgId,
+      batch.map((l) => l.id as string),
+    );
+    for (const lead of batch) {
+      if (
+        canViewLead(
+          spaces.get(lead.id as string) ?? {
+            sharedAt: (lead as { shared_at?: string | null }).shared_at ?? undefined,
+            mailboxOwnerUserId: null,
+          },
+          viewerUserId,
+        )
+      ) {
+        visible.push(lead);
+        if (visible.length >= want) break;
+      }
+    }
+    offset += batch.length;
+    if (batch.length < PAGE) break;
+  }
+  return visible;
+}
+
+/**
  * Open requisitions, each with the people who could answer them.
  *
  * Deterministic word overlap rather than a model call. This runs on a page
@@ -106,21 +176,13 @@ function terms(...parts: (string | null | undefined)[]): Set<string> {
 export async function matchOpenLeads(
   orgId: string,
   limit = 5,
+  viewerUserId?: string | null,
 ): Promise<LeadMatch[]> {
   const svc = createServiceSupabaseClient();
   if (!svc) return [];
 
-  const [leadsResult, workersResult] = await Promise.all([
-    svc
-      .from("job_leads")
-      .select(
-        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at",
-      )
-      .eq("org_id", orgId)
-      .in("status", ["new", "reviewing"])
-      .not("contact_email", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(40),
+  const [leads, workersResult] = await Promise.all([
+    fetchVisibleOpenLeads(svc, orgId, viewerUserId ?? null, 40),
     svc
       .from("workers")
       .select(
@@ -129,8 +191,6 @@ export async function matchOpenLeads(
       .eq("organization_id", orgId)
       .neq("status", "blacklisted"),
   ]);
-
-  const leads = leadsResult.data ?? [];
   const workers = workersResult.data ?? [];
   if (leads.length === 0 || workers.length === 0) return [];
 

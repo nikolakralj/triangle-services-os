@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { getSession } from "@/lib/auth/session";
 import { JobIntakeSyncButton } from "@/components/modules/job-intake-sync-button";
 import { LeadReplyPanel } from "@/components/modules/lead-reply-panel";
+import { ShareLeadButton } from "@/components/modules/share-lead-button";
 import {
   getIntakeCounts,
   listJobLeads,
@@ -21,6 +22,7 @@ import {
   type LeadSort,
 } from "@/lib/data/job-intake";
 import { cn } from "@/lib/utils";
+import { isInSharedSpace, type MailSpace } from "@/lib/mail/mailbox-space";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,7 @@ const DOC_LABEL: Record<string, string> = {
 export default async function JobIntakePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; sort?: string }>;
+  searchParams: Promise<{ status?: string; sort?: string; space?: string }>;
 }) {
   const session = await getSession();
   if (!session?.organizationId) {
@@ -61,14 +63,17 @@ export default async function JobIntakePage({
   const status = query.status && query.status !== "all" ? query.status : undefined;
   const sort: LeadSort =
     query.sort === "newest" || query.sort === "oldest" ? query.sort : "score";
+  const space: MailSpace = query.space === "shared" ? "shared" : "mine";
 
   /** Keep the other filter intact when changing one of them. */
-  const linkTo = (next: { status?: string; sort?: string }) => {
+  const linkTo = (next: { status?: string; sort?: string; space?: string }) => {
     const params = new URLSearchParams();
     const s = next.status ?? query.status;
     const o = next.sort ?? query.sort;
+    const p = next.space ?? query.space;
     if (s && s !== "all") params.set("status", s);
     if (o && o !== "score") params.set("sort", o);
+    if (p && p !== "mine") params.set("space", p);
     const qs = params.toString();
     return qs ? `/job-intake?${qs}` : "/job-intake";
   };
@@ -77,13 +82,19 @@ export default async function JobIntakePage({
   const exportParams = new URLSearchParams();
   if (status) exportParams.set("status", status);
   if (sort !== "score") exportParams.set("sort", sort);
+  if (space !== "mine") exportParams.set("space", space);
   const exportHref = `/api/job-intake/export${
     exportParams.toString() ? `?${exportParams}` : ""
   }`;
 
   const [counts, leads] = await Promise.all([
-    getIntakeCounts(session.organizationId),
-    listJobLeads(session.organizationId, { status, sort }),
+    getIntakeCounts(session.organizationId, session.userId),
+    listJobLeads(session.organizationId, {
+      status,
+      sort,
+      viewerUserId: session.userId,
+      space,
+    }),
   ]);
 
   // Attribution only earns screen space once a second person is feeding the
@@ -104,7 +115,7 @@ export default async function JobIntakePage({
     <div className="space-y-6">
       <PageHeader
         title="Job Intake"
-        description="Agency emails, read automatically and turned into scored opportunities. Nothing is ever sent without you clicking send."
+        description="Your connected inbox, scored as opportunities. Share a lead into the common space when the team should work it. Sending from Triangle leaves from your own mailbox, and only if you turned it on."
       />
 
       <DiagnosticsBanner />
@@ -144,6 +155,27 @@ export default async function JobIntakePage({
       {/* Filters + export */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5">
+          {[
+            { key: "mine", label: "Mine" },
+            { key: "shared", label: "Shared" },
+          ].map(({ key, label }) => {
+            const active = space === key;
+            return (
+              <Link
+                key={key}
+                href={linkTo({ space: key })}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition",
+                  active
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                )}
+              >
+                {label}
+              </Link>
+            );
+          })}
+          <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden />
           {[
             { key: "all", label: "All" },
             { key: "new", label: "New" },
@@ -211,6 +243,7 @@ export default async function JobIntakePage({
               lead={lead}
               draft={draftByLead.get(lead.id) ?? null}
               showSource={sourceMailboxCount > 1}
+              canShare={lead.canShare}
             />
           ))}
         </div>
@@ -280,11 +313,13 @@ function LeadCard({
   lead,
   draft,
   showSource,
+  canShare,
 }: {
   lead: JobLead;
   draft: LeadReplyDraft | null;
   /** Only worth showing once leads arrive from more than one mailbox. */
   showSource: boolean;
+  canShare: boolean;
 }) {
   const tone = scoreTone(lead.teamPotential);
 
@@ -311,6 +346,11 @@ function LeadCard({
             {showSource && lead.sourceMailbox ? (
               <span className="text-slate-400"> · via {lead.sourceMailbox}</span>
             ) : null}
+            {isInSharedSpace(lead.sharedAt) ? (
+              <span className="text-slate-400"> · in shared space</span>
+            ) : (
+              <span className="text-slate-400"> · your mailbox</span>
+            )}
           </p>
           {lead.technologies.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -396,6 +436,11 @@ function LeadCard({
           contactName={lead.contactName}
           existingDraft={draft}
         />
+        {canShare ? (
+          <div className="pt-1">
+            <ShareLeadButton leadId={lead.id} />
+          </div>
+        ) : null}
       </div>
     </article>
   );

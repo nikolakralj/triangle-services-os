@@ -4,6 +4,7 @@ import { logContactAttempt } from "@/lib/data/contact-log";
 import { recordRefusal } from "@/lib/data/refusals";
 import { pickSendableMailbox, SEND_NOT_ENABLED } from "@/lib/mail/send-policy";
 import { isPlainAddress, sendViaMailbox } from "@/lib/mail/smtp-send";
+import { getJobLead } from "@/lib/data/job-intake";
 
 // ---------------------------------------------------------------------------
 // A person presses Send in Triangle (DEV-013).
@@ -95,6 +96,11 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
   }
   if (subject.length === 0) return { ok: false, error: "Give the message a subject.", status: 400 };
   if (body.length < 2) return { ok: false, error: "The message is empty.", status: 400 };
+
+  if (input.leadId) {
+    const lead = await getJobLead(input.leadId, input.orgId, input.userId);
+    if (!lead) return { ok: false, error: "Lead not found.", status: 404 };
+  }
 
   const entityType = input.leadId ? "job_lead" : input.personId ? "contact" : "buyer_contact";
   const entityId = input.contactId ?? input.leadId ?? input.personId ?? null;

@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import type { ContactOutcome } from "@/lib/data/contact-channels";
+import { normalizeMessageId } from "@/lib/mail/observe-policy";
 
 // ---------------------------------------------------------------------------
 // What has actually been tried on a person, and what came of it.
@@ -101,6 +102,33 @@ export function followUpDate(days = FOLLOW_UP_AFTER_DAYS, from = Date.now()): st
   return new Date(from + days * 86_400_000).toISOString();
 }
 
+type Svc = NonNullable<ReturnType<typeof createServiceSupabaseClient>>;
+
+async function existingByRfc822(
+  svc: Svc,
+  orgId: string,
+  rfc822Id: string,
+): Promise<{ actionId: string; draftId: string; followUpAt: string | null } | null> {
+  const { data: draft, error } = await svc
+    .from("outreach_drafts")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("outbound_rfc822_id", rfc822Id)
+    .maybeSingle();
+  if (error || !draft) return null;
+  const { data: action } = await svc
+    .from("commercial_actions")
+    .select("id, follow_up_at")
+    .eq("org_id", orgId)
+    .eq("outreach_draft_id", draft.id)
+    .maybeSingle();
+  return {
+    actionId: (action?.id as string | undefined) ?? (draft.id as string),
+    draftId: draft.id as string,
+    followUpAt: (action?.follow_up_at as string | null | undefined) ?? null,
+  };
+}
+
 /**
  * The line that stands in for the words when there are none to keep.
  *
@@ -164,12 +192,49 @@ export async function logContactAttempt(params: {
    * recording every other kind of contact.
    */
   sentFromTriangle?: { mailAccountId: string; rfc822Id: string } | null;
+  /**
+   * Set only by mailbox observation (DEV-019): the connected mailbox already
+   * has this message. sent_via = outside, Message-ID for idempotency. Not a
+   * CEO button. The mailbox owner is the actor.
+   */
+  observedFromMailbox?: {
+    mailAccountId: string;
+    rfc822Id: string;
+    threadId?: string | null;
+  } | null;
+  /** When the message actually went or arrived. Follow-up dates count from this. */
+  occurredAt?: string | null;
 }): Promise<
-  | { ok: true; actionId: string; draftId: string; followUpAt: string | null }
+  | { ok: true; actionId: string; draftId: string; followUpAt: string | null; duplicate?: boolean }
   | { ok: false; error: string }
 > {
   const svc = createServiceSupabaseClient();
   if (!svc) return { ok: false, error: "Database unavailable." };
+
+  const rfc822Id = normalizeMessageId(
+    params.sentFromTriangle?.rfc822Id ?? params.observedFromMailbox?.rfc822Id,
+  );
+  if (rfc822Id) {
+    const existing = await existingByRfc822(svc, params.orgId, rfc822Id);
+    if (existing) {
+      const threadId = params.observedFromMailbox?.threadId?.trim();
+      if (threadId) {
+        await svc
+          .from("outreach_drafts")
+          .update({ outbound_thread_id: threadId })
+          .eq("id", existing.draftId)
+          .eq("org_id", params.orgId)
+          .is("outbound_thread_id", null);
+      }
+      return {
+        ok: true,
+        actionId: existing.actionId,
+        draftId: existing.draftId,
+        followUpAt: existing.followUpAt,
+        duplicate: true,
+      };
+    }
+  }
 
   // Either a buyer contact or an inbound requisition. A conversation with a
   // recruiter at g2 about a live role is not attached to a discovered project
@@ -240,10 +305,16 @@ export async function logContactAttempt(params: {
   const channel = DRAFT_CHANNEL[params.channelKind] ?? "email_cold";
   const now = new Date().toISOString();
   const defer = Boolean(params.defer);
+  const occurredMs = params.occurredAt ? Date.parse(params.occurredAt) : Date.now();
+  const occurredIso =
+    params.occurredAt && !Number.isNaN(occurredMs) ? new Date(occurredMs).toISOString() : now;
   // Something went and nothing came back yet, so there is a date to look again.
   // A defer is a look-again with no send — still needs a date, or it vanishes.
+  // Observed sends count from the message date, not from the sync that saw it.
   const followUpAt =
-    defer || params.outcome === "sent" || params.outcome === "no_answer" ? followUpDate() : null;
+    defer || params.outcome === "sent" || params.outcome === "no_answer"
+      ? followUpDate(FOLLOW_UP_AFTER_DAYS, Number.isNaN(occurredMs) ? Date.now() : occurredMs)
+      : null;
   // The words belong to what we did: a message that went, or a call. When the
   // event is their reply, the prepared email is not what happened, and filing
   // it as the content would say we sent it again.
@@ -273,8 +344,8 @@ export async function logContactAttempt(params: {
       subject,
       body: record,
       status: draftStatus,
-      sent_at: now,
-      replied_at: params.outcome === "reached" && !defer ? now : null,
+      sent_at: occurredIso,
+      replied_at: params.outcome === "reached" && !defer ? occurredIso : null,
       reply_summary: summary,
       created_by_user_id: params.userId,
       ...(params.sentFromTriangle
@@ -283,15 +354,28 @@ export async function logContactAttempt(params: {
             mail_account_id: params.sentFromTriangle.mailAccountId,
             outbound_rfc822_id: params.sentFromTriangle.rfc822Id,
           }
-        : {}),
+        : params.observedFromMailbox
+          ? {
+              sent_via: "outside",
+              mail_account_id: params.observedFromMailbox.mailAccountId,
+              outbound_rfc822_id: rfc822Id ?? params.observedFromMailbox.rfc822Id,
+            }
+          : {}),
     })
     .select("id")
     .single();
   if (draftError) return { ok: false, error: draftError.message };
+  if (params.observedFromMailbox?.threadId) {
+    await svc
+      .from("outreach_drafts")
+      .update({ outbound_thread_id: params.observedFromMailbox.threadId })
+      .eq("id", draft.id)
+      .eq("org_id", params.orgId);
+  }
 
   // The ledger entry is the part that counts as commercial truth. A human
-  // pressed the button, so the human confirmation is real — that is exactly
-  // what the guard on this table is checking for.
+  // pressed the button, or the owner's mailbox already holds the message —
+  // that is what the guard on this table is checking for.
   const { data: action, error: actionError } = await svc.from("commercial_actions").insert({
     org_id: params.orgId,
     outreach_draft_id: draft.id,
@@ -308,7 +392,7 @@ export async function logContactAttempt(params: {
     final_content: record,
     response_summary: summary,
     outcome,
-    occurred_at: now,
+    occurred_at: occurredIso,
     follow_up_at: followUpAt,
     human_confirmed_at: now,
     human_confirmed_by: params.userId,
