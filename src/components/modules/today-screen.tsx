@@ -12,7 +12,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type { NextMove, NextMoveAction } from "@/lib/data/next-move";
+import type { NextMove, NextMoveAction, OfferWorker } from "@/lib/data/next-move";
 import type { CameBackItem } from "@/lib/data/came-back";
 import type { FollowUp } from "@/lib/data/follow-ups";
 import {
@@ -25,7 +25,7 @@ import {
 import { AgentReport } from "@/components/modules/agent-report";
 import { EditableWords } from "@/components/modules/editable-words";
 import type { MissionTab, ReadyToContact } from "@/lib/data/mission-shared";
-import type { DoneItem } from "@/lib/data/today-in-progress";
+import type { AttachableWorker, DoneItem } from "@/lib/data/today-in-progress";
 import { DoneSince, InProgressByEmployee, ReadyForYou } from "@/components/modules/today-missions";
 import { CertExceptions } from "@/components/modules/today-certs";
 import type { CertAlertRow } from "@/lib/data/worker-documents";
@@ -39,7 +39,7 @@ import {
   TodayHandoffProvider,
   type ThreadTarget,
 } from "@/components/modules/today-handoff-context";
-import { findWait, type InProgressWait } from "@/lib/data/today-handoff";
+import { findDone, findWait, type InProgressWait } from "@/lib/data/today-handoff";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -103,6 +103,7 @@ export function TodayScreen({
   done,
   certs = [],
   sender = null,
+  pool = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -121,6 +122,8 @@ export function TodayScreen({
   certs?: CertAlertRow[];
   /** This person's mailbox with Send from Triangle on (DEV-013), or null. */
   sender?: { id: string; emailAddress: string } | null;
+  /** People on the books a human may attach as an anonymised profile. */
+  pool?: AttachableWorker[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const [thread, setThread] = useState<ThreadTarget | null>(null);
@@ -128,10 +131,14 @@ export function TodayScreen({
   const decisions = cameBack.filter((i) => i.state !== null);
   const older = cameBack.filter((i) => i.state === null);
   const nowAction = move.action;
-  const nowWait = nowAction
-    ? findWait(waits, { leadId: nowAction.leadId, contactId: nowAction.contactId })
+  const nowIds = nowAction
+    ? { leadId: nowAction.leadId, contactId: nowAction.contactId }
     : null;
-  const nowNeedsYou = Boolean(nowAction && !nowWait && !move.clear);
+  const nowWait = nowIds ? findWait(waits, nowIds) : null;
+  // The same card stays when Bob has it (DEV-015). Needs you is only the
+  // human decision — Send now, not the wait itself.
+  const nowShowCard = Boolean(nowAction && !move.clear);
+  const nowNeedsYou = Boolean(nowShowCard && !nowWait);
   const due = followUps.items.filter(
     (f) =>
       !nowAction ||
@@ -195,18 +202,20 @@ export function TodayScreen({
               onClear={() => setLogged(null)}
             />
           )}
-          {nowNeedsYou ? (
-            <NowCard key={cardKey} move={move} onLogged={setLogged} waits={waits} sender={sender} />
+          {nowShowCard ? (
+            <NowCard
+              key={cardKey}
+              move={move}
+              onLogged={setLogged}
+              waits={waits}
+              done={done}
+              sender={sender}
+              pool={pool}
+            />
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
-              <p className="text-base font-semibold text-slate-900">
-                {nowWait ? "Nothing needs you on this case" : move.headline}
-              </p>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                {nowWait
-                  ? "It is with the team under In progress. Open thread or take it back there."
-                  : move.because}
-              </p>
+              <p className="text-base font-semibold text-slate-900">{move.headline}</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{move.because}</p>
             </div>
           )}
         </div>
@@ -483,16 +492,20 @@ function NowCard({
   move,
   onLogged,
   waits,
+  done,
   sender,
+  pool,
 }: {
   move: NextMove;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  done: DoneItem[];
   sender: { id: string; emailAddress: string } | null;
+  pool: AttachableWorker[];
 }) {
   if (move.clear || !move.action) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center">
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
         <p className="text-base font-semibold text-slate-900">{move.headline}</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{move.because}</p>
       </div>
@@ -512,7 +525,14 @@ function NowCard({
           {move.because}
         </p>
       </div>
-      <ActionPanel action={move.action} onLogged={onLogged} waits={waits} sender={sender} />
+      <ActionPanel
+        action={move.action}
+        onLogged={onLogged}
+        waits={waits}
+        done={done}
+        sender={sender}
+        pool={pool}
+      />
     </div>
   );
 }
@@ -535,13 +555,17 @@ function ActionPanel({
   action,
   onLogged,
   waits,
+  done,
   sender,
+  pool,
 }: {
   action: NextMoveAction;
   onLogged: (logged: LoggedAttempt) => void;
   waits: InProgressWait[];
+  done: DoneItem[];
   /** This person's mailbox with sending on (DEV-013); null keeps Open mail only. */
   sender: { id: string; emailAddress: string } | null;
+  pool: AttachableWorker[];
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -549,16 +573,20 @@ function ActionPanel({
   const [logging, setLogging] = useState<ContactOutcome | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [workerId, setWorkerId] = useState(action.offering?.workerId ?? "");
 
   const isPhone = action.channelKind === "phone";
   const outcomes = outcomesFor(action.channelKind);
   // A written message can be changed before it goes; what is in the box is
   // what Copy, Open mail and Sent use. A call script is only read out.
   const [words, setWords] = useState(action.script ?? "");
+  const [autoWords, setAutoWords] = useState(action.script ?? "");
   const outgoing = isPhone ? (action.script ?? "") : words;
   const about = [action.personRole, action.country ? `in ${action.country}` : null]
     .filter(Boolean)
     .join(" ");
+  const offering =
+    (action.candidates ?? []).find((c) => c.workerId === workerId) ?? action.offering ?? null;
   const sendTarget = {
     to: action.value,
     subject: action.subject,
@@ -567,7 +595,27 @@ function ActionPanel({
     who: action.personName,
     leadId: action.leadId,
     contactId: action.contactId || undefined,
+    workerId: workerId || undefined,
+    candidates: action.candidates,
   };
+  const nowWait = findWait(waits, {
+    leadId: action.leadId,
+    contactId: action.contactId,
+  });
+  const nowDone = findDone(done, {
+    leadId: action.leadId,
+    contactId: action.contactId,
+  });
+
+  function pickWorker(nextId: string, next: OfferWorker | null) {
+    setWorkerId(nextId);
+    if (!next) return;
+    if (words === autoWords) {
+      const rewritten = rewriteBackground(autoWords, next.why);
+      setWords(rewritten);
+      setAutoWords(rewritten);
+    }
+  }
 
   async function log(outcome: ContactOutcome) {
     setLogging(outcome);
@@ -680,35 +728,68 @@ function ActionPanel({
       </div>
 
       <div className="space-y-4 px-6 py-5">
-        {action.offering && (
+        <EmployeePrepared wait={nowWait} done={nowDone} />
+
+        {(offering || (action.candidates && action.candidates.length > 0)) && (
           <div>
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-400">
               Who we put forward
             </p>
-            <p className="mt-1.5 text-[15px] font-semibold text-white">
-              {action.offering.name}
-              {action.offering.role && (
-                <span className="ml-2 text-[13px] font-normal text-slate-400">
-                  {action.offering.role}
-                </span>
-              )}
-            </p>
-            <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
-              {action.offering.why}
-            </p>
-            {/* What is NOT known about them, before it is offered to a buyer. */}
-            {action.offering.caveats.length > 0 && (
-              <ul className="mt-2.5 space-y-1">
-                {action.offering.caveats.map((c) => (
-                  <li
-                    key={c}
-                    className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
+            {(action.candidates?.length ?? 0) > 1 && (
+              <div className="mt-2 space-y-1">
+                {action.candidates!.map((c) => (
+                  <label
+                    key={c.workerId}
+                    className="flex cursor-pointer items-start gap-2 rounded-lg py-0.5"
                   >
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                    {c}
-                  </li>
+                    <input
+                      type="radio"
+                      name="today-offering"
+                      checked={workerId === c.workerId}
+                      onChange={() => pickWorker(c.workerId, c)}
+                      className="mt-1.5"
+                    />
+                    <span>
+                      <span className="text-[14px] font-semibold text-white">{c.name}</span>
+                      {c.role && (
+                        <span className="ml-2 text-[13px] font-normal text-slate-400">
+                          {c.role}
+                        </span>
+                      )}
+                    </span>
+                  </label>
                 ))}
-              </ul>
+              </div>
+            )}
+            {offering && (action.candidates?.length ?? 0) <= 1 && (
+              <p className="mt-1.5 text-[15px] font-semibold text-white">
+                {offering.name}
+                {offering.role && (
+                  <span className="ml-2 text-[13px] font-normal text-slate-400">
+                    {offering.role}
+                  </span>
+                )}
+              </p>
+            )}
+            {offering && (
+              <>
+                <p className="mt-1 text-[13px] leading-relaxed text-slate-400">
+                  {offering.why}
+                </p>
+                {offering.caveats.length > 0 && (
+                  <ul className="mt-2.5 space-y-1">
+                    {offering.caveats.map((c) => (
+                      <li
+                        key={c}
+                        className="flex items-start gap-2 text-[12px] leading-snug text-amber-300/90"
+                      >
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
         )}
@@ -717,6 +798,11 @@ function ActionPanel({
           <SendFromTriangleReview
             target={sendTarget}
             sender={sender}
+            pool={pool}
+            onPickWorker={(id) => {
+              const next = (action.candidates ?? []).find((c) => c.workerId === id) ?? null;
+              pickWorker(id, next);
+            }}
             onCancel={() => setReviewing(false)}
             onSent={(sent) => {
               setReviewing(false);
@@ -793,10 +879,7 @@ function ActionPanel({
                   .join(" "),
               })
             }
-            alreadyWith={findWait(waits, {
-              leadId: action.leadId,
-              contactId: action.contactId,
-            })}
+            alreadyWith={nowWait}
           />
         )}
 
@@ -815,6 +898,72 @@ function ActionPanel({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function rewriteBackground(script: string, why: string): string {
+  if (!why.trim()) return script;
+  const line = `Relevant background: ${why}.`;
+  if (/Relevant background:.*?(?=\n|$)/.test(script)) {
+    return script.replace(/Relevant background:.*?(?=\n|$)/, line);
+  }
+  return script;
+}
+
+/**
+ * What the employee wrote in Triangle on this case. A chat outside Triangle
+ * is not this record — if they only wrote there, the card says so.
+ */
+function EmployeePrepared({
+  wait,
+  done,
+}: {
+  wait: InProgressWait | null;
+  done: DoneItem | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const follow = wait ?? done;
+  if (!follow) return null;
+  const body = wait
+    ? wait.lastAgentBody ?? ""
+    : done?.lastAgentBody || done?.resultSummary || "";
+  const name = wait?.agentName ?? done?.agentName ?? "the team";
+  const label = wait ? wait.withLabel : `${name} prepared`;
+
+  return (
+    <div className="rounded-xl border border-sky-400/30 bg-sky-400/[0.07] p-3.5">
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">
+        {label}
+      </p>
+      {body ? (
+        <>
+          <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-slate-200">
+            {body}
+          </pre>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(body);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                /* clipboard may be blocked; the text is already on the card */
+              }
+            }}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-[12px] font-medium text-slate-200 transition hover:bg-white/10"
+          >
+            {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied" : "Copy what they wrote"}
+          </button>
+        </>
+      ) : (
+        <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+          Nothing is in the Triangle thread yet. Open thread — a chat outside
+          Triangle is not the record.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,22 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Send } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Send from Triangle (DEV-013).
+// Send from Triangle (DEV-013 + packet attach).
 //
 // Review, edit, press Send. The words in the card's editor are what goes;
 // the person sees To / From / Subject and the text once more, then presses
-// Send now. The server sends through the person's own mailbox and only then
-// records it (final text beside the AI draft, recipient, time, channel,
-// follow-up). If the mailbox's server refuses, nothing is recorded as sent
-// and the reason is shown here.
+// Send now. They may attach the anonymised Triangle profile for the person
+// they picked — filename is the Triangle reference, never the name. The
+// server sends through the person's own mailbox and only then records it.
+// If the mailbox's server refuses, nothing is recorded as sent.
 //
 // Rendered only when the person has a mailbox with sending turned on; with
 // none, Open mail stays the way out and this component renders nothing.
 // ---------------------------------------------------------------------------
+
+export interface OfferChoice {
+  workerId: string;
+  name: string;
+  role: string | null;
+  why?: string;
+  caveats?: string[];
+}
+
+export interface PoolWorker {
+  workerId: string;
+  name: string;
+  role: string | null;
+  status?: string;
+}
 
 export interface SendTarget {
   to: string;
@@ -29,6 +44,8 @@ export interface SendTarget {
   leadId?: string;
   contactId?: string;
   personId?: string;
+  workerId?: string;
+  candidates?: OfferChoice[];
 }
 
 export interface SentRecord {
@@ -36,6 +53,7 @@ export interface SentRecord {
   sentence: string;
   who: string;
   followUpAt: string | null;
+  attachedFilename?: string | null;
 }
 
 const TONE = {
@@ -54,6 +72,7 @@ const TONE = {
     cancel: "rounded-lg px-2.5 py-2 text-[13px] text-slate-400 transition hover:text-slate-200",
     error: "mt-2 text-[13px] text-rose-400",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
+    check: "mt-3 flex items-start gap-2 text-[13px] text-slate-200",
   },
   light: {
     button:
@@ -70,6 +89,7 @@ const TONE = {
     cancel: "rounded-lg px-2.5 py-2 text-[13px] text-slate-500 transition hover:text-slate-800",
     error: "mt-2 text-[12.5px] text-rose-600",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
+    check: "mt-3 flex items-start gap-2 text-[13px] text-slate-800",
   },
 } as const;
 
@@ -107,22 +127,61 @@ export function SendFromTriangleReview({
   target,
   sender,
   tone = "dark",
+  pool = [],
   onSent,
   onCancel,
+  onPickWorker,
 }: {
   target: SendTarget;
   sender: { id: string; emailAddress: string };
   tone?: keyof typeof TONE;
+  pool?: PoolWorker[];
   onSent: (sent: SentRecord) => void;
   onCancel: () => void;
+  onPickWorker?: (workerId: string) => void;
 }) {
   const router = useRouter();
   const t = TONE[tone];
   const [subject, setSubject] = useState(target.subject ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workerId, setWorkerId] = useState(target.workerId ?? "");
+  const [attach, setAttach] = useState(Boolean(target.workerId));
+  const [query, setQuery] = useState("");
   const body = target.body.trim();
-  const ready = !busy && subject.trim().length > 0 && body.length >= 2;
+  const canAttach = Boolean(workerId);
+  const ready =
+    !busy &&
+    subject.trim().length > 0 &&
+    body.length >= 2 &&
+    (!attach || canAttach);
+
+  const choices = useMemo(() => {
+    const seen = new Set<string>();
+    const out: OfferChoice[] = [];
+    for (const c of target.candidates ?? []) {
+      if (seen.has(c.workerId)) continue;
+      seen.add(c.workerId);
+      out.push(c);
+    }
+    const q = query.trim().toLowerCase();
+    if (q.length >= 2) {
+      for (const p of pool) {
+        if (seen.has(p.workerId)) continue;
+        const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) continue;
+        seen.add(p.workerId);
+        out.push({ workerId: p.workerId, name: p.name, role: p.role });
+      }
+    }
+    return out;
+  }, [target.candidates, pool, query]);
+
+  function pick(id: string) {
+    setWorkerId(id);
+    if (id) setAttach(true);
+    onPickWorker?.(id);
+  }
 
   async function send() {
     if (!ready) return;
@@ -141,6 +200,8 @@ export function SendFromTriangleReview({
           contactId: target.contactId || undefined,
           personId: target.personId,
           mailAccountId: sender.id,
+          workerId: attach && workerId ? workerId : undefined,
+          attachAnonymisedCv: attach && Boolean(workerId),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -148,16 +209,21 @@ export function SendFromTriangleReview({
         actionId?: string;
         followUpAt?: string | null;
         from?: string;
+        attachedFilename?: string | null;
       };
       if (!res.ok || !data.actionId) {
         setError(data.error ?? "Not sent.");
         return;
       }
+      const attached = data.attachedFilename ?? null;
       onSent({
         actionId: data.actionId,
-        sentence: `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}.`,
+        sentence: attached
+          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}, with ${attached}.`
+          : `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}.`,
         who: target.who,
         followUpAt: data.followUpAt ?? null,
+        attachedFilename: attached,
       });
       router.refresh();
     } catch {
@@ -166,6 +232,8 @@ export function SendFromTriangleReview({
       setBusy(false);
     }
   }
+
+  const selected = choices.find((c) => c.workerId === workerId);
 
   return (
     <div className={t.box} role="dialog" aria-label="Review before sending">
@@ -187,6 +255,70 @@ export function SendFromTriangleReview({
         />
       </label>
       <pre className={t.pre}>{body}</pre>
+
+      {(target.candidates?.length || pool.length > 0) && (
+        <div className="mt-3">
+          <p className={`${t.line} ${t.muted}`}>Who to put forward</p>
+          <div className="mt-1.5 space-y-1">
+            {choices.map((c) => (
+              <label
+                key={c.workerId}
+                className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1"
+              >
+                <input
+                  type="radio"
+                  name="packet-worker"
+                  checked={workerId === c.workerId}
+                  onChange={() => pick(c.workerId)}
+                  disabled={busy}
+                  className="mt-1"
+                />
+                <span className={t.line}>
+                  {c.name}
+                  {c.role ? <span className={t.muted}> · {c.role}</span> : null}
+                </span>
+              </label>
+            ))}
+          </div>
+          {pool.length > 0 && (
+            <label className="mt-2 block">
+              <span className={`${t.line} ${t.muted}`}>
+                Someone else in the pool — type two letters
+              </span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                disabled={busy}
+                placeholder="Name or role"
+                className={t.input}
+              />
+            </label>
+          )}
+        </div>
+      )}
+
+      <label className={t.check}>
+        <input
+          type="checkbox"
+          checked={attach}
+          onChange={(e) => setAttach(e.target.checked)}
+          disabled={busy}
+          className="mt-1"
+        />
+        <span>
+          Attach the anonymised Triangle profile (PDF). The filename is the
+          Triangle reference, never their name. Bob does not send.
+        </span>
+      </label>
+      {attach && !workerId && (
+        <p className={t.error}>Pick who to put forward before attaching a profile.</p>
+      )}
+      {attach && selected && (
+        <p className={t.note}>
+          {selected.name} — initials and no contact details. Named CVs stay in Talent.
+        </p>
+      )}
+
       <p className={t.note}>
         Leaves from your own mailbox. Triangle records the text as sent, the draft as
         written, and sets the follow-up date. If your mail server refuses, nothing is

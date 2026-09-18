@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { renderToBuffer, Document } from "@react-pdf/renderer";
 import type { DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
-import { buildWorkerCv } from "@/lib/data/worker-cv";
+import { buildWorkerCv, anonymisedCvFilename } from "@/lib/data/worker-cv";
 import { WorkerCvDoc } from "@/lib/pdf/worker-cv-pdf";
 import { requireApiAccess } from "@/lib/supabase/server";
 
@@ -47,7 +47,7 @@ export async function GET(
 
   const filename = includeIdentity
     ? `${cv.displayName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}-cv.pdf`
-    : `${cv.reference.toLowerCase()}-profile.pdf`;
+    : anonymisedCvFilename(cv.reference);
 
   return new Response(new Uint8Array(buffer), {
     headers: {

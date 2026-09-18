@@ -46,6 +46,12 @@ export function newRfc822Id(fromEmail: string): string {
   return `<${token}@${domain}>`;
 }
 
+export interface MailAttachment {
+  filename: string;
+  contentType: string;
+  bytes: Uint8Array | Buffer;
+}
+
 export interface OutboundMail {
   from: string;
   fromName?: string | null;
@@ -54,6 +60,7 @@ export interface OutboundMail {
   body: string;
   inReplyTo?: string | null;
   rfc822Id: string;
+  attachments?: MailAttachment[];
 }
 
 function headerSafe(value: string): string {
@@ -67,6 +74,17 @@ function encodeWord(value: string): string {
   return `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
 }
 
+/** ASCII filename for Content-Disposition. Never a path, never a quote. */
+export function safeAttachmentFilename(name: string): string {
+  const base = name.split(/[/\\]/).pop() ?? "file";
+  const cleaned = base.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleaned || "attachment.bin";
+}
+
+function wrapBase64(bytes: Uint8Array | Buffer): string {
+  return Buffer.from(bytes).toString("base64").replace(/(.{76})/g, "$1\r\n").trim();
+}
+
 export function buildMime(mail: OutboundMail): string {
   const from = mail.fromName ? `${encodeWord(mail.fromName)} <${mail.from}>` : mail.from;
   const headers = [
@@ -76,13 +94,44 @@ export function buildMime(mail: OutboundMail): string {
     `Message-ID: ${mail.rfc822Id}`,
     `Date: ${new Date().toUTCString()}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 8bit",
   ];
   if (mail.inReplyTo) {
     headers.push(`In-Reply-To: ${headerSafe(mail.inReplyTo)}`, `References: ${headerSafe(mail.inReplyTo)}`);
   }
-  return `${headers.join("\r\n")}\r\n\r\n${mail.body.replace(/\r?\n/g, "\r\n")}\r\n`;
+
+  const attachments = mail.attachments ?? [];
+  const body = mail.body.replace(/\r?\n/g, "\r\n");
+  if (attachments.length === 0) {
+    headers.push(
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+    );
+    return `${headers.join("\r\n")}\r\n\r\n${body}\r\n`;
+  }
+
+  const boundary = `triangle-${mail.rfc822Id.replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}`;
+  headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+  const parts = [
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    body,
+  ];
+  for (const file of attachments) {
+    const filename = safeAttachmentFilename(file.filename);
+    const type = headerSafe(file.contentType) || "application/octet-stream";
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${type}; name="${filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${filename}"`,
+      "",
+      wrapBase64(file.bytes),
+    );
+  }
+  parts.push(`--${boundary}--`, "");
+  return `${headers.join("\r\n")}\r\n\r\n${parts.join("\r\n")}`;
 }
 
 /** SMTP DATA: a line that starts with a dot is sent as two dots. */
@@ -125,6 +174,7 @@ export async function sendViaMailbox(
     body: mail.body,
     inReplyTo: mail.inReplyTo,
     rfc822Id,
+    attachments: mail.attachments,
   });
 
   try {

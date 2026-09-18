@@ -155,6 +155,8 @@ export async function buildWorkerCv(params: {
   };
 }
 
+export { anonymisedCvFilename } from "@/lib/data/anonymised-cv-filename";
+
 function organizationReferencePrefix(name: string): string {
   const words =
     name

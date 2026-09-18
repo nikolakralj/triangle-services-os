@@ -195,6 +195,7 @@ test('Handoff matching uses lead/contact/person ids, not assignment title', () =
     messageCount: 1,
     awaitingAgent: 0,
     createdAt: '',
+    lastAgentBody: null,
   };
   assert.equal(matchesWait(wait, { leadId: 'lead-1' }), true);
   assert.equal(matchesWait(wait, { leadId: 'lead-2' }), false);
@@ -216,6 +217,30 @@ test('docs lock the handoff rule and commercial_follow_through', () => {
   assert.match(roadmap, /Handoff changes the/);
   assert.match(execution, /DEV-015/);
   assert.match(execution, /commercial_follow_through/);
+});
+
+test('Today keeps the Now card when Bob has the case; Bob wrote in Triangle is on it', () => {
+  assert.match(todayScreen, /nowShowCard/);
+  assert.match(todayScreen, /EmployeePrepared/);
+  assert.match(todayScreen, /Nothing is in the Triangle thread yet/);
+  assert.match(todayScreen, /Copy what they wrote/);
+  assert.doesNotMatch(todayScreen, /Nothing needs you on this case/);
+  assert.match(todayScreen, /Who we put forward/);
+  assert.match(todayScreen, /today-offering/);
+});
+
+test('Done follow-through matches the same lead/contact as the card', () => {
+  const {
+    findDone,
+  } = moduleLoader()('src/lib/data/today-handoff.ts');
+  const item = {
+    assignmentId: 'done-1',
+    leadId: 'lead-1',
+    contactId: null,
+    personId: null,
+  };
+  assert.equal(findDone([item], { leadId: 'lead-1' })?.assignmentId, 'done-1');
+  assert.equal(findDone([item], { leadId: 'lead-2' }), null);
 });
 
 test('Workforce console is gone (DEV-012 slice B); Team hands nothing out', () => {

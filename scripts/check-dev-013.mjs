@@ -118,6 +118,49 @@ test('MIME: headers, threading, non-ASCII subject, dot-stuffing', () => {
   assert.doesNotMatch(inj, /\r\nBcc:/);
 });
 
+test('MIME: attachments are multipart/mixed, base64, and the filename is sanitised', () => {
+  const mime = buildMime({
+    from: 'owner@x.com',
+    to: 'oliver@g2.com',
+    subject: 'Re: profile',
+    body: 'Please find the anonymised profile attached.',
+    rfc822Id: '<1.2@x.com>',
+    attachments: [
+      {
+        filename: 'ts-aabbccdd-profile.pdf',
+        contentType: 'application/pdf',
+        bytes: Buffer.from('%PDF-mock'),
+      },
+    ],
+  });
+  assert.match(mime, /Content-Type: multipart\/mixed; boundary="/);
+  assert.match(mime, /Content-Type: text\/plain; charset=utf-8/);
+  assert.match(mime, /Content-Type: application\/pdf; name="ts-aabbccdd-profile.pdf"/);
+  assert.match(mime, /Content-Disposition: attachment; filename="ts-aabbccdd-profile.pdf"/);
+  assert.match(mime, /Content-Transfer-Encoding: base64/);
+  assert.match(mime, /JVBERi1tb2Nr/);
+  const sneaky = buildMime({
+    from: 'a@b.co',
+    to: 'c@d.co',
+    subject: 'x',
+    body: 'x',
+    rfc822Id: '<1@b.co>',
+    attachments: [
+      { filename: '../../Secret Name.pdf', contentType: 'application/pdf', bytes: Buffer.from('x') },
+    ],
+  });
+  assert.equal(sneaky.includes(".."), false);
+  assert.match(sneaky, /filename="Secret-Name.pdf"/);
+  assert.doesNotMatch(sneaky, /filename="\.\./);
+});
+
+test('anonymised profile filename is the reference, never a person name', () => {
+  const { anonymisedCvFilename } = moduleLoader()('src/lib/data/anonymised-cv-filename.ts');
+  assert.equal(anonymisedCvFilename('TS-AABBCCDD'), 'ts-aabbccdd-profile.pdf');
+  assert.equal(anonymisedCvFilename('  weird///ref  '), 'weird-ref-profile.pdf');
+  assert.doesNotMatch(anonymisedCvFilename('TS-AABBCCDD'), /name|cv_244|\.docx/i);
+});
+
 test('SMTP host by provider; only plain addresses are accepted', () => {
   assert.equal(defaultSmtpHost('a@gmail.com'), 'smtp.gmail.com');
   assert.equal(defaultSmtpHost('a@outlook.com'), 'smtp.office365.com');
@@ -158,6 +201,7 @@ const ORG = '11111111-1111-4111-8111-111111111111';
 const OWNER = '77777777-7777-4777-8777-777777777777';
 const COLLEAGUE = '88888888-8888-4888-8888-888888888888';
 const LEAD = '55555555-5555-4555-8555-555555555555';
+const WORKER = '66666666-6666-4666-8666-666666666666';
 
 let mailboxes = [];
 let logged = [];
@@ -207,6 +251,16 @@ const loadSend = moduleLoader({
       smtpCalls.push({ box, mail });
       if (smtpFail) return { error: smtpFail };
       return { rfc822Id: '<msg-1@x.com>' };
+    },
+  },
+  '@/lib/mail/anonymised-cv-attachment': {
+    buildAnonymisedCvAttachment: async ({ workerId }) => {
+      if (!workerId || workerId === 'missing') return null;
+      return {
+        filename: 'ts-aabbccdd-profile.pdf',
+        contentType: 'application/pdf',
+        bytes: Buffer.from('%PDF-mock'),
+      };
     },
   },
 });
@@ -330,6 +384,46 @@ test('sendableMailboxFor tells the Today page whose button to show', async () =>
   assert.equal(await sendableMailboxFor(ORG, COLLEAGUE), null);
 });
 
+test('attaching an anonymised profile: builder runs, SMTP gets the file, the record names the filename', async () => {
+  reset();
+  const r = await sendFromTriangle({
+    ...message,
+    userId: OWNER,
+    workerId: WORKER,
+    attachAnonymisedCv: true,
+  });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.attachedFilename, 'ts-aabbccdd-profile.pdf');
+  assert.equal(smtpCalls.length, 1);
+  assert.equal(smtpCalls[0].mail.attachments.length, 1);
+  assert.equal(smtpCalls[0].mail.attachments[0].filename, 'ts-aabbccdd-profile.pdf');
+  assert.equal(smtpCalls[0].mail.attachments[0].contentType, 'application/pdf');
+  assert.match(logged[0].note, /ts-aabbccdd-profile\.pdf/);
+});
+
+test('attach without picking a worker never reaches the server', async () => {
+  reset();
+  const r = await sendFromTriangle({ ...message, userId: OWNER, attachAnonymisedCv: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 400);
+  assert.match(r.error, /Pick who to put forward/);
+  assert.equal(smtpCalls.length, 0);
+  assert.equal(logged.length, 0);
+});
+
+test('a missing profile is a 404 and nothing is sent', async () => {
+  reset();
+  const r = await sendFromTriangle({
+    ...message,
+    userId: OWNER,
+    workerId: 'missing',
+    attachAnonymisedCv: true,
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 404);
+  assert.equal(smtpCalls.length, 0);
+});
+
 // ── the record keeps working on a database without migration 049 ────────────
 test('logContactAttempt writes sent_via / mail_account_id / Message-ID only when a Triangle send says so', () => {
   const src = read('src/lib/data/contact-log.ts');
@@ -346,6 +440,9 @@ test('/api/mail/send refuses machines and demo before reading the body', () => {
   assert.ok(guard > 0 && body > guard, 'guard before body');
   assert.match(src, /sendFromTriangle\(/);
   assert.doesNotMatch(src, /agentInstanceId|machine_credentials/);
+  assert.match(src, /workerId: z\.string\(\)\.uuid\(\)\.optional\(\)\.nullable\(\)/);
+  assert.match(src, /attachAnonymisedCv: z\.boolean\(\)\.optional\(\)/);
+  assert.match(src, /attachedFilename: result\.attachedFilename/);
 });
 
 test('nothing but the human route reaches the SMTP transport', () => {
@@ -385,6 +482,10 @@ test('Today card: Send from Triangle only with a sender; Open mail stays; review
   assert.match(comp, /Send now/);
   assert.match(comp, /nothing is\s+recorded as sent/);
   assert.match(comp, /draft: target\.draft/);
+  assert.match(comp, /attachAnonymisedCv/);
+  assert.match(comp, /Attach the anonymised Triangle profile/);
+  assert.match(comp, /Bob does not send/);
+  assert.match(comp, /packet-worker/);
 });
 
 test('mailbox switch: owner only, off by default, PATCH refuses machines', () => {
