@@ -134,16 +134,39 @@ function Bullets({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
-  // The client version stays short on purpose: a buyer deciding whether to
-  // take a call reads a page, and each further detail narrows the field of
-  // people it could be until the anonymity is decorative.
-  const shortlist = <T,>(items: T[], keep: number) =>
-    cv.anonymised ? items.slice(0, keep) : items;
+/**
+ * How much of the record each version prints.
+ *
+ * The anonymised versions stay short on purpose: a buyer deciding whether to
+ * take a call reads a page, and each further detail narrows the field of
+ * people it could be until the anonymity is decorative. The short bio is the
+ * same document cut to one screen for somebody who asked for one, and it
+ * drops the "will work in" line because a country list on three projects is
+ * most of an identification.
+ */
+const KEEP: Record<
+  WorkerCvDocument["intent"],
+  { skills: number; projects: number; certificates: number; mobility: boolean }
+> = {
+  full_cv: {
+    skills: Number.POSITIVE_INFINITY,
+    projects: Number.POSITIVE_INFINITY,
+    certificates: Number.POSITIVE_INFINITY,
+    mobility: true,
+  },
+  bio_anonymised: { skills: 10, projects: 6, certificates: 8, mobility: true },
+  short_bio: { skills: 5, projects: 3, certificates: 4, mobility: false },
+};
 
-  const skills = shortlist(cv.skills, 10);
-  const projects = shortlist(cv.workHistory, 6);
-  const certificates = shortlist(cv.certificates, 8);
+export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
+  const keep = KEEP[cv.intent] ?? KEEP.bio_anonymised;
+  const shortlist = <T,>(items: T[], max: number) =>
+    Number.isFinite(max) ? items.slice(0, max) : items;
+
+  const skills = shortlist(cv.skills, keep.skills);
+  const projects = shortlist(cv.workHistory, keep.projects);
+  const certificates = shortlist(cv.certificates, keep.certificates);
+  const mobility = keep.mobility ? cv.mobility : [];
 
   return (
     <Document
@@ -182,7 +205,7 @@ export function WorkerCvDoc({ cv }: { cv: WorkerCvDocument }) {
         <Row label="Availability" value={cv.availability} />
         <Row
           label="Will work in"
-          value={cv.mobility.length > 0 ? cv.mobility.join(", ") : null}
+          value={mobility.length > 0 ? mobility.join(", ") : null}
         />
         <Row
           label="Languages"

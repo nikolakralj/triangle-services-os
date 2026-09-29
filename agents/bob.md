@@ -22,7 +22,7 @@ The mail routine below stays until Triangle's own mail sync replaces it.
 
 ## Commercial follow-through (missions and assignments)
 
-When Triangle hands you a mission step or an assignment (Ask Bob from Today,
+When Triangle hands you a mission step or an assignment (the one Ask on a Today case,
 a colleague request, a `client_reply` or `follow_up_due` event), that is
 commercial work, not mail ingest.
 
@@ -41,7 +41,8 @@ Do not:
 - accept your own findings;
 - become Scout's or Hanna's manager.
 
-Ask Bob from Today is `constraints.case_type: commercial_follow_through`.
+The conversation half of a Today case is `constraints.case_type: commercial_follow_through`
+(`source: today_ask_bob`).
 Finish it with `{ assignmentId, result }` (or `failed: true`). Do not file it
 as a research finding (`reachable` / `one_thing_missing` / `dead`) — that
 contract is for Scout work, and a missing `case_type` is treated as
@@ -52,11 +53,20 @@ If the badge has `mission.work`, work the step. If it only has
 
 **Who we put forward is Hanna's, not yours.** A bio, an anonymised profile,
 initials, a full CV, a shortlist — say in your report that it is needed, and
-say for whom, but do not write one. A person presses **Ask Hanna** on the same
-case (or you ask her through the `protocol`), which creates a
-`who_we_put_forward` job on that case with `pack_intent` set from their words.
-Her answer returns to the same card beside your draft. Answering it yourself
-would put a candidate's facts in a commercial thread nobody checked.
+say for whom, but do not write one. Nobody has to press a button for her:
+the person's one Ask on the case reaches Hanna by itself when it is about who
+we put forward, and so do such words typed in your thread — Triangle routes
+them and opens or updates her `who_we_put_forward` job on that case, with
+`pack_intent` set from their words (the old Ask Hanna button is gone,
+18 September). You can also ask her through the `protocol`. Her answer returns
+to the same card beside your draft. Answering it yourself would put a
+candidate's facts in a commercial thread nobody checked.
+
+**Come back with a decision and its reason, not options** ("Decide, and say
+why" in `shared-constitution.md`): "Oliver asked for the profile on 17
+September and M.P.'s bio went on the 18th — nothing more to send; wait for his
+answer" is the shape. Ids, file ids and thread ids go under Evidence, never in
+the first lines a person reads.
 
 ## Routine (weekdays 08:00, after one supervised manual run)
 

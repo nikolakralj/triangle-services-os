@@ -2,9 +2,14 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { logContactAttempt } from "@/lib/data/contact-log";
 import { recordRefusal } from "@/lib/data/refusals";
-import { pickSendableMailbox, SEND_NOT_ENABLED } from "@/lib/mail/send-policy";
+import {
+  pickSendableMailbox,
+  sendableMailboxes,
+  SEND_NOT_ENABLED,
+} from "@/lib/mail/send-policy";
 import { isPlainAddress, sendViaMailbox } from "@/lib/mail/smtp-send";
-import { buildAnonymisedCvAttachment } from "@/lib/mail/anonymised-cv-attachment";
+import { buildPackAttachment } from "@/lib/mail/pack-attachment";
+import { approvedPackForSend } from "@/lib/data/put-forward-cases";
 
 // ---------------------------------------------------------------------------
 // A person presses Send in Triangle (DEV-013).
@@ -37,9 +42,13 @@ export interface SendFromTriangleInput {
   mailAccountId?: string | null;
   /** The inbound message this answers, for threading. */
   inReplyTo?: string | null;
-  /** Attach the anonymised Triangle CV for this worker. Human ticks it. */
-  workerId?: string | null;
-  attachAnonymisedCv?: boolean;
+  /**
+   * Attach the profile a person approved on this case. Both are needed: the
+   * tick says they meant it now, and the case id is what the approval is
+   * read from. Neither is trusted on its own.
+   */
+  attachPack?: boolean;
+  putForwardAssignmentId?: string | null;
 }
 
 export type SendFromTriangleResult =
@@ -65,26 +74,69 @@ interface MailboxRow {
   credential_ref: string | null;
 }
 
+export interface SendableMailboxOption {
+  id: string;
+  emailAddress: string;
+  /** What the recipient sees in front of the address, when one is set. */
+  displayName: string | null;
+}
+
+type MailboxPickRow = {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  owner_user_id: string | null;
+  can_send: boolean | null;
+  status: string | null;
+};
+
+async function ownMailboxRows(
+  orgId: string,
+  userId: string,
+): Promise<MailboxPickRow[] | null> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return null;
+  const { data, error } = await svc
+    .from("mail_accounts")
+    .select("id, email_address, display_name, owner_user_id, can_send, status")
+    .eq("org_id", orgId)
+    .eq("owner_user_id", userId);
+  // Before migration 049 the column does not exist; then nobody may send.
+  if (error || !data) return null;
+  return data as MailboxPickRow[];
+}
+
+/**
+ * Every address this person may send from.
+ *
+ * A person with a personal mailbox and a company one has two identities, and
+ * which one a first approach leaves from is a commercial decision — a
+ * recruiter reading `@gmail.com` is being told something different from one
+ * reading the company domain. Triangle used to choose the first row for
+ * them and show it as a fact.
+ */
+export async function sendableMailboxesFor(
+  orgId: string,
+  userId: string,
+): Promise<SendableMailboxOption[]> {
+  const rows = await ownMailboxRows(orgId, userId);
+  if (!rows) return [];
+  return sendableMailboxes(rows, userId).map((row) => ({
+    id: row.id,
+    emailAddress: row.email_address,
+    displayName: row.display_name,
+  }));
+}
+
 /** The mailbox this person may send from, if any. Never a colleague's. */
 export async function sendableMailboxFor(
   orgId: string,
   userId: string,
   preferredId: string | null = null,
 ): Promise<{ id: string; emailAddress: string } | null> {
-  const svc = createServiceSupabaseClient();
-  if (!svc) return null;
-  const { data, error } = await svc
-    .from("mail_accounts")
-    .select("id, email_address, owner_user_id, can_send, status")
-    .eq("org_id", orgId)
-    .eq("owner_user_id", userId);
-  // Before migration 049 the column does not exist; then nobody may send.
-  if (error || !data) return null;
-  const picked = pickSendableMailbox(
-    data as Array<{ id: string; email_address: string; owner_user_id: string | null; can_send: boolean | null; status: string | null }>,
-    userId,
-    preferredId,
-  );
+  const rows = await ownMailboxRows(orgId, userId);
+  if (!rows) return null;
+  const picked = pickSendableMailbox(rows, userId, preferredId);
   return picked ? { id: picked.id, emailAddress: picked.email_address } : null;
 }
 
@@ -132,19 +184,54 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
     return { ok: false, error: SEND_NOT_ENABLED, status: 403 };
   }
 
+  // The human review gate, re-read from the record at the moment of sending.
+  // A browser cannot assert that somebody approved this, and an approval
+  // given on another case does not travel to this one. A refused attach is a
+  // refusal in the ledger, not a silent plain-text send.
   let attachedFilename: string | null = null;
   const attachments: Array<{ filename: string; contentType: string; bytes: Buffer }> = [];
-  if (input.attachAnonymisedCv) {
-    const workerId = input.workerId?.trim();
-    if (!workerId) {
-      return { ok: false, error: "Pick who to put forward before attaching a profile.", status: 400 };
+  if (input.attachPack) {
+    const assignmentId = input.putForwardAssignmentId?.trim();
+    if (!assignmentId) {
+      return {
+        ok: false,
+        error: "Ask Hanna for a profile on this case, and approve it, before attaching one.",
+        status: 400,
+      };
     }
-    const file = await buildAnonymisedCvAttachment({
+    const approved = await approvedPackForSend({
       orgId: input.orgId,
-      workerId,
+      assignmentId,
+      ids: {
+        leadId: input.leadId ?? null,
+        contactId: input.contactId ?? null,
+        personId: input.personId ?? null,
+      },
+    });
+    if (!approved.ok) {
+      await recordRefusal({
+        orgId: input.orgId,
+        surface: "Send from Triangle",
+        reason: approved.error,
+        userId: input.userId,
+        entityType,
+        entityId,
+        details: { putForwardAssignmentId: assignmentId },
+        kind: "boundary",
+      });
+      return { ok: false, error: approved.error, status: approved.status };
+    }
+    const file = await buildPackAttachment({
+      orgId: input.orgId,
+      workerId: approved.workerId,
+      intent: approved.intent,
     });
     if (!file) {
-      return { ok: false, error: "Could not build the anonymised profile for that person.", status: 404 };
+      return {
+        ok: false,
+        error: "Could not build that profile. Nothing was sent.",
+        status: 404,
+      };
     }
     attachments.push(file);
     attachedFilename = file.filename;
@@ -186,7 +273,7 @@ export async function sendFromTriangle(input: SendFromTriangleInput): Promise<Se
     subject,
     sentFromTriangle: { mailAccountId: mailbox.id, rfc822Id: sent.rfc822Id },
     note: attachedFilename
-      ? `Anonymised Triangle profile attached: ${attachedFilename}`
+      ? `Approved Triangle profile attached: ${attachedFilename}`
       : undefined,
   });
   if (!logged.ok) {

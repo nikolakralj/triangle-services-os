@@ -5,10 +5,10 @@ import { listWhatCameBack } from "@/lib/data/came-back";
 import { listWorkforce } from "@/lib/data/workforce";
 import { listMissionTabs, listReadyToContact } from "@/lib/data/missions";
 import { listFollowUpsDue } from "@/lib/data/follow-ups";
-import { listAttachableWorkers, listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
+import { listDoneSince, listInProgressWaits } from "@/lib/data/today-in-progress";
 import { listCertAlerts } from "@/lib/data/worker-documents";
 import { getSession } from "@/lib/auth/session";
-import { sendableMailboxFor } from "@/lib/data/mail-send";
+import { sendableMailboxesFor } from "@/lib/data/mail-send";
 import { listPutForwardCases } from "@/lib/data/put-forward-cases";
 
 // ---------------------------------------------------------------------------
@@ -50,8 +50,7 @@ export default async function DecisionsPage() {
     waits,
     done,
     certAlerts,
-    sender,
-    pool,
+    senders,
     putForward,
   ] = await Promise.all([
     getNextMove(org),
@@ -63,10 +62,10 @@ export default async function DecisionsPage() {
     listInProgressWaits(org),
     listDoneSince(org),
     listCertAlerts(org),
-    // Send from Triangle (DEV-013): this person's own mailbox with sending
-    // turned on, or null — then the card keeps Open mail only.
-    sendableMailboxFor(org, session.userId),
-    listAttachableWorkers(org),
+    // Send from Triangle (DEV-013): every address this person may send from,
+    // or none — then the card keeps Open mail only. The reply leaves from the
+    // address the recruiter wrote to when it is one of these.
+    sendableMailboxesFor(org, session.userId),
     // Hanna's half of an open case: who we put forward, and in which form.
     listPutForwardCases(org),
   ]);
@@ -106,8 +105,8 @@ export default async function DecisionsPage() {
         waits={waits}
         done={done}
         certs={certs}
-        sender={sender}
-        pool={pool}
+        sender={senders[0] ?? null}
+        senders={senders}
         putForward={putForward}
       />
     </div>

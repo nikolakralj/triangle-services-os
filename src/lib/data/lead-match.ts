@@ -39,6 +39,11 @@ export interface LeadMatch {
   headcountText: string | null;
   receivedAt: string;
   /**
+   * The mailbox the requisition arrived in. A reply goes out from the address
+   * the recruiter wrote to, so the person is not asked to pick one.
+   */
+  receivedIn: string | null;
+  /**
    * How many requisitions this card stands for. g2 sent one Ireland
    * commissioning role four times; answering one produced its twin, so the
    * card looked untouched and every click looked like nothing.
@@ -114,7 +119,7 @@ export async function matchOpenLeads(
     svc
       .from("job_leads")
       .select(
-        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at",
+        "id, duplicate_of_id, agency_name, contact_name, contact_email, client_company, role_title, country, city, technologies, headcount_text, rate_text, start_date_text, status, created_at, inbound_email_id",
       )
       .eq("org_id", orgId)
       .in("status", ["new", "reviewing"])
@@ -168,6 +173,8 @@ export async function matchOpenLeads(
   }
 
   const matches: LeadMatch[] = [];
+  /** Lead -> the email it came from, to find the mailbox it arrived in. */
+  const emailByLead = new Map<string, string>();
   /** Group key -> the card already built for that role, to count its copies. */
   const cardByGroup = new Map<string, LeadMatch>();
   const seenGroups = new Set<string>();
@@ -272,9 +279,11 @@ export async function matchOpenLeads(
       rateText: (lead.rate_text as string | null) ?? null,
       headcountText: (lead.headcount_text as string | null) ?? null,
       receivedAt: lead.created_at as string,
+      receivedIn: null,
       candidates: candidates.slice(0, 8),
       copies: 1,
     };
+    if (lead.inbound_email_id) emailByLead.set(card.leadId, lead.inbound_email_id as string);
     matches.push(card);
     cardByGroup.set(group, card);
   }
@@ -286,7 +295,25 @@ export async function matchOpenLeads(
     return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
   });
 
-  return matches.slice(0, limit);
+  const top = matches.slice(0, limit);
+  const emailIds = top
+    .map((m) => emailByLead.get(m.leadId))
+    .filter((id): id is string => Boolean(id));
+  if (emailIds.length > 0) {
+    const { data: emails } = await svc
+      .from("inbound_emails")
+      .select("id, mail_account_id")
+      .eq("org_id", orgId)
+      .in("id", emailIds);
+    const accountByEmail = new Map(
+      (emails ?? []).map((e) => [e.id as string, (e.mail_account_id as string | null) ?? null]),
+    );
+    for (const m of top) {
+      const emailId = emailByLead.get(m.leadId);
+      m.receivedIn = emailId ? (accountByEmail.get(emailId) ?? null) : null;
+    }
+  }
+  return top;
 }
 
 /**

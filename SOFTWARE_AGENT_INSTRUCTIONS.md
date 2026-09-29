@@ -362,6 +362,10 @@ For project, company, buyer/contact, requirement, and package work:
 7. retain source facts separately from summaries and model memory;
 8. reuse canonical domain tables and current conversation stores before adding
    a generic case, vector-memory, or orchestration platform.
+9. before adding any control to a human surface, pass the "Employees, not
+   buttons" test in `PRODUCT_OPERATING_RULES.md`: the employee decides and
+   gives the reason, a person judges in words through one Ask, and a design
+   never adds more primary buttons than it removes.
 
 Automatic continuation never authorizes outreach, personal-data disclosure,
 supplier registration, legal acceptance, pricing commitment, or any other

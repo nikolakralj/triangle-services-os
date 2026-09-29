@@ -27,7 +27,7 @@ const uuid = z.string().uuid();
 
 const bodySchema = z.object({
   instruction: z.string().trim().min(2).max(4_000),
-  intent: z.enum(["bio_anonymised", "full_cv"]).optional(),
+  intent: z.enum(["bio_anonymised", "short_bio", "full_cv"]).optional(),
   who: z.string().trim().max(200).optional(),
   about: z.string().trim().max(300).optional(),
   workerId: uuid.optional(),

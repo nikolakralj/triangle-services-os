@@ -6,6 +6,98 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-18: Employees, not buttons — the core of Triangle
+
+Locked by Nikola on 18 September, looking at the Oliver Hall card: three radio
+buttons for the three people in Talent, a "Bob prepared" box full of Drive and
+thread ids, and Ask Bob, Ask Hanna and Dismiss side by side. In his words:
+
+> "I don't care what the agent is called, Bob or Hanna. When they get an email
+> they need to work and come back to me: boss, we decided to propose these
+> people, and we decided to use the bio because it's an agency and we don't
+> want to expose our candidate's name. This is the intelligence I need."
+>
+> "It's like new human employees — with time they gain trust. This needs to be
+> in the core of this app."
+
+Every other product decision is read against this one. It sits above the
+surface decisions below and amends them where they disagree.
+
+Law:
+
+1. **Employees work without being pushed.** When something arrives — a
+   requirement, a reply, a follow-up that falls due — the employee who owns
+   that kind of work starts on it. A person does not press a button for
+   routine work to begin.
+2. **They come back with decisions and reasons, not options.** "We propose
+   Matej and Igor. We used anonymised bios, initials only, because g2 is an
+   agency and we don't expose our candidates' names to agencies. The reply is
+   drafted." Who fits, which form, which thread and which wording are the
+   employee's decisions, each stated with its reason.
+3. **A person judges, in words.** A case has one Ask. A person approves,
+   changes something by saying it ("not Igor — use Matej, full CV"), or says
+   no. Triangle routes the words to whichever employees the work needs. A
+   person never chooses between Bob, Hanna and Scout, never picks a document
+   form from a control, and never picks a candidate from a list. An
+   employee's name shows who did the work; it is never a choice a person has
+   to make.
+4. **Trust is earned, like a new hire's.** For each kind of action, each
+   employee has a level of freedom, and moves up only on its record:
+   - **Proposes** — says what should happen;
+   - **Prepares** — does the whole job up to the step that cannot be undone;
+     a person approves and presses Send. **Every external message is here
+     today, for every employee: Hanna and Bob prepare drafts, a person
+     sends;**
+   - **Acts and reports** — does it within a named kind and limit, and a
+     person sees it afterwards.
+
+   A kind of action moves up only when the CEO grants it on the record, for
+   one employee, on evidence: how often their prepared work was approved
+   unchanged, what had to be corrected, what went wrong. It comes down in one
+   step. An employee never promotes itself, and no code change or
+   configuration raises a level as a side effect. Commitments (price, rate,
+   date, headcount, contract), payment, signing and deletion never move up:
+   they stay a person's. This is the path through the existing
+   `communicationPolicy` — Prepares is APPROVAL, Acts and reports is AUTO,
+   FORBIDDEN stays forbidden — and enforcement stays where the action happens.
+5. **A person sees a decision, not machinery.** What we decided, why, what is
+   prepared (open it to read it), the one thing needed now, and what happens
+   after approval. Ids, file ids, thread ids, JSON and transcripts stay behind
+   the evidence link.
+6. **Design for ten thousand.** Talent will hold ten thousand people and
+   Today a hundred cases a day. A control that works only because there are
+   three candidates is wrong today too. The employee searches the pool; a
+   person sees the two or three it chose, and why.
+
+The test a design must pass is "Employees, not buttons" in
+`PRODUCT_OPERATING_RULES.md`. A design that adds more primary buttons than it
+removes is rejected.
+
+Amends:
+
+- **Two employees on one case (18 September).** Bob chasing and Hanna putting
+  forward stay as the internal division of work; they stop being two
+  controls. The form is the employee's decision under the same rules — a bio
+  by default and always for an agency, a full CV only when a person releases
+  the name — and a person's words override it. Releasing a name still takes a
+  person.
+- **The operating shell (16 September), law 5.** "Ask the employee" means the
+  one Ask on the case, not an Ask button per employee.
+
+Building it: one Ask on the case, routed inside Triangle, is the first slice
+(briefed 18 September). Each employee's track record and the CEO's step to
+grant or withdraw a level come after, as their own item in
+`ROADMAP_EXECUTION.md`.
+
+Why:
+
+- the Oliver Hall card asked the CEO to pick a candidate from radio buttons,
+  to choose between Ask Bob and Ask Hanna, and to read Drive ids — work a
+  competent colleague does without being asked;
+- a list of controls grows with every feature, and a person operating it is
+  rebuilding a CRM by hand. A colleague who decides, explains and earns more
+  freedom is the product.
+
 ### 2026-09-16: The operating shell — three menu items, one inbox, tasks on cases
 
 Proposed by Claude on 16 September at Nikola's request ("Workforce is useless";
@@ -209,6 +301,58 @@ Law:
 
 Deliberately not in this: autonomous send, and the dual From picker (gmail vs
 triangle-services.com), which stays a follow-up.
+
+### 2026-09-18: A person opens it and approves it, or it does not go
+
+Locked the same day, reading the loop above back. The law is Nikola's: he must
+open Hanna's Triangle version on the case and **approve** it before it can be
+attached on Send. No silent auto-attach.
+
+What was actually there: picking who to put forward in the Send review switched
+the attach checkbox on for you, and that checkbox was the whole gate.
+`/api/mail/send` took the boolean, built a profile for whatever `workerId` the
+browser sent, and attached it. Nothing checked that anybody had opened the
+document, nothing tied the file to the case it was being sent on, and the
+builder passed `includeIdentity: false` unconditionally — so a case asked for
+as a full CV attached the anonymised one, under a checkbox that promised either
+depending on which you read.
+
+Law:
+
+1. **Approval is a recorded human act, not a tick.** A person opens the exact
+   document on the case and approves it. It goes in migration 042's review
+   columns with who and when — "acknowledged" there already means a person read
+   it and agrees — beside the employee's claim, never over it. Ruling one out
+   costs a reason, like every other discard on Today.
+2. **The server is the gate, not the browser.** `sendFromTriangle` re-reads the
+   approval from the record at the moment of sending. Unapproved, or approved
+   on another case, and nothing is sent — not the attachment and not the words.
+   The refusal goes in the ledger with its reason.
+3. **The tick is the last step of that decision.** It starts off, it exists
+   only once an approval stands, and it names the file. Choosing who the reply
+   is about is a separate control and attaches nothing.
+4. **What was approved is what goes.** The version is read from the case, so a
+   full CV approved as a full CV arrives named, and a bio arrives as a bio.
+5. **An approval lapses when the employee answers after it.** What was approved
+   is not what the case now says. The card asks for it again rather than
+   carrying an attachment nobody re-read.
+6. **Approving does not wait for Hanna.** The document is Triangle's own record
+   and is ready immediately, so a person may approve before her check lands —
+   but the card says which it was, and so does the recorded approval.
+7. **Three versions, not two.** `bio_anonymised`, `short_bio` and `full_cv`.
+   "Short bio" contains "bio", so short is read first; both are anonymised, so
+   getting that pair wrong costs a length, not an identity.
+8. **Which address it leaves from is a decision.** A person who owns a personal
+   mailbox and a company one is telling a recruiter something different with
+   each. Triangle offers both and picks neither; with one address there is
+   nothing to choose. The owner-only rule is unchanged, and no agent gets SMTP.
+9. **The drawer is a case, not a chat window.** It opens on the status read
+   from the record — queued and not picked up, working, answered and back with
+   you, or stopped — then the last word, with everything before it folded and
+   a long reply folded to its opening. The history stays complete and
+   reachable; it is just not the first thing in the way. Renaming the Send
+   button was half of this; a person still had to read a Grok write-up to the
+   end to learn whose move it was.
 
 ### 2026-09-16: Refined product IA — four primary surfaces, context-aware Ask, send-from-Triangle
 

@@ -31,6 +31,41 @@ Every serious product change must help Triangle:
 Triangle is not a generic CRM and is not a generic hybrid work OS. AI employees
 are supporting capabilities, not the product category.
 
+## Employees, not buttons — the core law (18 September 2026)
+
+Triangle's AI employees are colleagues who earn trust, not features a person
+operates. They start on work when it arrives, decide what a competent colleague
+would decide, and come back with the decision and the reason. A person judges
+in words. The full decision, with the levels of trust:
+`DECISIONS.md`, 18 September, "Employees, not buttons".
+
+**Reject a design, a pull request or a card that:**
+
+1. makes a person choose which employee does the work — "Ask Bob", "Ask
+   Hanna", "Hand to X" as separate controls;
+2. makes a person pick from a list that grows with the data — radio buttons,
+   dropdowns or checkboxes over people, CVs, companies or threads;
+3. makes a person choose what the employee can decide — bio, short bio or full
+   CV; which template; which mailbox; which thread;
+4. adds more primary buttons than it removes;
+5. shows machinery instead of a decision — ids, file ids, JSON, "assignment
+   completed", a raw thread;
+6. asks a person to record what a machine can observe — sent, replied,
+   stages, statuses;
+7. returns work as options without a decision and its reason — "here are
+   three candidates" instead of "we propose these two, because…";
+8. lets an employee act beyond the trust granted for that kind of action, or
+   raises that trust in code or configuration without the CEO's decision on
+   the record.
+
+**What a person does on a case:** reads the decision; **approves** it, and
+presses **Send** when something leaves the company; says what to change in the
+**one Ask**; or **dismisses** it. The evidence is always one click away. Any
+other control has to say in its pull request which of the eight points it
+keeps and why nothing simpler works.
+
+**Scale:** design for ten thousand people in Talent and a hundred cases a day.
+
 ## Core workflows
 
 ### Demand-first
@@ -298,8 +333,9 @@ binding claim, or contact a third party without explicit authority.
 2. Use live data. Production screens must not present sample data as truth.
 3. Make missing information and uncertainty visible.
 4. Favor action queues and progressive disclosure over decorative dashboards.
-5. Task-first delegation is preferred: define the outcome and attach context
-   before choosing an agent.
+5. Task-first delegation: a person states the outcome in words on the case,
+   and Triangle routes it to the employees the work needs. A person never
+   chooses the agent (18 September, "Employees, not buttons").
 6. A unified approvals/decisions queue is good; it must preserve the domain
    context and consequence of each item.
 7. Agent technical details stay secondary to commercial/delivery state.

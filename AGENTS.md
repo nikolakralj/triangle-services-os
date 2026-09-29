@@ -62,6 +62,17 @@ status and commitments, personal-data sharing, deletion, money, and
 mobilization. Provider/model is not the employee identity. Triangle's database
 is truth; agent memory is context.
 
+**Employees, not buttons (18 September — the core law).** Triangle's AI
+employees start on work when it arrives, decide, and come back with the
+decision and its reason ("we propose these two, as anonymised bios, because
+it's an agency"). A person judges in words through one Ask on the case and
+presses Send. Trust grows per employee and per kind of action, only when the
+CEO grants it on the record; today every external message is a draft a person
+sends. Before adding any control to a human surface, pass the eight-point test
+in `PRODUCT_OPERATING_RULES.md` ("Employees, not buttons"): no choosing the
+employee, no radio buttons over the pool, no picking bio or CV, no machinery on
+the card, and never more primary buttons than you remove.
+
 For Job Intake work, also read `docs/reference/JOB_INTAKE.md`. For agent/workforce work, also
 read `agents/WORKFORCE.md`, `agents/shared-constitution.md`, and the
 affected role file.

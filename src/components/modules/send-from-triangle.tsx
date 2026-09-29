@@ -1,36 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Send } from "lucide-react";
+import { FileText, Loader2, Send } from "lucide-react";
+import {
+  mayAttachPack,
+  PACK_NOT_APPROVED,
+  PACK_SUPERSEDED,
+  type PackApproval,
+  type PackIntent,
+} from "@/lib/data/put-forward";
 
 // ---------------------------------------------------------------------------
 // Send from Triangle (DEV-013 + packet attach).
 //
 // Review, edit, press Send. The words in the card's editor are what goes;
 // the person sees To / From / Subject and the text once more, then presses
-// Send now. They may attach the anonymised Triangle profile for the person
-// they picked — filename is the Triangle reference, never the name. The
-// server sends through the person's own mailbox and only then records it.
-// If the mailbox's server refuses, nothing is recorded as sent.
+// Send now. The server sends through the person's own mailbox and only then
+// records it. If the mailbox's server refuses, nothing is recorded as sent.
+//
+// Nothing here asks the person to pick what the team already decided
+// ("Employees, not buttons", 18 September):
+//
+//   - who the reply is about is the team's decision, on the card — change it
+//     with the one Ask, not with a radio list here;
+//   - the From address is the mailbox the recruiter wrote to, said in words.
+//     Only when Triangle cannot tell does a choice appear;
+//   - the approved document goes with the reply, named, because approving it
+//     on the case was the person's decision. It can still be taken off. The
+//     server re-reads the approval anyway: an unapproved, lapsed or other-case
+//     document is refused and nothing is sent.
 //
 // Rendered only when the person has a mailbox with sending turned on; with
 // none, Open mail stays the way out and this component renders nothing.
 // ---------------------------------------------------------------------------
 
-export interface OfferChoice {
-  workerId: string;
-  name: string;
-  role: string | null;
-  why?: string;
-  caveats?: string[];
-}
-
-export interface PoolWorker {
-  workerId: string;
-  name: string;
-  role: string | null;
-  status?: string;
+/** The approved profile on this case, as the Send review needs to know it. */
+export interface AttachablePack {
+  assignmentId: string;
+  approval: PackApproval;
+  intent: PackIntent;
+  /** "M. P." on a bio; the name once identity has been released. */
+  who: string;
+  filename: string;
+  href: string;
+  agentName: string;
+  approvedAt: string | null;
 }
 
 export interface SendTarget {
@@ -45,7 +60,6 @@ export interface SendTarget {
   contactId?: string;
   personId?: string;
   workerId?: string;
-  candidates?: OfferChoice[];
 }
 
 export interface SentRecord {
@@ -55,6 +69,8 @@ export interface SentRecord {
   followUpAt: string | null;
   attachedFilename?: string | null;
 }
+
+type Mailbox = { id: string; emailAddress: string; displayName?: string | null };
 
 const TONE = {
   dark: {
@@ -73,6 +89,8 @@ const TONE = {
     error: "mt-2 text-[13px] text-rose-400",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-200",
+    select:
+      "rounded-lg border border-white/15 bg-black/30 px-2 py-1 font-mono text-[12.5px] text-slate-100 focus:border-white/30 focus:outline-none",
   },
   light: {
     button:
@@ -90,6 +108,8 @@ const TONE = {
     error: "mt-2 text-[12.5px] text-rose-600",
     note: "mt-2 text-[11.5px] leading-snug text-slate-500",
     check: "mt-3 flex items-start gap-2 text-[13px] text-slate-800",
+    select:
+      "rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-[12.5px] text-slate-900 focus:border-slate-400 focus:outline-none",
   },
 } as const;
 
@@ -118,7 +138,7 @@ export function SendFromTriangleButton({
       title={`Send from ${sender.emailAddress}`}
     >
       <Send className="h-3.5 w-3.5" />
-      Send from Triangle
+      Send
     </button>
   );
 }
@@ -126,62 +146,45 @@ export function SendFromTriangleButton({
 export function SendFromTriangleReview({
   target,
   sender,
+  senders = [],
+  replyFrom = null,
   tone = "dark",
-  pool = [],
+  pack = null,
   onSent,
   onCancel,
-  onPickWorker,
 }: {
   target: SendTarget;
   sender: { id: string; emailAddress: string };
+  /** Every address this person may send from. */
+  senders?: Mailbox[];
+  /** The mailbox the conversation arrived in, when Triangle knows it. */
+  replyFrom?: string | null;
   tone?: keyof typeof TONE;
-  pool?: PoolWorker[];
+  /** What Hanna prepared on this case, and whether anybody approved it. */
+  pack?: AttachablePack | null;
   onSent: (sent: SentRecord) => void;
   onCancel: () => void;
-  onPickWorker?: (workerId: string) => void;
 }) {
   const router = useRouter();
   const t = TONE[tone];
+  // The address the recruiter wrote to, when it is one this person sends from.
+  const decided = senders.find((box) => box.id === replyFrom) ?? null;
+  const [mailAccountId, setMailAccountId] = useState(decided?.id ?? sender.id);
+  const from: Mailbox =
+    senders.find((box) => box.id === mailAccountId) ?? {
+      id: sender.id,
+      emailAddress: sender.emailAddress,
+      displayName: null,
+    };
   const [subject, setSubject] = useState(target.subject ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [workerId, setWorkerId] = useState(target.workerId ?? "");
-  const [attach, setAttach] = useState(Boolean(target.workerId));
-  const [query, setQuery] = useState("");
+  const canAttach = Boolean(pack && mayAttachPack(pack.approval));
+  // Approving the document on the case was the decision; it goes with the
+  // reply unless it is taken off here. Nothing unapproved can be ticked.
+  const [attach, setAttach] = useState(canAttach);
   const body = target.body.trim();
-  const canAttach = Boolean(workerId);
-  const ready =
-    !busy &&
-    subject.trim().length > 0 &&
-    body.length >= 2 &&
-    (!attach || canAttach);
-
-  const choices = useMemo(() => {
-    const seen = new Set<string>();
-    const out: OfferChoice[] = [];
-    for (const c of target.candidates ?? []) {
-      if (seen.has(c.workerId)) continue;
-      seen.add(c.workerId);
-      out.push(c);
-    }
-    const q = query.trim().toLowerCase();
-    if (q.length >= 2) {
-      for (const p of pool) {
-        if (seen.has(p.workerId)) continue;
-        const hay = `${p.name} ${p.role ?? ""}`.toLowerCase();
-        if (!hay.includes(q)) continue;
-        seen.add(p.workerId);
-        out.push({ workerId: p.workerId, name: p.name, role: p.role });
-      }
-    }
-    return out;
-  }, [target.candidates, pool, query]);
-
-  function pick(id: string) {
-    setWorkerId(id);
-    if (id) setAttach(true);
-    onPickWorker?.(id);
-  }
+  const ready = !busy && subject.trim().length > 0 && body.length >= 2;
 
   async function send() {
     if (!ready) return;
@@ -199,9 +202,9 @@ export function SendFromTriangleReview({
           leadId: target.leadId,
           contactId: target.contactId || undefined,
           personId: target.personId,
-          mailAccountId: sender.id,
-          workerId: attach && workerId ? workerId : undefined,
-          attachAnonymisedCv: attach && Boolean(workerId),
+          mailAccountId,
+          attachPack: attach && canAttach,
+          putForwardAssignmentId: attach && canAttach ? pack?.assignmentId : undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -219,8 +222,8 @@ export function SendFromTriangleReview({
       onSent({
         actionId: data.actionId,
         sentence: attached
-          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}, with ${attached}.`
-          : `Sent to ${target.who} at ${target.to} from ${data.from ?? sender.emailAddress}.`,
+          ? `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}, with ${attached}.`
+          : `Sent to ${target.who} at ${target.to} from ${data.from ?? from.emailAddress}.`,
         who: target.who,
         followUpAt: data.followUpAt ?? null,
         attachedFilename: attached,
@@ -233,8 +236,6 @@ export function SendFromTriangleReview({
     }
   }
 
-  const selected = choices.find((c) => c.workerId === workerId);
-
   return (
     <div className={t.box} role="dialog" aria-label="Review before sending">
       <p className={t.label}>Once more before it goes</p>
@@ -242,7 +243,30 @@ export function SendFromTriangleReview({
         <dt className={`${t.line} ${t.muted}`}>To</dt>
         <dd className={`${t.line} font-mono`}>{target.to}</dd>
         <dt className={`${t.line} ${t.muted}`}>From</dt>
-        <dd className={`${t.line} font-mono`}>{sender.emailAddress}</dd>
+        <dd className={t.line}>
+          {!decided && senders.length > 1 ? (
+            // Only when Triangle cannot tell which address the conversation
+            // is in. Otherwise it is the address they wrote to, said in words.
+            <select
+              value={mailAccountId}
+              onChange={(e) => setMailAccountId(e.target.value)}
+              disabled={busy}
+              aria-label="Send from"
+              className={t.select}
+            >
+              {senders.map((box) => (
+                <option key={box.id} value={box.id}>
+                  {box.displayName ? `${box.displayName} <${box.emailAddress}>` : box.emailAddress}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <span className="font-mono">{from.emailAddress}</span>
+              {decided && <span className={t.muted}> — the address {target.who} wrote to</span>}
+            </>
+          )}
+        </dd>
       </dl>
       <label className="mt-2 block">
         <span className={`${t.line} ${t.muted}`}>Subject</span>
@@ -256,73 +280,12 @@ export function SendFromTriangleReview({
       </label>
       <pre className={t.pre}>{body}</pre>
 
-      {(target.candidates?.length || pool.length > 0) && (
-        <div className="mt-3">
-          <p className={`${t.line} ${t.muted}`}>Who to put forward</p>
-          <div className="mt-1.5 space-y-1">
-            {choices.map((c) => (
-              <label
-                key={c.workerId}
-                className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-1"
-              >
-                <input
-                  type="radio"
-                  name="packet-worker"
-                  checked={workerId === c.workerId}
-                  onChange={() => pick(c.workerId)}
-                  disabled={busy}
-                  className="mt-1"
-                />
-                <span className={t.line}>
-                  {c.name}
-                  {c.role ? <span className={t.muted}> · {c.role}</span> : null}
-                </span>
-              </label>
-            ))}
-          </div>
-          {pool.length > 0 && (
-            <label className="mt-2 block">
-              <span className={`${t.line} ${t.muted}`}>
-                Someone else in the pool — type two letters
-              </span>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                disabled={busy}
-                placeholder="Name or role"
-                className={t.input}
-              />
-            </label>
-          )}
-        </div>
-      )}
-
-      <label className={t.check}>
-        <input
-          type="checkbox"
-          checked={attach}
-          onChange={(e) => setAttach(e.target.checked)}
-          disabled={busy}
-          className="mt-1"
-        />
-        <span>
-          Attach the anonymised Triangle profile (PDF). The filename is the
-          Triangle reference, never their name. Bob does not send.
-        </span>
-      </label>
-      {attach && !workerId && (
-        <p className={t.error}>Pick who to put forward before attaching a profile.</p>
-      )}
-      {attach && selected && (
-        <p className={t.note}>
-          {selected.name} — initials and no contact details. Named CVs stay in Talent.
-        </p>
-      )}
+      <AttachRow pack={pack} attach={attach} onAttach={setAttach} busy={busy} tone={tone} />
 
       <p className={t.note}>
-        Leaves from your own mailbox. Triangle records the text as sent, the draft as
-        written, and sets the follow-up date. If your mail server refuses, nothing is
-        recorded as sent.
+        Leaves from {from.emailAddress}, your own mailbox. Triangle records the text as
+        sent, the draft as written, and sets the follow-up date. If your mail server
+        refuses, nothing is recorded as sent.
       </p>
       {error && <p className={t.error}>{error}</p>}
       <div className="mt-3 flex items-center gap-2">
@@ -335,5 +298,83 @@ export function SendFromTriangleReview({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The attachment, and only in the state where attaching is a real option.
+ *
+ * Every other state says what is missing, rather than offering a tick that
+ * the server would refuse. An unapproved profile has no checkbox at all — a
+ * disabled one still reads as "almost allowed".
+ */
+function AttachRow({
+  pack,
+  attach,
+  onAttach,
+  busy,
+  tone,
+}: {
+  pack: AttachablePack | null;
+  attach: boolean;
+  onAttach: (next: boolean) => void;
+  busy: boolean;
+  tone: keyof typeof TONE;
+}) {
+  const t = TONE[tone];
+
+  if (!pack) {
+    return (
+      <p className={t.note}>
+        Nothing is attached. When the team prepares a document for this case and you
+        approve it on the card, it goes with the reply.
+      </p>
+    );
+  }
+
+  const preview = (
+    <a
+      href={pack.href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+    >
+      <FileText className="h-3 w-3" />
+      Open {pack.filename}
+    </a>
+  );
+
+  if (!mayAttachPack(pack.approval)) {
+    return (
+      <p className={t.note}>
+        {pack.approval === "superseded" ? PACK_SUPERSEDED : PACK_NOT_APPROVED} {preview}
+      </p>
+    );
+  }
+
+  const what =
+    pack.intent === "full_cv"
+      ? "the full named CV"
+      : pack.intent === "short_bio"
+        ? "the short bio — initials, one screen, no contact details"
+        : "the anonymised bio — initials, no contact details";
+
+  return (
+    <>
+      <label className={t.check}>
+        <input
+          type="checkbox"
+          checked={attach}
+          onChange={(e) => onAttach(e.target.checked)}
+          disabled={busy}
+          className="mt-1"
+        />
+        <span>
+          With {pack.filename} — {what} for {pack.who}. You approved it on the case; untick
+          to send the reply alone.
+        </span>
+      </label>
+      <p className={t.note}>{preview}</p>
+    </>
   );
 }

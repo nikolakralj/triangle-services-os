@@ -149,18 +149,18 @@ test('Hand to Bob does not dismiss the Today card', () => {
   assert.match(askBobRoute, /does not dismiss the card/i);
 });
 
-test('After Hand to Bob the card is With Bob with Open thread and Take back', () => {
-  assert.match(emailActions, /With Bob|withLabel/);
-  assert.match(emailActions, /Open thread/);
-  assert.match(emailActions, /Take back/);
-  assert.match(emailActions, /\/api\/agents\/assignments/);
+test('After an Ask the card says who has it; the chip opens the thread, where Take back lives', () => {
+  assert.match(emailActions, /withLabel/);
+  assert.match(emailActions, /openCaseThread\(threadOf\(holder\), false\)/);
+  assert.match(drawer, /Take back/);
+  assert.match(drawer, /\/api\/agents\/assignments/);
   assert.doesNotMatch(emailActions, /router\.push\(["']\/agents/);
 });
 
 test('Toast copy is Handed to <employee> · Open thread, and the drawer opens on the case', () => {
   // Named rather than literally "Bob": Hanna takes cases from Today too, and
   // the toast must not claim the wrong owner (DEV-021).
-  assert.match(handoffCtx, /Handed to \{toast\.agentName/);
+  assert.match(handoffCtx, /Handed to \{toast\.handedTo \|\| toast\.agentName/);
   assert.match(handoffCtx, /The answer returns on this case/);
   assert.match(handoffCtx, /Open thread/);
   const impl = handoffCtx.slice(handoffCtx.indexOf('export function TodayHandoffProvider'));
@@ -183,6 +183,61 @@ test('Open thread is a right-side drawer on Today, reusing AssignmentThread', ()
   assert.match(handoffCtx, /AssignmentThreadDrawer/);
   assert.match(todayScreen, /TodayHandoffProvider/);
   assert.doesNotMatch(drawer, /router\.push\(["']\/agents/);
+});
+
+// ── the drawer is a case, not a chat window (DEV-022) ──────────────────────
+
+const {
+  caseWorkState,
+  caseWorkSentence,
+  caseWorkIsYours,
+} = moduleLoader()('src/lib/data/case-work-status.ts');
+
+test('the status says whose move it is, and never claims a pickup that did not happen', () => {
+  assert.equal(caseWorkState({ status: 'queued', awaitingAgent: 1 }), 'queued');
+  assert.equal(caseWorkState({ status: 'active', awaitingAgent: 0 }), 'working');
+  assert.equal(caseWorkState({ status: 'completed', awaitingAgent: 0 }), 'answered');
+  assert.equal(caseWorkState({ status: 'cancelled', awaitingAgent: 0 }), 'stopped');
+
+  const queued = caseWorkSentence({ state: 'queued', agentName: 'Bob', awaitingAgent: 1 });
+  assert.match(queued, /Not picked up yet/);
+  assert.match(queued, /1 message not picked up yet/);
+  assert.match(
+    caseWorkSentence({ state: 'answered', agentName: 'Hanna', awaitingAgent: 0 }),
+    /Hanna answered\. It is back with you\./,
+  );
+
+  // The colour of the dot is the same judgement: answered and stopped are
+  // yours, queued and working are theirs.
+  assert.equal(caseWorkIsYours('answered'), true);
+  assert.equal(caseWorkIsYours('stopped'), true);
+  assert.equal(caseWorkIsYours('queued'), false);
+  assert.equal(caseWorkIsYours('working'), false);
+});
+
+test('the drawer opens on status and the last word, not a wall of everything', () => {
+  // Status comes from the record, through the same GET the thread already made.
+  const route = read('src/app/api/assignments/[id]/messages/route.ts');
+  assert.match(route, /getAssignmentWork/);
+  assert.match(route, /messages, work/);
+  const work = read('src/lib/data/assignment-work.ts');
+  assert.match(work, /caseWorkState/);
+  assert.match(work, /withLabelFor/);
+  assert.match(work, /agent_assignments/);
+
+  assert.match(thread, /function WorkStatus/);
+  assert.match(thread, /work\.statusLine/);
+  // Everything before the last message is folded; the last one is open.
+  assert.match(thread, /Earlier in this case/);
+  assert.match(thread, /messages\.slice\(0, -1\)/);
+  assert.match(thread, /latest/);
+  // A long reply is folded to its opening rather than printed whole.
+  assert.match(thread, /const LONG_REPLY = \d+/);
+  assert.match(thread, /Read all of it/);
+  // And it is still a case, not an email: the composer says so.
+  assert.match(thread, /Message \{recipientPhrase\}/);
+  assert.match(thread, /Nothing is emailed/);
+  assert.doesNotMatch(thread, /<Send /);
 });
 
 test('Today has Needs you and In progress; Needs you is not the wait list', () => {
@@ -257,15 +312,18 @@ test('docs lock the handoff rule and commercial_follow_through', () => {
   assert.match(execution, /commercial_follow_through/);
 });
 
-test('Today keeps the Now card when Bob has the case; Bob wrote in Triangle is on it', () => {
+test('Today keeps the Now card when Bob has the case; what Bob wrote is in the team\'s decision', () => {
   assert.match(todayScreen, /nowShowCard/);
-  assert.match(todayScreen, /EmployeePrepared/);
-  assert.match(todayScreen, /Nothing is in the Triangle thread yet/);
-  assert.match(todayScreen, /Copy what they wrote/);
   assert.doesNotMatch(todayScreen, /Nothing needs you on this case/);
-  assert.match(todayScreen, /Who we put forward/);
-  assert.match(todayScreen, /today-offering/);
-  assert.match(todayScreen, /Someone else in the pool/);
+  // One decision block instead of Bob's wall, Hanna's block and a radio list
+  // over the pool ("Employees, not buttons", 18 September).
+  assert.match(todayScreen, /<CaseDecision/);
+  assert.match(todayScreen, /chase=\{chase\}/);
+  assert.match(todayScreen, /body: nowWait\.lastAgentBody/);
+  assert.doesNotMatch(todayScreen, /EmployeePrepared|today-offering|Someone else in the pool|type="radio"/);
+  const decision = read('src/components/modules/case-decision.tsx');
+  assert.match(decision, /has not written in the Triangle thread yet/);
+  assert.match(decision, /reportOpening/);
 });
 
 test('Done follow-through matches the same lead/contact as the card', () => {

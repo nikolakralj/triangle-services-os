@@ -116,7 +116,12 @@ export function askHannaTitle(params: {
   workerName?: string | null;
   who?: string | null;
 }): string {
-  const form = params.intent === "full_cv" ? "Full CV" : "Bio";
+  const form =
+    params.intent === "full_cv"
+      ? "Full CV"
+      : params.intent === "short_bio"
+        ? "Short bio"
+        : "Bio";
   const subject = params.workerName?.trim() || "who we put forward";
   const to = params.who?.trim() ? ` for ${params.who.trim()}` : "";
   return `${form}: ${subject}${to}`.slice(0, 120);
@@ -131,6 +136,9 @@ export function askHannaObjective(params: AskHannaContext): string {
     bio
       ? "Initials only. No name, no contact details, no rate. The filename is the Triangle reference, never the person's name."
       : "A person has released the identity for this one. The named CV is the deliverable; it still carries no rate.",
+    params.intent === "short_bio"
+      ? "One screen: role, the tickets that matter for that country, three projects, dated availability. Say what you cut rather than pretending it is everything."
+      : null,
     "",
     "Context from the Today case (ids only — Triangle is truth):",
     params.who ? `Asked by / for: ${params.who}` : null,
@@ -158,7 +166,11 @@ export function askHannaObjective(params: AskHannaContext): string {
 }
 
 export function askHannaExpectedOutput(intent: PackIntent): string {
-  return intent === "full_cv"
-    ? "Who to put forward and whether the named CV is safe to release: right to work, tickets, language, dated availability, and what is not recorded. Do not send it."
-    : "Who to put forward as an anonymised profile — initials only — with right to work, tickets, language, dated availability, and what is not recorded. Do not send it.";
+  if (intent === "full_cv") {
+    return "Who to put forward and whether the named CV is safe to release: right to work, tickets, language, dated availability, and what is not recorded. Do not send it.";
+  }
+  if (intent === "short_bio") {
+    return "Who to put forward as a short anonymised bio — initials only, one screen — with right to work, tickets, language, dated availability, and what you had to leave out. Do not send it.";
+  }
+  return "Who to put forward as an anonymised profile — initials only — with right to work, tickets, language, dated availability, and what is not recorded. Do not send it.";
 }

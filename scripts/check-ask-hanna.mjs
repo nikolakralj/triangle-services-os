@@ -56,23 +56,35 @@ const handoff = load('src/lib/data/today-handoff.ts');
 const {
   DEFAULT_PACK_INTENT,
   PUT_FORWARD_CASE_TYPE,
+  PACK_APPROVED_OUTCOME,
+  PACK_NOT_USED_OUTCOME,
   asksForAPutForward,
   initialsOf,
+  mayAttachPack,
+  packApprovalNote,
+  packApprovalOf,
+  packApprovalSentence,
   packDisplayName,
   packIntentLabel,
   parsePackIntent,
 } = putForward;
 
+const filenames = load('src/lib/data/anonymised-cv-filename.ts');
+
 const askHannaSrc = read('src/lib/data/ask-hanna.ts');
 const policySrc = read('src/lib/data/ask-hanna-policy.ts');
 const routeSrc = read('src/app/api/ask/hanna/route.ts');
-const actionSrc = read('src/components/modules/ask-hanna-action.tsx');
+// The Ask Hanna button left the card on 18 September ("Employees, not
+// buttons"): her half is reached through the one Ask on the case.
+const actionSrc = read('src/lib/data/case-ask.ts');
 const drawerSrc = read('src/components/modules/assignment-thread-drawer.tsx');
 const threadSrc = read('src/components/modules/assignment-thread.tsx');
 const emailActionsSrc = read('src/components/modules/today-email-actions.tsx');
 const todayScreenSrc = read('src/components/modules/today-screen.tsx');
 const todayMissionsSrc = read('src/components/modules/today-missions.tsx');
-const blockSrc = read('src/components/modules/put-forward-block.tsx');
+// Who we put forward is shown as the team's decision (18 September), in the
+// block that replaced the separate Hanna block and the radio list.
+const blockSrc = read('src/components/modules/case-decision.tsx');
 const casesSrc = read('src/lib/data/put-forward-cases.ts');
 const decisionsPage = read('src/app/(app)/decisions/page.tsx');
 const findingSql = read('supabase/migrations/041_finding_contract.sql');
@@ -103,6 +115,61 @@ test('only an explicit full/named CV releases the identity', () => {
   ]) {
     assert.equal(parsePackIntent(words), 'full_cv', words);
   }
+});
+
+test('asking for a short one gets the short one, not the long bio', () => {
+  for (const words of [
+    'short bio please',
+    'just a short profile',
+    'can you do a one-pager',
+    'one page version',
+    'brief bio for the recruiter',
+    'keep it short',
+    'just the headlines',
+  ]) {
+    assert.equal(parsePackIntent(words), 'short_bio', words);
+  }
+  // "short bio" contains "bio"; read in the other order it would come back
+  // as the long one, which is the wrong document for somebody who said short.
+  assert.equal(parsePackIntent('a short bio, initials only'), 'short_bio');
+});
+
+test('short is still anonymised, and still never carries the name', () => {
+  assert.equal(packDisplayName('Matej Pavlović', 'short_bio'), 'M. P.');
+  assert.equal(
+    filenames.packFilename({
+      intent: 'short_bio',
+      reference: 'TS-1A2B3C4D',
+      workerName: 'Matej Pavlović',
+    }),
+    'ts-1a2b3c4d-short-profile.pdf',
+  );
+  assert.doesNotMatch(
+    filenames.packFilename({
+      intent: 'short_bio',
+      reference: 'TS-1A2B3C4D',
+      workerName: 'Matej Pavlović',
+    }),
+    /matej|pavlovic/i,
+  );
+  assert.equal(putForward.isAnonymisedIntent('short_bio'), true);
+  assert.equal(putForward.isAnonymisedIntent('bio_anonymised'), true);
+  assert.equal(putForward.isAnonymisedIntent('full_cv'), false);
+});
+
+test('the short version is a shorter document, not the same one relabelled', () => {
+  const pdf = read('src/lib/pdf/worker-cv-pdf.tsx');
+  assert.match(pdf, /short_bio: \{ skills: 5, projects: 3, certificates: 4, mobility: false \}/);
+  assert.match(pdf, /bio_anonymised: \{ skills: 10, projects: 6, certificates: 8/);
+  assert.match(pdf, /KEEP\[cv\.intent\]/);
+  const cv = read('src/lib/data/worker-cv.ts');
+  assert.match(cv, /intent,/);
+  assert.match(cv, /isAnonymisedIntent\(intent\)/);
+  // The route serves the exact version the case approved.
+  const route = read('src/app/api/workers/[id]/cv/route.ts');
+  assert.match(route, /isPackIntent\(asked\)/);
+  assert.match(route, /packFilename\(/);
+  assert.match(casesSrc, /cv\?variant=\$\{intent\}/);
 });
 
 test('a bio marker beats "full named CV" in the same sentence', () => {
@@ -310,40 +377,41 @@ test('Today and the follow-up rail both decide ownership on the chase half', () 
   assert.match(todayScreenSrc, /<InProgressByEmployee waits=\{waits\}/);
 });
 
-test('Ask Hanna is on the card, and stays there while Bob has the chase', () => {
-  assert.match(emailActionsSrc, /AskHannaAction/);
-  assert.match(emailActionsSrc, /isHannaHolding/);
-  const from = emailActionsSrc.indexOf('{withBob ? (');
-  const to = emailActionsSrc.indexOf('\n      ) : (', from);
-  assert.notEqual(from, -1);
-  assert.ok(to > from, 'withBob branch not found');
-  assert.match(emailActionsSrc.slice(from, to), /AskHannaAction/);
+test('Hanna is reached through the one Ask, which stays on the card while Bob has the chase', () => {
+  assert.match(emailActionsSrc, /\/api\/ask\/case/);
+  assert.doesNotMatch(emailActionsSrc, /AskHannaAction|Ask Hanna/);
+  // The Ask button is not hidden when somebody already holds the case.
+  const askButton = emailActionsSrc.indexOf('aria-expanded={asking}');
+  assert.notEqual(askButton, -1);
+  const guard = emailActionsSrc.lastIndexOf('holders.length === 0 && (', askButton);
+  const holdersRow = emailActionsSrc.lastIndexOf('holders.length > 0 && (', askButton);
+  assert.ok(guard === -1 || guard < holdersRow, 'Ask must not sit behind the no-holder guard');
 });
 
-test('Ask Hanna posts a handoff, not an email, and defaults to the bio', () => {
-  assert.match(actionSrc, /\/api\/ask\/hanna/);
-  assert.match(actionSrc, /parsePackIntent/);
-  assert.match(actionSrc, /Hand to Hanna/);
-  assert.match(actionSrc, /you still press Send/i);
+test('Hanna\'s half posts a handoff, not an email, and defaults to the bio', () => {
+  assert.match(actionSrc, /askHanna\(/);
+  assert.match(actionSrc, /explicitPackIntent/);
+  assert.match(actionSrc, /intent \?\? DEFAULT_PACK_INTENT/);
   assert.doesNotMatch(actionSrc, /\/api\/mail\/send/);
   assert.match(routeSrc, /refuseUnlessHuman/);
   assert.match(routeSrc, /parsePackIntent/);
   assert.match(routeSrc, /DEFAULT_PACK_INTENT/);
-  assert.match(emailActionsSrc, /fromAssignmentId=\{withBob\.assignmentId\}/);
+  // The two halves stay joined: Hanna's job carries Bob's thread on the case.
+  assert.match(actionSrc, /fromAssignmentId: params\.chaseThread/);
 });
 
 test('the result returns on the same case, not a second chat', () => {
   assert.match(casesSrc, /PUT_FORWARD_CASE_TYPE/);
   assert.match(casesSrc, /buildWorkerCv/);
-  assert.match(casesSrc, /includeIdentity: named/);
-  assert.match(casesSrc, /anonymisedCvFilename/);
+  assert.match(casesSrc, /buildWorkerCv\(\{ orgId, workerId, intent \}\)/);
+  assert.match(casesSrc, /packFilename/);
   assert.match(decisionsPage, /listPutForwardCases/);
-  assert.match(todayScreenSrc, /PutForwardBlock/);
-  assert.match(blockSrc, /Who we put forward/);
-  assert.match(blockSrc, /Open thread/);
+  assert.match(todayScreenSrc, /<CaseDecision/);
+  assert.match(blockSrc, /The team&apos;s decision/);
+  assert.match(blockSrc, /&apos;s thread/);
   assert.doesNotMatch(blockSrc, /router\.push\(["']\/agents/);
   assert.match(blockSrc, /Triangle&apos;s own record/);
-  assert.match(blockSrc, /Not recorded:/);
+  assert.match(blockSrc, /not recorded/);
   // Oliver Hall is a follow-up card, not only the hero.
   assert.match(todayMissionsSrc, /PutForwardOnCard/);
   assert.match(todayMissionsSrc, /putForward=\{putForward\}/);
@@ -356,17 +424,20 @@ test('a finished put-forward pack returns to the case, not the old reports list'
 });
 
 test('the thread composer says it messages the employee, and emails nobody', () => {
-  assert.match(threadSrc, /Message \{recipient\}/);
+  assert.match(threadSrc, /Message \{recipientPhrase\}/);
   assert.match(threadSrc, /Nothing is emailed/);
   assert.doesNotMatch(threadSrc, /^\s*Send\s*$/m);
   assert.match(drawerSrc, /composerHint/);
   assert.match(drawerSrc, /asksForAPutForward/);
-  assert.match(drawerSrc, /Ask Hanna/);
+  assert.match(drawerSrc, /Hanna gets this too/);
+  assert.doesNotMatch(drawerSrc, /AskHannaAction/);
+  // Words typed in Bob's thread reach Hanna by themselves.
+  assert.match(read('src/app/api/assignments/[id]/messages/route.ts'), /routeThreadWords/);
 });
 
 test('the toast names the employee who took it', () => {
   const ctx = read('src/components/modules/today-handoff-context.tsx');
-  assert.match(ctx, /Handed to \{toast\.agentName/);
+  assert.match(ctx, /Handed to \{toast\.handedTo \|\| toast\.agentName/);
   assert.match(ctx, /The answer returns on this case/);
 });
 
@@ -390,10 +461,130 @@ test('the role files tell Bob and Hanna whose half this is', () => {
   assert.match(hannaMd, /do not file `reachable`/i);
   const bobMd = read('agents/bob.md');
   assert.match(bobMd, /Who we put forward is Hanna's/);
-  assert.match(bobMd, /Ask Hanna/);
+  // No button to press for her half: the one Ask and Bob's thread reach her.
+  assert.match(bobMd, /reaches Hanna by itself/);
   const inbox = read('src/app/api/agent/inbox/route.ts');
   assert.match(inbox, /who_we_put_forward/);
   assert.match(inbox, /pack_intent/);
+});
+
+// ── the human review gate (DEV-022) ────────────────────────────────────────
+
+test('nothing is approved until a person approves it', () => {
+  const none = packApprovalOf({ reviewOutcome: null, reviewedAt: null, completedAt: null });
+  assert.equal(none, 'not_checked');
+  assert.equal(mayAttachPack(none), false, 'an unreviewed pack can never be attached');
+  // A half-written review row is not an approval either.
+  assert.equal(
+    packApprovalOf({ reviewOutcome: 'sent_back', reviewedAt: '2026-09-18T09:00:00Z', completedAt: null }),
+    'not_checked',
+  );
+});
+
+test('approved is approved, and a ruled-out pack stays out', () => {
+  assert.equal(
+    mayAttachPack(
+      packApprovalOf({
+        reviewOutcome: PACK_APPROVED_OUTCOME,
+        reviewedAt: '2026-09-18T09:00:00Z',
+        completedAt: '2026-09-18T08:00:00Z',
+      }),
+    ),
+    true,
+  );
+  const out = packApprovalOf({
+    reviewOutcome: PACK_NOT_USED_OUTCOME,
+    reviewedAt: '2026-09-18T09:00:00Z',
+    completedAt: null,
+  });
+  assert.equal(out, 'not_used');
+  assert.equal(mayAttachPack(out), false);
+});
+
+test('an approval lapses when Hanna answers after it', () => {
+  const stale = packApprovalOf({
+    reviewOutcome: PACK_APPROVED_OUTCOME,
+    reviewedAt: '2026-09-18T09:00:00Z',
+    completedAt: '2026-09-18T11:00:00Z',
+  });
+  assert.equal(stale, 'superseded');
+  assert.equal(mayAttachPack(stale), false, 'what was approved is not what the case now says');
+  assert.match(
+    packApprovalSentence({
+      approval: stale,
+      agentName: 'Hanna',
+      finished: true,
+      intent: 'bio_anonymised',
+    }),
+    /approve it again/i,
+  );
+});
+
+test('a person may approve before Hanna answers, and the record says which it was', () => {
+  const waiting = packApprovalSentence({
+    approval: 'not_checked',
+    agentName: 'Hanna',
+    finished: false,
+    intent: 'bio_anonymised',
+  });
+  assert.match(waiting, /has not checked the facts yet/);
+  assert.match(waiting, /nothing attaches until you do/);
+  const early = packApprovalNote({
+    intent: 'bio_anonymised',
+    who: 'M. P.',
+    filename: 'ts-aabbccdd-profile.pdf',
+    agentName: 'Hanna',
+    finished: false,
+  });
+  assert.match(early, /anonymised bio for M\. P\./);
+  assert.match(early, /had not checked the facts yet/);
+  const late = packApprovalNote({
+    intent: 'full_cv',
+    who: 'Matej Pavlović',
+    filename: 'matej-pavlovic-cv.pdf',
+    agentName: 'Hanna',
+    finished: true,
+  });
+  assert.match(late, /full named CV/);
+  assert.match(late, /check was in/);
+});
+
+test('the filename on the card is the filename on the wire', () => {
+  assert.equal(
+    filenames.packFilename({
+      intent: 'bio_anonymised',
+      reference: 'TS-AABBCCDD',
+      workerName: 'Matej Pavlović',
+    }),
+    'ts-aabbccdd-profile.pdf',
+    'a bio is named after the reference, never the person',
+  );
+  assert.equal(
+    filenames.packFilename({
+      intent: 'full_cv',
+      reference: 'TS-AABBCCDD',
+      workerName: 'Matej Pavlović',
+    }),
+    'matej-pavlovic-cv.pdf',
+  );
+});
+
+test('the card is where a person opens it and approves it', () => {
+  assert.match(blockSrc, /Open \{doc\.label\}/);
+  assert.match(blockSrc, /label: pack\.filename/);
+  assert.match(blockSrc, /Approve for sending/);
+  assert.match(blockSrc, /"\/api\/put-forward"/);
+  assert.match(blockSrc, /method: "PATCH"/);
+  assert.match(blockSrc, /packApprovalSentence/);
+  // "Not this one" is words in the one Ask now: the case is rebound and the
+  // approval cleared (case-ask.ts), rather than a second button with a reason box.
+  assert.doesNotMatch(blockSrc, /Not this one/);
+});
+
+test('the Send review is told about the pack, and only an approved one arrives ticked-able', () => {
+  assert.match(todayScreenSrc, /attachablePackFrom/);
+  assert.match(todayScreenSrc, /pack=\{attachable\}/);
+  assert.match(todayScreenSrc, /mayAttachPack\(item\.approval\)/);
 });
 
 test('docs record the split and the human-only Send', () => {
@@ -404,6 +595,24 @@ test('docs record the split and the human-only Send', () => {
   const execution = read('ROADMAP_EXECUTION.md');
   assert.match(execution, /DEV-021/);
   assert.match(execution, /who_we_put_forward/);
+});
+
+test('docs lock the review gate, the third version and the From picker', () => {
+  const decisions = read('DECISIONS.md');
+  assert.match(decisions, /A person opens it and approves it, or it does not go/);
+  assert.match(decisions, /The server is the gate, not the browser/);
+  assert.match(decisions, /An approval lapses when the employee answers after it/);
+  assert.match(decisions, /The drawer is a case, not a chat window/);
+  assert.match(decisions, /short_bio/);
+  const execution = read('ROADMAP_EXECUTION.md');
+  assert.match(execution, /DEV-022/);
+  assert.match(execution, /Approve before attach/);
+  const state = read('CURRENT_STATE.md');
+  assert.match(state, /DEV-022/);
+  // Hanna is told her answer releases nothing.
+  const hanna = read('agents/hanna.md');
+  assert.match(hanna, /short_bio/);
+  assert.match(hanna, /Your answer does not release anything/);
 });
 
 let failed = 0;
