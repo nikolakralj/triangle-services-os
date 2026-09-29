@@ -222,6 +222,7 @@ export async function recordInboundEmail(params: {
   mailAccountId: string | null;
   providerMessageId: string;
   providerThreadId: string | null;
+  inReplyTo?: string | null;
   senderEmail: string | null;
   senderName: string | null;
   recipientEmail: string | null;
@@ -310,6 +311,7 @@ async function insertInboundEmail(
     mailAccountId: string | null;
     providerMessageId: string;
     providerThreadId: string | null;
+    inReplyTo?: string | null;
     senderEmail: string | null;
     senderName: string | null;
     recipientEmail: string | null;
@@ -321,27 +323,31 @@ async function insertInboundEmail(
     bodyText: string | null;
   },
 ): Promise<{ id: string; alreadyExisted: boolean } | null> {
-  const { data, error } = await svc
-    .from("inbound_emails")
-    .insert({
-      org_id: params.orgId,
-      mail_account_id: params.mailAccountId,
-      provider_message_id: params.providerMessageId,
-      provider_thread_id: params.providerThreadId,
-      sender_email: params.senderEmail,
-      sender_name: params.senderName,
-      recipient_email: params.recipientEmail,
-      subject: params.subject,
-      sent_at: params.sentAt,
-      body_text: params.bodyText,
-      body_discarded: params.bodyText === null,
-      classification: params.classification,
-      classification_confidence: params.confidence,
-      classification_reason: params.reason,
-      processed_at: new Date().toISOString(),
-    })
-    .select("id")
-    .maybeSingle();
+  const base = {
+    org_id: params.orgId,
+    mail_account_id: params.mailAccountId,
+    provider_message_id: params.providerMessageId,
+    provider_thread_id: params.providerThreadId,
+    sender_email: params.senderEmail,
+    sender_name: params.senderName,
+    recipient_email: params.recipientEmail,
+    subject: params.subject,
+    sent_at: params.sentAt,
+    body_text: params.bodyText,
+    body_discarded: params.bodyText === null,
+    classification: params.classification,
+    classification_confidence: params.confidence,
+    classification_reason: params.reason,
+    processed_at: new Date().toISOString(),
+  };
+  const withReply = params.inReplyTo
+    ? { ...base, in_reply_to: params.inReplyTo }
+    : base;
+  let { data, error } = await svc.from("inbound_emails").insert(withReply).select("id").maybeSingle();
+  // 050 is live. If a schema cache is stale, keep the message without the header.
+  if (error && params.inReplyTo && /in_reply_to/i.test(error.message ?? "")) {
+    ({ data, error } = await svc.from("inbound_emails").insert(base).select("id").maybeSingle());
+  }
 
   if (error || !data) {
     // Two readers (the schedule and Bob) can insert the same id together.

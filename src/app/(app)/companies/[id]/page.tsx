@@ -6,6 +6,8 @@ import { getCompanyById, rowToCompany } from "@/lib/data/companies";
 import { getCompanyCrossProjectIntel } from "@/lib/data/company-intel";
 import { getCompanyCase } from "@/lib/data/company-case";
 import { AskPageContext } from "@/components/missions/ask-context";
+import { ReportedWork } from "@/components/modules/reported-work";
+import { listReportsForCompany } from "@/lib/data/employee-reports";
 
 export default async function CompanyDetailPage({
   params,
@@ -20,9 +22,10 @@ export default async function CompanyDetailPage({
 
   const company = rowToCompany(row);
 
-  const [crossProjectIntel, companyCase] = await Promise.all([
+  const [crossProjectIntel, companyCase, reports] = await Promise.all([
     getCompanyCrossProjectIntel(company.name, session.organizationId, company.id),
     getCompanyCase(id, session.organizationId),
+    listReportsForCompany(session.organizationId, company.id, company.name),
   ]);
 
   return (
@@ -38,6 +41,11 @@ export default async function CompanyDetailPage({
         intel={crossProjectIntel}
         companyCase={companyCase}
       />
+      {reports.length > 0 && (
+        <div className="mt-4">
+          <ReportedWork reports={reports} />
+        </div>
+      )}
     </>
   );
 }

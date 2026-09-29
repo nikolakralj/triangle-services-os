@@ -4,6 +4,8 @@ import { getMissionWorkspace } from "@/lib/data/missions";
 import { parseMissionSurfaceTab } from "@/lib/data/mission-shared";
 import { MissionView } from "@/components/missions/mission-view";
 import { AskPageContext } from "@/components/missions/ask-context";
+import { ReportedWork } from "@/components/modules/reported-work";
+import { listReportsForCase } from "@/lib/data/employee-reports";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export default async function MissionPage({
   if (!workspace) notFound();
 
   const caps = capabilities(session.role);
+  const reports = await listReportsForCase(session.organizationId, id);
   // A role that cannot see Triangle's people on the Talent Pool page does not
   // see them through a recruiting mission either.
   const visible = caps.canSeeWorkers ? workspace : { ...workspace, candidates: [], partners: [] };
@@ -43,6 +46,11 @@ export default async function MissionPage({
         canSeeWorkers={caps.canSeeWorkers}
         initialTab={initialTab}
       />
+      {reports.length > 0 && (
+        <div className="mt-4">
+          <ReportedWork reports={reports} />
+        </div>
+      )}
     </>
   );
 }

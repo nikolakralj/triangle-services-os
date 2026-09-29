@@ -30,9 +30,12 @@ function initials(name: string) {
 export function WorkerCards({
   workers,
   noteCounts,
+  unavailable = {},
 }: {
   workers: Worker[];
   noteCounts?: Record<string, number>;
+  /** "Last reported unavailable, on …" — never replaced by Unknown. */
+  unavailable?: Record<string, string>;
 }) {
   if (workers.length === 0) {
     return (
@@ -49,7 +52,10 @@ export function WorkerCards({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {workers.map((w) => {
-        const avail = AVAILABILITY[w.availabilityStatus] ?? AVAILABILITY.unknown;
+        const reported = unavailable[w.id];
+        const avail = reported
+          ? { label: reported, cls: "bg-amber-100 text-amber-900" }
+          : (AVAILABILITY[w.availabilityStatus] ?? AVAILABILITY.unknown);
         const rate =
           w.dailyRateExpectation != null
             ? `${w.dailyRateExpectation} ${w.currency}/day`
@@ -88,7 +94,7 @@ export function WorkerCards({
                 </span>
               ) : (
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${avail.cls}`}
+                  className={`max-w-[11rem] break-words rounded-full px-2 py-0.5 text-right text-[11px] font-medium leading-snug ${avail.cls}`}
                 >
                   {avail.label}
                 </span>

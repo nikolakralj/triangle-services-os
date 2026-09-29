@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { getWorkerById } from "@/lib/data/workers";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { listWorkerNotes } from "@/lib/data/worker-notes";
+import { listReportsForPerson } from "@/lib/data/employee-reports";
 import { WorkerProfile } from "@/components/modules/worker-profile";
 import { EntityCasePanel } from "@/components/modules/entity-case-panel";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -27,11 +28,12 @@ export default async function WorkerDetailPage({
 
   if (!row || row.organization_id !== session.organizationId) notFound();
 
-  const [notes, workerCase] = await Promise.all([
+  const [notes, workerCase, reports] = await Promise.all([
     listWorkerNotes(id, session.organizationId),
     // What an employee has done about this person, so an Ask made here has
     // a place to report back (DEV-010).
     getEntityCase("worker", id, session.organizationId),
+    listReportsForPerson(session.organizationId, id, row.full_name),
   ]);
 
   // The CV this profile was read from. Stored and attached to the person from
@@ -96,6 +98,7 @@ export default async function WorkerDetailPage({
           status: row.status ?? "active",
         }}
         initialNotes={notes}
+        reports={reports}
         cvDocumentId={(cvDoc?.id as string | undefined) ?? null}
         cvFileName={(cvDoc?.file_name as string | undefined) ?? null}
       />

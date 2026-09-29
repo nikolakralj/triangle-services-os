@@ -27,6 +27,8 @@ import {
   type WorkerNote,
   type WorkerNoteKind,
 } from "@/lib/data/worker-notes-shared";
+import { availabilityReading, type ReportView } from "@/lib/data/employee-report-policy";
+import { ReportedWork } from "@/components/modules/reported-work";
 
 // ---------------------------------------------------------------------------
 // A person, not a table row.
@@ -82,6 +84,7 @@ const AVAILABILITY: Record<string, { label: string; cls: string }> = {
   available_soon: { label: "Available soon", cls: "bg-amber-100 text-amber-800" },
   busy: { label: "On a job", cls: "bg-slate-200 text-slate-700" },
   unknown: { label: "Availability unknown", cls: "bg-slate-100 text-slate-500" },
+  unavailable: { label: "Last reported unavailable", cls: "bg-amber-100 text-amber-900" },
 };
 
 const KIND_STYLE: Record<string, string> = {
@@ -141,12 +144,14 @@ export function WorkerProfile({
   initialNotes,
   cvDocumentId = null,
   cvFileName = null,
+  reports = [],
 }: {
   worker: ProfileWorker;
   initialNotes: WorkerNote[];
   /** The CV this profile was built from, if one is on file. */
   cvDocumentId?: string | null;
   cvFileName?: string | null;
+  reports?: ReportView[];
 }) {
   const router = useRouter();
   const [rereading, setRereading] = useState(false);
@@ -189,7 +194,15 @@ export function WorkerProfile({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const avail = AVAILABILITY[worker.availabilityStatus] ?? AVAILABILITY.unknown;
+  const reading = availabilityReading({
+    status: worker.availabilityStatus,
+    reports,
+  });
+  const avail =
+    reading.tone === "unavailable"
+      ? AVAILABILITY.unavailable
+      : (AVAILABILITY[worker.availabilityStatus] ?? AVAILABILITY.unknown);
+  const availabilityLabel = reading.tone === "unavailable" ? reading.phrase : avail.label;
 
   const facts: Array<{ label: string; on: boolean | null }> = [
     { label: "Passport", on: worker.hasPassport },
@@ -283,8 +296,8 @@ export function WorkerProfile({
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5">
-            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${avail.cls}`}>
-              {avail.label}
+            <span className={`max-w-full break-words rounded-full px-2.5 py-1 text-right text-xs font-medium ${avail.cls}`}>
+              {availabilityLabel}
             </span>
             {worker.availableFrom && (
               <span className="text-xs text-slate-500">
@@ -362,6 +375,8 @@ export function WorkerProfile({
           </div>
         </div>
       </div>
+
+      <ReportedWork reports={reports} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

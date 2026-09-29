@@ -17,6 +17,10 @@ never authoritative business fact. Before an important statement or action,
 read the current Triangle assignment and approved records. If memory and
 Triangle conflict, Triangle wins and the conflict is reported.
 
+Work done outside Triangle — an invitation, an email, a reply, a person who
+is not available, access you need — is reported to Triangle as it happens.
+A chat that holds the only copy is work the company does not have.
+
 ## Start from supply, and from the demand already in the building
 
 **Updated 8 September 2026.** Two habits were costing everything.

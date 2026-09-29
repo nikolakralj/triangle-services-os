@@ -115,7 +115,13 @@ line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, r
 drafted" — whose case shows three role rows with counts, and Hanna and Bob
 each have exactly one step.
 
-### P3 — Employees report everything · `IN_PROGRESS` · another agent, branch `cursor/p3-employee-reports-*`
+### P3 — Employees report everything · `IN_PROGRESS` · Cursor, branch `cursor/p3-employee-reports-cca2`
+
+Nikola approved this on 29 September. Migration `053_employee_reports.sql`
+is written and **not applied** — local and Production share one database.
+050 and 051 stay as they are: already live, files not rewritten here.
+The 29 September docs sync (PR #39) records the same item as `IN_PROGRESS`
+on `cursor/p3-employee-reports-*`.
 
 - One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
   email drafted, email sent (by a person), candidate found for a role (with
@@ -253,7 +259,8 @@ decision before any build. Recorded here so it is not lost. Not scheduled.
   connected.
 - P2: shipped (PR #38). Migration 052 is applied. The signed-in check on
   Ralph's Cologne email is still owed.
-- P3: in progress on `cursor/p3-employee-reports-*`. Tell Hanna once, in Grok,
+- P3: in progress on `cursor/p3-employee-reports-cca2` (docs sync PR #39
+  recorded `cursor/p3-employee-reports-*`). Tell Hanna once, in Grok,
   to report everything to Triangle.
 - Then run Ralph's case on it and say what is wrong.
 

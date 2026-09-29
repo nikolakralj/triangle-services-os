@@ -226,6 +226,16 @@ export async function ingestAccount(
     getOrganizationOperatingProfile(orgId),
   ]);
   const houseRules = rules?.body ?? null;
+  const arrivals: Array<{
+    inboundEmailId: string;
+    messageId: string;
+    threadId: string | null;
+    inReplyTo: string | null;
+    subject: string;
+    senderName: string | null;
+    senderEmail: string | null;
+    sentAt: string | null;
+  }> = [];
 
   for (const msg of messages) {
     try {
@@ -248,6 +258,7 @@ export async function ingestAccount(
         mailAccountId: account.id,
         providerMessageId: msg.providerMessageId,
         providerThreadId: msg.providerThreadId,
+        inReplyTo: msg.inReplyTo,
         senderEmail: msg.senderEmail,
         senderName: msg.senderName,
         recipientEmail: msg.recipientEmail,
@@ -265,6 +276,16 @@ export async function ingestAccount(
         summary.errors.push(`Could not store "${msg.subject}".`);
         continue;
       }
+      arrivals.push({
+        inboundEmailId: stored.id,
+        messageId: msg.providerMessageId,
+        threadId: msg.providerThreadId,
+        inReplyTo: msg.inReplyTo,
+        subject: msg.subject,
+        senderName: msg.senderName,
+        senderEmail: msg.senderEmail,
+        sentAt: msg.sentAt,
+      });
       if (stored.alreadyExisted) {
         summary.alreadySeen += 1;
         continue;
@@ -301,6 +322,30 @@ export async function ingestAccount(
     } catch (err) {
       summary.errors.push(
         `${msg.subject}: ${err instanceof Error ? err.message : "extraction failed"}`,
+      );
+    }
+  }
+
+  // After every message in this read is stored, including the one that opens
+  // a case. A later message on that thread is the reply.
+  const { attachMailboxReply } = await import("@/lib/data/employee-reports");
+  for (const arrival of arrivals) {
+    try {
+      await attachMailboxReply({
+        orgId,
+        inboundEmailId: arrival.inboundEmailId,
+        messageId: arrival.messageId,
+        threadId: arrival.threadId,
+        inReplyTo: arrival.inReplyTo,
+        subject: arrival.subject,
+        senderName: arrival.senderName,
+        senderEmail: arrival.senderEmail,
+        sentAt: arrival.sentAt,
+      });
+    } catch (err) {
+      console.error(
+        "attachMailboxReply:",
+        err instanceof Error ? err.message : "failed",
       );
     }
   }

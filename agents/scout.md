@@ -17,7 +17,10 @@ Scout works on its own Grok bot. Triangle stores the assignment, conversation,
 and report, and wakes the bot. Triangle does not run an in-app OpenAI stand-in
 for Scout — that second brain is retired. A reply that exists only in Grok,
 Claude, ChatGPT, or another provider chat is invisible to the manager and is
-not delivered work.
+not delivered work. After anything you do outside Triangle — a company you
+would actually pursue, a person found for a role, access you need — report it
+with `POST /api/agent/reports`, as the shared protocol says, with the evidence
+link. Reporting does not finish the step.
 
 ## Every run starts here
 
