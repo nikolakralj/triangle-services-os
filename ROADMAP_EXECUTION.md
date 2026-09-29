@@ -18,6 +18,9 @@ evidence or authority that is missing. Approval boundaries do not change.
 
 ## The plan (29 September 2026) — read this before anything else
 
+**This section is the only queue.** The 16 September "Operating shell" build
+order under Development — now is history.
+
 Decision: "The plan" in `DECISIONS.md`. One sentence: **an email asking for
 people becomes one case, the team starts on it without a click, everything
 they do lands on it, and Nikola approves and sends from one line on Today.**
@@ -32,24 +35,16 @@ buttons, not research features, not a second agency. Active searching, after
 P4 below, waits on that same gate, and it does not put LinkedIn inside
 Triangle.
 
-### P0 — Clean the floor · `READY` · 1 day
+### P0 — Clean the floor · `DONE` · PR #35 (`656ccca`)
 
-- Merge `claude/ready-to-ship` (Today as a short list, the card fixes, the
-  workspace schema and drawing, Scout's instructions). One PR.
-- Review Grok's `cursor/mailbox-observed-d3bd` (sent and replied read from the
-  mailbox, DEV-019) — it is P3's foundation; merge it or say what blocks it.
-- Close every other branch older than three days after checking it holds
-  nothing unmerged that matters: `cursor/personal-mail-d3bd`,
-  `cursor/anonymised-packet-d3bd`, `cursor/dev-013-live-d3bd`,
-  `cursor/put-forward-approve-gate-a68d`, `claude/employees-not-buttons`,
-  `claude/one-ask-on-the-case`, `claude/workspace-shapes`,
-  `claude/card-defects`, and the empty `codex/recruiting-case-continuity`.
-- Nikola: forward Ralph's Cologne email to `nikola.kralj86@gmail.com`.
+Shipped 29 September 2026. PR #35 merged `claude/ready-to-ship` (`656ccca`):
+Today as a short list, the card fixes, the workspace schema and drawing, and
+Scout's instructions.
 
-**Done when:** Production runs `main`, no open branch is older than three
-days, and Ralph's email is in Triangle.
+P0's "no branch older than three days" test still fails. Open PRs #27, #28,
+#29 and #31, and the stale branches under them, are still open.
 
-### P1 — Mail in minutes, not mornings · `IN_PROGRESS` · Cursor, branch `cursor/mail-sync-minutes-75af`
+### P1 — Mail in minutes, not mornings · `DONE` · PR #36 (`84c5243`)
 
 Cause, checked in the code and the Vercel cron docs: the route only
 accepted POST, and Vercel Cron calls it with GET, so Next.js returned 405
@@ -70,16 +65,12 @@ hand-in stays the other backup. Gmail push was not used: company mail is
 not Google Workspace, and a Gmail readonly scope is restricted. No
 migration.
 
-Signed-in check (an email in a connected mailbox shows up within ten
-minutes) is still owed. It starts only after this is merged and the
-repository secret below is set.
+Shipped 29 September 2026 (PR #36, `84c5243`). `GET /api/job-intake/sync`
+runs the same read as POST, and only with `Authorization: Bearer CRON_SECRET`.
+`.github/workflows/mail-sync.yml` calls that GET on Production every 10
+minutes. Production verified 200. The daily Vercel cron and Bob's morning
+hand-in stay the backups. No migration.
 
-- Find why Triangle's own mail check (`/api/job-intake/sync`, daily cron in
-  `vercel.json`) has not recorded a read since 8 September, and fix it.
-- Read every connected mailbox every 5–10 minutes. Vercel Hobby runs crons
-  once a day; choose the trigger (Vercel Pro cron, Supabase `pg_cron` calling
-  the route, or Bob's routine every ten minutes) and write the choice down.
-  Keep Bob's morning run as the backup.
 - Connect `nikola.kralj@triangle-services.com` in Settings → Mailboxes, and
   Ralph's when he wants it.
 - A forward from a colleague is read as what it forwards: the client is the
@@ -87,25 +78,32 @@ repository secret below is set.
 
 **Done when:** an email sent to a connected mailbox is in Triangle within ten
 minutes, and Ralph's forward is recognised as a requirement naming the
-original client.
+original client. The route check (Production 200) is done; a live mailbox
+arrival inside ten minutes is the remaining read of that sentence.
 
-### P2 — One email, one case · `IN_PROGRESS` · Cursor agent · `cursor/one-email-one-case-0272`
+### P2 — One email, one case · `DONE` · PR #38 (merge `fe201c3`)
 
-Built off `main` while P1 is still PR #36. It does not depend on that
-schedule. Both the built-in sync and Bob's hand-in call `settlePeopleRequest`
-after a message is stored. Migration `052_requirement_roles.sql` is written
-and **not applied** — local and Production share one database. 050 and 051
-are already live from PR #29 (mailbox observe and mailbox space); this file
-does not touch those columns. Not done until Nikola applies 052 and the
-signed-in Preview check passes.
+Shipped 29 September 2026. PR #38 merged as `fe201c3`. Both the built-in sync
+and Bob's hand-in call `settlePeopleRequest` after a message is stored.
+Migration `052_requirement_roles.sql` was applied on 29 September. 050 and
+051 were already live from PR #29 (mailbox observe and mailbox space); 052
+does not touch those columns.
+
+The signed-in check on a real multi-role email (Ralph's Cologne) is still
+owed.
+
+The plan says the email and its attachments stay on the case. Ingestion does
+not store attachments yet. The email is linked on the case through
+`inbound_email_id`.
 
 - Requirement extraction: one email becomes one requirement with N roles —
   title, how many, level, skills and tools, start, duration, location,
   languages, rate when given — plus the questions nobody has answered. The
   email and its attachments stay on the case.
-- The case is a mission of kind `recruiting`; roles live in a new
-  `requirement_roles` table (migration written, Nikola applies it). Single-role
-  agency mail (Henry, Oliver) keeps its reply card for now.
+- The case is a mission of kind `recruiting`; roles live in
+  `requirement_roles` (migration `052_requirement_roles.sql`, applied
+  29 September). Single-role agency mail (Henry, Oliver) keeps its reply card
+  for now.
 - Idempotent: the same thread, message or forward never opens a second case.
 - The case starts itself: one step for Hanna ("who we put forward, per role")
   and one for Bob ("acknowledge, and ask what only the client can answer"),
@@ -117,7 +115,7 @@ line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, r
 drafted" — whose case shows three role rows with counts, and Hanna and Bob
 each have exactly one step.
 
-### P3 — Employees report everything · `READY` after P2 · 2 days
+### P3 — Employees report everything · `IN_PROGRESS` · another agent, branch `cursor/p3-employee-reports-*`
 
 - One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
   email drafted, email sent (by a person), candidate found for a role (with
@@ -230,9 +228,10 @@ decision before any build. Recorded here so it is not lost. Not scheduled.
 
 ### Rules for every coding agent
 
-1. This section is the queue, except **Later**, which is not scheduled. Take
-   the first `READY` item, write your name and branch next to it before
-   editing, and do nothing outside it.
+1. **The plan is the only queue**, except **Later**, which is not scheduled.
+   Take the first open item there (P3 while it is `IN_PROGRESS` is already
+   taken), write your name and branch next to it before editing, and do
+   nothing outside it. The 16 September Operating shell order is history.
 2. One item, one branch from the current `main`, one pull request. No stacked
    branches. Merged or closed within 48 hours.
 3. An item is done only after a signed-in check of the real flow on the
@@ -247,15 +246,22 @@ decision before any build. Recorded here so it is not lost. Not scheduled.
 
 ### Nikola's part — minutes, not hours
 
-- P0: merge one pull request, promote it; forward Ralph's email.
-- P1: connect the company mailbox in Settings.
-- P2: apply one migration when asked.
-- P3: tell Hanna once, in Grok, to report everything to Triangle.
+- P0: shipped (PR #35). Open PRs #27, #28, #29 and #31, and stale branches,
+  still fail the three-day test. Forward Ralph's email if it is not in the
+  connected mailbox yet.
+- P1: shipped (PR #36). Connect the company mailbox in Settings if it is not
+  connected.
+- P2: shipped (PR #38). Migration 052 is applied. The signed-in check on
+  Ralph's Cologne email is still owed.
+- P3: in progress on `cursor/p3-employee-reports-*`. Tell Hanna once, in Grok,
+  to report everything to Triangle.
 - Then run Ralph's case on it and say what is wrong.
 
 ## How work is picked
 
-1. Take the first `READY` item under *Development — now*.
+1. Take the first open item under **The plan**. That section is the only queue.
+   The list under *Development — now* is history, including the 16 September
+   Operating shell build order.
 2. Mark it `IN_PROGRESS` here before editing. One item in progress at a time.
 3. Build the smallest coherent slice and verify it: type check, lint, build, the
    checks the change needs, and a signed-in check wherever it shows on screen.
@@ -275,14 +281,15 @@ management changes the order, or when the gate is met or fails.
 
 These unblock the Phase 0 exit gate below; none of them counts toward it.
 
-**Operating shell (16 September; locked when Nikola merges its pull request):**
-build in this order — **DEV-016** refusal ledger off Today → **DEV-017** Today
-as one inbox → **DEV-012** Team in Settings → **DEV-011** menu Today · Missions
-· Talent → **DEV-010** context-aware Ask → mailbox observed (Next) →
-**DEV-013** Send from Triangle. **DEV-018** is Nikola's, in parallel. DEV-009
-and DEV-015 are `DONE`. Do not invent Work Items. Do not implement the Send
-button unless you are on DEV-013. Decision: "The operating shell" in
-`DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html`.
+**Operating shell build order (16 September) — history.** Superseded on
+29 September by **The plan**, which is the only queue. The order was
+**DEV-016** refusal ledger off Today → **DEV-017** Today as one inbox →
+**DEV-012** Team in Settings → **DEV-011** menu Today · Missions · Talent →
+**DEV-010** context-aware Ask → mailbox observed → **DEV-013** Send from
+Triangle, with **DEV-018** in parallel. Decision: "The operating shell" in
+`DECISIONS.md`. Design: `docs/design/PRODUCT_SHELL_2026-09-16.html` (Today's
+Needs you | In progress | Done layout there is superseded by "The plan"
+law 5: Today is one line per thing).
 
 ### DEV-001 — Sent-message record · `DONE`
 
@@ -924,8 +931,10 @@ the owner a switch "Let me send from Triangle" (`PATCH
 Recorded outside Triangle remain. `communicationPolicy` is unchanged and
 `SENT_MESSAGES_RECORDED` stays `false`: a human send does not make an
 employee's own sending recorded, and the freeze on autonomous outbound holds.
-Migration `049_send_from_triangle.sql` (idempotent, changes no rows) is
-written, **not applied**.
+Migration `049_send_from_triangle.sql` (idempotent, changes no rows) was
+written here and not yet applied on 16 September. Applied by 17 September
+(open PR #27: `can_send` on, Oliver Hall send recorded). Do not apply it
+again.
 
 Checked: `npm run check:dev-013` 18/18 (policy, MIME and dot-stuffing,
 transport stub, end to end against a fake database, route guards, only one
@@ -1061,7 +1070,13 @@ approve a pack on a case and confirm the tick appears; send with it and
 confirm the recorded note names the file; try to send with an unapproved pack
 and confirm the refusal is in Settings → Diagnostics.
 
-### DEV-024 - The workspace is the answer: shapes, not counters - `IN_PROGRESS` (Claude, branch `claude/workspace-shapes`, on top of DEV-023)
+### DEV-024 - The workspace is the answer: shapes, not counters - slices A–C shipped in PR #35 (`656ccca`); slice E deferred
+
+Shipped with the ready-to-ship merge (PR #35, `656ccca`), 29 September 2026.
+Slice D (the Serbian-citizens question as proof, with no new code) was not a
+separate ship. Slice E (a workspace pinned on Today) is deferred by the
+P0–P4 freeze: nothing outside P0–P4 is built until P4 holds on three real
+requirements.
 
 **Why now (29 September):** the Germany Rates mission. The CEO asked what
 electricians lease for and how erection compares with troubleshooting; the
@@ -1072,7 +1087,7 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
 
 **Slices, so another agent can continue:**
 
-- **A — The schema and the law. DONE on the branch (not merged).**
+- **A — The schema and the law. Shipped in PR #35 (`656ccca`).**
   `src/lib/data/workspace.ts`: a workspace is a declared shape, a short
   answer (verdict, confidence, what is not established), up to five blocks
   from a fixed vocabulary (table, list, route, calc, decision, gaps), its own
@@ -1088,7 +1103,7 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
   and `AGENTS.md`. Check: `npm run check:workspace` (25/25 with the drawing), which validates
   both the rates question and the Serbian-citizens question against the same
   vocabulary.
-- **B — Drawn. DONE on the branch (not merged).**
+- **B — Drawn. Shipped in PR #35 (`656ccca`).**
   `src/components/modules/workspace-view.tsx` draws the vocabulary: the short
   answer first with how solid it is and how much of it is answered, the table
   with a numbered link on every sourced cell, "ours" on Triangle's own record
@@ -1102,7 +1117,7 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
   counters and the company finish line. A step may file one through the
   existing `/complete` badge endpoint; a workspace Triangle cannot draw is
   refused in words, naming the line that broke.
-- **C — Scout files one. DONE on the branch (not merged).** The contract is
+- **C — Scout files one. Shipped in PR #35 (`656ccca`).** The contract is
   in `agents/missions.md`, the protocol every employee is handed on each
   check-in (`loadMissionProtocol`, read from disk at request time): the five
   shapes, the six blocks, the caps, the three bases, the seven `doneWhen`
@@ -1118,10 +1133,11 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
   citizens in the EU" must produce a route, a country table and gaps with no
   new code. If it needs a new block, that block is added to the vocabulary
   once — never a generated page.
-- **E — Keep it.** Follow-up words revise the same workspace as a new
-  version; a workspace worth keeping is pinned on Today; the rest closes.
-  Also: the per-mission Autonomy picker goes (trust belongs to the employee's
-  record).
+- **E — Keep it. Deferred** by the P0–P4 freeze in The plan. Follow-up words
+  would revise the same workspace as a new version; a workspace worth keeping
+  would be pinned on Today; the rest would close. Also: the per-mission
+  Autonomy picker goes (trust belongs to the employee's record). Not built
+  until P4 holds on three real requirements.
 
 **Acceptance (whole item):** the CEO asks a business question, gets an answer
 in the shape the question needs with every fact sourced or marked unknown,
@@ -1134,8 +1150,8 @@ slice C; it reuses the mission record tables where it can.
 
 ### DEV-023 - One Ask on the case: the team decides who takes it - `DONE` (merged in PR #34; live on Production `693be38`, checked 29 September; a real end-to-end run on a case is still owed)
 
-**Defects found on Production, 29 September (Henry Hammond card) — fixed on
-branch `claude/card-defects`, not merged:**
+**Defects found on Production, 29 September (Henry Hammond card) — shipped in
+PR #35 (`656ccca`):**
 
 1. Hanna's finished who-we-put-forward job was drawn twice — once as the
    team's decision and again as "what came back on the chase". Finished
@@ -1158,7 +1174,7 @@ branch `claude/card-defects`, not merged:**
    not mistake the initials "M. P." for the end of a sentence); the rest
    is behind Read all.
 
-**Today as a short list — done on the same branch, 29 September.** Every
+**Today as a short list — shipped in PR #35 (`656ccca`), 29 September.** Every
 Needs you item is one line until a person opens it (`TodayFold`): who,
 what is ready, the one fact not confirmed, and one button. The hero reads
 "Henry Hammond · g2 recruitment — Reply ready …: we propose M. P. as an
@@ -1171,12 +1187,9 @@ to the uncorrected draft; the reply offered a profile that was already
 attached; the grey line under the headline named a candidate the team had
 not proposed.
 
-**Next: every client requirement becomes one case, automatically.** An
-email asking for people (Ralph's six commissioning roles in Cologne)
-becomes one recruiting case with its roles as rows; Hanna starts sourcing
-per role and Bob drafts the acknowledgement without a click; replies land
-on the same case; Today shows it as one line. Ralph's email is not in
-Triangle today — which mailbox it reached is the first question.
+**Next** is The plan, not a new item here. P2 (one email, one case) shipped
+in PR #38 (`fe201c3`); the signed-in check on Ralph's Cologne email is still
+owed.
 
 
 **Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The
