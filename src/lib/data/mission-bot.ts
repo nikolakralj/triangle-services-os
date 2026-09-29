@@ -11,6 +11,8 @@ import { communicationPolicyFor } from "@/lib/data/communication-policy";
 import { loadMissionProtocol } from "@/lib/data/agent-brief";
 import { employeeConfig } from "@/lib/data/bot-runtime";
 import { fileMissionTargets } from "@/lib/data/mission-records";
+import { parseWorkspace, type Workspace } from "@/lib/data/workspace";
+import { recordRefusal } from "@/lib/data/refusals";
 import {
   activity,
   appendMissionActivity,
@@ -860,6 +862,8 @@ export async function setBotPlan(step: BotStep, raw: { criteria?: unknown; plan?
 
 const completeInput = z.object({
   reply: z.string().trim().min(1).max(900),
+  /** The answer in the shape the question needed. Validated below, in words. */
+  workspace: z.unknown().optional(),
   brief: z.object({
     headline: z.string().trim().min(1).max(220),
     summary: z.string().trim().max(700).default(""),
@@ -947,6 +951,29 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
     } as const;
   }
   const input = parsed.data;
+  // The answer's shape is the employee's to choose, but Triangle draws it, so
+  // it has to be one Triangle knows. A refusal says which line broke.
+  let workspace: Workspace | undefined;
+  if (input.workspace !== undefined) {
+    const read = parseWorkspace(input.workspace);
+    if (!read.ok) {
+      const reason = `The workspace is not one Triangle can draw: ${read.errors.join("; ")}`;
+      // A refused answer is a check that worked, and belongs in the ledger
+      // rather than only in a reply the employee may not read twice.
+      await recordRefusal({
+        orgId: step.orgId,
+        surface: "mission_workspace",
+        reason,
+        agentName: await employeeName(svc, step.orgId, step.agentInstanceId),
+        entityType: "assignment",
+        entityId: step.id,
+        kind: "boundary",
+        details: { missionId: step.missionId, errors: read.errors.slice(0, 6) },
+      });
+      return { error: reason, status: 400 } as const;
+    }
+    workspace = read.workspace;
+  }
   const filed = await filedByStep(svc, step);
   const pool = await loadMissionPool(step.orgId, step.missionId);
   const question = input.questionForCeo?.trim() || null;
@@ -954,6 +981,7 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
     kind: "mission_step",
     version: 1,
     reply: input.reply,
+    workspace,
     brief: {
       headline: input.brief.headline,
       summary: input.brief.summary,

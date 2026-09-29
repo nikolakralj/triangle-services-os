@@ -66,6 +66,41 @@ keeps and why nothing simpler works.
 
 **Scale:** design for ten thousand people in Talent and a hundred cases a day.
 
+## The workspace is the answer (29 September 2026)
+
+An answer takes the shape the question needs, and the employee picks that
+shape: a short answer, a comparison, a shortlist, a route, a decision.
+Triangle draws it from a fixed vocabulary of tested blocks — the short answer,
+a table, a shortlist, a route, a calculation, a decision, the gaps, the
+sources. Full decision: `DECISIONS.md`, 29 September, "The workspace is the
+answer". Schema and tests: `src/lib/data/workspace.ts`, `npm run
+check:workspace`.
+
+**Reject a result that:**
+
+1. answers a question with counters it never asked for — companies found for
+   a question about rates;
+2. leaves the answer in a conversation while the page measures something
+   else;
+3. says Ready and 0% at once — how far along comes from the artifact's own
+   tests;
+4. draws a fact without a dated source, Triangle's own record, or "not
+   established";
+5. leaves an empty cell instead of saying not established;
+6. shows a person more than five blocks or six columns, or needs a scroll
+   before it makes sense;
+7. puts ids, file ids, JSON or markup in what a person reads;
+8. appends a second essay instead of revising the saved result;
+9. asks a person to assemble the workspace, or an employee to generate
+   interface code;
+10. answers a legal, tax or immigration question without official sources and
+    a caution.
+
+**What a person does with a workspace:** reads the short answer; opens the
+evidence only if they want it; changes their own numbers in the calculation;
+says in words what to add or change; pins it if it stays useful; closes it
+when it is done.
+
 ## Core workflows
 
 ### Demand-first

@@ -73,6 +73,17 @@ in `PRODUCT_OPERATING_RULES.md` ("Employees, not buttons"): no choosing the
 employee, no radio buttons over the pool, no picking bio or CV, no machinery on
 the card, and never more primary buttons than you remove.
 
+**The workspace is the answer (29 September).** A delegated question comes
+back in the shape it needs — a short answer, a comparison, a shortlist, a
+route, a decision — built from Triangle's tested blocks and drawn by Triangle,
+never as interface code an employee wrote. Every fact carries a dated source,
+Triangle's own record, or "not established"; how far along is counted from the
+workspace's own tests, never claimed and never a company counter the question
+did not ask for; and a person's follow-up words revise that same record. Caps
+exist because the reader is a human with two minutes: five blocks, six
+columns, plain words, no ids. Schema and tests: `src/lib/data/workspace.ts`,
+`npm run check:workspace`.
+
 For Job Intake work, also read `docs/reference/JOB_INTAKE.md`. For agent/workforce work, also
 read `agents/WORKFORCE.md`, `agents/shared-constitution.md`, and the
 affected role file.

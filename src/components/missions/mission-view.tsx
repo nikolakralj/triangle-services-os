@@ -55,6 +55,8 @@ import { MissionMark, StateChip } from "@/components/missions/mission-state";
 import { MissionContextChips } from "@/components/missions/mission-context";
 import { WorkerPanel } from "@/components/missions/worker-panel";
 import { FinishLine } from "@/components/missions/finish-line";
+import { WorkspaceView } from "@/components/modules/workspace-view";
+import { latestWorkspaceOf } from "@/lib/data/mission-workspace";
 import { MissionDecisions } from "@/components/missions/mission-decisions";
 
 // ---------------------------------------------------------------------------
@@ -586,6 +588,10 @@ function ResearchOverview({
   const live = companies.filter((c) => !c.notForUs);
   const firstMove = pickRecommendedCompany(latest?.brief.recommended, companies);
   const name = lead?.name ?? "The worker";
+  // An answer in the shape the question needed replaces the company counters
+  // and the company finish line: a question about rates is not a count of
+  // companies ("The workspace is the answer", 29 September).
+  const filed = latestWorkspaceOf(steps);
 
   return (
     <div className="space-y-5">
@@ -612,19 +618,27 @@ function ResearchOverview({
             <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-slate-600">{latest.brief.summary}</p>
           ) : null}
         </div>
-        <Metrics counts={counts} />
+        {!filed && <Metrics counts={counts} />}
         {latest?.brief.recommended ? (
           <Recommended text={latest.brief.recommended} company={firstMove} canWrite={canWrite} />
         ) : null}
       </section>
 
-      <FinishLine
-        missionId={mission.id}
-        progress={workspace.progress}
-        leadName={name}
-        running={running}
-        canWrite={canWrite}
-      />
+      {filed ? (
+        <WorkspaceView
+          workspace={filed.workspace}
+          filedBy={filed.filedBy}
+          filedAt={filed.filedAt}
+        />
+      ) : (
+        <FinishLine
+          missionId={mission.id}
+          progress={workspace.progress}
+          leadName={name}
+          running={running}
+          canWrite={canWrite}
+        />
+      )}
 
       <MissionDecisions
         missionId={mission.id}
@@ -1241,8 +1255,9 @@ function RecruitingOverview({
   canWrite: boolean;
   canSeeWorkers: boolean;
 }) {
-  const { latest, lead, state, candidates, partners } = workspace;
+  const { latest, lead, state, candidates, partners, steps } = workspace;
   const running = state === "queued" || state === "working";
+  const filed = latestWorkspaceOf(steps);
   const headline = latest?.brief.headline ?? "";
   const rest = latest?.brief.summary.startsWith(headline)
     ? latest.brief.summary.slice(headline.length).trim()
@@ -1285,13 +1300,21 @@ function RecruitingOverview({
           </p>
         )}
       </section>
-      <FinishLine
-        missionId={workspace.mission.id}
-        progress={workspace.progress}
-        leadName={lead?.name ?? "The worker"}
-        running={running}
-        canWrite={canWrite}
-      />
+      {filed ? (
+        <WorkspaceView
+          workspace={filed.workspace}
+          filedBy={filed.filedBy}
+          filedAt={filed.filedAt}
+        />
+      ) : (
+        <FinishLine
+          missionId={workspace.mission.id}
+          progress={workspace.progress}
+          leadName={lead?.name ?? "The worker"}
+          running={running}
+          canWrite={canWrite}
+        />
+      )}
       <MissionDecisions
         missionId={workspace.mission.id}
         decisions={workspace.decisions}
