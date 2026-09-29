@@ -865,11 +865,18 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
   counters and the company finish line. A step may file one through the
   existing `/complete` badge endpoint; a workspace Triangle cannot draw is
   refused in words, naming the line that broke.
-- **C — Scout files one.** A badge endpoint that takes a workspace, refuses
-  it in words when it breaks the schema (and records the refusal), plus the
-  role-file instructions and two worked examples. Until then a workspace can
-  be written from Triangle's own records for a question it can already
-  answer.
+- **C — Scout files one. DONE on the branch (not merged).** The contract is
+  in `agents/missions.md`, the protocol every employee is handed on each
+  check-in (`loadMissionProtocol`, read from disk at request time): the five
+  shapes, the six blocks, the caps, the three bases, the seven `doneWhen`
+  tests, the sensitive rule, and a worked `complete` body. The offline check
+  parses that example out of the protocol and validates it, so the
+  instructions cannot drift from the schema. `agents/scout.md` works both
+  questions through in prose — the rates comparison and the Serbian-citizens
+  route — including why a waiting time nobody published stays unknown. A
+  workspace Triangle cannot draw is refused with the line that broke and
+  written to the refusal ledger (`surface: mission_workspace`, kind
+  `boundary`), so Settings → Diagnostics shows what an employee got wrong.
 - **D — The second question, as the proof.** "How do we employ Serbian
   citizens in the EU" must produce a route, a country table and gaps with no
   new code. If it needs a new block, that block is added to the vocabulary

@@ -572,6 +572,42 @@ not reachable. The response carries `sourceCheck` and the actual stored state.
 Bring back a readable source; do not report unchecked as reachable. A match
 confirms publication, not identity or buying authority.
 
+## Answering in a workspace — two worked examples
+
+The protocol has the shape and the rules. These are two answers in full, so
+the difference between a report and an answer is concrete.
+
+**A question about rates.** "What do industrial electricians lease for in
+Germany, and how do erection rates compare with troubleshooting?" is a
+`comparison`. Two rows, because the question names two kinds of work. The
+verdict says both halves at once, including the half nobody publishes:
+
+> Erection work leases at about 30–45 €/h. Nobody publishes a separate
+> troubleshooting rate, so that half is not established.
+
+The table carries `work`, `rate`, `model` and `included`. Each rate that came
+off a page cites that page by `source`; the row nobody published is
+`"basis": "unknown"` with a note saying what you looked for. Add a `calc` when
+the answer is about money — bill rate, worker cost, hours, accommodation, and
+the margin those make — so a person can put their own numbers in. Finish with
+`gaps`: the written quote nobody has yet, and who could get it. `doneWhen`:
+every row has a rate or says it is not established, every row rests on a dated
+source, and at least two sources stand behind the answer.
+
+**A question about employing people.** "How do we employ Serbian citizens on
+EU sites?" is a `route`, not a table of rates. Set `"sensitive": true` and a
+caution: this is what the official pages say, not legal advice. A `table` of
+country against permit route against weeks, every cell citing the official
+page — and `"basis": "unknown"` where a waiting time is not published, because
+guessing it is how somebody promises a start date they cannot keep. Then a
+`route` block: sign the work contract, file the labour-market check, book the
+consulate appointment — each with `who` and `duration`. `doneWhen`: every step
+says who does it, every row has its weeks or says it is not established, and
+at least two official sources.
+
+What both have in common: the verdict is the first thing, the unknowns are
+stated rather than left blank, and nothing in what a person reads is an id.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Outside a mission your

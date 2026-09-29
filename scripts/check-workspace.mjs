@@ -488,6 +488,57 @@ test('a filed answer replaces the company counters and the company finish line',
   assert.equal((missionView.match(/<WorkspaceView/g) ?? []).length, 2);
 });
 
+// ── what the employees are told, and what happens when they get it wrong ────
+
+const protocol = read('agents/missions.md');
+const scoutFile = read('agents/scout.md');
+
+test('the worked example in the protocol is one Triangle can actually draw', () => {
+  const section = protocol.slice(protocol.indexOf('## The answer: file a workspace'));
+  const fence = section.slice(section.indexOf('```'), section.indexOf('```', section.indexOf('```') + 3));
+  // The body starts on its own line; the POST line above it has {TRIANGLE_URL}.
+  const body = fence.slice(fence.search(/\n\{/) + 1, fence.lastIndexOf('}') + 1);
+  const sent = JSON.parse(body);
+  assert.ok(sent.workspace, 'the example carries a workspace');
+  const parsed = parseWorkspace(sent.workspace);
+  assert.equal(parsed.ok, true, parsed.ok ? '' : parsed.errors.join(' | '));
+  // And it is honest: the row nobody published is unknown, not invented.
+  const progress = workspaceProgress(parsed.workspace);
+  assert.ok(progress.open.length > 0, 'the example does not pretend to be finished');
+});
+
+test('the protocol tells an employee the shapes, the caps and the bases', () => {
+  const section = protocol.slice(protocol.indexOf('## The answer: file a workspace'));
+  for (const word of ['comparison', 'shortlist', 'route', 'decision', 'table', 'calc', 'gaps']) {
+    assert.ok(section.includes(word), `the protocol never mentions ${word}`);
+  }
+  assert.match(section, /Five blocks at\r?\nmost, six columns at most, plain words, units on numbers, no ids/);
+  assert.match(section, /"our_record"/);
+  assert.match(section, /"unknown"/);
+  assert.match(section, /Never\r?\nreport a percentage yourself/);
+  assert.match(section, /sensitive/);
+  assert.match(section, /not legal advice/);
+  // Every test name the schema accepts is named for them.
+  for (const t of ['rows_at_least', 'every_row_has', 'every_row_dated', 'items_at_least', 'steps_have_owner', 'no_open_gaps', 'sources_at_least']) {
+    assert.ok(section.includes(t), `the protocol never mentions ${t}`);
+  }
+});
+
+test('Scout has both questions worked through, not just the rules', () => {
+  assert.match(scoutFile, /Answering in a workspace — two worked examples/);
+  assert.match(scoutFile, /comparison/);
+  assert.match(scoutFile, /not legal advice/);
+  assert.match(scoutFile, /guessing it is how somebody promises a start date they cannot keep/);
+});
+
+test('a refused workspace lands in the ledger, not only in the reply', () => {
+  assert.match(missionBot, /recordRefusal\(\{/);
+  const refusal = missionBot.slice(missionBot.indexOf('const reason = `The workspace is not one Triangle can draw'));
+  assert.match(refusal.slice(0, 800), /surface: "mission_workspace"/);
+  assert.match(refusal.slice(0, 800), /kind: "boundary"/);
+  assert.match(refusal.slice(0, 800), /entityId: step\.id/);
+});
+
 // ── the law is written where every agent reads it ────────────────────────────
 
 test('the law says the workspace is the answer, and keeps it human', () => {

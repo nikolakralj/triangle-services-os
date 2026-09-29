@@ -12,6 +12,7 @@ import { loadMissionProtocol } from "@/lib/data/agent-brief";
 import { employeeConfig } from "@/lib/data/bot-runtime";
 import { fileMissionTargets } from "@/lib/data/mission-records";
 import { parseWorkspace, type Workspace } from "@/lib/data/workspace";
+import { recordRefusal } from "@/lib/data/refusals";
 import {
   activity,
   appendMissionActivity,
@@ -956,10 +957,20 @@ export async function completeBotStep(step: BotStep, raw: unknown) {
   if (input.workspace !== undefined) {
     const read = parseWorkspace(input.workspace);
     if (!read.ok) {
-      return {
-        error: `The workspace is not one Triangle can draw: ${read.errors.join("; ")}`,
-        status: 400,
-      } as const;
+      const reason = `The workspace is not one Triangle can draw: ${read.errors.join("; ")}`;
+      // A refused answer is a check that worked, and belongs in the ledger
+      // rather than only in a reply the employee may not read twice.
+      await recordRefusal({
+        orgId: step.orgId,
+        surface: "mission_workspace",
+        reason,
+        agentName: await employeeName(svc, step.orgId, step.agentInstanceId),
+        entityType: "assignment",
+        entityId: step.id,
+        kind: "boundary",
+        details: { missionId: step.missionId, errors: read.errors.slice(0, 6) },
+      });
+      return { error: reason, status: 400 } as const;
     }
     workspace = read.workspace;
   }
