@@ -1,6 +1,6 @@
 # Roadmap execution — what happens next
 
-Updated 16 September 2026. The one place for next steps, for people and for
+Updated 29 September 2026 — **start at "The plan" below**. The one place for next steps, for people and for
 coding agents. What exists is in [CURRENT_STATE](CURRENT_STATE.md), why it was
 decided is in [DECISIONS](DECISIONS.md), and the long-term phases are in
 [ROADMAP](ROADMAP.md). The earlier, longer version of this file, the old work
@@ -15,6 +15,139 @@ work below.
 **Test for every piece of work (8 September):** can an AI employee take over
 this human job and its follow-through? If not, name the exact capability,
 evidence or authority that is missing. Approval boundaries do not change.
+
+## The plan (29 September 2026) — read this before anything else
+
+Decision: "The plan" in `DECISIONS.md`. One sentence: **an email asking for
+people becomes one case, the team starts on it without a click, everything
+they do lands on it, and Nikola approves and sends from one line on Today.**
+The acceptance test for the whole plan is Ralph's request: six commissioning
+engineers for a data centre near Cologne (3 Basic, 2 Advanced, 1 Expert,
+Desigo CC / PXC / ABT, start November–December 2026, English required,
+German desirable).
+
+**Nothing outside P0–P4 is built until P4 holds on three real requirements.**
+Not a chat in Triangle, not LinkedIn in Triangle, not new pages, panels or
+buttons, not research features, not a second agency.
+
+### P0 — Clean the floor · `READY` · 1 day
+
+- Merge `claude/ready-to-ship` (Today as a short list, the card fixes, the
+  workspace schema and drawing, Scout's instructions). One PR.
+- Review Grok's `cursor/mailbox-observed-d3bd` (sent and replied read from the
+  mailbox, DEV-019) — it is P3's foundation; merge it or say what blocks it.
+- Close every other branch older than three days after checking it holds
+  nothing unmerged that matters: `cursor/personal-mail-d3bd`,
+  `cursor/anonymised-packet-d3bd`, `cursor/dev-013-live-d3bd`,
+  `cursor/put-forward-approve-gate-a68d`, `claude/employees-not-buttons`,
+  `claude/one-ask-on-the-case`, `claude/workspace-shapes`,
+  `claude/card-defects`, and the empty `codex/recruiting-case-continuity`.
+- Nikola: forward Ralph's Cologne email to `nikola.kralj86@gmail.com`.
+
+**Done when:** Production runs `main`, no open branch is older than three
+days, and Ralph's email is in Triangle.
+
+### P1 — Mail in minutes, not mornings · `READY` after P0 · 2 days
+
+- Find why Triangle's own mail check (`/api/job-intake/sync`, daily cron in
+  `vercel.json`) has not recorded a read since 8 September, and fix it.
+- Read every connected mailbox every 5–10 minutes. Vercel Hobby runs crons
+  once a day; choose the trigger (Vercel Pro cron, Supabase `pg_cron` calling
+  the route, or Bob's routine every ten minutes) and write the choice down.
+  Keep Bob's morning run as the backup.
+- Connect `nikola.kralj@triangle-services.com` in Settings → Mailboxes, and
+  Ralph's when he wants it.
+- A forward from a colleague is read as what it forwards: the client is the
+  original sender, and the colleague is who brought it.
+
+**Done when:** an email sent to a connected mailbox is in Triangle within ten
+minutes, and Ralph's forward is recognised as a requirement naming the
+original client.
+
+### P2 — One email, one case · `READY` after P1 · 3 days — the core
+
+- Requirement extraction: one email becomes one requirement with N roles —
+  title, how many, level, skills and tools, start, duration, location,
+  languages, rate when given — plus the questions nobody has answered. The
+  email and its attachments stay on the case.
+- The case is a mission of kind `recruiting`; roles live in a new
+  `requirement_roles` table (migration written, Nikola applies it). Single-role
+  agency mail (Henry, Oliver) keeps its reply card for now.
+- Idempotent: the same thread, message or forward never opens a second case.
+- The case starts itself: one step for Hanna ("who we put forward, per role")
+  and one for Bob ("acknowledge, and ask what only the client can answer"),
+  each woken exactly once. Fix the double run Hanna reported on 29 September
+  as part of this.
+
+**Done when:** Ralph's forwarded email becomes, within fifteen minutes, one
+line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, reply
+drafted" — whose case shows three role rows with counts, and Hanna and Bob
+each have exactly one step.
+
+### P3 — Employees report everything · `READY` after P2 · 2 days
+
+- One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
+  email drafted, email sent (by a person), candidate found for a role (with
+  the evidence link), reply received, not available (until when), access
+  needed (what). Triangle files it on the person, the company and the case,
+  and sets the follow-up date.
+- The protocol and every role file say it: after anything done outside
+  Triangle, report it. Hanna's work of 29 September (INITECH, Suport Total,
+  Dario Martić, Ratko Vukonić) is the test fixture.
+- Mailbox observation (from P0) attaches replies to their case by thread and
+  wakes the owner.
+- "Last reported unavailable, on this date" stays until newer evidence
+  replaces it; it never decays into "unknown".
+- "Hanna needs your LinkedIn login" is one line on Today; the same step
+  resumes afterwards.
+
+**Done when:** Hanna sends a LinkedIn invitation from her computer and the
+person's record shows it, with a follow-up date, within minutes; a reply in
+the mailbox lands on the right case.
+
+### P4 — The case page · `READY` after P3 · 2 days
+
+- One screen per case: what was asked; a table of roles (needed · proposed ·
+  what is missing); the drafts to approve and send; the open questions;
+  activity folded. Built from the workspace blocks — no new framework.
+- Today's line opens the case page. Today stays one line per thing.
+
+**Done when:** Nikola runs Ralph's case from Today to sent replies in under
+five minutes of his own time a day, without reading an employee's report.
+
+### P5 — Trust · `GATED` on two weeks of real cases
+
+Each employee's record (approved unchanged, edited, refused) and the CEO's
+grants on it — for example "Hanna may send availability enquiries to
+candidates already on our books" — enforced on the server.
+
+### P6 — A second agency · `GATED` on P4 holding for three requirements
+
+The blueprint for another staffing firm, onboarding and billing. Not before.
+
+### Rules for every coding agent
+
+1. This section is the queue. Take the first `READY` item, write your name and
+   branch next to it before editing, and do nothing outside it.
+2. One item, one branch from the current `main`, one pull request. No stacked
+   branches. Merged or closed within 48 hours.
+3. An item is done only after a signed-in check of the real flow on the
+   preview, with the evidence in `CURRENT_STATE.md`. Offline checks are
+   necessary, never enough.
+4. Never send email, apply SQL or migrations to the live database, or promote
+   to production without Nikola's yes. Stage explicit paths. Stay out of other
+   agents' folders.
+5. Every pull request says what Nikola will read, type or click less.
+6. The laws bind: "Employees, not buttons", "The workspace is the answer" and
+   "The plan" in `DECISIONS.md`.
+
+### Nikola's part — minutes, not hours
+
+- P0: merge one pull request, promote it; forward Ralph's email.
+- P1: connect the company mailbox in Settings.
+- P2: apply one migration when asked.
+- P3: tell Hanna once, in Grok, to report everything to Triangle.
+- Then run Ralph's case on it and say what is wrong.
 
 ## How work is picked
 

@@ -6,6 +6,53 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
+
+Locked by Nikola on 29 September: "What I need is to handle Ralph's request
+with ease — once I receive an email, agents need to act. Today is a shame. I
+don't want to waste my time anymore."
+
+What was true that day, and why the plan is shaped this way:
+
+- Triangle reads one mailbox (`nikola.kralj86@gmail.com`), once a day, through
+  Bob's 06:10 run. Triangle's own mail check is a daily cron that has not
+  recorded a read since 8 September. Ralph's Cologne request (six
+  commissioning engineers) never reached Triangle at all.
+- Hanna did the real work that day in her own chat with her own computer —
+  LinkedIn invitations, emails to two partner firms in two languages — and
+  Triangle knew none of it.
+- Today was a scroll of about 5,000 pixels. Nine commits of finished work sat
+  unmerged across three branches while other agents started more.
+
+Law:
+
+1. **Triangle is the company's memory and dispatcher, not the place the work
+   is done.** People talk to employees wherever they are — Grok, voice, the
+   phone. Employees work with their own tools: their computer, a browser,
+   LinkedIn, the mailbox. Triangle keeps the record (cases, people, companies,
+   what was sent, said and promised, and when), the rules (who may do what,
+   what a person must approve), and wakes the right employee when something
+   arrives. It is not a chat, a LinkedIn client, or a CRM a person maintains.
+2. **One requirement is one case, opened by Triangle.** An email asking for
+   people — from a client, an agency, or a colleague's forward — becomes one
+   case with its roles as rows. The same thread or the same forward never
+   opens a second case.
+3. **The team starts without a click.** A new case wakes Hanna (who we put
+   forward, per role) and Bob (the reply and the questions) once each.
+   Nothing leaves the company without a person pressing Send.
+4. **Everything an employee does lands on the case.** Every invitation, email,
+   reply, "not available until March" and promised follow-up is recorded on
+   the case and the person, by the employee, as it happens. Work that exists
+   only in a chat is work the company does not have.
+5. **The person's screen is Today and the case.** Today is one line per thing
+   that needs a person. The case shows the roles, who is proposed for each,
+   what is missing, and the drafts to approve. Nothing else is a daily page.
+6. **The measure is the CEO's minutes.** A change that does not reduce what a
+   person reads, types or clicks is not in this plan.
+
+The queue is `ROADMAP_EXECUTION.md` — "The plan", P0 to P6. Nothing outside it
+is built until P4 holds on real cases.
+
 ### 2026-09-29: The workspace is the answer — the employee picks its shape, Triangle draws it
 
 Locked by Nikola, looking at the Germany Rates mission. He asked what
