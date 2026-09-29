@@ -115,13 +115,12 @@ line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, r
 drafted" — whose case shows three role rows with counts, and Hanna and Bob
 each have exactly one step.
 
-### P3 — Employees report everything · `IN_PROGRESS` · Cursor, branch `cursor/p3-employee-reports-cca2`
+### P3 — Employees report everything · `DONE` · PR #40 (`4997ec9`)
 
-Nikola approved this on 29 September. Migration `053_employee_reports.sql`
-is written and **not applied** — local and Production share one database.
-050 and 051 stay as they are: already live, files not rewritten here.
-The 29 September docs sync (PR #39) records the same item as `IN_PROGRESS`
-on `cursor/p3-employee-reports-*`.
+Shipped 29 September 2026. On main. Nikola's brief for P4 says migration
+`053_employee_reports.sql` is applied. This P4 branch did not apply it and
+did not re-check the live database. The signed-in check (an invitation
+visible on the person's record) was not repeated here.
 
 - One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
   email drafted, email sent (by a person), candidate found for a role (with
@@ -142,15 +141,23 @@ on `cursor/p3-employee-reports-*`.
 person's record shows it, with a follow-up date, within minutes; a reply in
 the mailbox lands on the right case.
 
-### P4 — The case page · `READY` after P3 · 2 days
+### P4 — The case page · `IN_PROGRESS` · Cursor, branch `cursor/p4-case-page-f43d`
 
 - One screen per case: what was asked; a table of roles (needed · proposed ·
   what is missing); the drafts to approve and send; the open questions;
   activity folded. Built from the workspace blocks — no new framework.
 - Today's line opens the case page. Today stays one line per thing.
 
+A recruiting case (a mission with `requirement_roles`) opens as that screen
+at `/missions/{id}`. The line on Today is the link. Send is the existing
+Send from Triangle control; the one Ask is the existing case Ask. The
+Autonomy picker is off the mission page (29 September, "The workspace is
+the answer"). No new migration.
+
 **Done when:** Nikola runs Ralph's case from Today to sent replies in under
 five minutes of his own time a day, without reading an employee's report.
+The offline fixture (`npm run check:case-page`) draws the six-person Cologne
+case. A signed-in run is still owed.
 
 ### Active searching — work for a person on the bench · `GATED` until P4 holds
 
@@ -235,9 +242,10 @@ decision before any build. Recorded here so it is not lost. Not scheduled.
 ### Rules for every coding agent
 
 1. **The plan is the only queue**, except **Later**, which is not scheduled.
-   Take the first open item there (P3 while it is `IN_PROGRESS` is already
-   taken), write your name and branch next to it before editing, and do
-   nothing outside it. The 16 September Operating shell order is history.
+   Take the first open item there (P4 while it is `IN_PROGRESS` is already
+   taken, on `cursor/p4-case-page-f43d`), write your name and branch next to
+   it before editing, and do nothing outside it. The 16 September Operating
+   shell order is history.
 2. One item, one branch from the current `main`, one pull request. No stacked
    branches. Merged or closed within 48 hours.
 3. An item is done only after a signed-in check of the real flow on the
@@ -259,10 +267,10 @@ decision before any build. Recorded here so it is not lost. Not scheduled.
   connected.
 - P2: shipped (PR #38). Migration 052 is applied. The signed-in check on
   Ralph's Cologne email is still owed.
-- P3: in progress on `cursor/p3-employee-reports-cca2` (docs sync PR #39
-  recorded `cursor/p3-employee-reports-*`). Tell Hanna once, in Grok,
-  to report everything to Triangle.
-- Then run Ralph's case on it and say what is wrong.
+- P3: shipped (PR #40). Tell Hanna once, in Grok, to report everything
+  to Triangle, if that has not been said.
+- P4: in progress on `cursor/p4-case-page-f43d`. Open Ralph's line on Today
+  and run the case through to a sent reply. Say what is wrong.
 
 ## How work is picked
 
