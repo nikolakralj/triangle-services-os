@@ -325,18 +325,48 @@ export async function matchOpenLeads(
  * not an opening line — and no name, because releasing a candidate's identity
  * before there is an engagement is how a recruiter goes direct.
  */
+/**
+ * What we can honestly say we have.
+ *
+ * This sentence said "available" whatever the record held, while the card
+ * beside it said "availability never confirmed" — a claim to a recruiter that
+ * nobody had established. Availability is a fact with a fourteen-day shelf
+ * life; skill fit is a different fact. The draft now says only the one the
+ * record supports.
+ */
+export function offerSentence(params: {
+  role: string | null;
+  roleTitle: string | null;
+  country: string | null;
+  availabilityConfirmed: boolean;
+}): string {
+  const who = params.role ?? "an engineer";
+  const article = /^[aeiou]/i.test(who) ? "an" : "a";
+  const where = params.country ? ` in ${params.country}` : "";
+  const have = params.availabilityConfirmed
+    ? `we have ${article} ${who} available who fits it`
+    : `we have ${article} ${who} on our books who fits it — I am confirming their availability now`;
+  return `On the ${params.roleTitle ?? "the role"}${where} — ${have}.`;
+}
+
+/** Availability is only a yes when a person confirmed it; a caveat is a no. */
+export function availabilityConfirmed(caveats: string[] | undefined): boolean {
+  return !(caveats ?? []).some((c) => /availability/i.test(c));
+}
+
 export function draftLeadReply(match: LeadMatch, senderName: string): string {
   const c = match.candidates[0];
-  const who = c?.role ?? "an engineer";
   const first = match.contactName?.split(/\s+/)[0] ?? "there";
-  const role = match.roleTitle ?? "the role";
 
   return [
     `Hi ${first},`,
     "",
-    `On the ${role}${match.country ? ` in ${match.country}` : ""} — we have ${
-      /^[aeiou]/i.test(who) ? "an" : "a"
-    } ${who} available who fits it.`,
+    offerSentence({
+      role: c?.role ?? null,
+      roleTitle: match.roleTitle,
+      country: match.country,
+      availabilityConfirmed: availabilityConfirmed(c?.caveats),
+    }),
     "",
     c?.why ? `Relevant background: ${c.why}.` : "",
     "",
