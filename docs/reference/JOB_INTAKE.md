@@ -100,8 +100,9 @@ src/app/api/job-intake/
 
 A confident email that asks for more than one role becomes one recruiting
 mission (`settlePeopleRequest`). Roles are rows in `requirement_roles`
-(migration 050, written, not applied). Hanna and Bob each get one step on
-that mission and are woken once. The same message, thread or forward does
+(migration 052, written, not applied; 050 and 051 are already live from
+PR #29 and this file does not change them). Hanna and Bob each get one step
+on that mission and are woken once. The same message, thread or forward does
 not open another case. A single role keeps the reply card. An unsure read
 wakes nobody. Both this hand-in and the IMAP sync call the same function
 after the lead is stored.

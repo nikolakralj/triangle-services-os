@@ -35,7 +35,7 @@ export type { RequirementCaseLine };
 // message, thread or forward returns the case that is already open and does
 // not wake anyone again.
 //
-// Migration 050 is not applied by this code. When the table is missing the
+// Migration 052 is not applied by this code. When the table is missing the
 // email stays on its reply card and the team is not started.
 // ---------------------------------------------------------------------------
 

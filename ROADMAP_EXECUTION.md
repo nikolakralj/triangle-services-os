@@ -68,9 +68,11 @@ original client.
 
 Built off `main` while P1 is still PR #36. It does not depend on that
 schedule. Both the built-in sync and Bob's hand-in call `settlePeopleRequest`
-after a message is stored. Migration `050_requirement_roles.sql` is written
-and **not applied** — local and Production share one database. Not done until
-Nikola applies it and the signed-in Preview check passes.
+after a message is stored. Migration `052_requirement_roles.sql` is written
+and **not applied** — local and Production share one database. 050 and 051
+are already live from PR #29 (mailbox observe and mailbox space); this file
+does not touch those columns. Not done until Nikola applies 052 and the
+signed-in Preview check passes.
 
 - Requirement extraction: one email becomes one requirement with N roles —
   title, how many, level, skills and tools, start, duration, location,

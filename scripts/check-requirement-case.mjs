@@ -256,7 +256,7 @@ test("both mail paths settle a stored message, and the migration is unapplied", 
   const ingest = read("src/lib/job-intake/ingest.ts");
   const route = read("src/app/api/job-intake/ingest/route.ts");
   const opener = read("src/lib/data/requirement-case.ts");
-  const migration = read("supabase/migrations/050_requirement_roles.sql");
+  const migration = read("supabase/migrations/052_requirement_roles.sql");
   const pickup = read("src/lib/data/mission-bot.ts");
   const today = read("src/components/modules/today-screen.tsx");
 
@@ -267,7 +267,16 @@ test("both mail paths settle a stored message, and the migration is unapplied", 
   assert.match(opener, /clientReply: false/);
   assert.match(opener, /event: "mission_step"/);
   assert.match(migration, /create table if not exists public\.requirement_roles/);
+  assert.match(migration, /add column if not exists source_key/);
+  assert.match(migration, /create unique index if not exists requirement_roles_source_position_key/);
   assert.match(migration, /DO NOT APPLY THIS FROM A CODING AGENT/);
+  assert.doesNotMatch(migration, /alter table public\.inbound_emails/i);
+  assert.doesNotMatch(migration, /alter table public\.outreach_drafts/i);
+  assert.doesNotMatch(migration, /alter table public\.job_leads/i);
+  assert.doesNotMatch(
+    migration,
+    /add column if not exists (in_reply_to|references_header|outbound_thread_id|shared_at|shared_by)/i,
+  );
   assert.match(pickup, /earliestOpenRun/);
   assert.doesNotMatch(today, /Ask Hanna|Ask Bob/);
 });
