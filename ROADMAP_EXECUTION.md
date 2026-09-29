@@ -824,6 +824,61 @@ approve a pack on a case and confirm the tick appears; send with it and
 confirm the recorded note names the file; try to send with an unapproved pack
 and confirm the refusal is in Settings → Diagnostics.
 
+### DEV-024 - The workspace is the answer: shapes, not counters - `IN_PROGRESS` (Claude, branch `claude/workspace-shapes`, on top of DEV-023)
+
+**Why now (29 September):** the Germany Rates mission. The CEO asked what
+electricians lease for and how erection compares with troubleshooting; the
+page scored the mission on companies found, buyers named and people reachable
+(`mission-progress.ts`), said `READY` and `0%` together, and left Scout's real
+answer in the chat rail. Chat is a good steering wheel and a bad answer.
+Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
+
+**Slices, so another agent can continue:**
+
+- **A — The schema and the law. DONE on the branch (not merged).**
+  `src/lib/data/workspace.ts`: a workspace is a declared shape, a short
+  answer (verdict, confidence, what is not established), up to five blocks
+  from a fixed vocabulary (table, list, route, calc, decision, gaps), its own
+  `doneWhen` tests, and its sources. Every fact carries `basis`: `source`
+  (with a dated source it names), `our_record`, or `unknown`. Caps, plain-text
+  rules (no ids, no markup) and refusals are in the schema, so "one more
+  panel" is a validation error. `workspaceProgress` counts the tests from what
+  the workspace holds; `evaluateCalc` runs the person's own numbers through a
+  tiny arithmetic evaluator — expressions are data and no employee code runs
+  in a browser. The law is in `DECISIONS.md`,
+  `PRODUCT_OPERATING_RULES.md` (a ten-point reject test),
+  `agents/shared-constitution.md` ("Answer in the shape the question needs")
+  and `AGENTS.md`. Check: `npm run check:workspace` (16/16), which validates
+  both the rates question and the Serbian-citizens question against the same
+  vocabulary.
+- **B — Draw it, on Germany Rates. NEXT.** A renderer for the vocabulary
+  (answer first, table with basis marks and "not established", the
+  calculation with the person's own inputs, the gaps, the sources folded),
+  the mission page reading `workspaceProgress` instead of the company
+  counters, and no scroll before it makes sense. Phone width included.
+- **C — Scout files one.** A badge endpoint that takes a workspace, refuses
+  it in words when it breaks the schema (and records the refusal), plus the
+  role-file instructions and two worked examples. Until then a workspace can
+  be written from Triangle's own records for a question it can already
+  answer.
+- **D — The second question, as the proof.** "How do we employ Serbian
+  citizens in the EU" must produce a route, a country table and gaps with no
+  new code. If it needs a new block, that block is added to the vocabulary
+  once — never a generated page.
+- **E — Keep it.** Follow-up words revise the same workspace as a new
+  version; a workspace worth keeping is pinned on Today; the rest closes.
+  Also: the per-mission Autonomy picker goes (trust belongs to the employee's
+  record).
+
+**Acceptance (whole item):** the CEO asks a business question, gets an answer
+in the shape the question needs with every fact sourced or marked unknown,
+changes his own numbers in it, says "add Austria" and sees that same answer
+change — without reading a chat rail, and without a company counter deciding
+when it is finished.
+
+**No migration in slice A.** Storing a workspace and its versions comes with
+slice C; it reuses the mission record tables where it can.
+
 ### DEV-023 - One Ask on the case: the team decides who takes it - `IN_PROGRESS` (Claude, branch `claude/one-ask-on-the-case`, on top of DEV-022)
 
 **Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The

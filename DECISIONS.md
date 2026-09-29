@@ -6,6 +6,78 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-09-29: The workspace is the answer — the employee picks its shape, Triangle draws it
+
+Locked by Nikola, looking at the Germany Rates mission. He asked what
+industrial electricians lease for in Germany and how erection compares with
+troubleshooting. The page counted companies found, buyers named and people
+reachable, said `READY` and `0%` at the same time, and put Scout's actual
+answer — erection around 30–45 €/h, no separate published troubleshooting
+rate, three dated sources — in the chat rail beside it. "I don't like that
+today we communicate with bots as chat."
+
+That is not a layout problem: the mission was measuring the wrong thing,
+because a question about rates has no counter of its own.
+
+Law:
+
+1. **The answer is a record, not a message.** Chat steers the work, the
+   workspace holds the result, and Today keeps what needs a person. Nobody
+   should have to reread a conversation to recover what the company knows.
+2. **The employee picks the shape, and says which.** Taking the job, it
+   declares one — a short answer, a comparison, a shortlist, a route, a
+   decision — and reports "answered as a comparison with dated evidence".
+   The shape is part of the decision it reports, not a choice a person makes
+   ("Employees, not buttons", 18 September).
+3. **Triangle draws it from a fixed vocabulary.** Tested blocks only: the
+   short answer, a table, a shortlist, a route, a calculation, a decision,
+   the gaps, the sources. No employee writes interface code, and a block
+   Triangle does not know is refused rather than drawn. A new kind of answer
+   is a new block in the vocabulary, reviewed once — never a page an
+   employee generates.
+4. **Simple enough for a person.** The CEO is a human with two minutes, not
+   an analyst: the short answer first, at most five blocks, at most six
+   columns, plain words, no ids, numbers with their units, one screen that
+   reads on a phone. These are limits in the schema, not advice.
+5. **Every fact carries its basis** — a dated source, Triangle's own record,
+   or "not established". Nothing else is drawn as fact, and "not
+   established" is a value rather than an empty cell. A tidy table of
+   invented numbers is worse than no table, because the layout lends it
+   authority.
+6. **Done is counted from the artifact.** Each workspace carries its own
+   tests ("every work type has a dated range"), and the number is counted
+   from what it holds. No employee claims progress, and no question is
+   scored against counters it never asked for.
+7. **Words revise the same workspace.** "Add Austria", "make it a table",
+   "keep the calculation, hide the explanation" produce a new version of
+   that record — never a second essay under the first.
+8. **Sensitive answers** — immigration, tax, employment law, safety — cite
+   the official source or say not established, carry a caution, and are
+   never presented as legal advice. Triangle's own record is not authority
+   there.
+9. **A person's numbers stay a person's.** A calculation is data: inputs,
+   arithmetic and the assumptions said out loud, evaluated by Triangle. No
+   code from an employee runs in a person's browser.
+
+Amends:
+
+- **Missions.** A mission's finish line is its workspace's tests. The
+  company and candidate counters stay where the question is about companies
+  or people; they stop being every mission's finish line.
+- **Autonomy is not a per-mission dropdown.** The picker on the mission page
+  goes: how much freedom an employee has belongs to its own record, granted
+  once by the CEO on evidence (18 September, law 4).
+
+Deliberately not in this: blank workspaces a person assembles from widgets —
+that is another management job, and the CEO's effort ceiling is a copied
+email or a phone call; a dashboard of counters; and any interface code an
+employee writes. A workspace worth keeping is pinned; the rest is closed.
+
+Built in this order: the schema and this law first
+(`src/lib/data/workspace.ts`, `npm run check:workspace`), then Germany Rates
+drawn from it, then Scout filing one, then "how do we employ Serbian citizens
+in the EU" as the proof — the second question must need no new code.
+
 ### 2026-09-18: Employees, not buttons — the core of Triangle
 
 Locked by Nikola on 18 September, looking at the Oliver Hall card: three radio

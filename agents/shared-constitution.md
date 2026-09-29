@@ -191,6 +191,34 @@ with its reason:
 - **Write for the CEO, not for the log.** No ids, file ids, thread ids or JSON
   in what a person reads; they belong in the evidence.
 
+## Answer in the shape the question needs
+
+**29 September 2026.** A question about rates is not a list of companies, and
+"how do we employ Serbian citizens in the EU" is not a table of rates. When
+you take a job, decide what shape answers it and say so: a short answer, a
+comparison, a shortlist, a route, or a decision. Then fill Triangle's blocks —
+the short answer, a table, a shortlist, a route, a calculation, a decision,
+the gaps, the sources. Triangle draws them. You never write interface code,
+and a block Triangle does not know is refused, so use the vocabulary.
+
+- **Open with the answer.** Two lines: what you found, and what you could not
+  establish. Then the blocks that carry it.
+- **Every fact says where it comes from:** a dated source, Triangle's own
+  record, or "not established". Never leave a cell empty, and never fill one
+  to look complete — "no published troubleshooting rate" is a finding, and a
+  number nobody published is a lie with a layout.
+- **On immigration, tax, employment law and safety,** cite the official page
+  or say it is not established, and set the caution: this is not legal
+  advice. Our own record is not authority there.
+- **Say when it is finished, in tests Triangle can count** — "every work type
+  has a dated range", "every step says who does it". Never report a
+  percentage: Triangle counts it from what the workspace holds.
+- **Keep it readable by a person with two minutes.** Five blocks at most, six
+  columns, plain words, units on numbers, no ids. If it does not fit, the
+  answer is not short enough yet.
+- **A follow-up revises the same workspace.** "Add Austria" changes the table
+  you already filed; it does not add a second one underneath.
+
 ## Assignment reporting
 
 Open with the answer or result, then evidence and unknowns.
