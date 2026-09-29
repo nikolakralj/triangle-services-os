@@ -384,6 +384,110 @@ test('an expression may only use the inputs above it, and never call anything', 
   refused(semicolons, /arithmetic over the inputs only/);
 });
 
+// ── drawn: the renderer, and where a filed answer lives ─────────────────────
+
+const { renderToStaticMarkup } = require('react-dom/server');
+const { createElement } = require('react');
+const { WorkspaceView } = load('src/components/modules/workspace-view.tsx');
+const { latestWorkspaceOf } = load('src/lib/data/mission-workspace.ts');
+const missionView = read('src/components/missions/mission-view.tsx');
+const missionBot = read('src/lib/data/mission-bot.ts');
+
+const drawn = (input, props = {}) =>
+  renderToStaticMarkup(createElement(WorkspaceView, { workspace: ok(input), ...props }));
+
+const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, ' ').trim();
+
+test('the answer is drawn first, with how solid it is and what is open', () => {
+  const html = drawn(RATES, { filedBy: 'Scout' });
+  const plain = text(html);
+  assert.match(plain, /^The answer Answered as a comparison with dated evidence\. From Scout/);
+  assert.ok(plain.indexOf('Erection work leases at about 30–45') < plain.indexOf('Lease rates by work'));
+  assert.match(plain, /Partly established/);
+  assert.match(plain, /2 of 3 answered · 67%/);
+  assert.match(plain, /Not established: A published troubleshooting or commissioning bill rate/);
+  assert.match(plain, /Finished when every row in Lease rates by work has rate/);
+});
+
+test('a table shows its units, its sources and its unknowns', () => {
+  const html = drawn(RATES);
+  assert.match(html, /<th[^>]*scope="col"/);
+  assert.match(text(html), /Rate \(€\/h\)/);
+  assert.match(text(html), /30–45/);
+  // Two cells nobody established, said in words rather than left blank.
+  assert.equal((text(html).match(/not established/g) ?? []).length >= 2, true);
+  // The sourced number carries a link to the source that backs it.
+  assert.match(html, /href="https:\/\/go2-work\.de\/kosten"/);
+  assert.match(html, /title="Cost of leased Polish specialists · 2026-01"/);
+  // A table may scroll sideways; the page never does.
+  assert.match(html, /overflow-x-auto/);
+});
+
+test('the sources are folded, numbered and dated', () => {
+  const html = drawn(RATES);
+  assert.match(html, /<details/);
+  assert.match(text(html), /2 sources behind this/);
+  assert.match(text(html), /Subcontracting and freelance costs · 2026-01-24/);
+});
+
+test('the calculation shows the person\'s own numbers and the assumptions', () => {
+  const html = drawn(RATES);
+  assert.match(html, /type="number"/);
+  assert.match(text(html), /We bill \(€\/h\)/);
+  assert.match(text(html), /Margin an hour 16/);
+  assert.match(text(html), /Margin a month 2184/);
+  assert.match(text(html), /Taken for granted: One worker, no travel, no idle days/);
+});
+
+test('a route shows its steps, owners and what has no owner yet', () => {
+  const plain = text(drawn(SERBIAN_CITIZENS));
+  // The little source number sits between the step and its owner.
+  assert.match(plain, /Sign a work contract naming the site and the pay \d? ?Nikola · 1 day/);
+  assert.match(plain, /Book the consulate appointment in Belgrade The worker/);
+  assert.match(plain, /not legal advice/);
+});
+
+test('nothing an employee wrote is drawn as markup', () => {
+  const sneaky = clone(RATES);
+  sneaky.answer.notEstablished = ['A published rate'];
+  const html = drawn(sneaky);
+  assert.doesNotMatch(html, /<script/i);
+  // The schema refuses markup before it can reach the page at all.
+  const attempt = clone(RATES);
+  attempt.answer.verdict = 'Rates are <img src=x onerror=alert(1)> per hour.';
+  refused(attempt, /plain words only/);
+});
+
+test('a filed answer lives in the step record, newest first, and is read back', () => {
+  const steps = [
+    { id: 'newer', record: { workspace: RATES }, worker: 'Scout', completedAt: '2026-09-29T08:00:00Z', createdAt: '2026-09-29T07:00:00Z' },
+    { id: 'older', record: { workspace: SERBIAN_CITIZENS }, worker: 'Scout', completedAt: '2026-09-28T08:00:00Z', createdAt: '2026-09-28T07:00:00Z' },
+  ];
+  const filed = latestWorkspaceOf(steps);
+  assert.equal(filed.stepId, 'newer');
+  assert.equal(filed.filedBy, 'Scout');
+  assert.equal(filed.workspace.shape, 'comparison');
+  // A step with no workspace, or one that no longer validates, is skipped.
+  assert.equal(latestWorkspaceOf([{ id: 'a', record: { reply: 'done' }, worker: null, completedAt: null, createdAt: '2026-09-01T00:00:00Z' }]), null);
+  const broken = [{ id: 'b', record: { workspace: { shape: 'comparison' } }, worker: null, completedAt: null, createdAt: '2026-09-01T00:00:00Z' }];
+  assert.equal(latestWorkspaceOf(broken), null);
+});
+
+test('a step may file one, and an invalid one is refused in words', () => {
+  assert.match(missionBot, /workspace: z\.unknown\(\)\.optional\(\)/);
+  assert.match(missionBot, /parseWorkspace\(input\.workspace\)/);
+  assert.match(missionBot, /not one Triangle can draw/);
+  assert.match(missionBot, /workspace,\r?\n {4}brief: \{/);
+});
+
+test('a filed answer replaces the company counters and the company finish line', () => {
+  assert.match(missionView, /const filed = latestWorkspaceOf\(steps\)/);
+  assert.match(missionView, /\{!filed && <Metrics counts=\{counts\} \/>\}/);
+  assert.match(missionView, /filed \? \(\s*<WorkspaceView/);
+  // Both kinds of mission, not only research.
+  assert.equal((missionView.match(/<WorkspaceView/g) ?? []).length, 2);
+});
+
 // ── the law is written where every agent reads it ────────────────────────────
 
 test('the law says the workspace is the answer, and keeps it human', () => {

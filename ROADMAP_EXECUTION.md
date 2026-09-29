@@ -848,14 +848,23 @@ Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
   in a browser. The law is in `DECISIONS.md`,
   `PRODUCT_OPERATING_RULES.md` (a ten-point reject test),
   `agents/shared-constitution.md` ("Answer in the shape the question needs")
-  and `AGENTS.md`. Check: `npm run check:workspace` (16/16), which validates
+  and `AGENTS.md`. Check: `npm run check:workspace` (25/25 with the drawing), which validates
   both the rates question and the Serbian-citizens question against the same
   vocabulary.
-- **B — Draw it, on Germany Rates. NEXT.** A renderer for the vocabulary
-  (answer first, table with basis marks and "not established", the
-  calculation with the person's own inputs, the gaps, the sources folded),
-  the mission page reading `workspaceProgress` instead of the company
-  counters, and no scroll before it makes sense. Phone width included.
+- **B — Drawn. DONE on the branch (not merged).**
+  `src/components/modules/workspace-view.tsx` draws the vocabulary: the short
+  answer first with how solid it is and how much of it is answered, the table
+  with a numbered link on every sourced cell, "ours" on Triangle's own record
+  and "not established" where nobody established anything, the calculation
+  with the person's own inputs recomputing live, "Still open", "Finished
+  when" from the workspace's tests, and the sources folded and dated at the
+  bottom. A filed answer lives in the finished step's record
+  (`MissionStepRecord.workspace`, no migration) and is read back by
+  `latestWorkspaceOf` (`src/lib/data/mission-workspace.ts`), validated again
+  on the way out. Both mission overviews show it in place of the company
+  counters and the company finish line. A step may file one through the
+  existing `/complete` badge endpoint; a workspace Triangle cannot draw is
+  refused in words, naming the line that broke.
 - **C — Scout files one.** A badge endpoint that takes a workspace, refuses
   it in words when it breaks the schema (and records the refusal), plus the
   role-file instructions and two worked examples. Until then a workspace can
