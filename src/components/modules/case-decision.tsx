@@ -11,10 +11,10 @@ import {
   type PutForwardCase,
 } from "@/lib/data/put-forward";
 import {
+  firstLine,
   formSentence,
   humaniseReport,
   othersSentence,
-  reportOpening,
 } from "@/lib/data/case-decision";
 import type { CaseRef } from "@/lib/data/today-handoff";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
@@ -255,7 +255,7 @@ export function CaseDecision({
   );
 }
 
-/** What an employee wrote: the opening lines, ids stripped; the rest folds. */
+/** What an employee wrote: one line, ids stripped; the rest is one click away. */
 function Said({
   tone,
   who,
@@ -271,15 +271,15 @@ function Said({
 }) {
   const t = TONE[tone];
   const [all, setAll] = useState(false);
-  const opening = reportOpening(text);
+  const line = firstLine(text);
   const full = humaniseReport(text);
-  if (!opening && !emptyLine) return null;
+  if (!line && !emptyLine) return null;
   return (
     <div className={t.said}>
       <p className={t.saidWho}>{who}</p>
-      <p className={t.saidText}>{opening ? (all ? full : opening) : emptyLine}</p>
+      <p className={t.saidText}>{line ? (all ? full : line) : emptyLine}</p>
       <div className="mt-1.5 flex flex-wrap items-center gap-3">
-        {opening && full.length > opening.length && (
+        {line && full.length > line.length && (
           <button type="button" onClick={() => setAll((v) => !v)} className={t.link}>
             {all ? "Show less" : "Read all"}
           </button>

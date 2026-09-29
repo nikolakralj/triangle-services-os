@@ -117,6 +117,8 @@ export interface DoneItem {
   personId: string | null;
   lastAgentBody: string | null;
   resultSummary: string | null;
+  /** `constraints.case_type` — which half of a case this finished. */
+  caseType: string | null;
 }
 
 /** People on the books a human may attach as an anonymised profile. */
@@ -195,6 +197,7 @@ export async function listDoneSince(
       personId: asId(constraints.personId),
       lastAgentBody: thread?.lastAgentBody ?? null,
       resultSummary: (row.result_summary as string | null) ?? null,
+      caseType: typeof constraints.case_type === "string" ? constraints.case_type : null,
     });
     if (done.length >= limit) break;
   }

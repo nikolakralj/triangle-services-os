@@ -37,6 +37,7 @@ import {
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
 import {
+  chaseDone,
   chaseWaits,
   findDone,
   findWait,
@@ -44,6 +45,7 @@ import {
   type CaseRef,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
+import { redraftForPerson } from "@/lib/data/lead-reply";
 import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
 
@@ -142,6 +144,7 @@ export function TodayScreen({
   // the same case and has its own block on the card; counting it here would
   // read as "somebody else is handling this" and take the card off Needs you.
   const chase = chaseWaits(waits);
+  const chaseFinished = chaseDone(done);
   const nowIds = nowAction
     ? { leadId: nowAction.leadId, contactId: nowAction.contactId }
     : null;
@@ -208,7 +211,7 @@ export function TodayScreen({
               move={move}
               onLogged={setLogged}
               waits={chase}
-              done={done}
+              done={chaseFinished}
               sender={sender}
               senders={senders}
               putForward={putForward}
@@ -578,14 +581,32 @@ function ActionPanel({
   // Who the reply is about is the team's decision: Hanna's person when she has
   // the case, otherwise Triangle's own top match. Changing it is words in Ask.
   const decidedId = hannaCase?.pack?.workerId ?? action.offering?.workerId ?? "";
+  const pack = hannaCase?.pack ?? null;
   const decidedOffer: OfferWorker | null =
     candidates.find((c) => c.workerId === decidedId) ??
     (action.offering?.workerId === decidedId ? action.offering : null) ??
-    null;
+    // Hanna may put forward somebody the first match did not name. The draft
+    // still has to be about that person, not about the first match.
+    (pack && pack.workerId === decidedId
+      ? {
+          workerId: pack.workerId,
+          name: pack.workerName,
+          role: pack.role,
+          why: "",
+          caveats: /confirmed/i.test(pack.availability) && !/not confirmed|never|unknown/i.test(pack.availability)
+            ? []
+            : ["availability never confirmed"],
+        }
+      : null);
   const pick = decidedOffer ?? (hannaCase ? null : (action.offering ?? null));
+  // Both sentences that name the person follow the decision — their role,
+  // availability only if confirmed, and their background or none at all.
   const draftFor = (offer: OfferWorker | null) =>
-    offer && offer.workerId !== action.offering?.workerId
-      ? rewriteBackground(action.script ?? "", offer.why)
+    offer
+      ? redraftForPerson(action.script ?? "", offer, {
+          roleTitle: action.personRole,
+          country: action.country ?? null,
+        })
       : (action.script ?? "");
 
   // A written message can be changed before it goes; what is in the box is
@@ -887,15 +908,6 @@ function attachablePackFrom(items: PutForwardCase[]): AttachablePack | null {
     agentName: chosen.agentName,
     approvedAt: chosen.approvedAt,
   };
-}
-
-function rewriteBackground(script: string, why: string): string {
-  if (!why.trim()) return script;
-  const line = `Relevant background: ${why}.`;
-  if (/Relevant background:.*?(?=\n|$)/.test(script)) {
-    return script.replace(/Relevant background:.*?(?=\n|$)/, line);
-  }
-  return script;
 }
 
 // ── 04 · BACK FROM THE TEAM ─────────────────────────────────────────────────

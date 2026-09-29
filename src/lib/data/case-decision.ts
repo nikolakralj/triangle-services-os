@@ -31,11 +31,20 @@ export function humaniseReport(text: string | null | undefined): string {
   out = out.replace(THREAD_ID, "$1").replace(UUID, "");
   // "(worker )" and "(lead )" are what an id leaves behind in its brackets.
   out = out.replace(/\s*\((?:worker|lead|assignment|contact|person|mission|case|id)\s*\)/gi, "");
+  // "workerId ;" and "leadId …" — the label an id leaves behind outside brackets.
+  out = out.replace(
+    /\b(?:worker|lead|contact|person|company|mission|assignment|step|org)Id\b\s*[:=]?\s*[;,]?\s*/gi,
+    "",
+  );
+  // "(pack_intent bio_anonymised)" — a field name and its value, in brackets.
+  out = out.replace(/\s*\([a-z]+(?:_[a-z]+)+(?:\s*[:=]?\s*[a-z]+(?:_[a-z]+)*)?\)/g, "");
   out = out.replace(/\*\*/g, "").replace(/^#{1,6}\s+/gm, "");
   // What removing ids leaves behind: "(… · lead )", "( , )", doubled spaces.
   out = out
     .replace(/\s*·\s*lead\s*(?=\))/gi, "")
     .replace(/\(\s*[,·;:]?\s*\)/g, "")
+    .replace(/\(\s*[;,:·]\s*/g, "(")
+    .replace(/,\s*(…|\.\.\.)/g, "$1")
     .replace(/[,;]\s*\)/g, ")")
     .replace(/\(\s+/g, "(")
     .replace(/\s+\)/g, ")")
@@ -65,6 +74,24 @@ export function reportOpening(text: string | null | undefined, max = 420): strin
   const cut = opening.slice(0, max);
   const stop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("\n"));
   return `${(stop > max * 0.5 ? cut.slice(0, stop + 1) : cut).trim()}…`;
+}
+
+/**
+ * The one line a card shows of what an employee wrote: the first sentence of
+ * the decision lines, cut at `max`. The rest is one click away, never on the
+ * card by default — a person reads the team's decision, not the report.
+ */
+export function firstLine(text: string | null | undefined, max = 170): string {
+  const opening = reportOpening(text, 600);
+  if (!opening) return "";
+  const firstParagraph = opening.split(/\n\s*\n/)[0] ?? opening;
+  // "M. P." is initials, not the end of a sentence: a full stop after a lone
+  // capital letter does not count.
+  const sentence = firstParagraph.match(/^.*?(?<!\b[A-Z])[.!?](?=\s|$)/)?.[0] ?? firstParagraph;
+  if (sentence.length <= max) return sentence.trim();
+  const cut = sentence.slice(0, max);
+  const stop = cut.lastIndexOf(" ");
+  return `${(stop > max * 0.6 ? cut.slice(0, stop) : cut).trim()}…`;
 }
 
 /** Which form the document goes out in, and why — one sentence. */

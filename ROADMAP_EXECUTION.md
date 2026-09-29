@@ -824,7 +824,37 @@ approve a pack on a case and confirm the tick appears; send with it and
 confirm the recorded note names the file; try to send with an unapproved pack
 and confirm the refusal is in Settings → Diagnostics.
 
-### DEV-023 - One Ask on the case: the team decides who takes it - `IN_PROGRESS` (Claude, branch `claude/one-ask-on-the-case`, on top of DEV-022)
+### DEV-023 - One Ask on the case: the team decides who takes it - `DONE` (merged in PR #34; live on Production `693be38`, checked 29 September; a real end-to-end run on a case is still owed)
+
+**Defects found on Production, 29 September (Henry Hammond card) — fixed on
+branch `claude/card-defects`, not merged:**
+
+1. Hanna's finished who-we-put-forward job was drawn twice — once as the
+   team's decision and again as "what came back on the chase". Finished
+   work now carries its `caseType`, and `chaseDone` keeps the put-forward
+   half off the chase, the same split `chaseWaits` makes for open work.
+2. The draft said "we have an Automation Engineer available who fits it"
+   while the card said availability was never confirmed — a claim to a
+   recruiter nobody had established. `offerSentence`
+   (`src/lib/data/lead-reply.ts`) says "available" only when a person
+   confirmed it, otherwise "on our books … I am confirming their
+   availability now".
+3. When the team proposed somebody else, the card rewrote the background
+   line but left the first person's role in the sentence above.
+   `redraftForPerson` rewrites both sentences that name the person — and
+   drops the background line rather than keep somebody else's. It also
+   covers a person only Hanna named.
+4. Machinery in the prose: "(workerId ; …)", "leadId …" and
+   "(pack_intent bio_anonymised)". The labels now go with their ids.
+5. Each employee's prose is one line on the card (`firstLine`, which does
+   not mistake the initials "M. P." for the end of a sentence); the rest
+   is behind Read all.
+
+Still open on Today, and the next piece of work: the page is a long scroll
+of full cards. Codex's review (29 September) asks for a short queue — each
+case one line with what is prepared and what is blocking — that opens into
+the review. Not started.
+
 
 **Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The
 Oliver Hall card asked the CEO to choose between Ask Bob and Ask Hanna, to pick
