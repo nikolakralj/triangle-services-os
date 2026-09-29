@@ -183,6 +183,20 @@ does not rebuild it.
 It depends on the Grok computer offering an embeddable view, which still
 needs investigating. No date until that exists.
 
+**What that view is for, long term.** One computer the employee already uses,
+watched on the case, is how a three-sided search could run. The direction is
+a marketplace that connects people, jobs and clients:
+
+1. **Our agents search for people.** Candidates, on the web and on LinkedIn,
+   from the employee's own computer. Triangle keeps the case.
+2. **Freelancers search for jobs.** A freelancer uses Triangle to find work.
+3. **Clients search for agents and companies.** A client finds the right
+   agency, team or contractor.
+
+Sides 2 and 3 open Triangle to people outside this agency. That is a
+different product from today's single-agency tool, and it needs its own
+decision before any build. Recorded here so it is not lost. Not scheduled.
+
 ### Rules for every coding agent
 
 1. This section is the queue, except **Later**, which is not scheduled. Take
