@@ -6,6 +6,11 @@ import { MissionView } from "@/components/missions/mission-view";
 import { AskPageContext } from "@/components/missions/ask-context";
 import { ReportedWork } from "@/components/modules/reported-work";
 import { listReportsForCase } from "@/lib/data/employee-reports";
+import { buildCasePage } from "@/lib/data/case-page";
+import { casePageInput, loadCaseMail, threadReplyDraft } from "@/lib/data/case-page-load";
+import { sendableMailboxesFor } from "@/lib/data/mail-send";
+import { CasePageScreen } from "@/components/modules/case-page";
+import { CaseAsk, CaseDrafts } from "@/components/modules/case-drafts";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +32,59 @@ export default async function MissionPage({
 
   const caps = capabilities(session.role);
   const reports = await listReportsForCase(session.organizationId, id);
+  if (workspace.requirementRoles.length > 0) {
+    const [mail, senders] = await Promise.all([
+      loadCaseMail(session.organizationId, id),
+      sendableMailboxesFor(session.organizationId, session.userId),
+    ]);
+    const threadDraft =
+      mail && mail.drafts.length > 0 ? null : threadReplyDraft(workspace.steps, workspace.messages);
+    const built = buildCasePage(
+      casePageInput({
+        workspace,
+        reports,
+        mail,
+        threadDraft,
+      }),
+    );
+    if (built.ok) {
+      const replyFrom =
+        mail?.arrivedInAccountId && senders.some((box) => box.id === mail.arrivedInAccountId)
+          ? mail.arrivedInAccountId
+          : null;
+      return (
+        <>
+          <AskPageContext kind="mission" missionId={id} />
+          <CasePageScreen
+            model={built.model}
+            drafts={
+              <CaseDrafts
+                letters={built.model.drafts}
+                to={mail?.clientEmail ?? null}
+                who={built.model.askedBy}
+                leadId={mail?.leadId ?? undefined}
+                sender={senders[0] ?? null}
+                senders={senders}
+                replyFrom={replyFrom}
+              />
+            }
+            ask={
+              caps.canWrite ? (
+                <CaseAsk
+                  who={built.model.askedBy}
+                  about={built.model.place}
+                  leadId={mail?.leadId ?? undefined}
+                  missionId={id}
+                  email={mail?.clientEmail ?? null}
+                />
+              ) : null
+            }
+          />
+        </>
+      );
+    }
+    console.error("case page:", built.errors.join("; "));
+  }
   // A role that cannot see Triangle's people on the Talent Pool page does not
   // see them through a recruiting mission either.
   const visible = caps.canSeeWorkers ? workspace : { ...workspace, candidates: [], partners: [] };
