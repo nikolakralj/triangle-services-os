@@ -133,6 +133,12 @@ export interface MissionStepRecord {
     dead: number;
     dropped: number;
   };
+  /**
+   * The answer in the shape the question needed (29 September). Kept raw
+   * here and validated on the way in and on the way out, so a record written
+   * by an older worker still reads.
+   */
+  workspace?: unknown;
   /** For a recruiting step: the pool records the answer named. */
   candidates?: {
     workerIds: string[];
@@ -171,6 +177,7 @@ export function parseMissionStepRecord(value: string | null): MissionStepRecord 
         dead: Number(parsed.filed?.dead ?? 0),
         dropped: Number(parsed.filed?.dropped ?? 0),
       },
+      workspace: parsed.workspace ?? undefined,
       candidates: parsed.candidates
         ? {
             workerIds: stringList(parsed.candidates.workerIds),

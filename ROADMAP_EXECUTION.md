@@ -1,6 +1,6 @@
 # Roadmap execution — what happens next
 
-Updated 16 September 2026. The one place for next steps, for people and for
+Updated 29 September 2026 — **start at "The plan" below**. The one place for next steps, for people and for
 coding agents. What exists is in [CURRENT_STATE](CURRENT_STATE.md), why it was
 decided is in [DECISIONS](DECISIONS.md), and the long-term phases are in
 [ROADMAP](ROADMAP.md). The earlier, longer version of this file, the old work
@@ -15,6 +15,139 @@ work below.
 **Test for every piece of work (8 September):** can an AI employee take over
 this human job and its follow-through? If not, name the exact capability,
 evidence or authority that is missing. Approval boundaries do not change.
+
+## The plan (29 September 2026) — read this before anything else
+
+Decision: "The plan" in `DECISIONS.md`. One sentence: **an email asking for
+people becomes one case, the team starts on it without a click, everything
+they do lands on it, and Nikola approves and sends from one line on Today.**
+The acceptance test for the whole plan is Ralph's request: six commissioning
+engineers for a data centre near Cologne (3 Basic, 2 Advanced, 1 Expert,
+Desigo CC / PXC / ABT, start November–December 2026, English required,
+German desirable).
+
+**Nothing outside P0–P4 is built until P4 holds on three real requirements.**
+Not a chat in Triangle, not LinkedIn in Triangle, not new pages, panels or
+buttons, not research features, not a second agency.
+
+### P0 — Clean the floor · `READY` · 1 day
+
+- Merge `claude/ready-to-ship` (Today as a short list, the card fixes, the
+  workspace schema and drawing, Scout's instructions). One PR.
+- Review Grok's `cursor/mailbox-observed-d3bd` (sent and replied read from the
+  mailbox, DEV-019) — it is P3's foundation; merge it or say what blocks it.
+- Close every other branch older than three days after checking it holds
+  nothing unmerged that matters: `cursor/personal-mail-d3bd`,
+  `cursor/anonymised-packet-d3bd`, `cursor/dev-013-live-d3bd`,
+  `cursor/put-forward-approve-gate-a68d`, `claude/employees-not-buttons`,
+  `claude/one-ask-on-the-case`, `claude/workspace-shapes`,
+  `claude/card-defects`, and the empty `codex/recruiting-case-continuity`.
+- Nikola: forward Ralph's Cologne email to `nikola.kralj86@gmail.com`.
+
+**Done when:** Production runs `main`, no open branch is older than three
+days, and Ralph's email is in Triangle.
+
+### P1 — Mail in minutes, not mornings · `READY` after P0 · 2 days
+
+- Find why Triangle's own mail check (`/api/job-intake/sync`, daily cron in
+  `vercel.json`) has not recorded a read since 8 September, and fix it.
+- Read every connected mailbox every 5–10 minutes. Vercel Hobby runs crons
+  once a day; choose the trigger (Vercel Pro cron, Supabase `pg_cron` calling
+  the route, or Bob's routine every ten minutes) and write the choice down.
+  Keep Bob's morning run as the backup.
+- Connect `nikola.kralj@triangle-services.com` in Settings → Mailboxes, and
+  Ralph's when he wants it.
+- A forward from a colleague is read as what it forwards: the client is the
+  original sender, and the colleague is who brought it.
+
+**Done when:** an email sent to a connected mailbox is in Triangle within ten
+minutes, and Ralph's forward is recognised as a requirement naming the
+original client.
+
+### P2 — One email, one case · `READY` after P1 · 3 days — the core
+
+- Requirement extraction: one email becomes one requirement with N roles —
+  title, how many, level, skills and tools, start, duration, location,
+  languages, rate when given — plus the questions nobody has answered. The
+  email and its attachments stay on the case.
+- The case is a mission of kind `recruiting`; roles live in a new
+  `requirement_roles` table (migration written, Nikola applies it). Single-role
+  agency mail (Henry, Oliver) keeps its reply card for now.
+- Idempotent: the same thread, message or forward never opens a second case.
+- The case starts itself: one step for Hanna ("who we put forward, per role")
+  and one for Bob ("acknowledge, and ask what only the client can answer"),
+  each woken exactly once. Fix the double run Hanna reported on 29 September
+  as part of this.
+
+**Done when:** Ralph's forwarded email becomes, within fifteen minutes, one
+line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, reply
+drafted" — whose case shows three role rows with counts, and Hanna and Bob
+each have exactly one step.
+
+### P3 — Employees report everything · `READY` after P2 · 2 days
+
+- One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
+  email drafted, email sent (by a person), candidate found for a role (with
+  the evidence link), reply received, not available (until when), access
+  needed (what). Triangle files it on the person, the company and the case,
+  and sets the follow-up date.
+- The protocol and every role file say it: after anything done outside
+  Triangle, report it. Hanna's work of 29 September (INITECH, Suport Total,
+  Dario Martić, Ratko Vukonić) is the test fixture.
+- Mailbox observation (from P0) attaches replies to their case by thread and
+  wakes the owner.
+- "Last reported unavailable, on this date" stays until newer evidence
+  replaces it; it never decays into "unknown".
+- "Hanna needs your LinkedIn login" is one line on Today; the same step
+  resumes afterwards.
+
+**Done when:** Hanna sends a LinkedIn invitation from her computer and the
+person's record shows it, with a follow-up date, within minutes; a reply in
+the mailbox lands on the right case.
+
+### P4 — The case page · `READY` after P3 · 2 days
+
+- One screen per case: what was asked; a table of roles (needed · proposed ·
+  what is missing); the drafts to approve and send; the open questions;
+  activity folded. Built from the workspace blocks — no new framework.
+- Today's line opens the case page. Today stays one line per thing.
+
+**Done when:** Nikola runs Ralph's case from Today to sent replies in under
+five minutes of his own time a day, without reading an employee's report.
+
+### P5 — Trust · `GATED` on two weeks of real cases
+
+Each employee's record (approved unchanged, edited, refused) and the CEO's
+grants on it — for example "Hanna may send availability enquiries to
+candidates already on our books" — enforced on the server.
+
+### P6 — A second agency · `GATED` on P4 holding for three requirements
+
+The blueprint for another staffing firm, onboarding and billing. Not before.
+
+### Rules for every coding agent
+
+1. This section is the queue. Take the first `READY` item, write your name and
+   branch next to it before editing, and do nothing outside it.
+2. One item, one branch from the current `main`, one pull request. No stacked
+   branches. Merged or closed within 48 hours.
+3. An item is done only after a signed-in check of the real flow on the
+   preview, with the evidence in `CURRENT_STATE.md`. Offline checks are
+   necessary, never enough.
+4. Never send email, apply SQL or migrations to the live database, or promote
+   to production without Nikola's yes. Stage explicit paths. Stay out of other
+   agents' folders.
+5. Every pull request says what Nikola will read, type or click less.
+6. The laws bind: "Employees, not buttons", "The workspace is the answer" and
+   "The plan" in `DECISIONS.md`.
+
+### Nikola's part — minutes, not hours
+
+- P0: merge one pull request, promote it; forward Ralph's email.
+- P1: connect the company mailbox in Settings.
+- P2: apply one migration when asked.
+- P3: tell Hanna once, in Grok, to report everything to Triangle.
+- Then run Ralph's case on it and say what is wrong.
 
 ## How work is picked
 
@@ -824,7 +957,123 @@ approve a pack on a case and confirm the tick appears; send with it and
 confirm the recorded note names the file; try to send with an unapproved pack
 and confirm the refusal is in Settings → Diagnostics.
 
-### DEV-023 - One Ask on the case: the team decides who takes it - `IN_PROGRESS` (Claude, branch `claude/one-ask-on-the-case`, on top of DEV-022)
+### DEV-024 - The workspace is the answer: shapes, not counters - `IN_PROGRESS` (Claude, branch `claude/workspace-shapes`, on top of DEV-023)
+
+**Why now (29 September):** the Germany Rates mission. The CEO asked what
+electricians lease for and how erection compares with troubleshooting; the
+page scored the mission on companies found, buyers named and people reachable
+(`mission-progress.ts`), said `READY` and `0%` together, and left Scout's real
+answer in the chat rail. Chat is a good steering wheel and a bad answer.
+Law: `DECISIONS.md`, 29 September, "The workspace is the answer".
+
+**Slices, so another agent can continue:**
+
+- **A — The schema and the law. DONE on the branch (not merged).**
+  `src/lib/data/workspace.ts`: a workspace is a declared shape, a short
+  answer (verdict, confidence, what is not established), up to five blocks
+  from a fixed vocabulary (table, list, route, calc, decision, gaps), its own
+  `doneWhen` tests, and its sources. Every fact carries `basis`: `source`
+  (with a dated source it names), `our_record`, or `unknown`. Caps, plain-text
+  rules (no ids, no markup) and refusals are in the schema, so "one more
+  panel" is a validation error. `workspaceProgress` counts the tests from what
+  the workspace holds; `evaluateCalc` runs the person's own numbers through a
+  tiny arithmetic evaluator — expressions are data and no employee code runs
+  in a browser. The law is in `DECISIONS.md`,
+  `PRODUCT_OPERATING_RULES.md` (a ten-point reject test),
+  `agents/shared-constitution.md` ("Answer in the shape the question needs")
+  and `AGENTS.md`. Check: `npm run check:workspace` (25/25 with the drawing), which validates
+  both the rates question and the Serbian-citizens question against the same
+  vocabulary.
+- **B — Drawn. DONE on the branch (not merged).**
+  `src/components/modules/workspace-view.tsx` draws the vocabulary: the short
+  answer first with how solid it is and how much of it is answered, the table
+  with a numbered link on every sourced cell, "ours" on Triangle's own record
+  and "not established" where nobody established anything, the calculation
+  with the person's own inputs recomputing live, "Still open", "Finished
+  when" from the workspace's tests, and the sources folded and dated at the
+  bottom. A filed answer lives in the finished step's record
+  (`MissionStepRecord.workspace`, no migration) and is read back by
+  `latestWorkspaceOf` (`src/lib/data/mission-workspace.ts`), validated again
+  on the way out. Both mission overviews show it in place of the company
+  counters and the company finish line. A step may file one through the
+  existing `/complete` badge endpoint; a workspace Triangle cannot draw is
+  refused in words, naming the line that broke.
+- **C — Scout files one. DONE on the branch (not merged).** The contract is
+  in `agents/missions.md`, the protocol every employee is handed on each
+  check-in (`loadMissionProtocol`, read from disk at request time): the five
+  shapes, the six blocks, the caps, the three bases, the seven `doneWhen`
+  tests, the sensitive rule, and a worked `complete` body. The offline check
+  parses that example out of the protocol and validates it, so the
+  instructions cannot drift from the schema. `agents/scout.md` works both
+  questions through in prose — the rates comparison and the Serbian-citizens
+  route — including why a waiting time nobody published stays unknown. A
+  workspace Triangle cannot draw is refused with the line that broke and
+  written to the refusal ledger (`surface: mission_workspace`, kind
+  `boundary`), so Settings → Diagnostics shows what an employee got wrong.
+- **D — The second question, as the proof.** "How do we employ Serbian
+  citizens in the EU" must produce a route, a country table and gaps with no
+  new code. If it needs a new block, that block is added to the vocabulary
+  once — never a generated page.
+- **E — Keep it.** Follow-up words revise the same workspace as a new
+  version; a workspace worth keeping is pinned on Today; the rest closes.
+  Also: the per-mission Autonomy picker goes (trust belongs to the employee's
+  record).
+
+**Acceptance (whole item):** the CEO asks a business question, gets an answer
+in the shape the question needs with every fact sourced or marked unknown,
+changes his own numbers in it, says "add Austria" and sees that same answer
+change — without reading a chat rail, and without a company counter deciding
+when it is finished.
+
+**No migration in slice A.** Storing a workspace and its versions comes with
+slice C; it reuses the mission record tables where it can.
+
+### DEV-023 - One Ask on the case: the team decides who takes it - `DONE` (merged in PR #34; live on Production `693be38`, checked 29 September; a real end-to-end run on a case is still owed)
+
+**Defects found on Production, 29 September (Henry Hammond card) — fixed on
+branch `claude/card-defects`, not merged:**
+
+1. Hanna's finished who-we-put-forward job was drawn twice — once as the
+   team's decision and again as "what came back on the chase". Finished
+   work now carries its `caseType`, and `chaseDone` keeps the put-forward
+   half off the chase, the same split `chaseWaits` makes for open work.
+2. The draft said "we have an Automation Engineer available who fits it"
+   while the card said availability was never confirmed — a claim to a
+   recruiter nobody had established. `offerSentence`
+   (`src/lib/data/lead-reply.ts`) says "available" only when a person
+   confirmed it, otherwise "on our books … I am confirming their
+   availability now".
+3. When the team proposed somebody else, the card rewrote the background
+   line but left the first person's role in the sentence above.
+   `redraftForPerson` rewrites both sentences that name the person — and
+   drops the background line rather than keep somebody else's. It also
+   covers a person only Hanna named.
+4. Machinery in the prose: "(workerId ; …)", "leadId …" and
+   "(pack_intent bio_anonymised)". The labels now go with their ids.
+5. Each employee's prose is one line on the card (`firstLine`, which does
+   not mistake the initials "M. P." for the end of a sentence); the rest
+   is behind Read all.
+
+**Today as a short list — done on the same branch, 29 September.** Every
+Needs you item is one line until a person opens it (`TodayFold`): who,
+what is ready, the one fact not confirmed, and one button. The hero reads
+"Henry Hammond · g2 recruitment — Reply ready …: we propose M. P. as an
+anonymised bio — profile approved · Availability not confirmed yet";
+each person's follow-ups are one line with how late they are; the six
+call cards are one line ("6 calls to make"); what came back is one line.
+The full card is unchanged underneath. On the live data the page went
+from roughly 5,000 px to 985 px. Also fixed: "Back to the draft" returned
+to the uncorrected draft; the reply offered a profile that was already
+attached; the grey line under the headline named a candidate the team had
+not proposed.
+
+**Next: every client requirement becomes one case, automatically.** An
+email asking for people (Ralph's six commissioning roles in Cologne)
+becomes one recruiting case with its roles as rows; Hanna starts sourcing
+per role and Bob drafts the acknowledgement without a click; replies land
+on the same case; Today shows it as one line. Ralph's email is not in
+Triangle today — which mailbox it reached is the first question.
+
 
 **Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The
 Oliver Hall card asked the CEO to choose between Ask Bob and Ask Hanna, to pick

@@ -323,7 +323,8 @@ test('Today keeps the Now card when Bob has the case; what Bob wrote is in the t
   assert.doesNotMatch(todayScreen, /EmployeePrepared|today-offering|Someone else in the pool|type="radio"/);
   const decision = read('src/components/modules/case-decision.tsx');
   assert.match(decision, /has not written in the Triangle thread yet/);
-  assert.match(decision, /reportOpening/);
+  // One line per employee on the card (29 September); the rest folds.
+  assert.match(decision, /firstLine\(text\)/);
 });
 
 test('Done follow-through matches the same lead/contact as the card', () => {

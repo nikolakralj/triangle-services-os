@@ -271,6 +271,130 @@ test('the approved document goes with the reply; the server still re-reads the a
   assert.match(read('src/lib/data/mail-send.ts'), /approvedPackForSend\(/);
 });
 
+// ── 29 September: the Henry Hammond card, defect by defect ──────────────────
+
+const handoff = load('src/lib/data/today-handoff.ts');
+const reply = load('src/lib/data/lead-reply.ts');
+
+// Hanna's report on Henry's card, as it arrived (ids replaced by look-alikes).
+const HANNA_ON_HENRY =
+  'Switching back to M. P. as asked ("propose matej instead"). Building the anonymised bio against the CV #244 template from Triangle facts only; finishing with UK/Ireland sellability gaps and a draft reply for human send.\n\n' +
+  'We propose M. P. (workerId 174ef973-2f41-4e49-b40a-10cd1730a644; Triangle ref TS-174EF973 / CV #244) as the anonymised bio for Henry Hammond / Siemens Automation Engineer (UK/Ireland), leadId 5b8e1c2d-1111-4a4a-9b9b-0123456789ab …';
+
+test('one assignment appears once on a case: a finished Hanna job is not also the chase', () => {
+  const done = [
+    { assignmentId: 'hanna-1', caseType: 'who_we_put_forward', agentName: 'Hanna' },
+    { assignmentId: 'bob-1', caseType: 'commercial_follow_through', agentName: 'Bob' },
+    { assignmentId: 'old-1', caseType: null, agentName: 'Bob' },
+  ];
+  assert.deepEqual(handoff.chaseDone(done).map((d) => d.assignmentId), ['bob-1', 'old-1']);
+  // The card reads finished chase work only through that filter.
+  assert.match(todayScreen, /const chaseFinished = chaseDone\(done\)/);
+  assert.match(todayScreen, /done=\{chaseFinished\}/);
+  // And the loader says which half each finished job belongs to.
+  assert.match(read('src/lib/data/today-in-progress.ts'), /caseType: typeof constraints\.case_type === "string"/);
+});
+
+test('the draft never says available when nobody confirmed it', () => {
+  const unconfirmed = reply.offerSentence({
+    role: 'Automation Engineer', roleTitle: 'Siemens Automation Engineer', country: 'UK/Ireland', availabilityConfirmed: false,
+  });
+  assert.doesNotMatch(unconfirmed, /\bavailable who\b/);
+  assert.match(unconfirmed, /on our books who fits it — I am confirming their availability now/);
+  const confirmed = reply.offerSentence({
+    role: 'Automation Engineer', roleTitle: 'Siemens Automation Engineer', country: null, availabilityConfirmed: true,
+  });
+  assert.match(confirmed, /an Automation Engineer available who fits it/);
+  // Any caveat about availability is a no; other caveats are not about it.
+  assert.equal(reply.availabilityConfirmed(['availability never confirmed']), false);
+  assert.equal(reply.availabilityConfirmed(['came off a CV, nobody has vouched for them yet']), true);
+  assert.doesNotMatch(read('src/lib/data/lead-match.ts'), /available who fits it`/);
+});
+
+test('changing the person rewrites every sentence that names them', () => {
+  const draft = [
+    'Hi Henry,',
+    '',
+    'On the Siemens Automation Engineer in UK/Ireland — we have an Automation Engineer on our books who fits it — I am confirming their availability now.',
+    '',
+    'Relevant background: Commissioning of Automation Systems, TIA Portal.',
+    '',
+    'Happy to send an anonymised profile today if useful.',
+  ].join('\n');
+  const toMatej = reply.redraftForPerson(
+    draft,
+    { role: 'Senior Electrical Automation Engineer', why: 'Siemens S7, TIA Portal, Wonderware InTouch', caveats: ['availability never confirmed'] },
+    { roleTitle: 'Siemens Automation Engineer', country: 'UK/Ireland' },
+  );
+  assert.match(toMatej, /we have a Senior Electrical Automation Engineer on our books who fits it/);
+  assert.match(toMatej, /Relevant background: Siemens S7, TIA Portal, Wonderware InTouch\./);
+  assert.doesNotMatch(toMatej, /Commissioning of Automation Systems/);
+  // With nothing known about the new person's background, the old person's goes — not stays.
+  const noWhy = reply.redraftForPerson(draft, { role: 'Electrician', why: '', caveats: [] }, { roleTitle: 'Siemens Automation Engineer', country: null });
+  assert.doesNotMatch(noWhy, /Relevant background/);
+  assert.doesNotMatch(noWhy, /\n{3,}/);
+  assert.match(noWhy, /we have an Electrician available who fits it/);
+  // The card applies it for every decided person, including one only Hanna named.
+  assert.match(todayScreen, /redraftForPerson\(action\.script \?\? "", offer,/);
+  assert.match(todayScreen, /pack && pack\.workerId === decidedId/);
+});
+
+test('no machinery in what a person reads: id labels go with their ids', () => {
+  const clean = decisionHelpers.humaniseReport(HANNA_ON_HENRY);
+  assert.doesNotMatch(clean, /workerId|leadId/);
+  assert.doesNotMatch(clean, /[0-9a-f]{8}-[0-9a-f]{4}-/);
+  assert.doesNotMatch(clean, /\(\s*;/);
+  assert.match(clean, /We propose M\. P\. \(Triangle ref TS-174EF973 \/ CV #244\) as the anonymised bio/);
+  // Oliver's card, the same day: a field name and its value in brackets.
+  assert.equal(
+    decisionHelpers.humaniseReport('Who / form: propose M.P. only as anonymised bio (pack_intent bio_anonymised) — initials only.'),
+    'Who / form: propose M.P. only as anonymised bio — initials only.',
+  );
+  // Ordinary words in brackets stay.
+  assert.equal(decisionHelpers.humaniseReport('Erection (not troubleshooting) leases at 30–45 €/h.'), 'Erection (not troubleshooting) leases at 30–45 €/h.');
+});
+
+test('each employee gets one line on the card; the rest is one click away', () => {
+  const line = decisionHelpers.firstLine(HANNA_ON_HENRY);
+  assert.ok(line.length <= 171, `${line.length} characters`);
+  assert.match(line, /^Switching back to M\. P\. as asked/);
+  assert.doesNotMatch(line, /We propose M\. P\./);
+  const decision = read('src/components/modules/case-decision.tsx');
+  assert.match(decision, /const line = firstLine\(text\)/);
+  assert.match(decision, /Read all/);
+});
+
+// ── 29 September: Today is a short list, each thing one line ────────────────
+
+test('every Needs you item is one line until a person opens it', () => {
+  const missions = read('src/components/modules/today-missions.tsx');
+  const fold = read('src/components/modules/today-fold.tsx');
+  // The hero, each person's follow-ups, the calls, and what came back.
+  assert.match(todayScreen, /<TodayFold key=\{cardKey\} \{\.\.\.nowSummary\(move, putForward\)\}>/);
+  assert.match(missions, /<TodayFold key=\{group\[0\]\.actionId\} \{\.\.\.followUpSummary\(group\)\}>/);
+  assert.match(missions, /<TodayFold \{\.\.\.callsSummary\(reachable\)\}>/);
+  assert.match(todayScreen, /came back since you looked/);
+  // Folded by default; the full card unchanged underneath.
+  assert.match(fold, /const \[open, setOpen\] = useState\(defaultOpen\)/);
+  assert.match(fold, /defaultOpen = false/);
+  // A stopped mission's reason is one line; the mission page has the rest.
+  assert.match(missions, /block truncate text-\[13px\] leading-snug/);
+});
+
+test('"Back to the draft" returns to the corrected draft, and an attached profile is said to be attached', () => {
+  assert.match(todayScreen, /original=\{autoWords\}/);
+  assert.match(todayScreen, /draft: autoWords/);
+  const attached = reply.redraftForPerson(
+    'Hi Henry,\n\nHappy to send an anonymised profile today if useful, and we can talk rates once you have seen it.',
+    { role: 'Electrician', why: '', caveats: [] },
+    { roleTitle: 'Role', country: null, attaching: 'bio' },
+  );
+  assert.match(attached, /The anonymised profile is attached — initials only\./);
+  assert.doesNotMatch(attached, /Happy to send an anonymised profile/);
+  // The grey line under the headline no longer names a candidate.
+  assert.doesNotMatch(read('src/lib/data/next-move.ts'), /fits it: \$\{who\.why\}/);
+});
+
 test('the law this implements is written where coding agents read it', () => {
   assert.match(rules, /Employees, not buttons/);
   assert.match(rules, /more primary buttons than it removes/);

@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { canWorkIn } from "@/lib/data/work-authorisation";
 import { isInternalMailbox } from "@/lib/job-intake/contact-email";
+import { availabilityConfirmed, offerSentence } from "@/lib/data/lead-reply";
 
 // ---------------------------------------------------------------------------
 // The warm demand nobody was looking at.
@@ -325,18 +326,23 @@ export async function matchOpenLeads(
  * not an opening line — and no name, because releasing a candidate's identity
  * before there is an engagement is how a recruiter goes direct.
  */
+// The sentence naming who we have is shared with the Today card
+// (`lead-reply.ts`), so the card can rebuild it for another person without
+// the two copies drifting. It said "available" whatever the record held,
+// while the card beside it said "availability never confirmed".
 export function draftLeadReply(match: LeadMatch, senderName: string): string {
   const c = match.candidates[0];
-  const who = c?.role ?? "an engineer";
   const first = match.contactName?.split(/\s+/)[0] ?? "there";
-  const role = match.roleTitle ?? "the role";
 
   return [
     `Hi ${first},`,
     "",
-    `On the ${role}${match.country ? ` in ${match.country}` : ""} — we have ${
-      /^[aeiou]/i.test(who) ? "an" : "a"
-    } ${who} available who fits it.`,
+    offerSentence({
+      role: c?.role ?? null,
+      roleTitle: match.roleTitle,
+      country: match.country,
+      availabilityConfirmed: availabilityConfirmed(c?.caveats),
+    }),
     "",
     c?.why ? `Relevant background: ${c.why}.` : "",
     "",

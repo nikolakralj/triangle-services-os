@@ -41,6 +41,7 @@ import {
   type InProgressWait,
 } from "@/lib/data/today-handoff";
 import { CaseDecision } from "@/components/modules/case-decision";
+import { TodayFold } from "@/components/modules/today-fold";
 import { reportOpening } from "@/lib/data/case-decision";
 import type { PutForwardCase } from "@/lib/data/put-forward";
 import { useTodayHandoff } from "@/components/modules/today-handoff-context";
@@ -145,7 +146,9 @@ export function ReadyForYou({
                     {m.title}
                   </span>
                   <span
-                    className={`mt-0.5 block text-[13px] leading-snug ${
+                    // One line on Today, like everything else on it; the
+                    // mission page carries the whole reason.
+                    className={`mt-0.5 block truncate text-[13px] leading-snug ${
                       m.state === "needs_you" ? "text-amber-900" : "text-rose-700"
                     }`}
                   >
@@ -166,28 +169,29 @@ export function ReadyForYou({
           than someone who never has. Follow-ups are Bob's to chase; this list
           is the exception rail, not a place to report Sent-a-follow-up. */}
       {due.length > 0 && (
-        <div>
-          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {groupByPerson(due).map((group) =>
-              group.length === 1 ? (
-                <FollowUpRow
-                  key={group[0].actionId}
-                  item={group[0]}
-                  onRecorded={setRecorded}
-                  waits={chase}
-                  putForward={putForward}
-                />
-              ) : (
-                <FollowUpGroup
-                  key={group[0].actionId}
-                  items={group}
-                  onRecorded={setRecorded}
-                  waits={chase}
-                  putForward={putForward}
-                />
-              ),
-            )}
-          </ul>
+        <div className="space-y-2">
+          {/* One line per person; the whole follow-up only when opened. */}
+          {groupByPerson(due).map((group) => (
+            <TodayFold key={group[0].actionId} {...followUpSummary(group)}>
+              <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                {group.length === 1 ? (
+                  <FollowUpRow
+                    item={group[0]}
+                    onRecorded={setRecorded}
+                    waits={chase}
+                    putForward={putForward}
+                  />
+                ) : (
+                  <FollowUpGroup
+                    items={group}
+                    onRecorded={setRecorded}
+                    waits={chase}
+                    putForward={putForward}
+                  />
+                )}
+              </ul>
+            </TodayFold>
+          ))}
           {moreFollowUps > 0 && (
             <p className="mt-1.5 px-1 text-[11.5px] text-slate-500">
               {moreFollowUps} more {moreFollowUps === 1 ? "follow-up is" : "follow-ups are"} due —
@@ -198,14 +202,57 @@ export function ReadyForYou({
       )}
 
       {reachable.length > 0 && (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          {reachable.map((p) => (
-            <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={chase} />
-          ))}
-        </ul>
+        // Every call in one line: who, and how many. The scripts open under it.
+        <TodayFold {...callsSummary(reachable)}>
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            {reachable.map((p) => (
+              <ReadyPerson key={p.contactId} person={p} onRecorded={setRecorded} waits={chase} />
+            ))}
+          </ul>
+        </TodayFold>
       )}
     </div>
   );
+}
+
+/** One person's follow-ups as one line: who, how many, how late. */
+function followUpSummary(group: FollowUp[]): {
+  title: string;
+  line: string;
+  alert: string | null;
+  action: string;
+} {
+  const first = group[0];
+  const title = [first.who, first.company].filter(Boolean).join(" · ");
+  const line =
+    group.length > 1
+      ? `${group.length} roles to follow up.`
+      : `Follow up${first.about ? ` about ${first.about}` : ""}.`;
+  const late = Math.max(...group.map((item) => item.daysOverdue));
+  return {
+    title,
+    line,
+    alert: late > 0 ? `${late} ${late === 1 ? "day" : "days"} overdue` : null,
+    action: "Review",
+  };
+}
+
+/** Every call waiting, as one line. */
+function callsSummary(people: ReadyToContact[]): {
+  title: string;
+  line: string;
+  alert: string | null;
+  action: string;
+} {
+  const names = people.map((p) => p.name).filter(Boolean);
+  const shown = names.slice(0, 2).join(", ");
+  const more = names.length - Math.min(names.length, 2);
+  return {
+    title: `${people.length} ${people.length === 1 ? "call" : "calls"} to make`,
+    line: more > 0 ? `${shown} and ${more} more — the words are ready.` : `${shown} — the words are ready.`,
+    alert: null,
+    action: "Start",
+  };
 }
 
 const FOLLOW_UP_LABEL: Partial<Record<ContactOutcome, string>> = {

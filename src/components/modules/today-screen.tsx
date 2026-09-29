@@ -37,6 +37,7 @@ import {
 } from "@/components/modules/send-from-triangle";
 import { TodayHandoffProvider } from "@/components/modules/today-handoff-context";
 import {
+  chaseDone,
   chaseWaits,
   findDone,
   findWait,
@@ -44,8 +45,10 @@ import {
   type CaseRef,
   type InProgressWait,
 } from "@/lib/data/today-handoff";
+import { redraftForPerson } from "@/lib/data/lead-reply";
 import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
+import { TodayFold } from "@/components/modules/today-fold";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -142,6 +145,7 @@ export function TodayScreen({
   // the same case and has its own block on the card; counting it here would
   // read as "somebody else is handling this" and take the card off Needs you.
   const chase = chaseWaits(waits);
+  const chaseFinished = chaseDone(done);
   const nowIds = nowAction
     ? { leadId: nowAction.leadId, contactId: nowAction.contactId }
     : null;
@@ -202,17 +206,18 @@ export function TodayScreen({
               onClear={() => setLogged(null)}
             />
           )}
-          {nowShowCard ? (
-            <NowCard
-              key={cardKey}
-              move={move}
-              onLogged={setLogged}
-              waits={chase}
-              done={done}
-              sender={sender}
-              senders={senders}
-              putForward={putForward}
-            />
+          {nowShowCard && move.action ? (
+            <TodayFold key={cardKey} {...nowSummary(move, putForward)}>
+              <NowCard
+                move={move}
+                onLogged={setLogged}
+                waits={chase}
+                done={chaseFinished}
+                sender={sender}
+                senders={senders}
+                putForward={putForward}
+              />
+            </TodayFold>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 text-center">
               <p className="text-base font-semibold text-slate-900">{move.headline}</p>
@@ -256,6 +261,12 @@ export function TodayScreen({
         }
         id="today-done"
       >
+        {finishedMissions.length + done.length + cameBackCount > 0 && (
+        <TodayFold
+          title={`${finishedMissions.length + done.length} came back since you looked`}
+          line="What the team finished. Nothing here needs you unless you open it."
+          action="Show"
+        >
         <DoneSince missions={finishedMissions} done={done}>
           {/* Reports filed before missions existed. They can still carry a
               decision, so they stay reachable — folded under what came back,
@@ -281,6 +292,8 @@ export function TodayScreen({
             </details>
           )}
         </DoneSince>
+        </TodayFold>
+        )}
       </Zone>
     </div>
     </TodayHandoffProvider>
@@ -476,6 +489,41 @@ function Zone({
 
 // ── 01 · NOW ────────────────────────────────────────────────────────────────
 
+/**
+ * The first thing on Today, in one line: who, what the team has ready, and
+ * the one fact nobody has confirmed. The whole card opens under it.
+ */
+function nowSummary(
+  move: NextMove,
+  putForward: PutForwardCase[],
+): { title: string; line: string; alert: string | null; action: string } {
+  const a = move.action;
+  if (!a) return { title: move.headline, line: move.because, alert: null, action: "Open" };
+  const title = [a.personName, a.company].filter(Boolean).join(" · ") || move.headline;
+  const about = [a.personRole, a.country ? `in ${a.country}` : null].filter(Boolean).join(" ") || "the role";
+  const pf = putForward
+    .filter((item) => matchesIds(item, { leadId: a.leadId, contactId: a.contactId }))
+    .sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0];
+  const who = pf?.pack?.displayName ?? null;
+  const form = pf?.intent === "full_cv" ? "with the full CV" : "as an anonymised bio";
+  const approved = pf ? mayAttachPack(pf.approval) : false;
+  const line =
+    a.channelKind === "phone"
+      ? `Call about ${about} — the words are ready.`
+      : who
+        ? `Reply ready about ${about}: we propose ${who} ${form}${approved ? " — profile approved" : ""}.`
+        : `Reply ready about ${about}.`;
+  const availabilityOpen =
+    (pf?.pack?.availability ? /not confirmed|never|unknown/i.test(pf.pack.availability) : false) ||
+    (a.offering?.caveats ?? []).some((c) => /availab/i.test(c));
+  return {
+    title,
+    line,
+    alert: availabilityOpen ? "Availability not confirmed yet" : null,
+    action: a.channelKind === "phone" ? "Call" : "Review",
+  };
+}
+
 function NowCard({
   move,
   onLogged,
@@ -578,14 +626,41 @@ function ActionPanel({
   // Who the reply is about is the team's decision: Hanna's person when she has
   // the case, otherwise Triangle's own top match. Changing it is words in Ask.
   const decidedId = hannaCase?.pack?.workerId ?? action.offering?.workerId ?? "";
+  const pack = hannaCase?.pack ?? null;
   const decidedOffer: OfferWorker | null =
     candidates.find((c) => c.workerId === decidedId) ??
     (action.offering?.workerId === decidedId ? action.offering : null) ??
-    null;
+    // Hanna may put forward somebody the first match did not name. The draft
+    // still has to be about that person, not about the first match.
+    (pack && pack.workerId === decidedId
+      ? {
+          workerId: pack.workerId,
+          name: pack.workerName,
+          role: pack.role,
+          why: "",
+          caveats: /confirmed/i.test(pack.availability) && !/not confirmed|never|unknown/i.test(pack.availability)
+            ? []
+            : ["availability never confirmed"],
+        }
+      : null);
   const pick = decidedOffer ?? (hannaCase ? null : (action.offering ?? null));
+  // Both sentences that name the person follow the decision — their role,
+  // availability only if confirmed, and their background or none at all.
+  // An approved document goes with the reply, so the reply says it is
+  // attached rather than offering to send it later.
+  const attaching: "bio" | "cv" | null =
+    pack && hannaCase && mayAttachPack(hannaCase.approval)
+      ? hannaCase.intent === "full_cv"
+        ? "cv"
+        : "bio"
+      : null;
   const draftFor = (offer: OfferWorker | null) =>
-    offer && offer.workerId !== action.offering?.workerId
-      ? rewriteBackground(action.script ?? "", offer.why)
+    offer
+      ? redraftForPerson(action.script ?? "", offer, {
+          roleTitle: action.personRole,
+          country: action.country ?? null,
+          attaching,
+        })
       : (action.script ?? "");
 
   // A written message can be changed before it goes; what is in the box is
@@ -593,9 +668,10 @@ function ActionPanel({
   const [words, setWords] = useState(() => draftFor(decidedOffer));
   const [autoWords, setAutoWords] = useState(() => draftFor(decidedOffer));
   // When the team's decision changes under an untouched draft, the draft follows.
-  const [wordsFor, setWordsFor] = useState(decidedId);
-  if (wordsFor !== decidedId) {
-    setWordsFor(decidedId);
+  const draftKey = `${decidedId}|${attaching ?? ""}`;
+  const [wordsFor, setWordsFor] = useState(draftKey);
+  if (wordsFor !== draftKey) {
+    setWordsFor(draftKey);
     if (words === autoWords) {
       const next = draftFor(decidedOffer);
       setWords(next);
@@ -610,7 +686,8 @@ function ActionPanel({
     to: action.value,
     subject: action.subject,
     body: outgoing,
-    draft: action.script,
+    // What Triangle wrote is the corrected draft, not the first match's.
+    draft: autoWords,
     who: action.personName,
     leadId: action.leadId,
     contactId: action.contactId || undefined,
@@ -786,7 +863,9 @@ function ActionPanel({
           ) : (
             <EditableWords
               value={words}
-              original={action.script}
+              // "Back to the draft" returns to the corrected draft — never to
+              // the first match's role or an availability nobody confirmed.
+              original={autoWords}
               onChange={setWords}
               tone="dark"
               label="The reply to send"
@@ -887,15 +966,6 @@ function attachablePackFrom(items: PutForwardCase[]): AttachablePack | null {
     agentName: chosen.agentName,
     approvedAt: chosen.approvedAt,
   };
-}
-
-function rewriteBackground(script: string, why: string): string {
-  if (!why.trim()) return script;
-  const line = `Relevant background: ${why}.`;
-  if (/Relevant background:.*?(?=\n|$)/.test(script)) {
-    return script.replace(/Relevant background:.*?(?=\n|$)/, line);
-  }
-  return script;
 }
 
 // ── 04 · BACK FROM THE TEAM ─────────────────────────────────────────────────

@@ -170,7 +170,6 @@ export async function getNextMove(
     const best = leadMatches[0];
     const who = best.candidates[0];
     const others = leadMatches.length - 1;
-    const people = best.candidates.length;
     return {
       // The country is in the headline because one person sends one title for
       // different countries. Without it, answering "PLC Commissioning
@@ -186,12 +185,9 @@ export async function getNextMove(
         best.copies > 1
           ? `They sent this role ${best.copies} times — one reply covers every copy.`
           : null,
-        `${who.name} fits it: ${who.why}.`,
-        // The team proposes; the person judges. Nobody is asked to pick from
-        // a list ("Employees, not buttons", 18 September).
-        people > 1
-          ? `${people - 1} more on the books ${people - 1 === 1 ? "fits" : "fit"} it too.`
-          : null,
+        // Who we put forward is the team's decision, on the card itself. Naming
+        // the first match here contradicted it whenever the team chose somebody
+        // else (29 September).
         others > 0
           ? `${others} more open ${others === 1 ? "role" : "roles"} behind this one.`
           : null,

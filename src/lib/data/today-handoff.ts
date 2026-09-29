@@ -58,6 +58,19 @@ export function chaseWaits(waits: InProgressWait[]): InProgressWait[] {
   return waits.filter((wait) => wait.caseType !== PUT_FORWARD_CASE_TYPE);
 }
 
+/**
+ * The finished work that belongs to the chase on a case — the same split as
+ * `chaseWaits`, for work that is done rather than open.
+ *
+ * Without it, Hanna's finished who-we-put-forward job reached the card twice:
+ * once as the team's decision and again as "what came back on the chase", the
+ * same report in two places, so a person could not tell whether she had
+ * answered once or twice.
+ */
+export function chaseDone<T extends { caseType?: string | null }>(done: T[]): T[] {
+  return done.filter((item) => item.caseType !== PUT_FORWARD_CASE_TYPE);
+}
+
 export function withLabelFor(roleKey: string, displayName: string): string {
   const name = displayName.trim();
   const lower = name.toLowerCase();
