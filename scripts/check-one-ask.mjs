@@ -364,6 +364,37 @@ test('each employee gets one line on the card; the rest is one click away', () =
   assert.match(decision, /Read all/);
 });
 
+// ── 29 September: Today is a short list, each thing one line ────────────────
+
+test('every Needs you item is one line until a person opens it', () => {
+  const missions = read('src/components/modules/today-missions.tsx');
+  const fold = read('src/components/modules/today-fold.tsx');
+  // The hero, each person's follow-ups, the calls, and what came back.
+  assert.match(todayScreen, /<TodayFold key=\{cardKey\} \{\.\.\.nowSummary\(move, putForward\)\}>/);
+  assert.match(missions, /<TodayFold key=\{group\[0\]\.actionId\} \{\.\.\.followUpSummary\(group\)\}>/);
+  assert.match(missions, /<TodayFold \{\.\.\.callsSummary\(reachable\)\}>/);
+  assert.match(todayScreen, /came back since you looked/);
+  // Folded by default; the full card unchanged underneath.
+  assert.match(fold, /const \[open, setOpen\] = useState\(defaultOpen\)/);
+  assert.match(fold, /defaultOpen = false/);
+  // A stopped mission's reason is one line; the mission page has the rest.
+  assert.match(missions, /block truncate text-\[13px\] leading-snug/);
+});
+
+test('"Back to the draft" returns to the corrected draft, and an attached profile is said to be attached', () => {
+  assert.match(todayScreen, /original=\{autoWords\}/);
+  assert.match(todayScreen, /draft: autoWords/);
+  const attached = reply.redraftForPerson(
+    'Hi Henry,\n\nHappy to send an anonymised profile today if useful, and we can talk rates once you have seen it.',
+    { role: 'Electrician', why: '', caveats: [] },
+    { roleTitle: 'Role', country: null, attaching: 'bio' },
+  );
+  assert.match(attached, /The anonymised profile is attached — initials only\./);
+  assert.doesNotMatch(attached, /Happy to send an anonymised profile/);
+  // The grey line under the headline no longer names a candidate.
+  assert.doesNotMatch(read('src/lib/data/next-move.ts'), /fits it: \$\{who\.why\}/);
+});
+
 test('the law this implements is written where coding agents read it', () => {
   assert.match(rules, /Employees, not buttons/);
   assert.match(rules, /more primary buttons than it removes/);

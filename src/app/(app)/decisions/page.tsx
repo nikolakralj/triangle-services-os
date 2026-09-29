@@ -90,7 +90,7 @@ export default async function DecisionsPage() {
     <div className="space-y-5">
       <PageHeader
         title="Today"
-        description="What needs you, what the team is working on, and what came back. Handoff changes the owner — the case stays here."
+        description="What needs you, what the team is doing, and what came back."
       />
       {/* The refusal ledger used to open this page. A refused record is a
           check working, not a decision for the CEO, so it lives under

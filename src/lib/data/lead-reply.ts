@@ -35,6 +35,7 @@ export function offerSentence(params: {
 
 const OFFER_LINE = /^On the .* — we have .*$/m;
 const BACKGROUND_LINE = /^Relevant background:.*$/m;
+const PROFILE_OFFER = /^Happy to send an anonymised profile.*$/m;
 
 /**
  * The draft, rewritten for the person the team decided to put forward.
@@ -47,7 +48,12 @@ const BACKGROUND_LINE = /^Relevant background:.*$/m;
 export function redraftForPerson(
   script: string,
   person: { role: string | null; why: string; caveats: string[] },
-  context: { roleTitle: string | null; country: string | null },
+  context: {
+    roleTitle: string | null;
+    country: string | null;
+    /** An approved document goes with this reply: say so instead of offering it. */
+    attaching?: "bio" | "cv" | null;
+  },
 ): string {
   let out = script;
   if (OFFER_LINE.test(out)) {
@@ -65,6 +71,14 @@ export function redraftForPerson(
     out = person.why.trim()
       ? out.replace(BACKGROUND_LINE, `Relevant background: ${person.why.trim()}.`)
       : out.replace(BACKGROUND_LINE, "");
+  }
+  if (context.attaching && PROFILE_OFFER.test(out)) {
+    out = out.replace(
+      PROFILE_OFFER,
+      context.attaching === "cv"
+        ? "Their CV is attached. We can talk rates once you have seen it."
+        : "The anonymised profile is attached — initials only. We can talk rates once you have seen it.",
+    );
   }
   // Removing a line must not leave a double gap in a letter.
   return out.replace(/\n{3,}/g, "\n\n");

@@ -850,10 +850,25 @@ branch `claude/card-defects`, not merged:**
    not mistake the initials "M. P." for the end of a sentence); the rest
    is behind Read all.
 
-Still open on Today, and the next piece of work: the page is a long scroll
-of full cards. Codex's review (29 September) asks for a short queue — each
-case one line with what is prepared and what is blocking — that opens into
-the review. Not started.
+**Today as a short list — done on the same branch, 29 September.** Every
+Needs you item is one line until a person opens it (`TodayFold`): who,
+what is ready, the one fact not confirmed, and one button. The hero reads
+"Henry Hammond · g2 recruitment — Reply ready …: we propose M. P. as an
+anonymised bio — profile approved · Availability not confirmed yet";
+each person's follow-ups are one line with how late they are; the six
+call cards are one line ("6 calls to make"); what came back is one line.
+The full card is unchanged underneath. On the live data the page went
+from roughly 5,000 px to 985 px. Also fixed: "Back to the draft" returned
+to the uncorrected draft; the reply offered a profile that was already
+attached; the grey line under the headline named a candidate the team had
+not proposed.
+
+**Next: every client requirement becomes one case, automatically.** An
+email asking for people (Ralph's six commissioning roles in Cologne)
+becomes one recruiting case with its roles as rows; Hanna starts sourcing
+per role and Bob drafts the acknowledgement without a click; replies land
+on the same case; Today shows it as one line. Ralph's email is not in
+Triangle today — which mailbox it reached is the first question.
 
 
 **Why now (18 September):** "Employees, not buttons" (`DECISIONS.md`). The
