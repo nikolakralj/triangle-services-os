@@ -50,8 +50,49 @@ Law:
 6. **The measure is the CEO's minutes.** A change that does not reduce what a
    person reads, types or clicks is not in this plan.
 
-The queue is `ROADMAP_EXECUTION.md` — "The plan", P0 to P6. Nothing outside it
-is built until P4 holds on real cases.
+The queue is `ROADMAP_EXECUTION.md` — "The plan", P0 to P6, and active
+searching once P4 holds. Nothing outside P0–P4 is built until P4 holds on
+real cases.
+
+### 2026-09-29: Active searching — when someone is on the bench, the team looks for work
+
+Locked by Nikola on 29 September. Triangle waits for agencies to email
+requests. The other half of the work is a person of ours with nothing to do.
+The example is Matej (M.P.), Senior Electrical Automation Engineer, currently
+on the bench: the team should be looking for freelance and contract work that
+fits him, and come back with a case he can be put forward for.
+
+Law:
+
+1. **A confirmed person without work starts the search.** When someone on our
+   books is available and has no current work, the team looks for freelance
+   and contract jobs that match that profile. A person does not press Search.
+   Only a human-confirmed available person counts, inside the 14-day window.
+   An unconfirmed record is not supply.
+2. **The search happens outside Triangle.** LinkedIn, and any other board
+   where the work fits, stays the employee's own tool — their computer, their
+   browser. Triangle is not a LinkedIn client and not an ATS. The employee
+   records what it found, with the source link, on the case. Work that exists
+   only in a chat is work the company does not have.
+3. **What comes back is a case on Today, already decided.** Scout searches
+   and files the opportunities he would actually pursue. Hanna matches them
+   to the profile and chooses the form — an anonymised bio, initials only,
+   unless a person releases the name. Bob drafts the application or the
+   put-forward. The owner sees one line per opportunity, with the reason,
+   and approves or says no in words. Nothing is sent without the person.
+4. **It waits until the case exists.** This reuses P2 (one opportunity, one
+   case), P3 (work outside Triangle is recorded) and P4 (Today is one line,
+   the case is where a person approves). It is gated until P4 holds on three
+   real requirements. It does not wait on trust grants (P5) or a second
+   agency (P6), and it adds no new employee.
+
+Done when a bench person marked available — Matej is the proof — produces at
+least three matching freelance or contract opportunities on Today within a
+day, each with a drafted anonymised put-forward, and nothing sent.
+
+Amends "The plan" (same date) by adding the supply-first trigger beside the
+inbound email. The freeze stands: nothing outside P0–P4 is built until P4
+holds, and LinkedIn is not built inside Triangle.
 
 ### 2026-09-29: The workspace is the answer — the employee picks its shape, Triangle draws it
 
