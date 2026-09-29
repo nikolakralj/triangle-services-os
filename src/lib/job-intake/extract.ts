@@ -6,6 +6,11 @@ import {
   resolveRecruiterContact,
 } from "./contact-email";
 import type { OrganizationOperatingProfile } from "@/lib/data/organization-profile";
+import {
+  normaliseOpenQuestions,
+  normaliseRequirementRoles,
+  type RequirementRoleRow,
+} from "@/lib/job-intake/requirement-case";
 
 // ---------------------------------------------------------------------------
 // Classify an inbound email, and where it is a real agency opportunity,
@@ -55,6 +60,10 @@ export interface ExtractedLead {
   teamRationale: string;
   requestedDocuments: string[];
   missingFields: string[];
+  /** One row per role. A single-role email has one. Empty when the model gave none. */
+  roles: RequirementRoleRow[];
+  /** Facts only the client can answer. */
+  openQuestions: string[];
 }
 
 export interface ExtractionResult {
@@ -130,8 +139,14 @@ Rules:
 - contactEmail: the recruiter or hiring person's address, the one a reply should go to. On a forwarded message that is the original From:/Von:/mailto address in the body, NOT the envelope sender and NOT the mailbox this was forwarded into. Never use an address at the receiving mailbox's own domain.
 - contactName: that same person. On a forward, the original sender's name.
 
+When classification is job_opportunity, also fill lead.roles: one object per role, not per person. "3 Basic and 2 Advanced" is two rows, with count 3 and count 2. A single named role is one row.
+Each role: {"title","count","level","skills","start","duration","location","languages","rate"}.
+count is an integer taken from the email. skills are the tools and platforms named for that role.
+lead.openQuestions: short phrases for facts only the client can answer. Empty when nothing is missing.
+If you are not sure this is a request for people, do not use job_opportunity.
+
 Reply with JSON only, matching this shape:
-{"classification":"...","confidence":0-100,"reason":"short","lead":null or {"agencyName":...,"contactName":...,"contactEmail":...,"clientCompany":...,"roleTitle":...,"country":...,"city":...,"sector":...,"technologies":[],"durationMonths":null,"startDateText":...,"rateText":...,"headcountText":...,"workMode":...,"teamPotential":0,"teamRationale":"...","requestedDocuments":[],"missingFields":[]}}`;
+{"classification":"...","confidence":0-100,"reason":"short","lead":null or {"agencyName":...,"contactName":...,"contactEmail":...,"clientCompany":...,"roleTitle":...,"country":...,"city":...,"sector":...,"technologies":[],"durationMonths":null,"startDateText":...,"rateText":...,"headcountText":...,"workMode":...,"teamPotential":0,"teamRationale":"...","requestedDocuments":[],"missingFields":[],"roles":[],"openQuestions":[]}}`;
 }
 
 /**
@@ -217,7 +232,7 @@ export async function classifyAndExtract(params: {
       ],
       temperature: 0,
       response_format: { type: "json_object" },
-      max_tokens: 900,
+      max_tokens: 1600,
     }),
   });
 
@@ -250,7 +265,7 @@ export async function classifyAndExtract(params: {
     reason: String(parsed.reason ?? ""),
     lead:
       classification === "job_opportunity"
-        ? normaliseLead(parsed.lead, {
+        ? normaliseLead(leadWithRoles(parsed), {
             senderName: params.senderName,
             senderEmail: params.senderEmail,
             recipientEmail: params.recipientEmail ?? null,
@@ -269,6 +284,18 @@ const VALID: EmailClassification[] = [
   "job_opportunity", "job_board", "newsletter",
   "finance", "application_receipt", "personal", "other",
 ];
+
+/** Roles sometimes come back beside the lead object. Keep them with the lead. */
+function leadWithRoles(parsed: Record<string, unknown>): unknown {
+  const lead = parsed.lead;
+  if (!lead || typeof lead !== "object") return lead;
+  const row = { ...(lead as Record<string, unknown>) };
+  if (row.roles == null && parsed.roles != null) row.roles = parsed.roles;
+  if (row.openQuestions == null && parsed.openQuestions != null) {
+    row.openQuestions = parsed.openQuestions;
+  }
+  return row;
+}
 
 function normaliseClassification(value: unknown): EmailClassification {
   const s = String(value ?? "").trim().toLowerCase();
@@ -352,6 +379,8 @@ function normaliseLead(
     missingFields: strArray(l.missingFields)
       .map((f) => f.toLowerCase())
       .filter((f) => VALID_MISSING.includes(f)),
+    roles: normaliseRequirementRoles(l.roles),
+    openQuestions: normaliseOpenQuestions(l.openQuestions),
   };
 }
 

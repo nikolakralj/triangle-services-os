@@ -50,6 +50,8 @@ export interface IngestSummary {
   opportunities: number;
   noiseDiscarded: number;
   leadsCreated: number;
+  /** Recruiting cases opened from a multi-role people request. */
+  casesOpened: number;
   /** True when older mail remains after this run. New mail is still read. */
   catchingUp: boolean;
   errors: string[];
@@ -158,6 +160,7 @@ export async function ingestAccount(
     opportunities: 0,
     noiseDiscarded: 0,
     leadsCreated: 0,
+    casesOpened: 0,
     catchingUp: false,
     errors: [],
   };
@@ -277,21 +280,22 @@ export async function ingestAccount(
         });
         if (leadId) {
           summary.leadsCreated += 1;
-          try {
-            const { recordClientReplyEvent } = await import("@/lib/data/event-outbox");
-            await recordClientReplyEvent({
-              orgId,
-              sourceType: "inbound_email",
-              sourceId: leadId,
-              recipientName: result.lead.contactName,
-              recipientEmail: result.lead.contactEmail,
-              recipientCompany: result.lead.clientCompany || result.lead.agencyName,
-              subject: msg.subject,
-              replySummary: result.reason,
-            });
-          } catch (err) {
-            console.error("ingestAccount: outbox dispatch failed:", err);
-          }
+          const { settlePeopleRequest } = await import("@/lib/data/requirement-case");
+          const follow = await settlePeopleRequest({
+            orgId,
+            leadId,
+            inboundEmailId: stored.id,
+            messageId: msg.providerMessageId,
+            threadId: msg.providerThreadId,
+            subject: msg.subject,
+            classification: result.classification,
+            confidence: result.confidence,
+            reason: result.reason,
+            recipientCompany: result.lead.clientCompany || result.lead.agencyName,
+            lead: result.lead,
+            bodyText: keepBody ? result.cleanedText || null : null,
+          });
+          summary.casesOpened += follow.casesOpened;
         }
       }
     } catch (err) {

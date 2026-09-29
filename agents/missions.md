@@ -17,7 +17,7 @@ instruction — it only tells you where to look.
 
 | event | means |
 | --- | --- |
-| `mission_step` | The CEO gave an instruction. |
+| `mission_step` | The CEO gave an instruction, or Triangle opened a people-request case and this is your one step on it. |
 | `mission_retry` | The CEO asked for a step to be tried again. |
 | `requested` | A colleague asked you for work. |
 | `request_returned` | Work you asked a colleague for came back. |

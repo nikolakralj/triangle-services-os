@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createAssignment } from "@/lib/data/workforce";
+import { loadRequirementRoles } from "@/lib/data/requirement-case";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { loadMissionPlan } from "@/lib/data/mission-plan";
 import { loadMissionDecisions } from "@/lib/data/mission-memory";
@@ -1166,7 +1167,7 @@ export async function getMissionWorkspace(
   if (error || !row) return null;
   const mission = row as MissionRow;
 
-  const [stepMap, holdings, tabs, lead, planRows, decisions] = await Promise.all([
+  const [stepMap, holdings, tabs, lead, planRows, decisions, requirement] = await Promise.all([
     loadSteps(svc, orgId, [missionId]),
     loadMissionHoldings(orgId, missionId),
     listMissionTabs(orgId),
@@ -1179,6 +1180,7 @@ export async function getMissionWorkspace(
       : Promise.resolve({ data: null }),
     loadMissionPlan(orgId, missionId),
     loadMissionDecisions(orgId, missionId),
+    loadRequirementRoles(orgId, missionId),
   ]);
   const steps = stepMap.get(missionId) ?? [];
   const stepIds = steps.map((s) => s.id);
@@ -1295,6 +1297,8 @@ export async function getMissionWorkspace(
     progress,
     decisions,
     context,
+    requirementRoles: requirement.roles,
+    requirementQuestions: requirement.openQuestions,
   };
 }
 

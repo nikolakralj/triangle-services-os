@@ -58,6 +58,7 @@ import { FinishLine } from "@/components/missions/finish-line";
 import { WorkspaceView } from "@/components/modules/workspace-view";
 import { latestWorkspaceOf } from "@/lib/data/mission-workspace";
 import { MissionDecisions } from "@/components/missions/mission-decisions";
+import { RequirementRoleTable } from "@/components/modules/requirement-role-table";
 
 // ---------------------------------------------------------------------------
 // A mission.
@@ -1267,6 +1268,12 @@ function RecruitingOverview({
 
   return (
     <div className="space-y-5">
+      {workspace.requirementRoles.length > 0 && (
+        <RequirementRoleTable
+          roles={workspace.requirementRoles}
+          openQuestions={workspace.requirementQuestions}
+        />
+      )}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="px-5 py-5">
           <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-slate-500">Brief</p>

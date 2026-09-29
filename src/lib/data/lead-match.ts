@@ -140,6 +140,10 @@ export async function matchOpenLeads(
   const workers = workersResult.data ?? [];
   if (leads.length === 0 || workers.length === 0) return [];
 
+  // A multi-role request is one case on Today. Its reply card would be a second line.
+  const { requirementLeadIds } = await import("@/lib/data/requirement-case");
+  const casedLeads = await requirementLeadIds(orgId);
+
   // Which requisitions have already been answered. A reply is an outreach
   // draft filed against the lead — asking twice is worse than not asking.
   const { data: answered } = await svc
@@ -188,6 +192,9 @@ export async function matchOpenLeads(
     });
     if (answeredGroups.has(group)) continue;
     if (isInternalMailbox(lead.contact_email as string | null)) continue;
+    const leadId = lead.id as string;
+    const duplicateOf = (lead.duplicate_of_id as string | null) ?? null;
+    if (casedLeads.has(leadId) || (duplicateOf !== null && casedLeads.has(duplicateOf))) continue;
     if (seenGroups.has(group)) {
       // Leads arrive newest first, so the card already built is the newest
       // copy; an older copy only adds to its count.

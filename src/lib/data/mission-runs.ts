@@ -1,6 +1,13 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
-import { parseActivity, type ActivityEvent, type ActivityKind } from "@/lib/data/mission-shared";
+import {
+  earliestOpenRun,
+  parseActivity,
+  type ActivityEvent,
+  type ActivityKind,
+} from "@/lib/data/mission-shared";
+
+export { earliestOpenRun };
 
 // ---------------------------------------------------------------------------
 // A mission step's run, and what the worker did during it.

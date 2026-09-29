@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
@@ -49,6 +50,8 @@ import { redraftForPerson } from "@/lib/data/lead-reply";
 import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
 import { TodayFold } from "@/components/modules/today-fold";
+import { RequirementRoleTable } from "@/components/modules/requirement-role-table";
+import type { RequirementCaseLine } from "@/lib/job-intake/requirement-case";
 
 // ---------------------------------------------------------------------------
 // One inbox. Needs you, then In progress, then Done since you looked.
@@ -114,6 +117,7 @@ export function TodayScreen({
   sender = null,
   senders = [],
   putForward = [],
+  requirementCases = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -136,6 +140,8 @@ export function TodayScreen({
   senders?: Array<{ id: string; emailAddress: string; displayName?: string | null }>;
   /** Open and recently finished "who we put forward" cases (Hanna's half). */
   putForward?: PutForwardCase[];
+  /** One line per people-request case. Role rows sit inside the line. */
+  requirementCases?: RequirementCaseLine[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
@@ -165,7 +171,13 @@ export function TodayScreen({
   const dueMore = Math.max(0, followUps.total - followUps.items.length);
 
   // The same filters Needs you applies, so the pulse counts what is shown.
-  const asking = missions.filter((m) => m.state === "needs_you" || m.state === "blocked");
+  const caseMissionIds = new Set(requirementCases.map((item) => item.missionId));
+  const needsCases = requirementCases.filter((item) => item.zone === "needs_you");
+  const workingCases = requirementCases.filter((item) => item.zone === "in_progress");
+  const asking = missions.filter(
+    (m) =>
+      (m.state === "needs_you" || m.state === "blocked") && !caseMissionIds.has(m.id),
+  );
   const dueOpen = due.filter(
     (f) =>
       !findWait(chase, {
@@ -179,6 +191,7 @@ export function TodayScreen({
   );
   const needsYou =
     (nowNeedsYou ? 1 : 0) +
+    needsCases.length +
     asking.length +
     dueOpen.length +
     (dueOpen.length > 0 ? dueMore : 0) +
@@ -225,10 +238,15 @@ export function TodayScreen({
             </div>
           )}
         </div>
+        {needsCases.length > 0 && (
+          <div className="mt-3">
+            <RequirementLines lines={needsCases} />
+          </div>
+        )}
         <div className="mt-3">
           <ReadyForYou
             people={ready}
-            missions={missions}
+            missions={missions.filter((m) => !caseMissionIds.has(m.id))}
             followUps={due}
             moreFollowUps={dueMore}
             waits={waits}
@@ -245,10 +263,17 @@ export function TodayScreen({
       <Zone
         n="02"
         name="In progress"
-        note={waits.length === 0 ? "nothing with the team" : "quiet — open a line if you want to"}
+        note={
+          waits.length === 0 && workingCases.length === 0
+            ? "nothing with the team"
+            : "quiet — open a line if you want to"
+        }
         id="today-in-progress"
       >
-        <InProgressByEmployee waits={waits} />
+        {workingCases.length > 0 && <RequirementLines lines={workingCases} />}
+        {(waits.length > 0 || workingCases.length === 0) && (
+          <InProgressByEmployee waits={waits} />
+        )}
       </Zone>
 
       <Zone
@@ -306,6 +331,26 @@ export function TodayScreen({
  * The missing piece behind "whatever I click, nothing happens". The write
  * always succeeded; nothing on the page ever said so.
  */
+function RequirementLines({ lines }: { lines: RequirementCaseLine[] }) {
+  return (
+    <div className="space-y-2">
+      {lines.map((item) => (
+        <TodayFold key={item.missionId} title={item.title} line={item.line} action="Open">
+          <div className="space-y-3">
+            <RequirementRoleTable roles={item.roles} openQuestions={item.openQuestions} />
+            <Link
+              href={`/missions/${item.missionId}`}
+              className="inline-flex text-[13px] font-medium text-sky-800 hover:underline"
+            >
+              Open the case
+            </Link>
+          </div>
+        </TodayFold>
+      ))}
+    </div>
+  );
+}
+
 function RecordedStrip({
   logged,
   onClear,

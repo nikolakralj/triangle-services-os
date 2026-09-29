@@ -218,6 +218,8 @@ export async function createAssignment(params: {
   runtime: MissionRuntime;
   wake: WakeResult | null;
   notice: string;
+  /** True when this key already had an assignment, so the caller must not wake again. */
+  alreadyExisted: boolean;
 } | null> {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
@@ -249,6 +251,7 @@ export async function createAssignment(params: {
         runtime,
         wake: null,
         notice: assignmentQueuedNotice(null),
+        alreadyExisted: true,
       };
     }
   }
@@ -273,6 +276,23 @@ export async function createAssignment(params: {
     })
     .select("id")
     .maybeSingle();
+  if (error?.code === "23505" && params.idempotencyKey) {
+    const { data: raced } = await svc
+      .from("agent_assignments")
+      .select("id")
+      .eq("org_id", params.orgId)
+      .eq("idempotency_key", params.idempotencyKey)
+      .maybeSingle();
+    if (raced) {
+      return {
+        id: raced.id as string,
+        runtime,
+        wake: null,
+        notice: assignmentQueuedNotice(null),
+        alreadyExisted: true,
+      };
+    }
+  }
   if (error || !data) return null;
 
   const entityRefs = [
@@ -315,6 +335,7 @@ export async function createAssignment(params: {
     runtime,
     wake,
     notice: assignmentQueuedNotice(wake),
+    alreadyExisted: false,
   };
 }
 

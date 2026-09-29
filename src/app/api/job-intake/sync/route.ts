@@ -90,6 +90,7 @@ export async function POST(request: Request) {
     (acc, s) => ({
       fetched: acc.fetched + s.fetched,
       leadsCreated: acc.leadsCreated + s.leadsCreated,
+      casesOpened: acc.casesOpened + s.casesOpened,
       noiseDiscarded: acc.noiseDiscarded + s.noiseDiscarded,
       alreadySeen: acc.alreadySeen + s.alreadySeen,
       errors: acc.errors + s.errors.length,
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     {
       fetched: 0,
       leadsCreated: 0,
+      casesOpened: 0,
       noiseDiscarded: 0,
       alreadySeen: 0,
       errors: 0,
