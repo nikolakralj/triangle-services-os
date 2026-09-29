@@ -166,10 +166,28 @@ candidates already on our books" — enforced on the server.
 
 The blueprint for another staffing firm, onboarding and billing. Not before.
 
+### Later — not scheduled
+
+Recorded so it is not lost. Not in the queue, and not built during P0–P6.
+
+#### Inline view of the agent's computer · `FUTURE`
+
+Hanna, Bob and Scout already work on their own Grok virtual computer, with a
+browser, for LinkedIn and the other sites they use. The goal is to show that
+computer on the case it belongs to, so the owner can watch the live session
+or step in without leaving Triangle.
+
+This is a view of the employee's own computer. LinkedIn stays there. Triangle
+does not rebuild it.
+
+It depends on the Grok computer offering an embeddable view, which still
+needs investigating. No date until that exists.
+
 ### Rules for every coding agent
 
-1. This section is the queue. Take the first `READY` item, write your name and
-   branch next to it before editing, and do nothing outside it.
+1. This section is the queue, except **Later**, which is not scheduled. Take
+   the first `READY` item, write your name and branch next to it before
+   editing, and do nothing outside it.
 2. One item, one branch from the current `main`, one pull request. No stacked
    branches. Merged or closed within 48 hours.
 3. An item is done only after a signed-in check of the real flow on the
