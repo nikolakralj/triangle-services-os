@@ -1,5 +1,15 @@
 # Current state
 
+## P1 mail sync — in progress, 29 September 2026
+
+Not done. Branch `cursor/mail-sync-minutes-75af`. Triangle's own mail check
+was a POST-only route called by Vercel with GET, so it recorded nothing;
+Hobby still cannot cron it more than once a day, so a repository schedule
+calls the same route every 10 minutes. Offline: `npm run check:mail-sync`.
+No migration. Nothing was sent. The signed-in check (mail in a connected
+mailbox shows up within ten minutes) waits on merge plus the GitHub Actions
+secret `CRON_SECRET` (same value as Vercel; not written here).
+
 Updated 16 September 2026. This week's development comes first; the 10 September
 source review follows it. Earlier sessions are preserved in the
 [history archive](docs/archive/2026-09-08/CURRENT_STATE.md).

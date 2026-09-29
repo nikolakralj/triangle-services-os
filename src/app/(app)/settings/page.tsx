@@ -12,6 +12,8 @@ import { TeamSettings } from "@/components/modules/team-settings";
 import { MembersSettings } from "@/components/modules/members-settings";
 import { HireEmployee } from "@/components/modules/hire-employee";
 import { WorkLog } from "@/components/modules/work-log";
+import { MailSyncStatus } from "@/components/modules/mail-sync-status";
+import { listMailboxReadRows } from "@/lib/data/job-intake";
 import { getSession } from "@/lib/auth/session";
 import { summarizeRefusals } from "@/lib/data/refusals";
 import { listTeam } from "@/lib/data/team";
@@ -50,11 +52,12 @@ export default async function SettingsPage({
   // The AI employees live here, not in the menu: work is handed out from the
   // case, and this is where an admin sees who carries what (DEV-012). The
   // humans board and the work log moved here from Workforce with slice B.
-  const [refusals, team, humans, runs] = await Promise.all([
+  const [refusals, team, humans, runs, mailboxReads] = await Promise.all([
     canSeeDiagnostics && orgId ? summarizeRefusals(orgId) : Promise.resolve(null),
     orgId ? listTeam(orgId) : Promise.resolve([]),
     orgId ? listHumans(orgId) : Promise.resolve([]),
     canSeeDiagnostics && orgId ? listAgentRuns(orgId) : Promise.resolve([]),
+    canSeeDiagnostics && orgId ? listMailboxReadRows(orgId) : Promise.resolve([]),
   ]);
   const workLogEmployees = team
     .filter((m) => m.employee.badgeName)
@@ -264,6 +267,14 @@ export default async function SettingsPage({
                 description="Machine records for whoever maintains Triangle; nothing here needs a business decision."
               />
               <CardContent className="space-y-6">
+                <section>
+                  <h3 className="text-sm font-semibold text-slate-900">Mail check</h3>
+                  <p className="mb-3 mt-0.5 text-[13px] text-slate-500">
+                    When Triangle last read each connected mailbox, and whether that
+                    read failed. A quiet check still updates this line.
+                  </p>
+                  <MailSyncStatus rows={mailboxReads} />
+                </section>
                 <section>
                   <h3 className="text-sm font-semibold text-slate-900">Hidden pages</h3>
                   <p className="mb-3 mt-0.5 text-[13px] text-slate-500">

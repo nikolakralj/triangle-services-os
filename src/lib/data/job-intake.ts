@@ -245,6 +245,82 @@ export async function recordInboundEmail(params: {
 
   if (existing) return { id: existing.id as string, alreadyExisted: true };
 
+  return insertInboundEmail(svc, params);
+}
+
+/**
+ * Ids already stored for this org. A repeat read skips these before the
+ * model is called, so a ten-minute overlap does not re-classify the same mail.
+ */
+export async function findInboundMessageIds(
+  orgId: string,
+  ids: string[],
+): Promise<Set<string>> {
+  const found = new Set<string>();
+  const svc = createServiceSupabaseClient();
+  if (!svc || ids.length === 0) return found;
+
+  const unique = [...new Set(ids.filter((id) => id.trim().length > 0))];
+  const chunk = 100;
+  for (let i = 0; i < unique.length; i += chunk) {
+    const slice = unique.slice(i, i + chunk);
+    const { data } = await svc
+      .from("inbound_emails")
+      .select("provider_message_id")
+      .eq("org_id", orgId)
+      .in("provider_message_id", slice);
+    for (const row of data ?? []) {
+      if (row.provider_message_id) found.add(String(row.provider_message_id));
+    }
+  }
+  return found;
+}
+
+export interface MailboxReadRow {
+  emailAddress: string;
+  readThrough: string | null;
+  lastAttempt: string | null;
+  failure: string | null;
+  paused: boolean;
+}
+
+/** Diagnostics only. No credentials. IMAP mailboxes Triangle itself reads. */
+export async function listMailboxReadRows(orgId: string): Promise<MailboxReadRow[]> {
+  const svc = createServiceSupabaseClient();
+  if (!svc) return [];
+  const { data } = await svc
+    .from("mail_accounts")
+    .select("email_address, last_synced_at, last_error, updated_at, provider, status")
+    .eq("org_id", orgId)
+    .eq("provider", "imap")
+    .order("email_address", { ascending: true });
+  return (data ?? []).map((row) => ({
+    emailAddress: String(row.email_address),
+    readThrough: (row.last_synced_at as string | null) ?? null,
+    lastAttempt: (row.updated_at as string | null) ?? null,
+    failure: (row.last_error as string | null) ?? null,
+    paused: row.status === "paused",
+  }));
+}
+
+async function insertInboundEmail(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  params: {
+    orgId: string;
+    mailAccountId: string | null;
+    providerMessageId: string;
+    providerThreadId: string | null;
+    senderEmail: string | null;
+    senderName: string | null;
+    recipientEmail: string | null;
+    subject: string;
+    sentAt: string | null;
+    classification: EmailClassification;
+    confidence: number;
+    reason: string;
+    bodyText: string | null;
+  },
+): Promise<{ id: string; alreadyExisted: boolean } | null> {
   const { data, error } = await svc
     .from("inbound_emails")
     .insert({
@@ -267,7 +343,21 @@ export async function recordInboundEmail(params: {
     .select("id")
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    // Two readers (the schedule and Bob) can insert the same id together.
+    // The unique key is the outcome we want: one row, not an error.
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "23505") {
+      const { data: raced } = await svc
+        .from("inbound_emails")
+        .select("id")
+        .eq("org_id", params.orgId)
+        .eq("provider_message_id", params.providerMessageId)
+        .maybeSingle();
+      if (raced) return { id: raced.id as string, alreadyExisted: true };
+    }
+    return null;
+  }
   return { id: data.id as string, alreadyExisted: false };
 }
 

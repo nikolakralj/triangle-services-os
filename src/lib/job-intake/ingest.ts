@@ -6,9 +6,19 @@ import { classifyAndExtract, shouldKeepBody } from "./extract";
 import {
   recordInboundEmail,
   createJobLead,
+  findInboundMessageIds,
   getIntakeRules,
 } from "@/lib/data/job-intake";
 import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile";
+import {
+  MANUAL_BACKLOG_LIMIT,
+  MANUAL_FRESH_LIMIT,
+  nextReadThrough,
+  planMailboxSync,
+  SCHEDULED_BACKLOG_LIMIT,
+  SCHEDULED_FRESH_LIMIT,
+  type SyncEnvelope,
+} from "./sync-plan";
 
 // ---------------------------------------------------------------------------
 // The ingestion run: fetch → clean → classify → store.
@@ -42,6 +52,8 @@ export interface IngestSummary {
   leadsCreated: number;
   /** Recruiting cases opened from a multi-role people request. */
   casesOpened: number;
+  /** True when older mail remains after this run. New mail is still read. */
+  catchingUp: boolean;
   errors: string[];
 }
 
@@ -63,7 +75,10 @@ export async function listActiveMailAccounts(orgId: string): Promise<MailAccount
       "id, email_address, credential_ref, credential_encrypted, imap_host, imap_port, provider, watch_label, status, last_synced_at",
     )
     .eq("org_id", orgId)
-    .eq("status", "active");
+    .eq("status", "active")
+    // Bob's hand-in creates provider "external" rows with no password.
+    // Reading those over IMAP would stamp a failure on every run.
+    .eq("provider", "imap");
   return (data as MailAccountRow[]) ?? [];
 }
 
@@ -115,12 +130,19 @@ function sinceFor(account: MailAccountRow, sinceDays?: number): Date {
  * filters on that: flipping it to 'error' would quietly drop the mailbox out
  * of every future sync after a single hiccup.
  */
-async function markSynced(accountId: string, error?: string): Promise<void> {
+async function markSynced(
+  accountId: string,
+  error?: string,
+  advanceTo?: Date,
+): Promise<void> {
   const svc = createServiceSupabaseClient();
   if (!svc) return;
 
   const patch: Record<string, unknown> = { last_error: error ?? null };
-  if (!error) patch.last_synced_at = new Date().toISOString();
+  // A failure leaves the cursor where it is. A success moves it to
+  // `advanceTo` — "now" when caught up, or the backlog frontier when not.
+  // updated_at (trigger) is the attempt time the diagnostics line shows.
+  if (!error) patch.last_synced_at = (advanceTo ?? new Date()).toISOString();
 
   await svc.from("mail_accounts").update(patch).eq("id", accountId);
 }
@@ -129,7 +151,7 @@ async function markSynced(accountId: string, error?: string): Promise<void> {
 export async function ingestAccount(
   account: MailAccountRow,
   orgId: string,
-  opts: { limit?: number; sinceDays?: number } = {},
+  opts: { limit?: number; sinceDays?: number; scheduled?: boolean } = {},
 ): Promise<IngestSummary> {
   const summary: IngestSummary = {
     account: account.email_address,
@@ -139,16 +161,56 @@ export async function ingestAccount(
     noiseDiscarded: 0,
     leadsCreated: 0,
     casesOpened: 0,
+    catchingUp: false,
     errors: [],
   };
+
+  // Search start includes a short overlap. The stored cursor does not, so a
+  // failed message cannot walk last_synced_at backwards by that overlap.
+  const since = sinceFor(account, opts.sinceDays);
+  const storedCursor =
+    !opts.sinceDays && account.last_synced_at
+      ? new Date(account.last_synced_at)
+      : since;
+  // Budgets stay small so a read finishes inside a one-minute function.
+  // A wider gap drains over later runs; new mail does not wait for it.
+  const freshLimit = opts.scheduled ? SCHEDULED_FRESH_LIMIT : MANUAL_FRESH_LIMIT;
+  const backlogLimit = opts.scheduled ? SCHEDULED_BACKLOG_LIMIT : MANUAL_BACKLOG_LIMIT;
+  let plannedAdvance = new Date().toISOString();
 
   let messages;
   try {
     const source = buildSource(account);
-    messages = await source.fetchSince(
-      sinceFor(account, opts.sinceDays),
-      opts.limit ?? 60,
-    );
+    messages = await source.fetchWindow(since, async (envelopes) => {
+      const cursorMs = since.getTime();
+      const inRange: SyncEnvelope[] = [];
+      for (const envelope of envelopes) {
+        if (!envelope.sentAt) {
+          inRange.push(envelope);
+          continue;
+        }
+        const t = Date.parse(envelope.sentAt);
+        if (!Number.isFinite(t) || t >= cursorMs) inRange.push(envelope);
+      }
+
+      const known = await findInboundMessageIds(
+        orgId,
+        inRange.map((envelope) => envelope.id),
+      );
+      const unseen = inRange.filter((envelope) => !known.has(envelope.id));
+      summary.alreadySeen += inRange.length - unseen.length;
+
+      const plan = planMailboxSync({
+        now: new Date().toISOString(),
+        cursor: storedCursor.toISOString(),
+        envelopes: unseen,
+        freshLimit,
+        backlogLimit,
+      });
+      summary.catchingUp = plan.truncated;
+      plannedAdvance = plan.advanceTo;
+      return plan.ids;
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Mailbox fetch failed.";
     summary.errors.push(message);
@@ -243,14 +305,27 @@ export async function ingestAccount(
     }
   }
 
-  await markSynced(account.id);
+  if (summary.errors.length > 0) {
+    // Leave the cursor. The next read retries the message. New mail in this
+    // run is already stored, and the diagnostics line shows the failure.
+    summary.catchingUp = true;
+    await markSynced(account.id, summary.errors[0]);
+    return summary;
+  }
+
+  const advance = nextReadThrough({
+    cursor: storedCursor.toISOString(),
+    plannedAdvance,
+    hadMessageErrors: false,
+  });
+  await markSynced(account.id, undefined, new Date(advance));
   return summary;
 }
 
 /** Ingest every active mailbox for an org. */
 export async function ingestAllAccounts(
   orgId: string,
-  opts: { limit?: number; sinceDays?: number } = {},
+  opts: { limit?: number; sinceDays?: number; scheduled?: boolean } = {},
 ): Promise<IngestSummary[]> {
   const accounts = await listActiveMailAccounts(orgId);
   const summaries: IngestSummary[] = [];

@@ -28,7 +28,9 @@ German desirable).
 
 **Nothing outside P0–P4 is built until P4 holds on three real requirements.**
 Not a chat in Triangle, not LinkedIn in Triangle, not new pages, panels or
-buttons, not research features, not a second agency.
+buttons, not research features, not a second agency. Active searching, after
+P4 below, waits on that same gate, and it does not put LinkedIn inside
+Triangle.
 
 ### P0 — Clean the floor · `READY` · 1 day
 
@@ -47,7 +49,30 @@ buttons, not research features, not a second agency.
 **Done when:** Production runs `main`, no open branch is older than three
 days, and Ralph's email is in Triangle.
 
-### P1 — Mail in minutes, not mornings · `READY` after P0 · 2 days
+### P1 — Mail in minutes, not mornings · `IN_PROGRESS` · Cursor, branch `cursor/mail-sync-minutes-75af`
+
+Cause, checked in the code and the Vercel cron docs: the route only
+accepted POST, and Vercel Cron calls it with GET, so Next.js returned 405
+before any mailbox was read and nothing was recorded. That has been true
+since the route was added (25 August). The daily schedule is the Hobby
+limit, not the outage: `*/15` was rejected at deploy on 27 August, and a
+three-times-a-day employee cron was rejected on 4 September. An expired
+app password would still have written `last_error` and a work-log row;
+a 405 writes neither. The 8 September date is the last signed-in read,
+not a commit that broke the route (nothing in the mail path changed that
+day).
+
+Choice: a repository schedule (`.github/workflows/mail-sync.yml`) calls
+`GET /api/job-intake/sync` every 10 minutes with `CRON_SECRET`. Hobby
+cannot do that inside `vercel.json` without failing the deploy, so the
+daily Vercel cron stays as a backup now that GET works. Bob's morning
+hand-in stays the other backup. Gmail push was not used: company mail is
+not Google Workspace, and a Gmail readonly scope is restricted. No
+migration.
+
+Signed-in check (an email in a connected mailbox shows up within ten
+minutes) is still owed. It starts only after this is merged and the
+repository secret below is set.
 
 - Find why Triangle's own mail check (`/api/job-intake/sync`, daily cron in
   `vercel.json`) has not recorded a read since 8 September, and fix it.
@@ -123,6 +148,45 @@ the mailbox lands on the right case.
 **Done when:** Nikola runs Ralph's case from Today to sent replies in under
 five minutes of his own time a day, without reading an employee's report.
 
+### Active searching — work for a person on the bench · `GATED` until P4 holds
+
+After P4, before P5. Decision: "Active searching" in `DECISIONS.md`,
+29 September. Today Triangle waits for an agency to email a request. This is
+the other direction: someone we already have is without work, so the team
+looks for work for them. It reuses the case from P2, the record of work done
+outside Triangle from P3, and the one line on Today from P4. It is not built
+during P0–P4, and it does not wait on P5 or P6.
+
+The proof is Matej (M.P.), Senior Electrical Automation Engineer, confirmed
+available and on the bench. Freelance and contract jobs, matched to his
+profile, looked for on LinkedIn and on other boards where the work fits.
+LinkedIn stays the employee's own tool. Triangle keeps the case, the match
+and the draft. Nothing is sent without the person.
+
+- **Scout** searches, on his own computer, and files only what he would
+  actually pursue: the posting, who placed it, the link, and why it fits
+  this person. A job board is not built into Triangle, and neither is an ATS.
+- **Hanna** matches the posting to the profile on record — role, skills,
+  languages, location, and the availability a human confirmed — and decides
+  the form. An anonymised bio, initials only, is the default. A name goes
+  out only when a person releases it. She is not looking people up; the
+  person is already ours.
+- **Bob** drafts the application or the put-forward. He sends nothing.
+- The case opens itself when a human-confirmed available person has no
+  current work. No new page, no search button, no choice of employee. One
+  line on Today, one Ask on the case. Supply counts only while a human has
+  confirmed it inside 14 days; an unconfirmed record does not start a search.
+
+**Done when:** Matej, marked available, produces at least three matching
+freelance or contract opportunities on Today within a day. Each is one case:
+the role, who posted it, why it fits him, the source link, and a drafted
+put-forward as an anonymised bio. Three is the decision the team would
+actually make, not every hit on a board. Nothing has been sent. Nikola
+approves or says no in words on the case.
+
+**Not this item:** a LinkedIn or job-board client inside Triangle, a new
+agent, scraping other people's profiles, or any send that is not a person's.
+
 ### P5 — Trust · `GATED` on two weeks of real cases
 
 Each employee's record (approved unchanged, edited, refused) and the CEO's
@@ -133,10 +197,42 @@ candidates already on our books" — enforced on the server.
 
 The blueprint for another staffing firm, onboarding and billing. Not before.
 
+### Later — not scheduled
+
+Recorded so it is not lost. Not in the queue, and not built during P0–P6.
+
+#### Inline view of the agent's computer · `FUTURE`
+
+Hanna, Bob and Scout already work on their own Grok virtual computer, with a
+browser, for LinkedIn and the other sites they use. The goal is to show that
+computer on the case it belongs to, so the owner can watch the live session
+or step in without leaving Triangle.
+
+This is a view of the employee's own computer. LinkedIn stays there. Triangle
+does not rebuild it.
+
+It depends on the Grok computer offering an embeddable view, which still
+needs investigating. No date until that exists.
+
+**What that view is for, long term.** One computer the employee already uses,
+watched on the case, is how a three-sided search could run. The direction is
+a marketplace that connects people, jobs and clients:
+
+1. **Our agents search for people.** Candidates, on the web and on LinkedIn,
+   from the employee's own computer. Triangle keeps the case.
+2. **Freelancers search for jobs.** A freelancer uses Triangle to find work.
+3. **Clients search for agents and companies.** A client finds the right
+   agency, team or contractor.
+
+Sides 2 and 3 open Triangle to people outside this agency. That is a
+different product from today's single-agency tool, and it needs its own
+decision before any build. Recorded here so it is not lost. Not scheduled.
+
 ### Rules for every coding agent
 
-1. This section is the queue. Take the first `READY` item, write your name and
-   branch next to it before editing, and do nothing outside it.
+1. This section is the queue, except **Later**, which is not scheduled. Take
+   the first `READY` item, write your name and branch next to it before
+   editing, and do nothing outside it.
 2. One item, one branch from the current `main`, one pull request. No stacked
    branches. Merged or closed within 48 hours.
 3. An item is done only after a signed-in check of the real flow on the
@@ -146,8 +242,8 @@ The blueprint for another staffing firm, onboarding and billing. Not before.
    to production without Nikola's yes. Stage explicit paths. Stay out of other
    agents' folders.
 5. Every pull request says what Nikola will read, type or click less.
-6. The laws bind: "Employees, not buttons", "The workspace is the answer" and
-   "The plan" in `DECISIONS.md`.
+6. The laws bind: "Employees, not buttons", "The workspace is the answer",
+   "The plan" and "Active searching" in `DECISIONS.md`.
 
 ### Nikola's part — minutes, not hours
 

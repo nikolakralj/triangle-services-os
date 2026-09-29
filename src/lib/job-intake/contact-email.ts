@@ -104,6 +104,16 @@ export interface ResolvedRecruiterContact {
 }
 
 /**
+ * A forward, as opposed to a reply that merely quotes an earlier From:.
+ * Outlook replies and forwards can both say "Original Message", so that
+ * marker is not enough on its own.
+ */
+export function isColleagueForward(subject: string | null | undefined, body: string): boolean {
+  if (/^\s*(fw|fwd|wg|tr)\s*:/i.test(subject ?? "")) return true;
+  return /forwarded message|weitergeleitete nachricht|begin forwarded message/i.test(body);
+}
+
+/**
  * The person to reply to: extracted recruiter, then a From: in the body,
  * then the envelope sender — never the receiving mailbox or another
  * internal address.
@@ -114,14 +124,35 @@ export function resolveRecruiterContact(params: {
   senderEmail?: string | null;
   senderName?: string | null;
   recipientEmail?: string | null;
+  subject?: string | null;
   bodyText?: string | null;
 }): ResolvedRecruiterContact {
   const receiving = params.recipientEmail ?? null;
   const forwarded = contactsFromForwardedHeaders(params.bodyText ?? "");
   const usable = (email: string | null | undefined) =>
     Boolean(email && !isInternalMailbox(email, receiving));
+  const forwarder = normalizeEmail(params.senderEmail);
 
   const extractedEmail = normalizeEmail(params.extractedEmail);
+  // A colleague's forward: the envelope sender brought it, and the original
+  // sender is in the body. Extraction often copies the envelope. Prefer the
+  // inner From when the only address we were handed is the forwarder.
+  // The envelope sender stays on the email row as who brought it.
+  const original = forwarded.find((c) => usable(c.email) && c.email !== forwarder);
+  const forwardedByColleague = isColleagueForward(params.subject, params.bodyText ?? "");
+  if (
+    forwardedByColleague &&
+    original?.email &&
+    extractedEmail &&
+    forwarder &&
+    extractedEmail === forwarder
+  ) {
+    return {
+      email: original.email,
+      name: original.name ?? cleanName(params.extractedName ?? ""),
+    };
+  }
+
   if (usable(extractedEmail)) {
     const matching = forwarded.find((c) => c.email === extractedEmail);
     const name =
