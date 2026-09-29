@@ -51,6 +51,8 @@ import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
 import { TodayFold } from "@/components/modules/today-fold";
 import { RequirementRoleTable } from "@/components/modules/requirement-role-table";
+import { AccessNeededLines } from "@/components/modules/reported-work";
+import type { AccessNeededLine } from "@/lib/data/employee-report-policy";
 import type { RequirementCaseLine } from "@/lib/job-intake/requirement-case";
 
 // ---------------------------------------------------------------------------
@@ -118,6 +120,7 @@ export function TodayScreen({
   senders = [],
   putForward = [],
   requirementCases = [],
+  accessNeeded = [],
 }: {
   move: NextMove;
   employees: Employee[];
@@ -142,6 +145,8 @@ export function TodayScreen({
   putForward?: PutForwardCase[];
   /** One line per people-request case. Role rows sit inside the line. */
   requirementCases?: RequirementCaseLine[];
+  /** One line per access an employee asked for. The step stays open. */
+  accessNeeded?: AccessNeededLine[];
 }) {
   const [logged, setLogged] = useState<LoggedAttempt | null>(null);
   const decisions = cameBack.filter((i) => i.state !== null);
@@ -191,6 +196,7 @@ export function TodayScreen({
   );
   const needsYou =
     (nowNeedsYou ? 1 : 0) +
+    accessNeeded.length +
     needsCases.length +
     asking.length +
     dueOpen.length +
@@ -211,6 +217,11 @@ export function TodayScreen({
         doneCount={finishedMissions.length + done.length}
       />
       <Zone n="01" name="Needs you" note="human decisions only" id="today-needs-you">
+        {accessNeeded.length > 0 && (
+          <div className="mb-3">
+            <AccessNeededLines lines={accessNeeded} />
+          </div>
+        )}
         <div className="space-y-2">
           {logged && (
             <RecordedStrip

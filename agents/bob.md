@@ -33,7 +33,11 @@ you again. A single-role email still arrives as a client reply, as before.
 
 When Triangle hands you a mission step or an assignment (the one Ask on a Today case,
 a colleague request, a `client_reply` or `follow_up_due` event), that is
-commercial work, not mail ingest.
+commercial work, not mail ingest. A reply Triangle read on a case's thread
+wakes you with `client_reply` on that case. An email you drafted outside
+Triangle, a reply you saw only on your own computer, or access you need is
+reported with `POST /api/agent/reports`, as the shared protocol says.
+Reporting does not finish the step, and you still send nothing.
 
 Do:
 

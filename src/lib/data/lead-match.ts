@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { canWorkIn } from "@/lib/data/work-authorisation";
 import { isInternalMailbox } from "@/lib/job-intake/contact-email";
 import { availabilityConfirmed, offerSentence } from "@/lib/data/lead-reply";
+import { availabilityReading } from "@/lib/data/employee-report-policy";
 
 // ---------------------------------------------------------------------------
 // The warm demand nobody was looking at.
@@ -109,6 +110,29 @@ function terms(...parts: (string | null | undefined)[]): Set<string> {
  * kind of judgement a list of shared words already makes well enough to rank
  * by. Hanna is there for the harder question of who is actually best.
  */
+function unavailableFor(
+  worker: { id?: unknown; full_name?: unknown },
+  rows: Array<{
+    worker_id?: unknown;
+    person_name?: unknown;
+    kind?: unknown;
+    occurred_on?: unknown;
+  }>,
+): Array<{ kind: string; occurredOn: string }> {
+  const name = String(worker.full_name ?? "").trim().toLowerCase();
+  return rows
+    .filter((row) => {
+      if (row.kind !== "not_available") return false;
+      if (row.worker_id && row.worker_id === worker.id) return true;
+      const reported = String(row.person_name ?? "").trim().toLowerCase();
+      return name.length > 0 && reported === name;
+    })
+    .map((row) => ({
+      kind: "not_available",
+      occurredOn: String(row.occurred_on ?? "").slice(0, 10),
+    }));
+}
+
 export async function matchOpenLeads(
   orgId: string,
   limit = 5,
@@ -116,7 +140,7 @@ export async function matchOpenLeads(
   const svc = createServiceSupabaseClient();
   if (!svc) return [];
 
-  const [leadsResult, workersResult] = await Promise.all([
+  const [leadsResult, workersResult, unavailableResult] = await Promise.all([
     svc
       .from("job_leads")
       .select(
@@ -134,6 +158,11 @@ export async function matchOpenLeads(
       )
       .eq("organization_id", orgId)
       .neq("status", "blacklisted"),
+    svc
+      .from("employee_reports")
+      .select("id, worker_id, person_name, kind, occurred_on")
+      .eq("org_id", orgId)
+      .eq("kind", "not_available"),
   ]);
 
   const leads = leadsResult.data ?? [];
@@ -236,7 +265,13 @@ export async function matchOpenLeads(
         );
         if (!right.allowed) caveats.push(right.reason);
       }
-      if (w.availability_status === "unknown") {
+      const reading = availabilityReading({
+        status: (w.availability_status as string | null) ?? null,
+        reports: unavailableFor(w, unavailableResult.data ?? []),
+      });
+      if (reading.tone === "unavailable") {
+        caveats.push(reading.phrase);
+      } else if (w.availability_status === "unknown") {
         caveats.push("availability never confirmed");
       }
 

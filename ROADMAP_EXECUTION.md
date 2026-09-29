@@ -117,7 +117,11 @@ line on Today — "Ralph · Cologne data centre · 6 roles — Hanna sourcing, r
 drafted" — whose case shows three role rows with counts, and Hanna and Bob
 each have exactly one step.
 
-### P3 — Employees report everything · `READY` after P2 · 2 days
+### P3 — Employees report everything · `IN_PROGRESS` · Cursor, branch `cursor/p3-employee-reports-cca2`
+
+Nikola approved this on 29 September. Migration `053_employee_reports.sql`
+is written and **not applied** — local and Production share one database.
+050 and 051 stay as they are: already live, files not rewritten here.
 
 - One badge endpoint for work done outside Triangle: LinkedIn invitation sent,
   email drafted, email sent (by a person), candidate found for a role (with

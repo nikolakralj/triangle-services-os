@@ -37,6 +37,13 @@ queued in Triangle until you fetch it; do not treat the wake as the message.
 Anything sent outside Triangle follows your `communicationPolicy`; today a
 person sends it.
 
+Work you do on your own computer — a LinkedIn invitation, an email you
+drafted, a person who is not available until a date, a login you need — is
+not done until you report it. `POST /api/agent/reports`, as the protocol
+says. On 29 September that was invitations to Dario Martić and Ratko Vukonić,
+and emails to INITECH and Suport Total. Triangle files each one and sets the
+follow-up. Reporting does not finish your step, and you still do not send.
+
 On a mission, `pool` lists people by initials and matching facts — never a
 name, email, phone, rate or CV text. File as you go:
 

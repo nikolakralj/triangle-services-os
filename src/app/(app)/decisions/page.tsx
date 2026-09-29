@@ -11,6 +11,7 @@ import { getSession } from "@/lib/auth/session";
 import { sendableMailboxesFor } from "@/lib/data/mail-send";
 import { listPutForwardCases } from "@/lib/data/put-forward-cases";
 import { listRequirementCaseLines } from "@/lib/data/requirement-case";
+import { listOpenAccessNeeds } from "@/lib/data/employee-reports";
 
 // ---------------------------------------------------------------------------
 // The one screen.
@@ -54,6 +55,7 @@ export default async function DecisionsPage() {
     senders,
     putForward,
     requirementCases,
+    accessNeeded,
   ] = await Promise.all([
     getNextMove(org),
     listWhatCameBack(org),
@@ -71,6 +73,7 @@ export default async function DecisionsPage() {
     // Hanna's half of an open case: who we put forward, and in which form.
     listPutForwardCases(org),
     listRequirementCaseLines(org),
+    listOpenAccessNeeds(org),
   ]);
   // Cert Alerts left the menu (DEV-011); the exceptions are a Needs you card.
   const certs = certAlerts.filter(
@@ -112,6 +115,7 @@ export default async function DecisionsPage() {
         senders={senders}
         putForward={putForward}
         requirementCases={requirementCases}
+        accessNeeded={accessNeeded}
       />
     </div>
   );

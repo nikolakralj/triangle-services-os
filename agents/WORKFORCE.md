@@ -179,7 +179,9 @@ sees it in `requestedWork` and its employee is woken again. It is a graph, not
 a pipeline: anyone may ask anyone, requests run in parallel, and nothing in the
 schema names an employee. Limits: eight open requests per piece of work, five
 deep. The shared protocol every employee follows is `agents/missions.md`,
-served with every job. What an employee may send outside Triangle is a
+served with every job. Work done outside Triangle is reported with
+`POST /api/agent/reports` and filed on the person, the company and the case.
+What an employee may send outside Triangle is a
 per-employee `communicationPolicy` — approval-required or forbidden today.
 
 Köster and GOLDBECK are the first verified in-app cases. Their structured

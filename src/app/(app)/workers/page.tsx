@@ -7,6 +7,7 @@ import { PartnerFirms } from "@/components/modules/partner-firms";
 import { ComplianceOverview } from "@/components/modules/compliance-overview";
 import { getSession } from "@/lib/auth/session";
 import { countNotesByWorker } from "@/lib/data/worker-notes";
+import { unavailablePhrases } from "@/lib/data/employee-reports";
 import { listSupplyPartners } from "@/lib/data/supply-partners";
 import { listCertAlerts } from "@/lib/data/worker-documents";
 import {
@@ -108,7 +109,7 @@ export default async function WorkersPage({
     );
   }
 
-  const [workerRows, allRows, roles, skills, countries, partners, certAlerts] =
+  const [workerRows, allRows, roles, skills, countries, partners, certAlerts, unavailable] =
     await Promise.all([
       searchAndFilterWorkers(session.organizationId, {
         search: search || undefined,
@@ -123,6 +124,7 @@ export default async function WorkersPage({
       getWorkerCountries(session.organizationId),
       listSupplyPartners(session.organizationId),
       certs ? listCertAlerts(session.organizationId) : Promise.resolve([]),
+      unavailablePhrases(session.organizationId),
     ]);
 
   // "Whose certificates need attention" is a filter on the pool, not a page
@@ -166,7 +168,7 @@ export default async function WorkersPage({
         initialSkill={skill}
         initialCerts={certs}
       />
-      <WorkerCards workers={workers} noteCounts={noteCounts} />
+      <WorkerCards workers={workers} noteCounts={noteCounts} unavailable={unavailable} />
       {/* The other half of the pool. Two people on the bench cannot staff a
           crew of eight; a partner firm that already employs eight can. */}
       <PartnerFirms partners={partners} />

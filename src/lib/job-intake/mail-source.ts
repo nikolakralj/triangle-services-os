@@ -20,6 +20,8 @@ export interface FetchedMessage {
   /** Stable per-provider id — the RFC822 Message-ID. */
   providerMessageId: string;
   providerThreadId: string | null;
+  /** RFC 822 In-Reply-To, when the mailbox sent one. */
+  inReplyTo: string | null;
   senderEmail: string | null;
   senderName: string | null;
   recipientEmail: string | null;
@@ -244,6 +246,7 @@ function toFetchedMessage(
   return {
     providerMessageId: String(env?.messageId ?? ""),
     providerThreadId: readGmailThreadId(msg),
+    inReplyTo: env?.inReplyTo ?? null,
     senderEmail: from?.address ?? null,
     senderName: from?.name ?? null,
     recipientEmail: to?.address ?? null,

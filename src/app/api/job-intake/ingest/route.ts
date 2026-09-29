@@ -39,6 +39,7 @@ const MAX_MESSAGES = 50;
 interface IncomingMessage {
   messageId?: string;
   threadId?: string;
+  inReplyTo?: string;
   from?: string;
   fromName?: string;
   to?: string;
@@ -162,6 +163,16 @@ export async function POST(request: Request) {
     skipped: [] as Array<{ index: number; reason: string }>,
     errors: [] as string[],
   };
+  const arrivals: Array<{
+    inboundEmailId: string;
+    messageId: string;
+    threadId: string | null;
+    inReplyTo: string | null;
+    subject: string;
+    senderName: string | null;
+    senderEmail: string | null;
+    sentAt: string | null;
+  }> = [];
 
   for (const [index, msg] of messages.entries()) {
     // A stable id is what makes re-posting the same message harmless.
@@ -209,6 +220,7 @@ export async function POST(request: Request) {
         mailAccountId,
         providerMessageId: messageId,
         providerThreadId: msg.threadId ?? null,
+        inReplyTo: msg.inReplyTo ?? null,
         senderEmail: msg.from ?? null,
         senderName: msg.fromName ?? null,
         recipientEmail: msg.to ?? mailbox,
@@ -225,6 +237,16 @@ export async function POST(request: Request) {
         result.errors.push(`Could not store "${subject}".`);
         continue;
       }
+      arrivals.push({
+        inboundEmailId: stored.id,
+        messageId,
+        threadId: msg.threadId ?? null,
+        inReplyTo: msg.inReplyTo ?? null,
+        subject,
+        senderName: msg.fromName ?? null,
+        senderEmail: msg.from ?? null,
+        sentAt: msg.sentAt ?? null,
+      });
       if (stored.alreadyExisted) {
         result.alreadySeen += 1;
         continue;
@@ -263,6 +285,15 @@ export async function POST(request: Request) {
       result.errors.push(
         `${subject}: ${err instanceof Error ? err.message : "extraction failed"}`,
       );
+    }
+  }
+
+  const { attachMailboxReply } = await import("@/lib/data/employee-reports");
+  for (const arrival of arrivals) {
+    try {
+      await attachMailboxReply({ orgId: organizationId, ...arrival });
+    } catch (err) {
+      console.error("attachMailboxReply:", err instanceof Error ? err.message : "failed");
     }
   }
 

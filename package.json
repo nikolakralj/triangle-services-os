@@ -19,6 +19,7 @@
     "check:workspace": "node scripts/check-workspace.mjs",
     "check:requirement-case": "node scripts/check-requirement-case.mjs",
     "check:mail-sync": "node scripts/check-mail-sync.mjs",
+    "check:employee-reports": "node scripts/check-employee-reports.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
