@@ -19,6 +19,7 @@ import {
   finishMissionRun,
   startMissionRun,
 } from "@/lib/data/mission-runs";
+import { earliestOpenRun } from "@/lib/data/mission-shared";
 import {
   describeMissionState,
   normaliseQuote,
@@ -214,18 +215,33 @@ async function employeeName(svc: Svc, orgId: string, agentInstanceId: string): P
   return (data?.display_name as string | undefined) ?? "The bot";
 }
 
-/** The step's open run, or a new one. The mission page reads activity from it. */
-async function openBotRun(svc: Svc, step: BotStep): Promise<string | null> {
-  const { data: runs } = await svc
+async function listRunningRuns(
+  svc: Svc,
+  step: BotStep,
+): Promise<Array<{ id: string; startedAt: string | null }>> {
+  const { data } = await svc
     .from("agent_runs")
-    .select("id, status")
+    .select("id, started_at, status")
     .eq("org_id", step.orgId)
     .eq("assignment_id", step.id)
-    .order("started_at", { ascending: false })
-    .limit(1);
-  const current = runs?.[0];
-  if (current && current.status === "running") return current.id as string;
-  return startMissionRun({
+    .eq("status", "running");
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    startedAt: (row.started_at as string | null) ?? null,
+  }));
+}
+
+/**
+ * The step's open run, or a new one. The mission page reads activity from it.
+ *
+ * Hanna's 29 September double run: the wake and the inbox pickup each opened
+ * a run for the same step. The earlier run keeps the step. The later one is
+ * removed before it has any work on it.
+ */
+async function openBotRun(svc: Svc, step: BotStep): Promise<string | null> {
+  const already = earliestOpenRun(await listRunningRuns(svc, step));
+  if (already) return already.id;
+  const created = await startMissionRun({
     orgId: step.orgId,
     missionId: step.missionId,
     assignmentId: step.id,
@@ -235,6 +251,13 @@ async function openBotRun(svc: Svc, step: BotStep): Promise<string | null> {
     model: "grok-bot",
     first: activity("started", `Picked up on Grok: “${clip(step.title, 90)}”`),
   });
+  if (!created) return null;
+  const winner = earliestOpenRun(await listRunningRuns(svc, step));
+  if (winner && winner.id !== created) {
+    await svc.from("agent_runs").delete().eq("id", created).eq("org_id", step.orgId);
+    return winner.id;
+  }
+  return created;
 }
 
 /**

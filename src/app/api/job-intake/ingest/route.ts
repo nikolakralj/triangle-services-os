@@ -157,6 +157,7 @@ export async function POST(request: Request) {
     alreadySeen: 0,
     opportunities: 0,
     leadsCreated: 0,
+    casesOpened: 0,
     noiseDiscarded: 0,
     skipped: [] as Array<{ index: number; reason: string }>,
     errors: [] as string[],
@@ -238,7 +239,25 @@ export async function POST(request: Request) {
           contactEmail: extraction.lead.contactEmail,
           lead: extraction.lead,
         });
-        if (leadId) result.leadsCreated += 1;
+        if (leadId) {
+          result.leadsCreated += 1;
+          const { settlePeopleRequest } = await import("@/lib/data/requirement-case");
+          const follow = await settlePeopleRequest({
+            orgId: organizationId,
+            leadId,
+            inboundEmailId: stored.id,
+            messageId,
+            threadId: msg.threadId ?? null,
+            subject,
+            classification: extraction.classification,
+            confidence: extraction.confidence,
+            reason: extraction.reason,
+            recipientCompany: extraction.lead.clientCompany || extraction.lead.agencyName,
+            lead: extraction.lead,
+            bodyText: keepBody ? extraction.cleanedText || null : null,
+          });
+          result.casesOpened += follow.casesOpened;
+        }
       }
     } catch (err) {
       result.errors.push(
@@ -259,6 +278,7 @@ export async function POST(request: Request) {
       alreadySeen: result.alreadySeen,
       opportunities: result.opportunities,
       leadsCreated: result.leadsCreated,
+      casesOpened: result.casesOpened,
       noiseDiscarded: result.noiseDiscarded,
       errors: result.errors.length,
     },

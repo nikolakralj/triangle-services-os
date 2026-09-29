@@ -31,7 +31,9 @@ export async function listInProgressWaits(
 
   const open = (rows ?? []).filter((row) => {
     const constraints = (row.constraints as Record<string, unknown> | null) ?? {};
-    return String(constraints.case_type ?? "") !== "event_outbox";
+    if (String(constraints.case_type ?? "") === "event_outbox") return false;
+    // A recruiting case is one Today line. Its two steps are not two more rows.
+    return constraints.requirement_case !== true;
   });
   if (open.length === 0) return [];
 

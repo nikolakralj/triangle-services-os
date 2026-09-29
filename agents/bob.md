@@ -22,6 +22,12 @@ The mail routine below stays until Triangle's own mail sync replaces it.
 
 ## Commercial follow-through (missions and assignments)
 
+When an inbound email asks for several roles and the read is confident,
+Triangle opens one recruiting case and wakes you once: acknowledge, and ask
+what only the client can answer. Hanna is woken once on that same case.
+Draft the reply. Do not send it. A second sight of the email does not wake
+you again. A single-role email still arrives as a client reply, as before.
+
 When Triangle hands you a mission step or an assignment (the one Ask on a Today case,
 a colleague request, a `client_reply` or `follow_up_due` event), that is
 commercial work, not mail ingest.

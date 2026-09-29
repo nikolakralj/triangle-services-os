@@ -16,6 +16,22 @@ import type {
 export type MissionKind = "research" | "recruiting";
 
 /**
+ * The run that owns a step when two pickups land together.
+ * Earliest start wins; a tie keeps the smaller id so both callers agree.
+ */
+export function earliestOpenRun<T extends { id: string; startedAt: string | null }>(
+  runs: T[],
+): T | null {
+  if (runs.length === 0) return null;
+  return [...runs].sort((a, b) => {
+    const startA = a.startedAt ?? "";
+    const startB = b.startedAt ?? "";
+    if (startA !== startB) return startA < startB ? -1 : 1;
+    return a.id < b.id ? -1 : 1;
+  })[0];
+}
+
+/**
  * Where a mission is — read from its steps every time it is shown, never
  * stored, so the tab and the page cannot disagree.
  *
@@ -544,6 +560,19 @@ export interface MissionWorkspace {
     dead: number;
     notForUs: number;
   };
+  /** Roles on a case opened from one people-request email. Empty otherwise. */
+  requirementRoles: Array<{
+    title: string;
+    headcount: number;
+    level: string | null;
+    skills: string[];
+    startText: string | null;
+    durationText: string | null;
+    location: string | null;
+    languages: string[];
+    rateText: string | null;
+  }>;
+  requirementQuestions: string[];
 }
 
 /** A person found in a mission who can be contacted today and has not been. */

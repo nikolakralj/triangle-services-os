@@ -64,7 +64,13 @@ days, and Ralph's email is in Triangle.
 minutes, and Ralph's forward is recognised as a requirement naming the
 original client.
 
-### P2 — One email, one case · `READY` after P1 · 3 days — the core
+### P2 — One email, one case · `IN_PROGRESS` · Cursor agent · `cursor/one-email-one-case-0272`
+
+Built off `main` while P1 is still PR #36. It does not depend on that
+schedule. Both the built-in sync and Bob's hand-in call `settlePeopleRequest`
+after a message is stored. Migration `050_requirement_roles.sql` is written
+and **not applied** — local and Production share one database. Not done until
+Nikola applies it and the signed-in Preview check passes.
 
 - Requirement extraction: one email becomes one requirement with N roles —
   title, how many, level, skills and tools, start, duration, location,
