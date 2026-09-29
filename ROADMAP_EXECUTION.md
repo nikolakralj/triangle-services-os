@@ -28,7 +28,9 @@ German desirable).
 
 **Nothing outside P0–P4 is built until P4 holds on three real requirements.**
 Not a chat in Triangle, not LinkedIn in Triangle, not new pages, panels or
-buttons, not research features, not a second agency.
+buttons, not research features, not a second agency. Active searching, after
+P4 below, waits on that same gate, and it does not put LinkedIn inside
+Triangle.
 
 ### P0 — Clean the floor · `READY` · 1 day
 
@@ -115,6 +117,45 @@ the mailbox lands on the right case.
 **Done when:** Nikola runs Ralph's case from Today to sent replies in under
 five minutes of his own time a day, without reading an employee's report.
 
+### Active searching — work for a person on the bench · `GATED` until P4 holds
+
+After P4, before P5. Decision: "Active searching" in `DECISIONS.md`,
+29 September. Today Triangle waits for an agency to email a request. This is
+the other direction: someone we already have is without work, so the team
+looks for work for them. It reuses the case from P2, the record of work done
+outside Triangle from P3, and the one line on Today from P4. It is not built
+during P0–P4, and it does not wait on P5 or P6.
+
+The proof is Matej (M.P.), Senior Electrical Automation Engineer, confirmed
+available and on the bench. Freelance and contract jobs, matched to his
+profile, looked for on LinkedIn and on other boards where the work fits.
+LinkedIn stays the employee's own tool. Triangle keeps the case, the match
+and the draft. Nothing is sent without the person.
+
+- **Scout** searches, on his own computer, and files only what he would
+  actually pursue: the posting, who placed it, the link, and why it fits
+  this person. A job board is not built into Triangle, and neither is an ATS.
+- **Hanna** matches the posting to the profile on record — role, skills,
+  languages, location, and the availability a human confirmed — and decides
+  the form. An anonymised bio, initials only, is the default. A name goes
+  out only when a person releases it. She is not looking people up; the
+  person is already ours.
+- **Bob** drafts the application or the put-forward. He sends nothing.
+- The case opens itself when a human-confirmed available person has no
+  current work. No new page, no search button, no choice of employee. One
+  line on Today, one Ask on the case. Supply counts only while a human has
+  confirmed it inside 14 days; an unconfirmed record does not start a search.
+
+**Done when:** Matej, marked available, produces at least three matching
+freelance or contract opportunities on Today within a day. Each is one case:
+the role, who posted it, why it fits him, the source link, and a drafted
+put-forward as an anonymised bio. Three is the decision the team would
+actually make, not every hit on a board. Nothing has been sent. Nikola
+approves or says no in words on the case.
+
+**Not this item:** a LinkedIn or job-board client inside Triangle, a new
+agent, scraping other people's profiles, or any send that is not a person's.
+
 ### P5 — Trust · `GATED` on two weeks of real cases
 
 Each employee's record (approved unchanged, edited, refused) and the CEO's
@@ -138,8 +179,8 @@ The blueprint for another staffing firm, onboarding and billing. Not before.
    to production without Nikola's yes. Stage explicit paths. Stay out of other
    agents' folders.
 5. Every pull request says what Nikola will read, type or click less.
-6. The laws bind: "Employees, not buttons", "The workspace is the answer" and
-   "The plan" in `DECISIONS.md`.
+6. The laws bind: "Employees, not buttons", "The workspace is the answer",
+   "The plan" and "Active searching" in `DECISIONS.md`.
 
 ### Nikola's part — minutes, not hours
 
