@@ -65,12 +65,25 @@ configuration into a signed-in demo session.
 
 ## Database migrations — CEO approves each one
 
-Migrations live in `supabase/migrations/` and run through
-`049_send_from_triangle.sql` (048 is the last one applied; 049 waits for the
-CEO). Because every environment shares one database,
+Migrations live in `supabase/migrations/`. Files on `main` run through
+`052_requirement_roles.sql`. Because every environment shares one database,
 a migration is applied only after the CEO approves that migration. After any
 column or enum change run `NOTIFY pgrst, 'reload schema';`. Never run seed files
 against the live organization.
+
+Known applied, 29 September 2026:
+
+- 044–048, including `048_drafts_keep_what_triangle_wrote.sql` (on `main`),
+  applied 11–15 September.
+- `049_send_from_triangle.sql` (on `main`) applied by 17 September. Open
+  PR #27 (not merged) records that: the connected Gmail mailbox has `can_send`
+  on, and the Oliver Hall reply was sent from Triangle and recorded. Do not
+  apply 049 again.
+- `050_mailbox_observe.sql` and `051_mailbox_space.sql` are live on the
+  database, applied 17–18 September for open PRs #29 and #28. Their files are
+  not on `main`. PRs #28 and #29 both carry a `050_mailbox_observe.sql`; #29
+  also carries `051_mailbox_space.sql`.
+- `052_requirement_roles.sql` (on `main`) applied 29 September.
 
 ## Badges — the CEO mints them
 
@@ -145,9 +158,10 @@ How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
 A person may review, edit and press Send in Triangle (DEV-013). Nothing is
 sent until two things are done, both by the CEO:
 
-1. Approve and apply `049_send_from_triangle.sql` (adds `mail_accounts.can_send`,
-   default false, and `sent_via` / `mail_account_id` / `outbound_rfc822_id` on
-   `outreach_drafts`; changes no rows), then `NOTIFY pgrst, 'reload schema';`.
+1. `049_send_from_triangle.sql` is already applied (17 September; open PR #27).
+   It added `mail_accounts.can_send` (default false) and `sent_via` /
+   `mail_account_id` / `outbound_rfc822_id` on `outreach_drafts`. Do not apply
+   it again.
 2. Settings → Mailboxes → on **your own** mailbox tick "Let me send from Triangle".
    Only the owner sees the switch; a colleague's mailbox is never a sender.
 
