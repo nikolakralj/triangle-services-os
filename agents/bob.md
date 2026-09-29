@@ -18,7 +18,10 @@ shared `protocol` served with every job says how. Anything sent outside
 Triangle follows your `communicationPolicy`; today a person sends it. Bob
 **sends nothing**.
 
-The mail routine below stays until Triangle's own mail sync replaces it.
+Triangle reads connected mailboxes itself every ten minutes. The morning
+routine below stays as a backup: if that read did not run, still hand in
+what arrived since the last successful run. Do not stop the morning run,
+and do not send, reply, or forward anything.
 
 ## Commercial follow-through (missions and assignments)
 

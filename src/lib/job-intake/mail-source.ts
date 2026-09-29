@@ -29,8 +29,21 @@ export interface FetchedMessage {
   bodyIsHtml: boolean;
 }
 
+export interface ListedEnvelope {
+  id: string;
+  sentAt: string | null;
+}
+
 export interface MailSource {
-  fetchSince(since: Date, limit: number): Promise<FetchedMessage[]>;
+  /**
+   * List envelopes since `since`, then download only the ids `choose`
+   * returns. `choose` runs after the envelope fetch finishes — never during
+   * it — so it may hit the database without deadlocking the IMAP socket.
+   */
+  fetchWindow(
+    since: Date,
+    choose: (envelopes: ListedEnvelope[]) => Promise<string[]>,
+  ): Promise<FetchedMessage[]>;
 }
 
 export interface ImapConfig {
@@ -101,7 +114,10 @@ export class ImapMailSource implements MailSource {
     }
   }
 
-  async fetchSince(since: Date, limit = 100): Promise<FetchedMessage[]> {
+  async fetchWindow(
+    since: Date,
+    choose: (envelopes: ListedEnvelope[]) => Promise<string[]>,
+  ): Promise<FetchedMessage[]> {
     const client = this.newClient();
     // imapflow emits socket errors as events. Without a listener Node turns
     // them into an uncaughtException that can take the whole server down.
@@ -120,34 +136,48 @@ export class ImapMailSource implements MailSource {
         // ── Pass 1: envelopes only ──────────────────────────────────────
         // The FETCH must run to completion before any other command is
         // issued on this connection — downloading a body mid-iteration
-        // deadlocks until the socket times out.
-        const candidates: Array<{
-          uid: number;
-          msg: FetchMessageObject;
-          part: PickedPart | null;
-        }> = [];
+        // deadlocks until the socket times out. `choose` may await the
+        // database; that is not an IMAP command.
+        const byId = new Map<
+          string,
+          {
+            uid: number;
+            msg: FetchMessageObject;
+            part: PickedPart | null;
+            sentAt: string | null;
+          }
+        >();
 
         for await (const msg of client.fetch(
           { since },
           { uid: true, envelope: true, bodyStructure: true },
         )) {
-          if (!msg.envelope?.messageId) continue;
+          const messageId = msg.envelope?.messageId;
+          if (!messageId) continue;
           // Cheap sender/subject filter: most of a real inbox is newsletters
           // and alerts. Skipping them here avoids a body download AND an
           // LLM call per message, which is where the time and cost go.
           if (isObviousNoise(msg)) continue;
-          candidates.push({
+          const id = String(messageId);
+          if (byId.has(id)) continue;
+          byId.set(id, {
             uid: msg.uid,
             msg,
             part: pickBodyPart(msg.bodyStructure),
+            sentAt: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
           });
         }
 
-        // Newest first, so a limited run gets the most recent mail.
-        candidates.sort((a, b) => b.uid - a.uid);
+        const envelopes: ListedEnvelope[] = [...byId.entries()].map(([id, row]) => ({
+          id,
+          sentAt: row.sentAt,
+        }));
+        const ids = await choose(envelopes);
 
-        // ── Pass 2: download bodies for survivors only ──────────────────
-        for (const c of candidates.slice(0, limit)) {
+        // ── Pass 2: download bodies for the chosen ids only ─────────────
+        for (const id of ids) {
+          const c = byId.get(id);
+          if (!c) continue;
           const body = c.part
             ? await this.downloadPart(client, c.uid, c.part.path)
             : "";

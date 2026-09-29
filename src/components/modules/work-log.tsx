@@ -29,6 +29,10 @@ export function describeRun(run: AgentRun, who: string): string {
     if (n("leadsCreated") > 0) bits.push(`${n("leadsCreated")} new leads`);
     if (n("alreadySeen") > 0) bits.push(`${n("alreadySeen")} already known`);
     if (n("errors") > 0) bits.push(`${n("errors")} errors`);
+    if (run.summary.catchingUp === true) bits.push("older mail still reading");
+    if (n("fetched") === 0 && n("errors") > 0) {
+      return `Mailbox check failed — ${bits.join(", ")}.`;
+    }
     return `Mailbox check read ${n("fetched")} emails — ${bits.join(", ") || "nothing new"}.`;
   }
   return `${who}: ${Object.entries(run.summary)

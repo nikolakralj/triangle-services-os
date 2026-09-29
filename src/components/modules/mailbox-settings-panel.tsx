@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { mailboxReadSentence } from "@/lib/job-intake/sync-status";
 
 interface MailAccount {
   id: string;
@@ -20,6 +21,7 @@ interface MailAccount {
   imapHost: string;
   status: string;
   lastSyncedAt: string | null;
+  lastAttemptAt: string | null;
   lastError: string | null;
   credentialSetAt: string | null;
   connected: boolean;
@@ -177,16 +179,19 @@ node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&
                 <p className="mt-0.5 text-xs text-slate-500">
                   {a.imapHost}
                   {a.watchLabel ? ` · folder: ${a.watchLabel}` : ""}
-                  {a.lastSyncedAt
-                    ? ` · last read ${new Date(a.lastSyncedAt).toLocaleString()}`
-                    : " · never read"}
                 </p>
-                {a.lastError && (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-rose-600">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    {a.lastError}
-                  </p>
-                )}
+                <p
+                  className={`mt-1 text-xs ${a.lastError ? "text-rose-700" : "text-slate-600"}`}
+                  suppressHydrationWarning
+                >
+                  {mailboxReadSentence({
+                    readThrough: a.lastSyncedAt,
+                    lastAttempt: a.lastAttemptAt,
+                    failure: a.lastError,
+                    paused: a.status === "paused",
+                    format: (iso) => new Date(iso).toLocaleString(),
+                  })}
+                </p>
                 {a.usesLegacyEnvVar && (
                   <p className="mt-1 text-xs text-amber-700">
                     Using an environment variable. Reconnect it here to store the
