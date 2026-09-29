@@ -19,7 +19,7 @@ One file answers each question. Update that file and link to it from others.
 | What exists and is live? | [CURRENT_STATE](CURRENT_STATE.md) |
 | Why was a direction chosen? | [DECISIONS](DECISIONS.md) |
 | What are we building? | [VISION](VISION.md) |
-| What will the product look like? | [Operating shell design](docs/design/PRODUCT_SHELL_2026-09-16.html) — menu, Today, Team, how people and employees communicate |
+| What will the product look like? | [DECISIONS](DECISIONS.md) — "The plan", law 5: Today is one line per thing. The 16 September shell mockup ([operating shell](docs/design/PRODUCT_SHELL_2026-09-16.html)) is history for that layout |
 | What counts as truth, success or an authorized action? | [PRODUCT_OPERATING_RULES](PRODUCT_OPERATING_RULES.md) |
 | What is the long-term sequence? | [ROADMAP](ROADMAP.md) |
 | How should a coding agent work? | [AGENTS](AGENTS.md), [SOFTWARE_AGENT_INSTRUCTIONS](SOFTWARE_AGENT_INSTRUCTIONS.md), [CLAUDE](CLAUDE.md) |
@@ -30,7 +30,7 @@ employees' bots at runtime.
 
 ### Design — where the product is going
 
-- [Operating shell, 16 September](docs/design/PRODUCT_SHELL_2026-09-16.html): three menu items, Today as one inbox, Team in Settings, all delegated work as a task on a case. The decision is "The operating shell" in DECISIONS.
+- [DECISIONS](DECISIONS.md), "The plan", law 5 (29 September): Today is one line per thing. The [operating shell, 16 September](docs/design/PRODUCT_SHELL_2026-09-16.html) (Needs you | In progress | Done since you looked) is history for that layout. Menu and Team-in-Settings in that mockup still stand. The decision record is "The operating shell" in DECISIONS.
 
 ### Reference — how a module works
 
@@ -80,10 +80,17 @@ npm run dev
 
 Configure local values from `.env.example` and the
 [deploy guide](docs/operations/DEPLOY.md). Never paste or commit secrets, and do
-not run old seed instructions against a live organization. Migrations run
-through `048_drafts_keep_what_triangle_wrote.sql`; local development and
-production share one database, so a migration is applied only with the CEO's
-approval.
+not run old seed instructions against a live organization. Local development
+and production share one database, so a migration is applied only with the
+CEO's approval. Files on `main` run through `052_requirement_roles.sql`.
+Known applied, 29 September: 044–048 (11–15 September;
+`048_drafts_keep_what_triangle_wrote.sql` is on `main`).
+`049_send_from_triangle.sql` is on `main` and applied by 17 September — open
+PR #27 (not merged) records `can_send` on and the Oliver Hall send.
+`050_mailbox_observe` and `051_mailbox_space` are live (applied 17–18 September
+for open PRs #29 and #28); their files are not on `main`. PRs #28 and #29 both
+carry a `050` file; #29 also carries `051`. `052_requirement_roles.sql` was
+applied 29 September. Detail is in [DEPLOY](docs/operations/DEPLOY.md).
 
 The stack is Next.js 16, React 19, TypeScript, Supabase and server-side AI. Read
 the installed Next.js documentation before implementation.

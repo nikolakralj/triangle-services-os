@@ -30,8 +30,10 @@ external-action permissions and roadmap evidence gates remain unchanged.
 
 **Current operating surfaces (16 September 2026):** Today, Missions, Talent;
 Team lives in Settings (operating-shell decision, design in
-`docs/design/PRODUCT_SHELL_2026-09-16.html`). Today becomes **Needs you | In
-progress | Done since you looked** (DEV-017). Handoff changes the
+`docs/design/PRODUCT_SHELL_2026-09-16.html`). **Superseded, 29 September
+2026:** the Today layout **Needs you | In progress | Done since you looked**
+(DEV-017) is history. DECISIONS "The plan" law 5: Today is one line per thing.
+Handoff changes the
 owner of the work; it does not change where the work lives (DEV-015, ahead of
 the Team redesign). Open thread is a drawer on Today. Ask Bob assignments use
 `case_type: commercial_follow_through` so commercial complete is not judged as
