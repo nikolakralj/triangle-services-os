@@ -97,6 +97,41 @@ test('German Von: header yields the recruiter', () => {
   assert.equal(got.name, 'Anna Schmidt');
 });
 
+test('a colleague forward names the original sender, not the colleague', () => {
+  const body = [
+    '---------- Forwarded message ---------',
+    'From: Plant Manager <plant@example-dc.de>',
+    'Date: Mon, 22 Sep 2026',
+    'Subject: Commissioning engineers Cologne',
+    '',
+    'We need six commissioning engineers near Cologne.',
+  ].join('\n');
+  const got = email.resolveRecruiterContact({
+    extractedEmail: 'ralph.example@gmail.com',
+    extractedName: 'Ralph',
+    senderEmail: 'ralph.example@gmail.com',
+    senderName: 'Ralph',
+    recipientEmail: 'nikola.kralj86@gmail.com',
+    subject: 'Fwd: Commissioning engineers Cologne',
+    bodyText: body,
+  });
+  assert.equal(got.email, 'plant@example-dc.de');
+  assert.match(got.name, /Plant Manager/);
+});
+
+test('a reply that quotes an earlier From keeps the person who wrote it', () => {
+  const got = email.resolveRecruiterContact({
+    extractedEmail: 'oliver@g2recruitment.com',
+    extractedName: 'Oliver Hall',
+    senderEmail: 'oliver@g2recruitment.com',
+    senderName: 'Oliver Hall',
+    recipientEmail: mailbox,
+    subject: 'Re: PLC role',
+    bodyText: 'From: Plant Manager <plant@example-dc.de>\n\nThanks, sending the profile.',
+  });
+  assert.equal(got.email, 'oliver@g2recruitment.com');
+});
+
 test('direct agency mail keeps the envelope sender', () => {
   const got = email.resolveRecruiterContact({
     extractedEmail: 'oliver@g2recruitment.com',

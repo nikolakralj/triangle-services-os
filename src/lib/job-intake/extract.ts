@@ -254,6 +254,7 @@ export async function classifyAndExtract(params: {
             senderName: params.senderName,
             senderEmail: params.senderEmail,
             recipientEmail: params.recipientEmail ?? null,
+            subject: params.subject,
             cleanedText: cleaned.text,
           })
         : null,
@@ -301,6 +302,7 @@ function normaliseLead(
     senderName: string | null;
     senderEmail: string | null;
     recipientEmail?: string | null;
+    subject?: string | null;
     cleanedText: string;
   },
 ): ExtractedLead | null {
@@ -317,6 +319,7 @@ function normaliseLead(
     senderEmail: ctx.senderEmail,
     senderName: ctx.senderName,
     recipientEmail: ctx.recipientEmail ?? null,
+    subject: ctx.subject ?? null,
     bodyText: ctx.cleanedText,
   });
   const agencyEmail =

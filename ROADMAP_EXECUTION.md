@@ -49,7 +49,30 @@ Triangle.
 **Done when:** Production runs `main`, no open branch is older than three
 days, and Ralph's email is in Triangle.
 
-### P1 — Mail in minutes, not mornings · `READY` after P0 · 2 days
+### P1 — Mail in minutes, not mornings · `IN_PROGRESS` · Cursor, branch `cursor/mail-sync-minutes-75af`
+
+Cause, checked in the code and the Vercel cron docs: the route only
+accepted POST, and Vercel Cron calls it with GET, so Next.js returned 405
+before any mailbox was read and nothing was recorded. That has been true
+since the route was added (25 August). The daily schedule is the Hobby
+limit, not the outage: `*/15` was rejected at deploy on 27 August, and a
+three-times-a-day employee cron was rejected on 4 September. An expired
+app password would still have written `last_error` and a work-log row;
+a 405 writes neither. The 8 September date is the last signed-in read,
+not a commit that broke the route (nothing in the mail path changed that
+day).
+
+Choice: a repository schedule (`.github/workflows/mail-sync.yml`) calls
+`GET /api/job-intake/sync` every 10 minutes with `CRON_SECRET`. Hobby
+cannot do that inside `vercel.json` without failing the deploy, so the
+daily Vercel cron stays as a backup now that GET works. Bob's morning
+hand-in stays the other backup. Gmail push was not used: company mail is
+not Google Workspace, and a Gmail readonly scope is restricted. No
+migration.
+
+Signed-in check (an email in a connected mailbox shows up within ten
+minutes) is still owed. It starts only after this is merged and the
+repository secret below is set.
 
 - Find why Triangle's own mail check (`/api/job-intake/sync`, daily cron in
   `vercel.json`) has not recorded a read since 8 September, and fix it.

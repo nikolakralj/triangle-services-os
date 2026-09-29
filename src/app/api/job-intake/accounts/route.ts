@@ -111,7 +111,7 @@ export async function GET(request: Request) {
   const { data } = await svc
     .from("mail_accounts")
     .select(
-      "id, email_address, display_name, provider, watch_label, status, last_synced_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host, owner_user_id, can_send",
+      "id, email_address, display_name, provider, watch_label, status, last_synced_at, updated_at, last_error, credential_ref, credential_encrypted, credential_set_at, imap_host, owner_user_id, can_send",
     )
     .eq("org_id", access.organizationId)
     .order("created_at", { ascending: true });
@@ -124,6 +124,7 @@ export async function GET(request: Request) {
     imapHost: a.imap_host ?? defaultImapHost(String(a.email_address)),
     status: a.status,
     lastSyncedAt: a.last_synced_at,
+    lastAttemptAt: a.updated_at,
     lastError: a.last_error,
     credentialSetAt: a.credential_set_at,
     // Whether a password is available — never the password itself.

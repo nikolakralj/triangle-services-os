@@ -1,0 +1,55 @@
+# Triangle reads connected mailboxes every 10 minutes.
+#
+# Vercel Hobby rejects a cron more often than once a day at deploy time, and
+# its daily cron stays in vercel.json as a backup (GET /api/job-intake/sync).
+# This schedule is the heartbeat. It only reads. It never sends mail.
+#
+# Before this can succeed, the repository secret CRON_SECRET must be the same
+# value as Vercel’s CRON_SECRET. CRON_ORGANIZATION_ID stays on Vercel; the
+# route reads it. If Vercel Deployment Protection answers the request, also
+# set VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Settings → Deployment Protection).
+
+name: Mail sync
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mail-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read connected mailboxes
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "CRON_SECRET is not set on this repository."
+            echo "Add it under Settings → Secrets and variables → Actions."
+            echo "Use the same value as Vercel CRON_SECRET. Do not paste it into a chat."
+            exit 1
+          fi
+          args=(-sS -o /tmp/mail-sync.json -w "%{http_code}" --max-time 120)
+          args+=(-H "Authorization: Bearer ${CRON_SECRET}")
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET}" ]; then
+            args+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+          code=$(curl "${args[@]}" "https://triangle-services-os.vercel.app/api/job-intake/sync")
+          echo "HTTP ${code}"
+          cat /tmp/mail-sync.json
+          echo
+          if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
+            echo "Mail sync failed."
+            exit 1
+          fi

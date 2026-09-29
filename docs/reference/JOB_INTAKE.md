@@ -88,7 +88,7 @@ src/lib/data/job-intake.ts        Data layer (leads, counts, drafts, rules).
 src/lib/data/organization-profile.ts Tenant operating profile data boundary.
 src/app/(app)/job-intake/page.tsx The list, stat tiles, filters, sorting.
 src/app/api/job-intake/
-  sync/             POST — run ingestion. Session or CRON_SECRET.
+  sync/             POST (signed-in Sync now) and GET (cron secret only).
   accounts/         GET/POST/DELETE — connect mailboxes.
   rules/            GET/PUT — the org's own scoring rules.
   export/           GET — CSV, honours current filter + sort.
@@ -240,8 +240,15 @@ The follow-up appears on Today until something newer is recorded for that lead.
    password** (Account → Security → 2-Step Verification → App passwords), not the
    normal password. Company domains use the ordinary mailbox password.
 3. Job Intake → **Sync now**, or "Read older mail…" for a backfill.
-4. Scheduled: `vercel.json` currently schedules sync daily at 06:00 UTC. Needs
-   `CRON_SECRET` and `CRON_ORGANIZATION_ID`.
+4. Scheduled read, every 10 minutes: `.github/workflows/mail-sync.yml` calls
+   `GET /api/job-intake/sync` on production with `Authorization: Bearer $CRON_SECRET`.
+   The repository secret `CRON_SECRET` must match Vercel. `CRON_ORGANIZATION_ID`
+   stays on Vercel; the route reads it. Vercel Hobby cannot cron more than once
+   a day (`vercel.json` stays at 06:00 UTC as the backup, and that call is GET
+   because Vercel Cron does not POST). Bob's morning hand-in is the other backup.
+   The same message is stored once (`org_id`, `provider_message_id`).
+5. Settings → Diagnostics → Mail check shows the last successful read and, when
+   the last attempt failed, the error. The same sentence is on each mailbox.
 
 ## Why IMAP and not "Sign in with Google"
 

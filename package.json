@@ -17,6 +17,7 @@
     "check:ask-hanna": "node scripts/check-ask-hanna.mjs",
     "check:one-ask": "node scripts/check-one-ask.mjs",
     "check:workspace": "node scripts/check-workspace.mjs",
+    "check:mail-sync": "node scripts/check-mail-sync.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

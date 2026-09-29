@@ -11,6 +11,7 @@ interface SyncTotals {
   noiseDiscarded: number;
   alreadySeen: number;
   errors: number;
+  catchingUp?: boolean;
 }
 
 interface SyncResponse {
@@ -52,7 +53,8 @@ export function JobIntakeSyncButton() {
         setResult(
           `Read ${t.fetched} email${t.fetched === 1 ? "" : "s"} · ` +
             `${t.leadsCreated} new opportunit${t.leadsCreated === 1 ? "y" : "ies"} · ` +
-            `${t.noiseDiscarded} noise discarded`,
+            `${t.noiseDiscarded} noise discarded` +
+            (t.catchingUp ? " · older mail still reading" : ""),
         );
       }
 
