@@ -1,5 +1,11 @@
 # Current state
 
+## P3 employees report everything — 29 September 2026 (Europe/Zagreb)
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| Employees report work done outside Triangle. Badge `POST /api/agent/reports` files a LinkedIn invitation, an email, a candidate, a reply, unavailability or an access need on the person, the company and the case, with a follow-up date. "Last reported unavailable, on this date" does not become unknown. "Hanna needs your LinkedIn login" is one line on Today. A later mailbox message on a requirement case thread is filed on that case and the owner is woken once | `3619560` | `check:employee-reports` 14/14; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:one-ask` 30/30; `check:today-slim` 13/13; `check:workspace` 29/29; lint 0; `tsc --noEmit` 0; production build 0. Preview https://triangle-services-os-git-cu-9b5174-nikolakralj86-2532s-projects.vercel.app `/api/version` reports `3619560`, branch `cursor/p3-employee-reports-cca2`, env preview. `/` and `/decisions` return 307 to `/login`. Not signed in | Migration `053_employee_reports.sql` is written and not applied. No live report was posted. Nothing was sent. Ask, Approve and Send were not pressed. `check:tenant-identity` still fails on Ralph in `src/lib/job-intake/requirement-case.ts` (already on `main` at `fe201c3`). Full DEV-019 sent-folder observation is not in this branch. Draft PR #40 |
+
 ## P1 mail sync — in progress, 29 September 2026
 
 Not done. Branch `cursor/mail-sync-minutes-75af`. Triangle's own mail check
