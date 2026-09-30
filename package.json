@@ -20,6 +20,7 @@
     "check:requirement-case": "node scripts/check-requirement-case.mjs",
     "check:mail-sync": "node scripts/check-mail-sync.mjs",
     "check:employee-reports": "node scripts/check-employee-reports.mjs",
+    "check:case-page": "node scripts/check-case-page.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

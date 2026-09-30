@@ -50,7 +50,6 @@ import { redraftForPerson } from "@/lib/data/lead-reply";
 import { mayAttachPack, type PutForwardCase } from "@/lib/data/put-forward";
 import { CaseDecision, type DecisionChase } from "@/components/modules/case-decision";
 import { TodayFold } from "@/components/modules/today-fold";
-import { RequirementRoleTable } from "@/components/modules/requirement-role-table";
 import { AccessNeededLines } from "@/components/modules/reported-work";
 import type { AccessNeededLine } from "@/lib/data/employee-report-policy";
 import type { RequirementCaseLine } from "@/lib/job-intake/requirement-case";
@@ -346,17 +345,17 @@ function RequirementLines({ lines }: { lines: RequirementCaseLine[] }) {
   return (
     <div className="space-y-2">
       {lines.map((item) => (
-        <TodayFold key={item.missionId} title={item.title} line={item.line} action="Open">
-          <div className="space-y-3">
-            <RequirementRoleTable roles={item.roles} openQuestions={item.openQuestions} />
-            <Link
-              href={`/missions/${item.missionId}`}
-              className="inline-flex text-[13px] font-medium text-sky-800 hover:underline"
-            >
-              Open the case
-            </Link>
-          </div>
-        </TodayFold>
+        <Link
+          key={item.missionId}
+          href={`/missions/${item.missionId}`}
+          className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14.5px] font-semibold text-slate-900">{item.title}</span>
+            <span className="mt-0.5 block truncate text-[13px] leading-snug text-slate-600">{item.line}</span>
+          </span>
+          <span className="shrink-0 text-[13px] font-semibold text-slate-700">Open</span>
+        </Link>
       ))}
     </div>
   );

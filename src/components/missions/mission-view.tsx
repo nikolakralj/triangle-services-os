@@ -1,26 +1,23 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   BadgeCheck,
   Check,
-  ChevronDown,
   ChevronRight,
   Copy,
   Link2,
   Loader2,
   Mail,
   Phone,
-  ShieldCheck,
   Undo2,
   UserRound,
   X,
 } from "lucide-react";
 import {
-  AUTONOMY_STANDARD,
   ago,
   hostOf,
   missionHoldingsHref,
@@ -268,7 +265,6 @@ function MissionHeader({
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <AutonomyMenu leadName={lead?.name ?? "The worker"} />
         {canWrite && (
           <button
             type="button"
@@ -283,76 +279,6 @@ function MissionHeader({
       </div>
       {error && <p className="w-full text-[12px] text-rose-600">{error}</p>}
     </header>
-  );
-}
-
-/**
- * The company's rules, once — not a permissions form on every delegation.
- * The same list the worker is given in its instructions.
- */
-function AutonomyMenu({ leadName }: { leadName: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12.5px] text-slate-600 transition hover:bg-slate-50"
-      >
-        <ShieldCheck className="h-3.5 w-3.5 text-slate-500" />
-        Autonomy: <span className="font-semibold text-slate-900">{AUTONOMY_STANDARD.name}</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-11 z-30 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/10">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-            {leadName} can
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {AUTONOMY_STANDARD.can.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug text-slate-700">
-                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                {item}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-amber-700">
-            {leadName} must ask you before
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {AUTONOMY_STANDARD.mustAsk.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-[12.5px] leading-snug text-slate-700">
-                <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                {item}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 border-t border-slate-100 pt-3 text-[11.5px] leading-snug text-slate-500">
-            Company rules, the same on every mission. The database refuses a contact that no person
-            confirmed, whatever an employee attempts.
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
 

@@ -1,13 +1,21 @@
 # Current state
 
+## P4 the case page — 29 September 2026 (Europe/Zagreb)
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| One screen per recruiting case, drawn from the workspace blocks: what was asked (client and a source-email link), a roles table (needed, proposed, missing), the drafts with the existing Send from Triangle control, the open questions, and activity folded (employee reports included). Today's line for that case is the link to `/missions/{id}`. The Autonomy picker is off the mission page. The named Cologne fixture moved out of product source so the tenant-identity check passes | this branch | `check:case-page` 3/3; `check:requirement-case` 7/7; `check:tenant-identity` 0; `check:workspace` 29/29; `check:one-ask` 30/30; `check:employee-reports` 14/14; `check:today-slim` 13/13; `check:mail-sync` 9/9; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; lint 0; `tsc --noEmit` 0; production build 0. No signed-in Preview check | No migration. Nothing sent. `check:dev-004` and `check:dev-010` still fail on roadmap wording that was already on main (the DEV-004 slice no longer names `2026-09-16-bob-mission-work-scope.sql`; the DEV-010 slice no longer says "signed-in check"). Those two were not part of this change |
+
+Updated 29 September 2026 (Europe/Zagreb). This branch is `cursor/p4-case-page-f43d`, off main `4997ec9` (merge of PR #40). The queue is "The plan" in [ROADMAP_EXECUTION](ROADMAP_EXECUTION.md). P4 is `IN_PROGRESS`.
+
 ## P3 employees report everything — 29 September 2026 (Europe/Zagreb)
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
 | Employees report work done outside Triangle. Badge `POST /api/agent/reports` files a LinkedIn invitation, an email, a candidate, a reply, unavailability or an access need on the person, the company and the case, with a follow-up date. "Last reported unavailable, on this date" does not become unknown. "Hanna needs your LinkedIn login" is one line on Today. A later mailbox message on a requirement case thread is filed on that case and the owner is woken once | `3619560` | `check:employee-reports` 14/14; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:one-ask` 30/30; `check:today-slim` 13/13; `check:workspace` 29/29; lint 0; `tsc --noEmit` 0; production build 0. Preview https://triangle-services-os-git-cu-9b5174-nikolakralj86-2532s-projects.vercel.app `/api/version` reports `3619560`, branch `cursor/p3-employee-reports-cca2`, env preview. `/` and `/decisions` return 307 to `/login`. Not signed in | Migration `053_employee_reports.sql` is written and not applied. No live report was posted. Nothing was sent. Ask, Approve and Send were not pressed. `check:tenant-identity` still fails on Ralph in `src/lib/job-intake/requirement-case.ts` (already on `main` at `fe201c3`). Full DEV-019 sent-folder observation is not in this branch. Draft PR #40 |
 
-Updated 29 September 2026 (Europe/Zagreb). Production is `fe201c3` (merge of
-PR #38). The queue is "The plan" in [ROADMAP_EXECUTION](ROADMAP_EXECUTION.md).
+Updated 29 September 2026 (Europe/Zagreb). Main is `4997ec9` (merge of
+PR #40). The queue is "The plan" in [ROADMAP_EXECUTION](ROADMAP_EXECUTION.md).
 
 P0 shipped (PR #35, `656ccca`). Open PRs #27, #28, #29 and #31, and stale
 branches, still fail P0's "no branch older than three days" test. P1 shipped
@@ -15,9 +23,9 @@ branches, still fail P0's "no branch older than three days" test. P1 shipped
 CRON_SECRET`, a GitHub Actions mail-sync every 10 minutes, Production verified
 200. No migration. P2 shipped (PR #38, `fe201c3`); migration 052 applied
 29 September; the signed-in check on Ralph's Cologne email is still owed.
-Ingestion does not store email attachments yet. P3 is in progress on
-`cursor/p3-employee-reports-cca2` (draft PR #40). The docs sync (PR #39)
-recorded that branch as `cursor/p3-employee-reports-*`.
+Ingestion does not store email attachments yet. P3 shipped (PR #40,
+`4997ec9`). Nikola's brief for P4 says migration 053 is applied; this branch
+did not apply it. P4 is in progress on `cursor/p4-case-page-f43d`.
 
 Earlier sessions are preserved in the
 [history archive](docs/archive/2026-09-08/CURRENT_STATE.md).

@@ -61,9 +61,9 @@ export const MISSION_STATE_LABEL: Record<MissionState, string> = {
 
 /**
  * What an employee may do inside a mission without asking, and what it must
- * ask for. Shown to the CEO under "Autonomy" and given to the worker in its
- * instructions — one list, so the screen cannot promise a rule the worker was
- * never told.
+ * ask for. Given to the worker in its instructions. The per-mission Autonomy
+ * picker is gone: how much freedom an employee has belongs on its own record,
+ * granted by the CEO (29 September, "The workspace is the answer").
  *
  * Deliberately only what is true today. "Prepare files" is not here because
  * no employee can yet.

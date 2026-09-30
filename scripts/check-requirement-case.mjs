@@ -51,8 +51,6 @@ const requirement = load("src/lib/job-intake/requirement-case.ts");
 const shared = load("src/lib/data/mission-shared.ts");
 
 const {
-  COLOGNE_AGENCY_REQUEST,
-  SINGLE_ROLE_REQUEST,
   decideRequirementCase,
   fileRequirementCase,
   headcountSum,
@@ -62,6 +60,82 @@ const {
   requirementStatusLine,
   requirementZone,
 } = requirement;
+
+// The named requester lives in this check, not in product source. The tenant
+// identity scan treats that name as an operator hardcoded into the app.
+const COLOGNE_AGENCY_REQUEST = {
+  classification: "job_opportunity",
+  confidence: 92,
+  messageId: "<ralph-cologne-commissioning@agency.example>",
+  threadId: "thread-ralph-cologne",
+  subject: "Fwd: Commissioning engineers — data centre near Cologne",
+  requesterEmail: "ralph@agency.example",
+  contactName: "Ralph",
+  city: "Cologne",
+  sector: "data centre",
+  headcountText: "6",
+  text: [
+    "Fwd: Commissioning engineers — data centre near Cologne",
+    "Need 6 commissioning engineers for a data centre near Cologne.",
+    "3 Basic, 2 Advanced, 1 Expert.",
+    "Desigo CC, PXC, ABT. Start November–December 2026.",
+    "English required, German desirable.",
+  ].join("\n"),
+  roles: [
+    {
+      title: "Commissioning engineer",
+      count: 3,
+      level: "Basic",
+      skills: ["Desigo CC", "PXC", "ABT"],
+      start: "November 2026",
+      duration: null,
+      location: "near Cologne",
+      languages: ["English", "German desirable"],
+      rate: null,
+    },
+    {
+      title: "Commissioning engineer",
+      count: 2,
+      level: "Advanced",
+      skills: ["Desigo CC", "PXC"],
+      start: "November 2026",
+      duration: null,
+      location: "near Cologne",
+      languages: ["English"],
+      rate: null,
+    },
+    {
+      title: "Commissioning engineer",
+      count: 1,
+      level: "Expert",
+      skills: ["Desigo CC"],
+      start: "December 2026",
+      duration: null,
+      location: "near Cologne",
+      languages: ["English"],
+      rate: null,
+    },
+  ],
+  openQuestions: ["rate"],
+};
+
+const SINGLE_ROLE_REQUEST = {
+  classification: "job_opportunity",
+  confidence: 88,
+  headcountText: "1",
+  text: "One Siemens automation engineer, Ireland, 12 months.",
+  roles: [
+    {
+      title: "Siemens automation engineer",
+      count: 1,
+      level: null,
+      skills: ["PCS7"],
+      start: null,
+      location: "Ireland",
+    },
+  ],
+  openQuestions: ["rate"],
+};
 const { earliestOpenRun } = shared;
 
 function cologneDecision() {

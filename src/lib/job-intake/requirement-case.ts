@@ -301,7 +301,7 @@ export function requirementPlace(input: {
 
 /**
  * The Today sentence. The number is how many people were asked for, which is
- * how the plan names Ralph's line ("6 roles"); the table is one row per role.
+ * how the plan names the line ("6 roles"); the table is one row per role.
  */
 export function requirementCaseTitle(input: {
   who: string | null;
@@ -438,82 +438,3 @@ function roleLine(role: RequirementRoleRow, index: number): string {
   ].filter(Boolean);
   return bits.join(" — ");
 }
-
-/**
- * Ralph's Cologne request, as the plan describes it: an agency forward for
- * six commissioning engineers, three levels, one case.
- */
-export const COLOGNE_AGENCY_REQUEST = {
-  classification: "job_opportunity" as const,
-  confidence: 92,
-  messageId: "<ralph-cologne-commissioning@agency.example>",
-  threadId: "thread-ralph-cologne",
-  subject: "Fwd: Commissioning engineers — data centre near Cologne",
-  requesterEmail: "ralph@agency.example",
-  contactName: "Ralph",
-  city: "Cologne",
-  sector: "data centre",
-  headcountText: "6",
-  text: [
-    "Fwd: Commissioning engineers — data centre near Cologne",
-    "Need 6 commissioning engineers for a data centre near Cologne.",
-    "3 Basic, 2 Advanced, 1 Expert.",
-    "Desigo CC, PXC, ABT. Start November–December 2026.",
-    "English required, German desirable.",
-  ].join("\n"),
-  roles: [
-    {
-      title: "Commissioning engineer",
-      count: 3,
-      level: "Basic",
-      skills: ["Desigo CC", "PXC", "ABT"],
-      start: "November 2026",
-      duration: null,
-      location: "near Cologne",
-      languages: ["English", "German desirable"],
-      rate: null,
-    },
-    {
-      title: "Commissioning engineer",
-      count: 2,
-      level: "Advanced",
-      skills: ["Desigo CC", "PXC"],
-      start: "November 2026",
-      duration: null,
-      location: "near Cologne",
-      languages: ["English"],
-      rate: null,
-    },
-    {
-      title: "Commissioning engineer",
-      count: 1,
-      level: "Expert",
-      skills: ["Desigo CC"],
-      start: "December 2026",
-      duration: null,
-      location: "near Cologne",
-      languages: ["English"],
-      rate: null,
-    },
-  ],
-  openQuestions: ["rate"],
-};
-
-/** One named role, the shape Henry's and Oliver's mail already takes. */
-export const SINGLE_ROLE_REQUEST = {
-  classification: "job_opportunity" as const,
-  confidence: 88,
-  headcountText: "1",
-  text: "One Siemens automation engineer, Ireland, 12 months.",
-  roles: [
-    {
-      title: "Siemens automation engineer",
-      count: 1,
-      level: null,
-      skills: ["PCS7"],
-      start: null,
-      location: "Ireland",
-    },
-  ],
-  openQuestions: ["rate"],
-};
