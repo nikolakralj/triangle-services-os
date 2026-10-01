@@ -1,5 +1,21 @@
 # Current state
 
+## WhatsApp pilot — 1 October 2026
+
+Nikola approved an explicit exception to the P0–P4 freeze (decision "WhatsApp
+pilot" in [DECISIONS](DECISIONS.md); one entry in
+[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md)). Meta's free test number, text
+only. Inbound messages are stored once by wamid and filed on the person and
+their open case when the number matches. Hanna is woken once
+(`BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`). She drafts
+with her badge; a person approves and sends from the existing draft line on
+the case and the person. Free text only inside 24 hours; outside that, only
+the configured template. Nothing is sent automatically.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| Webhook `GET/POST /api/whatsapp/webhook`, badge `POST /api/agent/whatsapp/drafts`, human `POST /api/whatsapp/send`, migration `054_whatsapp_messages.sql` | this branch | `check:whatsapp` 9/9; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 14/14; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Migration 054 is written and not applied. Nothing was sent. No live webhook was registered from this agent. The draft line was rendered in `check:whatsapp`; a signed-in browser pass waits on Nikola applying 054 |
+
 ## P4 the case page — 29 September 2026 (Europe/Zagreb)
 
 | Change | Commit | Checked | Limit |

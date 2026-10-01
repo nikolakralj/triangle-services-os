@@ -6,6 +6,22 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-01: WhatsApp pilot — one approved exception to the P0–P4 freeze
+
+Nikola approved this on 1 October 2026. It is the one build outside the
+P0–P4 freeze in `ROADMAP_EXECUTION.md`.
+
+Meta's free test number. Text only. Only Nikola and Ralph message Hanna.
+An inbound message is stored once (Meta's wamid) and filed on the person and
+their open case when the number matches. Hanna is woken once, through the
+same wake the missions use (`BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her
+role key is `hr`). She may draft a reply with her badge. Nothing is sent
+until a person approves and sends it from the case or the person. Inside 24
+hours of the contact's last inbound, that send is free text. Outside it, only
+the configured approved template. A number that is not on
+`WHATSAPP_ALLOWED_NUMBERS` is stored and does not wake Hanna, and a send to
+it is refused.
+
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
 
 Locked by Nikola on 29 September: "What I need is to handle Ralph's request

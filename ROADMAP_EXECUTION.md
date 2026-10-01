@@ -35,6 +35,11 @@ buttons, not research features, not a second agency. Active searching, after
 P4 below, waits on that same gate, and it does not put LinkedIn inside
 Triangle.
 
+**Exception (1 October 2026).** Nikola approved a WhatsApp Cloud API pilot:
+Meta's free test number, text only, Nikola and Ralph message Hanna, replies
+stay drafts until a person sends them. It is the one build outside this
+freeze. Decision: "WhatsApp pilot" in `DECISIONS.md`.
+
 ### P0 — Clean the floor · `DONE` · PR #35 (`656ccca`)
 
 Shipped 29 September 2026. PR #35 merged `claude/ready-to-ship` (`656ccca`):
