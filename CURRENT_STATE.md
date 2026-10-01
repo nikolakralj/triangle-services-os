@@ -14,7 +14,7 @@ the configured template. Nothing is sent automatically.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
-| Webhook `GET/POST /api/whatsapp/webhook`, badge `POST /api/agent/whatsapp/drafts`, human `POST /api/whatsapp/send`, migration `054_whatsapp_messages.sql` | this branch | `check:whatsapp` (see the PR). Lint, `tsc --noEmit`, build and `check:*` recorded with the PR | Migration 054 is written and not applied. Nothing was sent. No live webhook was registered from this agent |
+| Webhook `GET/POST /api/whatsapp/webhook`, badge `POST /api/agent/whatsapp/drafts`, human `POST /api/whatsapp/send`, migration `054_whatsapp_messages.sql` | this branch | `check:whatsapp` 9/9; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 14/14; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Migration 054 is written and not applied. Nothing was sent. No live webhook was registered from this agent. The draft line was rendered in `check:whatsapp`; a signed-in browser pass waits on Nikola applying 054 |
 
 ## P4 the case page — 29 September 2026 (Europe/Zagreb)
 
