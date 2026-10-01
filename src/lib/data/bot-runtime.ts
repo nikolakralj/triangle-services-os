@@ -125,7 +125,8 @@ export type WakeEvent =
   | "assignment"
   | "client_reply"
   | "follow_up_due"
-  | "availability_stale";
+  | "availability_stale"
+  | "whatsapp_inbound";
 
 export interface WakeResult {
   status: "sent" | "failed" | "not_configured";
@@ -149,6 +150,13 @@ export async function wakeEmployee(params: {
   stepId: string;
   missionId: string | null;
   event: WakeEvent;
+  /** Ids only. WhatsApp passes the message, the sender, and the person and case. */
+  context?: {
+    messageId: string;
+    sender: string;
+    personId: string | null;
+    caseId: string | null;
+  };
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { status: "failed", httpStatus: null };
@@ -182,6 +190,14 @@ export async function wakeEmployee(params: {
           missionId: params.missionId,
           employee: (employee?.display_name as string | undefined) ?? null,
           at: new Date().toISOString(),
+          ...(params.context
+            ? {
+                messageId: params.context.messageId,
+                sender: params.context.sender,
+                personId: params.context.personId,
+                caseId: params.context.caseId,
+              }
+            : {}),
         }),
         signal: AbortSignal.timeout(10_000),
         cache: "no-store",

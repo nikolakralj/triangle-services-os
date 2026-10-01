@@ -29,6 +29,8 @@ import {
 } from "@/lib/data/worker-notes-shared";
 import { availabilityReading, type ReportView } from "@/lib/data/employee-report-policy";
 import { ReportedWork } from "@/components/modules/reported-work";
+import { WhatsAppOnRecord } from "@/components/modules/whatsapp-on-record";
+import type { WhatsAppRecord } from "@/lib/whatsapp/view";
 
 // ---------------------------------------------------------------------------
 // A person, not a table row.
@@ -145,6 +147,7 @@ export function WorkerProfile({
   cvDocumentId = null,
   cvFileName = null,
   reports = [],
+  whatsapp = null,
 }: {
   worker: ProfileWorker;
   initialNotes: WorkerNote[];
@@ -152,6 +155,7 @@ export function WorkerProfile({
   cvDocumentId?: string | null;
   cvFileName?: string | null;
   reports?: ReportView[];
+  whatsapp?: WhatsAppRecord | null;
 }) {
   const router = useRouter();
   const [rereading, setRereading] = useState(false);
@@ -377,6 +381,7 @@ export function WorkerProfile({
       </div>
 
       <ReportedWork reports={reports} />
+      {whatsapp ? <WhatsAppOnRecord record={whatsapp} /> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

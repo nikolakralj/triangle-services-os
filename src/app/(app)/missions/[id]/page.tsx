@@ -11,6 +11,8 @@ import { casePageInput, loadCaseMail, threadReplyDraft } from "@/lib/data/case-p
 import { sendableMailboxesFor } from "@/lib/data/mail-send";
 import { CasePageScreen } from "@/components/modules/case-page";
 import { CaseAsk, CaseDrafts } from "@/components/modules/case-drafts";
+import { WhatsAppOnRecord } from "@/components/modules/whatsapp-on-record";
+import { listWhatsAppForCase } from "@/lib/data/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,14 @@ export default async function MissionPage({
   if (!workspace) notFound();
 
   const caps = capabilities(session.role);
-  const reports = await listReportsForCase(session.organizationId, id);
+  const [reports, whatsapp] = await Promise.all([
+    listReportsForCase(session.organizationId, id),
+    listWhatsAppForCase(session.organizationId, id),
+  ]);
+  const whatsappLine =
+    whatsapp.drafts.length + whatsapp.waiting.length > 0 ? (
+      <WhatsAppOnRecord record={whatsapp} />
+    ) : null;
   if (workspace.requirementRoles.length > 0) {
     const [mail, senders] = await Promise.all([
       loadCaseMail(session.organizationId, id),
@@ -68,6 +77,7 @@ export default async function MissionPage({
                 replyFrom={replyFrom}
               />
             }
+            whatsapp={whatsappLine}
             ask={
               caps.canWrite ? (
                 <CaseAsk
@@ -104,6 +114,7 @@ export default async function MissionPage({
         canSeeWorkers={caps.canSeeWorkers}
         initialTab={initialTab}
       />
+      {whatsappLine}
       {reports.length > 0 && (
         <div className="mt-4">
           <ReportedWork reports={reports} />

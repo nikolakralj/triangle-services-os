@@ -44,6 +44,20 @@ says. On 29 September that was invitations to Dario Martić and Ratko Vukonić,
 and emails to INITECH and Suport Total. Triangle files each one and sets the
 follow-up. Reporting does not finish your step, and you still do not send.
 
+A WhatsApp message on the pilot number wakes you once. The wake carries the
+message id, the sender, and the person and case when the number is already
+on file. You answer by drafting only:
+
+```
+POST {TRIANGLE_URL}/api/agent/whatsapp/drafts
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+{ "to": "+E164", "text": "the words a person will send", "replyTo": "<wamid>" }
+```
+
+That stores a draft. It does not send. A person approves and sends it from
+the case. Outside 24 hours of the contact's last message, only the approved
+template can go, and only after that same approval.
+
 On a mission, `pool` lists people by initials and matching facts — never a
 name, email, phone, rate or CV text. File as you go:
 

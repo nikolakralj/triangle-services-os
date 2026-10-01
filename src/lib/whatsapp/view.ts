@@ -1,0 +1,25 @@
+// What the case and the person show. No secrets, no ids in the words.
+
+export interface WhatsAppDraftCard {
+  id: string;
+  to: string;
+  body: string;
+  who: string;
+  inboundText: string | null;
+  windowOpen: boolean;
+}
+
+export interface WhatsAppWaiting {
+  id: string;
+  who: string;
+  from: string;
+  text: string;
+  at: string;
+}
+
+export interface WhatsAppRecord {
+  drafts: WhatsAppDraftCard[];
+  waiting: WhatsAppWaiting[];
+  /** The one template a person may send outside the 24-hour window. */
+  approvedTemplate: string | null;
+}

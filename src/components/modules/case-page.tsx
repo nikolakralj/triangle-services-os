@@ -11,11 +11,14 @@ import type { CasePageModel } from "@/lib/data/case-page";
 export function CasePageScreen({
   model,
   drafts,
+  whatsapp,
   ask,
 }: {
   model: CasePageModel;
   /** The letters, with Send. Omitted, the words are still on the page. */
   drafts?: ReactNode;
+  /** WhatsApp on this case, in the same drafts section. */
+  whatsapp?: ReactNode;
   /** The one Ask. */
   ask?: ReactNode;
 }) {
@@ -65,9 +68,7 @@ export function CasePageScreen({
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Drafts to approve
         </h2>
-        {model.drafts.length === 0 ? (
-          <p className="text-[14px] text-slate-600">The reply is not drafted yet.</p>
-        ) : (
+        {model.drafts.length === 0 ? null : (
           drafts ??
           model.drafts.map((letter) => (
             <article
@@ -81,6 +82,10 @@ export function CasePageScreen({
             </article>
           ))
         )}
+        {whatsapp}
+        {model.drafts.length === 0 && !whatsapp ? (
+          <p className="text-[14px] text-slate-600">The reply is not drafted yet.</p>
+        ) : null}
       </section>
 
       {ask}
