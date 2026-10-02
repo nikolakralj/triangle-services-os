@@ -41,7 +41,20 @@ set, so the 09:51 inbound was not stored.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
-| Routing after an allowlisted inbound to Scout, Bob, or Hanna; one wake; roles in code and numbers in `WHATSAPP_OWNER_NUMBERS` / `WHATSAPP_FIELD_NUMBERS`; unlisted numbers stored with no wake; software and email refusals for the field role; Scout, Hanna, and Bob draft; one list document including xlsx; CV and worker-profile refusal; 503 when the app secret is missing. Migration `055_whatsapp_routing.sql` is required for this path (route and attachment columns, plus the `whatsapp-drafts` bucket) | this branch | `check:whatsapp` 13/13; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 14/14; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Migration 055 is written and not applied. Without it the webhook returns 503 and files nothing, because the inbound read and insert name the columns 055 adds. Nothing was sent. No live webhook was called. The draft line, including a document name, was rendered in `check:whatsapp`. A signed-in browser pass waits on applying 054 and 055. Phone numbers are environment variables, not in the repository |
+| Routing after an allowlisted inbound to Scout, Bob, or Hanna; one wake; roles in code and numbers in `WHATSAPP_OWNER_NUMBERS` / `WHATSAPP_FIELD_NUMBERS`; unlisted numbers stored with no wake; software and email refusals for the field role; Scout, Hanna, and Bob draft; one list document including xlsx; CV and worker-profile refusal; 503 when the app secret is missing. Migration `055_whatsapp_routing.sql` adds the route and attachment columns and the `whatsapp-drafts` bucket. Merged with the no-case report fix from main (`3288703`) | this branch | `check:whatsapp` 13/13; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Nikola applied migration 055 on 2 October 2026. Nothing was sent. No live webhook was called from this branch. The draft line, including a document name, was rendered in `check:whatsapp`. Phone numbers are environment variables, not in the repository |
+
+## Employee reports with no case — 2 October 2026
+
+Bob's `follow_up_due` wake for Tom Stocks (lead `0362e5f7`) filed an
+`email_drafted` report and was refused with "That case is not in this
+organisation". The assignment had no mission. A report now files on the
+person, the company, and the lead when the case is absent. A follow-up
+assignment takes the lead's open case when one exists, and stays without a
+mission otherwise. No migration. Nothing sent.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| `POST /api/agent/reports` skips the case check when `missionId` is absent. `follow_up_due` sets `mission_id` from the lead's open case | `3d6f9c4` | `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. The other `check:*` scripts passed. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | No migration. Nothing sent |
 
 ## WhatsApp pilot — 1 October 2026
 

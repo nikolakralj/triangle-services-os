@@ -54,7 +54,9 @@ const {
   availabilityReading,
   badgeMayReport,
   caseReplyAttachment,
+  decideReportCase,
   hanna29SeptemberPlans,
+  openCaseId,
   planEmployeeReport,
 } = policy;
 
@@ -101,6 +103,127 @@ test("Hanna's 29 September work files on the two people and the two firms", () =
   assert.equal(plans[0].personName, "Dario Martić");
   assert.equal(plans[2].companyName, "INITECH");
   assert.equal(HANNA_29_SEP_WORK.length, 4);
+});
+
+test("a report with no case files on the person and the company", () => {
+  const bodies = [
+    { kind: "email_drafted", person: "Tom Stocks", company: "Stocks GmbH", occurredOn: "2026-10-02", note: "Draft for the follow-up." },
+    { kind: "email_drafted", person: "Tom Stocks", occurredOn: "2026-10-02", note: "Draft.", missionId: null },
+    { kind: "email_drafted", person: "Tom Stocks", occurredOn: "2026-10-02", note: "Draft.", caseId: null },
+    { kind: "email_drafted", person: "Tom Stocks", occurredOn: "2026-10-02", note: "Draft.", caseId: "", missionId: "null" },
+    { kind: "email_drafted", person: "Tom Stocks", occurredOn: "2026-10-02", note: "Draft.", caseId: "null" },
+  ];
+  for (const body of bodies) {
+    const planned = planEmployeeReport({
+      employeeName: "Bob",
+      agentInstanceId: "bob",
+      body,
+    });
+    assert.equal(planned.ok, true, planned.ok ? "" : planned.error);
+    assert.equal(planned.planned.caseId, null);
+    assert.equal(planned.planned.personName, "Tom Stocks");
+  }
+
+  const withLead = planEmployeeReport({
+    employeeName: "Bob",
+    agentInstanceId: "bob",
+    body: {
+      kind: "email_drafted",
+      person: "Tom Stocks",
+      leadId: "0362e5f7-1111-4111-8111-111111111111",
+      missionId: null,
+      occurredOn: "2026-10-02",
+      note: "Draft for the follow-up.",
+    },
+  });
+  assert.equal(withLead.ok, true);
+  assert.equal(withLead.planned.caseId, null);
+  assert.equal(withLead.planned.leadId, "0362e5f7-1111-4111-8111-111111111111");
+});
+
+test("only a case from another organisation is rejected", () => {
+  const org = "11111111-1111-4111-8111-111111111111";
+  const other = "22222222-2222-4222-8222-222222222222";
+  const mission = "33333333-3333-4333-8333-333333333333";
+  const lead = "0362e5f7-1111-4111-8111-111111111111";
+
+  const absent = decideReportCase({ caseId: null, missionOrgId: null, orgId: org });
+  assert.equal(absent.ok, true);
+  assert.equal(absent.missionId, null);
+
+  const here = decideReportCase({ caseId: mission, missionOrgId: org, orgId: org });
+  assert.equal(here.ok, true);
+  assert.equal(here.missionId, mission);
+
+  const foreign = decideReportCase({ caseId: mission, missionOrgId: other, orgId: org });
+  assert.equal(foreign.ok, false);
+  assert.equal(foreign.error, "That case is not in this organisation.");
+
+  const leadAsCase = decideReportCase({
+    caseId: lead,
+    missionOrgId: null,
+    orgId: org,
+    leadInThisOrg: true,
+    openCaseId: mission,
+  });
+  assert.equal(leadAsCase.ok, true);
+  assert.equal(leadAsCase.missionId, mission);
+
+  const leadWithoutCase = decideReportCase({
+    caseId: lead,
+    missionOrgId: null,
+    orgId: org,
+    leadInThisOrg: true,
+    openCaseId: null,
+  });
+  assert.equal(leadWithoutCase.ok, true);
+  assert.equal(leadWithoutCase.missionId, null);
+
+  const leadOnly = decideReportCase({
+    caseId: null,
+    missionOrgId: null,
+    orgId: org,
+    leadInThisOrg: true,
+    openCaseId: mission,
+  });
+  assert.equal(leadOnly.ok, true);
+  assert.equal(leadOnly.missionId, mission);
+
+  const unknown = decideReportCase({ caseId: lead, missionOrgId: null, orgId: org });
+  assert.equal(unknown.ok, true);
+  assert.equal(unknown.missionId, null);
+});
+
+test("a follow-up uses the lead's open case and leaves a closed one unset", () => {
+  const lead = "0362e5f7-1111-4111-8111-111111111111";
+  assert.equal(openCaseId({ leadId: null, cases: [{ missionId: "open-1", closed: false }] }), null);
+  assert.equal(openCaseId({ leadId: lead, cases: [] }), null);
+  assert.equal(
+    openCaseId({ leadId: lead, cases: [{ missionId: "closed-1", closed: true }] }),
+    null,
+  );
+  assert.equal(
+    openCaseId({
+      leadId: lead,
+      cases: [
+        { missionId: "closed-1", closed: true, updatedAt: "2026-10-02" },
+        { missionId: "older", closed: false, updatedAt: "2026-09-01" },
+        { missionId: "newer", closed: false, updatedAt: "2026-10-01" },
+      ],
+    }),
+    "newer",
+  );
+
+  const reports = read("src/lib/data/employee-reports.ts");
+  assert.match(reports, /decideReportCase/);
+  assert.match(reports, /openCaseId/);
+  assert.doesNotMatch(reports, /That case is not in this organisation/);
+  const outbox = read("src/lib/data/event-outbox.ts");
+  assert.match(outbox, /follow_up_due/);
+  assert.match(outbox, /openCaseId/);
+  assert.match(outbox, /mission_id: missionId/);
+  assert.match(read("agents/missions.md"), /When that wake has no mission/);
+  assert.match(read("agents/missions.md"), /The case is optional/);
 });
 
 test("the same report files once", () => {

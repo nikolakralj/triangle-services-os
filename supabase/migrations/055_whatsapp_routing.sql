@@ -11,9 +11,8 @@
 -- that already exists, so each column is ADD COLUMN IF NOT EXISTS.
 --
 -- DO NOT APPLY THIS FROM A CODING AGENT.
--- Local development and Production share one database. Nikola applies it.
--- Until then a draft that carries a document, and an inbound that records
--- its route, answers 503 and files nothing.
+-- Local development and Production share one database.
+-- Applied by Nikola on 2 October 2026. Do not apply it again.
 
 alter table public.whatsapp_messages
   add column if not exists routed_employee text,

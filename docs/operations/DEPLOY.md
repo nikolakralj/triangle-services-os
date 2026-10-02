@@ -164,7 +164,7 @@ How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
 - The changed screen or route works signed in.
 - After a bot change, a new mission step wakes its bot.
 
-## WhatsApp pilot — CEO sets Meta and applies 054 and 055
+## WhatsApp pilot — CEO sets Meta; 055 is applied
 
 Approved 1 October 2026 as the one exception to the P0–P4 freeze, and
 continued on 2 October: an allowlisted inbound is routed to Scout (a
@@ -186,16 +186,15 @@ as a name, email, phone, or rate in the words. An anonymised bio's facts
 (initials, role, tickets, languages, availability) may be written. Triangle
 never sends by itself.
 
-1. Apply `supabase/migrations/054_whatsapp_messages.sql` and
-   `supabase/migrations/055_whatsapp_routing.sql` yourself. A coding agent
-   does not apply them. 054 creates `whatsapp_messages`. 055 is required for
-   routing: the webhook reads and writes `routed_employee` and `route_reason`,
-   and a document draft writes `attachment_filename`, `attachment_mime`,
-   `attachment_bucket`, `attachment_path`, `attachment_kind`, and
-   `attachment_source_table`. 055 also creates the private `whatsapp-drafts`
-   bucket and reloads the PostgREST schema. `routed_employee` is a key
-   pattern, so a later bot does not need another migration. Until 055 is
-   applied, an inbound returns 503 and is not stored.
+1. Nikola applied `supabase/migrations/055_whatsapp_routing.sql` on
+   2 October 2026. Do not apply it again. It adds `routed_employee` and
+   `route_reason`, the attachment columns (`attachment_filename`,
+   `attachment_mime`, `attachment_bucket`, `attachment_path`,
+   `attachment_kind`, `attachment_source_table`), and the private
+   `whatsapp-drafts` bucket, then reloads the PostgREST schema.
+   `routed_employee` is a key pattern, so a later bot does not need another
+   migration. 054 creates `whatsapp_messages`; 055 alters that table. A
+   coding agent does not apply migrations.
 2. In Meta's app, set the callback URL to
    `https://triangle-services-os.vercel.app/api/whatsapp/webhook`, the verify
    token to the same value as `WHATSAPP_VERIFY_TOKEN`, and subscribe to the
