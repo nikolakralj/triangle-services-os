@@ -11,13 +11,12 @@
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import {
+  decideInbound,
   draftTextAllowed,
   planAttachment,
-  resolveRoute,
   WHATSAPP_DRAFT_ENDPOINT,
   type AttachmentInput,
   type NormalizedAttachment,
-  type RouteEmployee,
 } from "@/lib/whatsapp/routing";
 
 export const DEFAULT_GRAPH_VERSION = "v25.0";
@@ -42,8 +41,9 @@ export interface WakeContext {
   personId: string | null;
   caseId: string | null;
   draftEndpoint: string;
-  employee: RouteEmployee;
+  employee: string;
   reason: string;
+  handoffNote: string | null;
 }
 
 export interface PilotMessage {
@@ -315,8 +315,9 @@ export function acceptCloudPayload(
       }
       const row = existing ?? next.find((item) => item.wamid === message.wamid);
       if (plan.wake && row && !row.woken) {
+        const decision = decideInbound({ text: message.text, from: message.from });
+        if (decision.action === "refuse" || !decision.employee) continue;
         row.woken = true;
-        const route = resolveRoute(message.text, null);
         wakes.push({
           messageId: message.wamid,
           sender: message.from,
@@ -324,8 +325,9 @@ export function acceptCloudPayload(
           personId: row.personId,
           caseId: row.missionId,
           draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
-          employee: route.employee,
-          reason: route.reason,
+          employee: decision.employee,
+          reason: decision.reason,
+          handoffNote: decision.handoffNote,
         });
       }
     }

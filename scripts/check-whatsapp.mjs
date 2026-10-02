@@ -72,10 +72,20 @@ const {
   WHATSAPP_DATA_RULE,
   WHATSAPP_DRAFT_ENDPOINT,
   draftTextAllowed,
+  EMAIL_REFUSAL_DRAFT,
+  NO_OUTBOUND_EMAIL_HANDOFF,
+  SOFTWARE_REFUSAL_DRAFT,
+  WHATSAPP_EMPLOYEES,
+  WHATSAPP_SENDERS,
+  asksForSoftwareChange,
+  asksToSendEmail,
+  decideInbound,
   employeeMayDraftWhatsApp,
   keywordRoute,
   parseModelRoute,
+  permissionFor,
   resolveRoute,
+  senderMayTalkTo,
   workerProfileAttachment,
 } = routing;
 
@@ -204,7 +214,7 @@ test("duplicate wamid stored once and wakes once", () => {
   assert.match(store, /text: ctx\.text/);
   assert.match(store, /draftEndpoint: ctx\.draftEndpoint/);
   assert.match(store, /classifyInbound/);
-  assert.match(store, /resolveRoute/);
+  assert.match(store, /decideInbound/);
   assert.doesNotMatch(store, /wakeHanna/);
   assert.match(read("src/lib/data/bot-runtime.ts"), /draftEndpoint/);
 });
@@ -260,7 +270,8 @@ test("Scout can draft, a list document is a draft, a CV is refused", () => {
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "project_researcher", displayName: "Scout" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "hr", displayName: "Hanna" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_hr", displayName: "Hanna" }), true);
-  assert.equal(employeeMayDraftWhatsApp({ roleKey: "inbox_coordinator", displayName: "Bob" }), false);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "inbox_coordinator", displayName: "Bob" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "viewer", displayName: "Pat" }), false);
   assert.match(read("src/lib/data/whatsapp.ts"), /employeeMayDraftWhatsApp/);
   assert.match(read("src/lib/data/whatsapp.ts"), /Only Scout or Hanna can draft/);
 
@@ -375,6 +386,197 @@ test("send requires approve, including a document", () => {
   assert.match(sql, /DO NOT APPLY/);
   assert.match(sql, /notify pgrst, 'reload schema'/);
   assert.match(sql, /whatsapp-drafts/);
+  assert.match(sql, /\^\[a-z\]/);
+  assert.doesNotMatch(sql, /in \('scout', 'hanna'\)/);
+});
+
+test("sender permissions, Bob, software refusal, and no email from the field sender", () => {
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const senders = [
+    {
+      id: "owner",
+      e164: ownerNumber,
+      employees: "all",
+      mayRequestSoftwareChange: true,
+      mayTriggerOutboundEmail: true,
+    },
+    {
+      id: "field",
+      e164: fieldNumber,
+      employees: ["hanna", "bob", "scout"],
+      mayRequestSoftwareChange: false,
+      mayTriggerOutboundEmail: false,
+    },
+  ];
+  const field = permissionFor(fieldNumber, senders);
+  assert.deepEqual([...field.employees].sort(), ["bob", "hanna", "scout"]);
+  assert.equal(field.mayRequestSoftwareChange, false);
+  assert.equal(field.mayTriggerOutboundEmail, false);
+  assert.equal(permissionFor(ownerNumber, senders).employees, "all");
+  assert.equal(permissionFor("+15559999999", senders).id, "unlisted");
+  assert.equal(permissionFor("+15559999999").mayTriggerOutboundEmail, false);
+  const shippedField = WHATSAPP_SENDERS.find((sender) => sender.id === "field");
+  assert.deepEqual([...shippedField.employees].sort(), ["bob", "hanna", "scout"]);
+  assert.equal(shippedField.e164, null);
+  assert.equal(WHATSAPP_SENDERS.find((sender) => sender.id === "owner").employees, "all");
+
+  const followUp = decideInbound({
+    text: "Please follow up with the client on the proposal",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(followUp.action, "route");
+  assert.equal(followUp.employee, "bob");
+  assert.equal(followUp.handoffNote, "requester may not trigger outbound email");
+  assert.equal(followUp.handoffNote, NO_OUTBOUND_EMAIL_HANDOFF);
+
+  const ownerFollowUp = decideInbound({
+    text: "Please follow up with the client on the proposal",
+    from: ownerNumber,
+    senders,
+  });
+  assert.equal(ownerFollowUp.employee, "bob");
+  assert.equal(ownerFollowUp.handoffNote, null);
+
+  assert.equal(asksForSoftwareChange("Please fix the software"), true);
+  const software = decideInbound({
+    text: "Please change the software and add a button",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(software.action, "refuse");
+  assert.equal(software.employee, null);
+  assert.equal(software.flagOwner, true);
+  assert.equal(software.draftText, SOFTWARE_REFUSAL_DRAFT);
+  assert.match(software.reason, /Flagged for the owner/);
+  const ownerSoftware = decideInbound({
+    text: "Please fix the software",
+    from: ownerNumber,
+    senders,
+  });
+  assert.equal(ownerSoftware.action, "route");
+  assert.notEqual(ownerSoftware.employee, null);
+
+  assert.equal(asksToSendEmail("Ask Bob to email the client"), true);
+  assert.equal(asksToSendEmail("What did the client email say?"), false);
+  const email = decideInbound({
+    text: "Ask Bob to email the client the proposal",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(email.action, "refuse");
+  assert.equal(email.flagOwner, true);
+  assert.equal(email.draftText, EMAIL_REFUSAL_DRAFT);
+  assert.equal(email.handoffNote, null);
+  assert.match(email.reason, /email/);
+  const ownerEmail = decideInbound({
+    text: "Ask Bob to email the client",
+    from: ownerNumber,
+    senders,
+  });
+  assert.equal(ownerEmail.action, "route");
+  assert.notEqual(ownerEmail.action, "refuse");
+
+  const accounting = {
+    key: "accounting",
+    roleKeys: ["accounting"],
+    displayNames: ["accounting"],
+    reason: "Company report, so accounting.",
+    patterns: [/\bcompany report\b/i],
+  };
+  const extended = [...WHATSAPP_EMPLOYEES, accounting];
+  const toAccounts = decideInbound({
+    text: "Thanks",
+    from: ownerNumber,
+    senders,
+    employees: extended,
+    model: { employee: "accounting", reason: "Company report." },
+  });
+  assert.equal(toAccounts.action, "route");
+  assert.equal(toAccounts.employee, "accounting");
+  const fieldBlocked = decideInbound({
+    text: "Thanks",
+    from: fieldNumber,
+    senders,
+    employees: extended,
+    model: { employee: "accounting", reason: "Company report." },
+  });
+  assert.equal(fieldBlocked.employee, "hanna");
+  assert.equal(senderMayTalkTo(field, "accounting"), false);
+  assert.equal(senderMayTalkTo(field, "scout"), true);
+
+  const opts = {
+    allowlist: readAllowlist(`${fieldNumber},${ownerNumber}`),
+    businessNumber: "+15550001111",
+    matchFor: () => ({ personId: null, missionId: null }),
+  };
+  const bobWake = acceptCloudPayload(
+    [],
+    cloudText("wamid.BOB", fieldNumber, "Please follow up with the client on the proposal"),
+    opts,
+  );
+  assert.equal(bobWake.wakes.length, 1);
+  assert.equal(bobWake.wakes[0].employee, "bob");
+  assert.equal(bobWake.wakes[0].handoffNote, NO_OUTBOUND_EMAIL_HANDOFF);
+  const again = acceptCloudPayload(
+    bobWake.messages,
+    cloudText("wamid.BOB", fieldNumber, "Please follow up with the client on the proposal"),
+    opts,
+  );
+  assert.equal(again.wakes.length, 0);
+  const refused = acceptCloudPayload(
+    again.messages,
+    cloudText("wamid.SOFT", fieldNumber, "Please fix the software"),
+    opts,
+  );
+  assert.equal(refused.wakes.length, 0);
+  assert.equal(refused.messages.length, again.messages.length + 1);
+  const emailWake = acceptCloudPayload(
+    refused.messages,
+    cloudText("wamid.MAIL", fieldNumber, "Ask Bob to email the client"),
+    opts,
+  );
+  assert.equal(emailWake.wakes.length, 0);
+
+  const store = read("src/lib/data/whatsapp.ts");
+  assert.match(store, /NO_OUTBOUND_EMAIL_HANDOFF|handoffNote/);
+  assert.match(store, /ensureRefusalDraft/);
+  assert.match(store, /decideInbound/);
+  assert.doesNotMatch(store, /mail-send|sendMail|nodemailer/);
+  assert.match(read("src/lib/data/bot-runtime.ts"), /handoffNote/);
+
+  const sheet = planDraft({
+    agentId: "scout",
+    to: fieldNumber,
+    text: "The company list is attached.",
+    replyTo: "wamid.BOB",
+    templateName: null,
+    attachment: {
+      filename: "companies.xlsx",
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      kind: "company_list",
+      hasContent: true,
+    },
+  });
+  assert.equal(sheet.ok, true);
+  assert.equal(sheet.sends, false);
+  assert.equal(sheet.attachment.filename, "companies.xlsx");
+  assert.equal(sheet.attachment.mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  const cvSheet = planDraft({
+    agentId: "scout",
+    to: fieldNumber,
+    text: "Attached.",
+    replyTo: null,
+    templateName: null,
+    attachment: {
+      filename: "worker-cv.xlsx",
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      kind: "company_list",
+      hasContent: true,
+    },
+  });
+  assert.equal(cvSheet.ok, false);
 });
 
 test("status update updates row", () => {

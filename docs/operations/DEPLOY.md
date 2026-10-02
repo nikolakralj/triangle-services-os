@@ -56,7 +56,7 @@ chat with any AI.
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Default AI. Optional overrides: `OPENAI_RESEARCH_MODEL`, `OPENAI_OUTREACH_MODEL`, `OPENAI_SCOUT_MODEL`, `OPENAI_SUMMARY_MODEL`. |
 | `XAI_API_KEY`, `XAI_MISSION_MODEL` | When the key is set, mission steps run inside Triangle use Grok (default `grok-4.6`) instead of OpenAI. Employees on their own bots do not use it. |
 | `CRON_SECRET`, `CRON_ORGANIZATION_ID` | Scheduled jobs. Vercel Cron (`vercel.json`) calls `GET /api/job-intake/sync` at 06:00 UTC and `GET /api/agents/cron` at 07:00 UTC. Hobby cannot run a cron more than once a day, so mail is also read every 10 minutes by `.github/workflows/mail-sync.yml`. That workflow needs the same `CRON_SECRET` as a GitHub Actions secret (Settings → Secrets and variables → Actions). Optional, only if Deployment Protection blocks the call: `VERCEL_AUTOMATION_BYPASS_SECRET`. Optional tuning: `AGENT_CRON_BATCH` (default 3), `AGENT_STALL_HOURS` (default 6). |
-| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna, `INBOX_COORDINATOR` for Bob. Live Bob: `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`. WhatsApp uses the same pairs: `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when Hanna's role key is `hr`, and `BOT_WAKE_URL_PROJECT_RESEARCHER` / `BOT_WAKE_KEY_PROJECT_RESEARCHER` for Scout. |
+| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna, `INBOX_COORDINATOR` for Bob. Live Bob: `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`. WhatsApp uses the same pairs: `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when Hanna's role key is `hr`, `BOT_WAKE_URL_PROJECT_RESEARCHER` / `BOT_WAKE_KEY_PROJECT_RESEARCHER` for Scout, and `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR` for Bob. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Meta's test phone number id. Required to send. |
 | `WHATSAPP_WABA_ID` | WhatsApp Business Account id. When set, webhooks for a different account are ignored. |
 | `WHATSAPP_ACCESS_TOKEN` | Graph API token. Required to send. Never a badge, never a person. |
@@ -166,12 +166,21 @@ How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
 
 Approved 1 October 2026 as the one exception to the P0–P4 freeze, and
 continued on 2 October: an allowlisted inbound is routed to Scout (a
-contractor, company, or subcontractor list, or research) or Hanna (people,
-CVs, availability, roles; unsure goes to Hanna). Only that employee is woken.
-A draft may carry one list document. No CV or worker profile leaves by
-WhatsApp — not as a file, and not as a name, email, phone, or rate in the
-words. An anonymised bio's facts (initials, role, tickets, languages,
-availability) may be written. Triangle never sends by itself.
+contractor, company, or subcontractor list, or research), Bob (a commercial
+or client follow-up), or Hanna (people, CVs, availability, roles; unsure
+goes to Hanna). Only that employee is woken. Who may reach whom is
+`WHATSAPP_SENDERS` in `src/lib/whatsapp/routing.ts`, not an environment
+variable. The `owner` row may reach every bot. The `field` row may reach
+only Hanna, Bob, and Scout, and may not ask to change the software or to
+send an email. Both E.164 values are null until you write the numbers in.
+Until the owner number is set, every sender — including you — is treated as
+the field row. A number that is not in the map stays on those same limits.
+A later bot is one more object on `WHATSAPP_EMPLOYEES` and its key on the
+senders who may reach it. A draft may carry one list document, including
+xlsx. No CV or worker profile leaves by WhatsApp — not as a file, and not
+as a name, email, phone, or rate in the words. An anonymised bio's facts
+(initials, role, tickets, languages, availability) may be written. Triangle
+never sends by itself.
 
 1. Apply `supabase/migrations/054_whatsapp_messages.sql` and
    `supabase/migrations/055_whatsapp_routing.sql` yourself. A coding agent
@@ -193,14 +202,22 @@ availability) may be written. Triangle never sends by itself.
    `WHATSAPP_VERIFY_TOKEN`, so the 09:51 inbound was not stored. Hanna's
    wake is `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`.
    Scout's wake is `BOT_WAKE_URL_PROJECT_RESEARCHER` /
-   `BOT_WAKE_KEY_PROJECT_RESEARCHER`.
-6. Inbound messages land on the person and the open case. The routed
+   `BOT_WAKE_KEY_PROJECT_RESEARCHER`. Bob's wake is
+   `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`.
+6. Write the two E.164 numbers into `WHATSAPP_SENDERS` (`owner` for you,
+   `field` for Ralph) and redeploy. Until `owner` is set, a software-change
+   request from your own number is refused the same way as Ralph's.
+7. Inbound messages land on the person and the open case. The routed
    employee drafts with `POST /api/agent/whatsapp/drafts` and their badge
-   (`tri_mc_…`). Scout may attach one CSV or PDF list (`contentBase64`, or
-   `storageBucket` + `storagePath` in `documents` or `whatsapp-drafts`).
-   You approve and press Send on that draft, on the case or the person.
-   Free text, or the document, only within 24 hours of their last inbound.
-   Nothing is sent when the draft is filed. The response is `sends: false`.
+   (`tri_mc_…`). Scout may attach one list (`contentBase64`, or
+   `storageBucket` + `storagePath` in `documents` or `whatsapp-drafts`):
+   csv, pdf, txt, xls, xlsx, doc, or docx. You approve and press Send on
+   that draft, on the case or the person. Free text, or the document, only
+   within 24 hours of their last inbound. Nothing is sent when the draft is
+   filed. The response is `sends: false`. A request from Ralph to change the
+   software, or to have Bob send an email, is stored as a draft for you and
+   wakes nobody. When Ralph's message does reach Bob, the handoff says the
+   requester may not trigger outbound email, and Bob does not send one.
 
 ## Send from Triangle — CEO turns it on per mailbox
 

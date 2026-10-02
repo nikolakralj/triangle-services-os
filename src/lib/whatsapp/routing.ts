@@ -4,11 +4,17 @@
 // Decisions only. No database, no fetch, no send.
 //
 // Scout takes a contractor, company, or subcontractor list, or a research
-// request. Hanna takes resourcing: people, CVs, availability, roles. When the
-// words match both, or neither, the message is unsure and goes to Hanna.
+// request. Bob takes a commercial or client follow-up. Hanna takes resourcing:
+// people, CVs, availability, roles. When the words match more than one, or
+// none, the message is unsure and goes to Hanna.
 // A model may decide first. An unsure or missing model answer uses the
-// keyword rule. The keyword rule never sends the message anywhere but Hanna
-// when it is not sure.
+// keyword rule.
+//
+// Who a sender may reach lives in WHATSAPP_SENDERS, keyed by E.164. Add a
+// bot by appending one object to WHATSAPP_EMPLOYEES and listing its key on
+// a sender. An unlisted number gets the restricted grant, never "all".
+// A restricted sender cannot ask for a software change and cannot ask for
+// an email to be sent. Those are refused as drafts. Nothing here sends.
 //
 // Data rule. No CV or worker profile leaves Triangle by WhatsApp. A draft may
 // carry one contractor, company, or subcontractor list. The words may say
@@ -18,7 +24,6 @@
 // Triangle; WhatsApp does not become a second way to send it.
 // ---------------------------------------------------------------------------
 
-import { isHannaEmployee } from "@/lib/data/ask-hanna-policy";
 import { explicitPackIntent } from "@/lib/data/put-forward";
 
 export const WHATSAPP_DRAFT_ENDPOINT = "/api/agent/whatsapp/drafts";
@@ -39,77 +44,222 @@ export const WHATSAPP_DATA_RULE =
 
 export const ROUTE_MODEL_INSTRUCTIONS = [
   "You route one inbound WhatsApp message.",
-  'Reply with JSON only: {"employee":"scout"|"hanna"|"unsure","reason":"short"}',
+  'Reply with JSON only: {"employee":"<employee key or unsure>","reason":"short"}',
   "scout: a contractor, company, or subcontractor list, or a research request.",
+  "bob: a commercial or client follow-up.",
   "hanna: resourcing — people, CVs, availability, or roles.",
-  "unsure: both, neither, or you are not sure.",
+  "unsure: more than one, none, or you are not sure.",
+  "Use only an employee key you were given, or unsure.",
   "The reason is one short sentence and does not quote the message.",
 ].join(" ");
 
-export type RouteEmployee = "scout" | "hanna";
+/** Exact sentence Bob's handoff carries when this sender may not cause an email to go out. */
+export const NO_OUTBOUND_EMAIL_HANDOFF = "requester may not trigger outbound email";
+
+export const SOFTWARE_REFUSAL_DRAFT =
+  "I can't take a change to the software on WhatsApp. I've left it with the owner. Nothing has been changed.";
+
+export const EMAIL_REFUSAL_DRAFT =
+  "I can't send an email from this chat. I've left it with the owner. Nothing was sent.";
+
+export const DEFAULT_WHATSAPP_EMPLOYEE = "hanna";
+
+export interface WhatsAppEmployeeDef {
+  key: string;
+  roleKeys: readonly string[];
+  displayNames: readonly string[];
+  /** Sole match routes here. Several matches, or none, go to Hanna. */
+  patterns: readonly RegExp[];
+  reason: string;
+}
+
+/**
+ * One object per bot. A later bot is another object — web design, accounting —
+ * plus its key on the senders who may reach it. Routing and permissions
+ * already walk this list.
+ */
+export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
+  {
+    key: "scout",
+    roleKeys: ["project_researcher"],
+    displayNames: ["scout"],
+    reason: "Contractor, company, subcontractor, or research request, so Scout.",
+    patterns: [
+      /\bsub[\s-]?contractors?\b/i,
+      /\bcontractors?\b/i,
+      /\bcompan(?:y|ies)\b/i,
+      /\bsuppliers?\b/i,
+      /\bresearch\b/i,
+      /\b(?:epc|general contractor)\b/i,
+      /\bwho\s+(?:is|are)\s+(?:the\s+)?(?:owner|developer|buyer)\b/i,
+    ],
+  },
+  {
+    key: "bob",
+    roleKeys: ["inbox_coordinator", "inbox_courier", "commercial_ops"],
+    displayNames: ["bob"],
+    reason: "Commercial or client follow-up, so Bob.",
+    patterns: [
+      /\bfollow[\s-]?ups?\b/i,
+      /\bclients?\b/i,
+      /\bcommercial\b/i,
+      /\b(?:quotes?|quotations?|proposals?|invoices?)\b/i,
+      /\bchas(?:e|ing)\b/i,
+      /\bcontracts?\b/i,
+    ],
+  },
+  {
+    key: "hanna",
+    roleKeys: ["hr", "triangle_hr", "resourcing"],
+    displayNames: ["hanna"],
+    reason: "Resourcing — people, CVs, availability, or roles — so Hanna.",
+    patterns: [
+      /\b(?:cvs?|resumes?|curriculum(?:\s+vitae)?)\b/i,
+      /\bavailab(?:le|ility)\b/i,
+      /\broles?\b/i,
+      /\b(?:people|person|persons)\b/i,
+      /\b(?:engineers?|technicians?|commissioning)\b/i,
+      /\b(?:candidates?|workers?|crew)\b/i,
+      /\bput\s+forward\b/i,
+      /\bbios?\b/i,
+      /\bheadcount\b/i,
+    ],
+  },
+];
+
+export interface SenderPermission {
+  /** Stable id. Not a person's name. */
+  id: string;
+  /** E.164. Null until the number is written in here. */
+  e164: string | null;
+  /** "all", or the employee keys this sender may wake. */
+  employees: "all" | readonly string[];
+  mayRequestSoftwareChange: boolean;
+  mayTriggerOutboundEmail: boolean;
+}
+
+/**
+ * Keyed by E.164 once the number is filled in.
+ * owner — may talk to every bot, including ones added later.
+ * field — Hanna, Bob, and Scout only. No software change. No outbound email.
+ * An unlisted number uses the same limits as field.
+ */
+export const WHATSAPP_SENDERS: readonly SenderPermission[] = [
+  {
+    id: "owner",
+    e164: null,
+    employees: "all",
+    mayRequestSoftwareChange: true,
+    mayTriggerOutboundEmail: true,
+  },
+  {
+    id: "field",
+    e164: null,
+    employees: ["hanna", "bob", "scout"],
+    mayRequestSoftwareChange: false,
+    mayTriggerOutboundEmail: false,
+  },
+];
+
+export const RESTRICTED_SENDER: SenderPermission = {
+  id: "unlisted",
+  e164: null,
+  employees: ["hanna", "bob", "scout"],
+  mayRequestSoftwareChange: false,
+  mayTriggerOutboundEmail: false,
+};
 
 export interface RouteDecision {
-  employee: RouteEmployee;
+  employee: string;
   reason: string;
   /** True when the choice is the default because the words were not clear. */
   unsure: boolean;
 }
 
 export interface ModelRoute {
-  employee: "scout" | "hanna" | "unsure";
+  employee: string;
   reason: string;
 }
 
-const SCOUT_PATTERNS: RegExp[] = [
-  /\bsub[\s-]?contractors?\b/i,
-  /\bcontractors?\b/i,
-  /\bcompan(?:y|ies)\b/i,
-  /\bsuppliers?\b/i,
-  /\bresearch\b/i,
-  /\b(?:epc|general contractor)\b/i,
-  /\bwho\s+(?:is|are)\s+(?:the\s+)?(?:owner|developer|buyer)\b/i,
+export interface InboundPlan {
+  action: "route" | "refuse";
+  employee: string | null;
+  reason: string;
+  unsure: boolean;
+  /** Set on Bob's handoff when this sender must not cause an email. */
+  handoffNote: string | null;
+  /** Polite draft. Null when the message is routed. */
+  draftText: string | null;
+  flagOwner: boolean;
+}
+
+const SOFTWARE_PATTERNS: RegExp[] = [
+  /\b(?:change|modify|fix|update|deploy|rewrite|patch)\b[\s\S]{0,48}\b(?:software|app|codebase|code|product)\b/i,
+  /\btriangle\s+engineer\b/i,
+  /\bservices\s+os\b/i,
+  /\badd (?:a |an )?(?:button|page|feature|screen)\b/i,
+  /\bbugs?\b[\s\S]{0,24}\b(?:app|software|code|codebase)\b/i,
 ];
 
-const HANNA_PATTERNS: RegExp[] = [
-  /\b(?:cvs?|resumes?|curriculum(?:\s+vitae)?)\b/i,
-  /\bavailab(?:le|ility)\b/i,
-  /\broles?\b/i,
-  /\b(?:people|person|persons)\b/i,
-  /\b(?:engineers?|technicians?|commissioning)\b/i,
-  /\b(?:candidates?|workers?|crew)\b/i,
-  /\bput\s+forward\b/i,
-  /\bbios?\b/i,
-  /\bheadcount\b/i,
+const EMAIL_SEND_PATTERNS: RegExp[] = [
+  /\b(?:send|shoot|dispatch)\b[\s\S]{0,40}\be-?mails?\b/i,
+  /\b(?:ask|tell|have)\s+bob\s+to\s+(?:e-?mail|mail|send)\b/i,
+  /\be-?mail\s+(?:the\s+)?(?:client|buyer|customer|them|him|her)\b/i,
 ];
 
-export function keywordRoute(text: string): RouteDecision {
-  const scout = SCOUT_PATTERNS.some((pattern) => pattern.test(text));
-  const hanna = HANNA_PATTERNS.some((pattern) => pattern.test(text));
-  if (scout && !hanna) {
-    return {
-      employee: "scout",
-      reason: "Contractor, company, subcontractor, or research request, so Scout.",
-      unsure: false,
-    };
+export function asksForSoftwareChange(text: string): boolean {
+  return SOFTWARE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function asksToSendEmail(text: string): boolean {
+  return EMAIL_SEND_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function asE164(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let digits = raw.trim().replace(/[^\d]/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length < 8 || digits.length > 15) return null;
+  return `+${digits}`;
+}
+
+export function permissionFor(
+  from: string,
+  senders: readonly SenderPermission[] = WHATSAPP_SENDERS,
+): SenderPermission {
+  const number = asE164(from);
+  if (!number) return RESTRICTED_SENDER;
+  const hit = senders.find((sender) => sender.e164 && asE164(sender.e164) === number);
+  return hit ?? RESTRICTED_SENDER;
+}
+
+export function senderMayTalkTo(sender: SenderPermission, employeeKey: string): boolean {
+  if (sender.employees === "all") return true;
+  return sender.employees.includes(employeeKey);
+}
+
+export function keywordRoute(
+  text: string,
+  employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
+): RouteDecision {
+  const hits = employees.filter((employee) => employee.patterns.some((pattern) => pattern.test(text)));
+  if (hits.length === 1) {
+    return { employee: hits[0].key, reason: hits[0].reason, unsure: false };
   }
-  if (hanna && !scout) {
+  if (hits.length > 1) {
     return {
-      employee: "hanna",
-      reason: "Resourcing — people, CVs, availability, or roles — so Hanna.",
-      unsure: false,
-    };
-  }
-  if (scout && hanna) {
-    return {
-      employee: "hanna",
-      reason: "Unsure — it asks for both a list or research and resourcing — so Hanna.",
+      employee: DEFAULT_WHATSAPP_EMPLOYEE,
+      reason: "Unsure — it matches more than one employee — so Hanna.",
       unsure: true,
     };
   }
-  return { employee: "hanna", reason: "Unsure, so Hanna.", unsure: true };
+  return { employee: DEFAULT_WHATSAPP_EMPLOYEE, reason: "Unsure, so Hanna.", unsure: true };
 }
 
-export function parseModelRoute(raw: string | null | undefined): ModelRoute | null {
+export function parseModelRoute(
+  raw: string | null | undefined,
+  employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
+): ModelRoute | null {
   if (!raw) return null;
   let cleaned = raw.trim();
   if (cleaned.startsWith("```")) {
@@ -120,8 +270,10 @@ export function parseModelRoute(raw: string | null | undefined): ModelRoute | nu
   if (first === -1 || last <= first) return null;
   try {
     const parsed = JSON.parse(cleaned.slice(first, last + 1)) as { employee?: unknown; reason?: unknown };
-    const employee = parsed.employee;
-    if (employee !== "scout" && employee !== "hanna" && employee !== "unsure") return null;
+    const employee = typeof parsed.employee === "string" ? parsed.employee.trim().toLowerCase() : "";
+    const known = employees.some((item) => item.key === employee);
+    if (employee !== "unsure" && !known && !/^[a-z][a-z0-9_]{0,63}$/.test(employee)) return null;
+    if (!employee) return null;
     const reason = typeof parsed.reason === "string" ? parsed.reason : "";
     return { employee, reason };
   } catch {
@@ -142,30 +294,115 @@ function sanitizeRouteReason(reason: string, text: string): string {
  * A confident model answer wins. Unsure, missing, or unreadable falls through
  * to the keyword rule, which itself sends an unclear message to Hanna.
  */
-export function resolveRoute(text: string, model: ModelRoute | null): RouteDecision {
-  if (model?.employee === "scout" || model?.employee === "hanna") {
-    const fallback = model.employee === "scout" ? "Scout." : "Hanna.";
+export function resolveRoute(
+  text: string,
+  model: ModelRoute | null,
+  employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
+): RouteDecision {
+  const known = employees.some((item) => item.key === model?.employee);
+  if (model && known && model.employee !== "unsure") {
+    const label = employees.find((item) => item.key === model.employee)?.reason ?? model.employee;
     return {
       employee: model.employee,
-      reason: sanitizeRouteReason(model.reason, text) || fallback,
+      reason: sanitizeRouteReason(model.reason, text) || label,
       unsure: false,
     };
   }
-  return keywordRoute(text);
+  return keywordRoute(text, employees);
+}
+
+export function employeeKeyOf(
+  employee: { roleKey: string; displayName: string },
+  employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
+): string | null {
+  const role = employee.roleKey;
+  const name = employee.displayName.trim().toLowerCase();
+  const hit = employees.find(
+    (item) => item.roleKeys.includes(role) || item.displayNames.includes(name),
+  );
+  return hit?.key ?? null;
 }
 
 export function isScoutEmployee(employee: { roleKey: string; displayName: string }): boolean {
-  return (
-    employee.roleKey === SCOUT_WHATSAPP_ROLE_KEY ||
-    employee.displayName.trim().toLowerCase() === "scout"
-  );
+  return employeeKeyOf(employee) === "scout";
 }
 
 export function employeeMayDraftWhatsApp(employee: {
   roleKey: string;
   displayName: string;
 }): boolean {
-  return isHannaEmployee(employee) || isScoutEmployee(employee);
+  return employeeKeyOf(employee) !== null;
+}
+
+function refuse(reason: string, draftText: string): InboundPlan {
+  return {
+    action: "refuse",
+    employee: null,
+    reason,
+    unsure: false,
+    handoffNote: null,
+    draftText,
+    flagOwner: true,
+  };
+}
+
+/**
+ * Permissions first, then the route. A software change or an email-send ask
+ * from a sender who may not make it never wakes a bot. A routed employee the
+ * sender cannot reach falls back to Hanna when Hanna is allowed.
+ */
+export function decideInbound(input: {
+  text: string;
+  from: string;
+  model?: ModelRoute | null;
+  senders?: readonly SenderPermission[];
+  employees?: readonly WhatsAppEmployeeDef[];
+}): InboundPlan {
+  const employees = input.employees ?? WHATSAPP_EMPLOYEES;
+  const sender = permissionFor(input.from, input.senders ?? WHATSAPP_SENDERS);
+  if (asksForSoftwareChange(input.text) && !sender.mayRequestSoftwareChange) {
+    return refuse(
+      "Refused: this sender may not ask for a software change. Flagged for the owner.",
+      SOFTWARE_REFUSAL_DRAFT,
+    );
+  }
+  if (asksToSendEmail(input.text) && !sender.mayTriggerOutboundEmail) {
+    return refuse(
+      "Refused: this sender may not ask for an email to be sent. Flagged for the owner.",
+      EMAIL_REFUSAL_DRAFT,
+    );
+  }
+
+  let route = resolveRoute(input.text, input.model ?? null, employees);
+  if (!employees.some((item) => item.key === route.employee)) {
+    route = { employee: DEFAULT_WHATSAPP_EMPLOYEE, reason: "Unsure, so Hanna.", unsure: true };
+  }
+  if (!senderMayTalkTo(sender, route.employee)) {
+    if (senderMayTalkTo(sender, DEFAULT_WHATSAPP_EMPLOYEE)) {
+      route = {
+        employee: DEFAULT_WHATSAPP_EMPLOYEE,
+        reason: "This sender cannot reach that employee, so Hanna.",
+        unsure: true,
+      };
+    } else {
+      return refuse(
+        "Refused: this sender cannot reach that employee. Flagged for the owner.",
+        "I can't pass that on from this chat. I've left it with the owner.",
+      );
+    }
+  }
+
+  const handoffNote =
+    route.employee === "bob" && !sender.mayTriggerOutboundEmail ? NO_OUTBOUND_EMAIL_HANDOFF : null;
+  return {
+    action: "route",
+    employee: route.employee,
+    reason: route.reason,
+    unsure: route.unsure,
+    handoffNote,
+    draftText: null,
+    flagOwner: false,
+  };
 }
 
 const BLOCKED_SOURCE_TABLES = new Set([

@@ -162,6 +162,8 @@ export async function wakeEmployee(params: {
     caseId: string | null;
     text?: string;
     draftEndpoint?: string;
+    /** Set when this sender must not cause an outbound email. */
+    handoffNote?: string;
   };
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
@@ -206,6 +208,7 @@ export async function wakeEmployee(params: {
                 ...(params.context.draftEndpoint
                   ? { draftEndpoint: params.context.draftEndpoint }
                   : {}),
+                ...(params.context.handoffNote ? { handoffNote: params.context.handoffNote } : {}),
               }
             : {}),
         }),

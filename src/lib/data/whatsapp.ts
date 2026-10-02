@@ -1,8 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
-import { isScoutRole, wakeEmployee } from "@/lib/data/bot-runtime";
-import { isHannaEmployee } from "@/lib/data/ask-hanna-policy";
+import { wakeEmployee } from "@/lib/data/bot-runtime";
 import type { WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
   decideSend,
@@ -26,17 +25,17 @@ import {
 } from "@/lib/whatsapp/pilot";
 import {
   decodeDraftDocument,
+  decideInbound,
   draftTextAllowed,
+  employeeKeyOf,
   employeeMayDraftWhatsApp,
-  isScoutEmployee,
   parseModelRoute,
-  resolveRoute,
   ROUTE_MODEL_INSTRUCTIONS,
   WHATSAPP_DRAFT_BUCKET,
   WHATSAPP_DRAFT_ENDPOINT,
   workerProfileAttachment,
+  type InboundPlan,
   type NormalizedAttachment,
-  type RouteDecision,
 } from "@/lib/whatsapp/routing";
 
 // ---------------------------------------------------------------------------
@@ -134,8 +133,21 @@ async function storeInbound(
     allowlist,
   });
 
+  const alreadyRefused = String(existing?.route_reason ?? "").startsWith("Refused:");
+  if (alreadyRefused && !plan.store) {
+    await ensureRefusalDraft(svc, orgId, business, message, filing, String(existing?.route_reason ?? ""));
+    return "ok";
+  }
+
   const storedRoute = routeFromRow(existing?.routed_employee, existing?.route_reason);
-  let route = plan.wake ? (storedRoute ?? (await classifyInbound(message.text))) : storedRoute;
+  let route = plan.wake ? (storedRoute ?? (await classifyInbound(message.from, message.text))) : storedRoute;
+  if (plan.wake && storedRoute?.employee) {
+    route = decideInbound({
+      text: message.text,
+      from: message.from,
+      model: { employee: storedRoute.employee, reason: storedRoute.reason },
+    });
+  }
 
   let id = (existing?.id as string | undefined) ?? null;
   if (plan.store) {
@@ -172,6 +184,10 @@ async function storeInbound(
         .maybeSingle();
       id = (again.data?.id as string | undefined) ?? null;
       if (again.data?.woken_at) return "ok";
+      if (String(again.data?.route_reason ?? "").startsWith("Refused:")) {
+        await ensureRefusalDraft(svc, orgId, business, message, filing, String(again.data?.route_reason ?? ""));
+        return "ok";
+      }
       const stored = routeFromRow(again.data?.routed_employee, again.data?.route_reason);
       if (stored) route = stored;
     } else if (error || !data) {
@@ -183,6 +199,12 @@ async function storeInbound(
   }
 
   if (!plan.wake || !id || !route) return "ok";
+  if (route.action === "refuse") {
+    await ensureRefusalDraft(svc, orgId, business, message, filing, route.reason, route.draftText);
+    console.error("whatsapp: inbound refused. Flagged for the owner. Nobody was woken. Nothing was sent.");
+    return "ok";
+  }
+  if (!route.employee) return "ok";
   await wakeRoutedEmployee(svc, orgId, id, route, {
     messageId: message.wamid,
     sender: message.from,
@@ -192,16 +214,21 @@ async function storeInbound(
     draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
     employee: route.employee,
     reason: route.reason,
+    handoffNote: route.handoffNote,
   });
   return "ok";
 }
 
-function routeFromRow(employee: unknown, reason: unknown): RouteDecision | null {
-  if (employee !== "scout" && employee !== "hanna") return null;
+function routeFromRow(employee: unknown, reason: unknown): InboundPlan | null {
+  if (typeof employee !== "string" || !/^[a-z][a-z0-9_]{0,63}$/.test(employee)) return null;
   return {
+    action: "route",
     employee,
-    reason: typeof reason === "string" && reason.trim() ? reason : employee === "scout" ? "Scout." : "Hanna.",
+    reason: typeof reason === "string" && reason.trim() ? reason : employee,
     unsure: false,
+    handoffNote: null,
+    draftText: null,
+    flagOwner: false,
   };
 }
 
@@ -210,9 +237,9 @@ function routeFromRow(employee: unknown, reason: unknown): RouteDecision | null 
  * answer uses the keyword rule. The keyword rule sends an unclear message
  * to Hanna. This never throws and never sends.
  */
-async function classifyInbound(text: string): Promise<RouteDecision> {
+async function classifyInbound(from: string, text: string): Promise<InboundPlan> {
   const model = await askRouteModel(text);
-  return resolveRoute(text, model);
+  return decideInbound({ text, from, model });
 }
 
 async function askRouteModel(text: string): Promise<ReturnType<typeof parseModelRoute>> {
@@ -341,7 +368,7 @@ async function wakeRoutedEmployee(
   svc: Svc,
   orgId: string,
   messageRowId: string,
-  route: RouteDecision,
+  route: InboundPlan,
   ctx: WakeContext,
 ): Promise<void> {
   const { data: employees } = await svc
@@ -350,8 +377,11 @@ async function wakeRoutedEmployee(
     .eq("org_id", orgId)
     .eq("status", "active");
   const employee = (employees ?? []).find((row) => {
-    const who = { roleKey: String(row.role_key ?? ""), displayName: String(row.display_name ?? "") };
-    return route.employee === "scout" ? isScoutEmployee(who) || isScoutRole(who.roleKey) : isHannaEmployee(who);
+    const key = employeeKeyOf({
+      roleKey: String(row.role_key ?? ""),
+      displayName: String(row.display_name ?? ""),
+    });
+    return key === route.employee;
   });
   if (!employee) {
     console.error(
@@ -404,7 +434,8 @@ async function wakeRoutedEmployee(
       .maybeSingle();
     stepId = (existing?.id as string | undefined) ?? null;
     if (!stepId) {
-      const who = route.employee === "scout" ? "Scout" : "Hanna";
+      const who = route.employee ?? "Hanna";
+      const handoff = ctx.handoffNote ? ` ${ctx.handoffNote}.` : "";
       const { data: created, error } = await svc
         .from("agent_assignments")
         .insert({
@@ -412,8 +443,8 @@ async function wakeRoutedEmployee(
           agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}. Do not send. No CV or worker profile.`,
-          expected_output: "A draft reply. Do not send. No CV or worker profile.",
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff} Do not send. No CV or worker profile.`,
+          expected_output: "A draft reply. Do not send. No CV or worker profile. Do not send email when the handoff forbids it.",
           status: "queued",
           priority: "high",
           idempotency_key: idempotencyKey,
@@ -429,6 +460,7 @@ async function wakeRoutedEmployee(
             draft_endpoint: ctx.draftEndpoint,
             routed_employee: route.employee,
             route_reason: route.reason,
+            ...(ctx.handoffNote ? { handoff_note: ctx.handoffNote } : {}),
           },
         })
         .select("id")
@@ -472,8 +504,54 @@ async function wakeRoutedEmployee(
       caseId: ctx.caseId,
       text: ctx.text,
       draftEndpoint: ctx.draftEndpoint,
+      ...(ctx.handoffNote ? { handoffNote: ctx.handoffNote } : {}),
     },
   });
+}
+
+async function ensureRefusalDraft(
+  svc: Svc,
+  orgId: string,
+  business: string,
+  message: ParsedText,
+  filing: { personId: string | null; missionId: string | null },
+  reason: string,
+  draftText?: string | null,
+): Promise<void> {
+  const text =
+    draftText?.trim() ||
+    decideInbound({ text: message.text, from: message.from }).draftText ||
+    "I've left this with the owner. Nothing was sent.";
+  const words = draftTextAllowed(text);
+  if (!words.ok) {
+    console.error("whatsapp: the refusal draft was blocked by the data rule. Nothing was sent.");
+    return;
+  }
+  const draftKey = `refuse|${message.wamid}`;
+  const { data: existing, error: readError } = await svc
+    .from("whatsapp_messages")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("draft_key", draftKey)
+    .maybeSingle();
+  if (schemaMissing(readError)) return;
+  if (existing?.id) return;
+  const { error } = await svc.from("whatsapp_messages").insert({
+    org_id: orgId,
+    direction: "outbound",
+    from_number: business,
+    to_number: message.from,
+    body: text,
+    wa_timestamp: new Date().toISOString(),
+    status: "draft",
+    person_id: filing.personId,
+    mission_id: filing.missionId,
+    reply_to_wamid: message.wamid,
+    draft_key: draftKey,
+    route_reason: reason,
+  });
+  if (error?.code === "23505") return;
+  if (error) console.error("whatsapp: the refusal draft was not stored. Nothing was sent.");
 }
 
 async function applyStatus(svc: Svc, orgId: string, status: ParsedStatus): Promise<"ok" | "missing"> {
