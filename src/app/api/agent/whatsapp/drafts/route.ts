@@ -4,7 +4,7 @@ import { badgeMayReport } from "@/lib/data/employee-report-policy";
 import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
 
 // ---------------------------------------------------------------------------
-// POST /api/agent/whatsapp/drafts — Hanna files a reply. It is a draft.
+// POST /api/agent/whatsapp/drafts — Scout or Hanna files a reply. It is a draft.
 //
 // Same badge check as POST /api/agent/reports. The legacy MCP key is not a
 // badge. This route does not call Graph and does not send.

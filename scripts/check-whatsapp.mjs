@@ -53,10 +53,14 @@ function test(name, fn) {
   tests.push([name, fn]);
 }
 
-const pilot = moduleLoader()("src/lib/whatsapp/pilot.ts");
+const load = moduleLoader();
+const pilot = load("src/lib/whatsapp/pilot.ts");
+const routing = load("src/lib/whatsapp/routing.ts");
 const {
   acceptCloudPayload,
   decideSend,
+  graphDocumentBody,
+  graphMediaUrl,
   planDraft,
   readAllowlist,
   signatureHex,
@@ -64,6 +68,16 @@ const {
   webhookGetDecision,
   webhookPostDecision,
 } = pilot;
+const {
+  WHATSAPP_DATA_RULE,
+  WHATSAPP_DRAFT_ENDPOINT,
+  draftTextAllowed,
+  employeeMayDraftWhatsApp,
+  keywordRoute,
+  parseModelRoute,
+  resolveRoute,
+  workerProfileAttachment,
+} = routing;
 
 const SECRET = "pilot-app-secret";
 const RAW = JSON.stringify({ hello: "triangle" });
@@ -144,12 +158,14 @@ test("duplicate wamid stored once and wakes once", () => {
   assert.equal(first.messages[0].personId, "person-1");
   assert.equal(first.messages[0].missionId, "case-1");
   assert.equal(first.wakes.length, 1);
-  assert.deepEqual(first.wakes[0], {
-    messageId: "wamid.IN",
-    sender: "+15551212000",
-    personId: "person-1",
-    caseId: "case-1",
-  });
+  assert.equal(first.wakes[0].messageId, "wamid.IN");
+  assert.equal(first.wakes[0].sender, "+15551212000");
+  assert.equal(first.wakes[0].text, "Hello Hanna");
+  assert.equal(first.wakes[0].personId, "person-1");
+  assert.equal(first.wakes[0].caseId, "case-1");
+  assert.equal(first.wakes[0].draftEndpoint, WHATSAPP_DRAFT_ENDPOINT);
+  assert.equal(first.wakes[0].employee, "hanna");
+  assert.match(first.wakes[0].reason, /Unsure/);
   const second = acceptCloudPayload(first.messages, payload, opts);
   assert.equal(second.messages.length, 1);
   assert.equal(second.wakes.length, 0);
@@ -185,6 +201,180 @@ test("duplicate wamid stored once and wakes once", () => {
   assert.match(store, /messageId: ctx\.messageId/);
   assert.match(store, /sender: ctx\.sender/);
   assert.match(store, /caseId: ctx\.caseId/);
+  assert.match(store, /text: ctx\.text/);
+  assert.match(store, /draftEndpoint: ctx\.draftEndpoint/);
+  assert.match(store, /classifyInbound/);
+  assert.match(store, /resolveRoute/);
+  assert.doesNotMatch(store, /wakeHanna/);
+  assert.match(read("src/lib/data/bot-runtime.ts"), /draftEndpoint/);
+});
+
+test("routing to Scout or Hanna, and unsure to Hanna", () => {
+  const list = keywordRoute("Send the contractor list for the Cologne project");
+  assert.equal(list.employee, "scout");
+  assert.equal(list.unsure, false);
+  const companies = keywordRoute("Research the companies on this data centre");
+  assert.equal(companies.employee, "scout");
+  const subs = keywordRoute("Who are the subcontractors?");
+  assert.equal(subs.employee, "scout");
+
+  const people = keywordRoute("Who is available for the commissioning role?");
+  assert.equal(people.employee, "hanna");
+  assert.equal(people.unsure, false);
+  const cvs = keywordRoute("Please send the CVs");
+  assert.equal(cvs.employee, "hanna");
+
+  const unsure = keywordRoute("Thanks");
+  assert.equal(unsure.employee, "hanna");
+  assert.equal(unsure.unsure, true);
+  assert.match(unsure.reason, /Unsure/);
+  const both = keywordRoute("Research who is available");
+  assert.equal(both.employee, "hanna");
+  assert.equal(both.unsure, true);
+
+  const model = resolveRoute("Thanks", { employee: "scout", reason: "Contractor list." });
+  assert.equal(model.employee, "scout");
+  assert.equal(model.unsure, false);
+  const modelUnsure = resolveRoute("Send the contractor list", { employee: "unsure", reason: "" });
+  assert.equal(modelUnsure.employee, "scout");
+  assert.equal(parseModelRoute('{"employee":"hanna","reason":"Resourcing."}')?.employee, "hanna");
+  assert.equal(parseModelRoute("not json"), null);
+
+  const opts = {
+    allowlist: readAllowlist("+15551212000"),
+    businessNumber: "+15550001111",
+    matchFor: () => ({ personId: "person-1", missionId: "case-1" }),
+  };
+  const scoutWake = acceptCloudPayload([], cloudText("wamid.SCOUT", "+15551212000", "Send the subcontractor list"), opts);
+  assert.equal(scoutWake.wakes.length, 1);
+  assert.equal(scoutWake.wakes[0].employee, "scout");
+  assert.equal(scoutWake.wakes[0].draftEndpoint, "/api/agent/whatsapp/drafts");
+  const again = acceptCloudPayload(scoutWake.messages, cloudText("wamid.SCOUT", "+15551212000", "Send the subcontractor list"), opts);
+  assert.equal(again.wakes.length, 0);
+  const hannaWake = acceptCloudPayload(again.messages, cloudText("wamid.HANNA", "+15551212000", "Two engineers available?"), opts);
+  assert.equal(hannaWake.wakes.length, 1);
+  assert.equal(hannaWake.wakes[0].employee, "hanna");
+});
+
+test("Scout can draft, a list document is a draft, a CV is refused", () => {
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "project_researcher", displayName: "Scout" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "hr", displayName: "Hanna" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_hr", displayName: "Hanna" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "inbox_coordinator", displayName: "Bob" }), false);
+  assert.match(read("src/lib/data/whatsapp.ts"), /employeeMayDraftWhatsApp/);
+  assert.match(read("src/lib/data/whatsapp.ts"), /Only Scout or Hanna can draft/);
+
+  const list = planDraft({
+    agentId: "scout",
+    to: "+1 555 121 2000",
+    text: "The contractor list for Cologne.",
+    replyTo: "wamid.IN",
+    templateName: null,
+    attachment: {
+      filename: "cologne-contractors.csv",
+      mime: "text/csv",
+      kind: "contractor_list",
+      sourceTable: null,
+      hasContent: true,
+    },
+  });
+  assert.equal(list.ok, true);
+  assert.equal(list.sends, false);
+  assert.equal(list.attachment.filename, "cologne-contractors.csv");
+  assert.equal(list.attachment.bucket, "whatsapp-drafts");
+
+  const byName = planDraft({
+    agentId: "scout",
+    to: "+15551212000",
+    text: "Attached.",
+    replyTo: null,
+    templateName: null,
+    attachment: { filename: "matej-cv.pdf", mime: "application/pdf", kind: "contractor_list", hasContent: true },
+  });
+  assert.equal(byName.ok, false);
+  assert.match(byName.error, /CV|bio|worker profile/i);
+
+  const byKind = workerProfileAttachment({ filename: "list.csv", kind: "full_cv", sourceTable: null });
+  assert.equal(byKind.blocked, true);
+  const byTable = workerProfileAttachment({
+    filename: "notes.pdf",
+    kind: "company_list",
+    sourceTable: "workers",
+  });
+  assert.equal(byTable.blocked, true);
+  const byLink = workerProfileAttachment({
+    filename: "notes.pdf",
+    kind: "company_list",
+    linkedEntityType: "worker",
+  });
+  assert.equal(byLink.blocked, true);
+  const pack = workerProfileAttachment({ filename: "ts-1a2b3c4d-profile.pdf", kind: "document" });
+  assert.equal(pack.blocked, true);
+
+  const anonymised = draftTextAllowed(
+    "M.P., Senior Electrical Automation Engineer, available from November. Initials only. Passport held.",
+  );
+  assert.equal(anonymised.ok, true);
+  const email = draftTextAllowed("Write to matej@example.com");
+  assert.equal(email.ok, false);
+  const phone = draftTextAllowed("His number is +385911234567");
+  assert.equal(phone.ok, false);
+  const rate = draftTextAllowed("Hourly rate 45 EUR");
+  assert.equal(rate.ok, false);
+  const named = draftTextAllowed("Here is the full named CV");
+  assert.equal(named.ok, false);
+  assert.match(WHATSAPP_DATA_RULE, /No CV or worker profile/);
+  assert.match(read("DECISIONS.md"), /no CV or worker profile\s+leaves by WhatsApp/i);
+});
+
+test("send requires approve, including a document", () => {
+  const base = {
+    status: "draft",
+    to: "+15551212000",
+    text: "The contractor list.",
+    draftTemplate: null,
+    allowlist: ["+15551212000"],
+    lastInboundAt: "2026-10-01T08:00:00.000Z",
+    now: new Date("2026-10-01T12:00:00.000Z"),
+    approvedTemplate: "pilot_hello",
+    templateLanguageCode: "en",
+    sendAttempted: false,
+    document: { filename: "cologne-contractors.csv", mime: "text/csv" },
+  };
+  assert.equal(decideSend({ ...base, actor: "human", approve: false }).ok, false);
+  assert.equal(decideSend({ ...base, actor: "machine", approve: true }).ok, false);
+  const approved = decideSend({ ...base, actor: "human", approve: true });
+  assert.equal(approved.ok, true);
+  assert.equal(approved.mode, "document");
+  const outside = decideSend({
+    ...base,
+    actor: "human",
+    approve: true,
+    now: new Date("2026-10-03T12:00:00.000Z"),
+  });
+  assert.equal(outside.ok, false);
+  assert.match(outside.error, /document/);
+  const body = graphDocumentBody({
+    to: "+15551212000",
+    mediaId: "media-1",
+    filename: "cologne-contractors.csv",
+    caption: "The contractor list.",
+  });
+  assert.equal(body.type, "document");
+  assert.equal(body.document.filename, "cologne-contractors.csv");
+  assert.equal(body.document.caption, "The contractor list.");
+  assert.equal(graphMediaUrl("v25.0", "phone-1"), "https://graph.facebook.com/v25.0/phone-1/media");
+  assert.match(read("src/lib/data/whatsapp.ts"), /uploadGraphMedia/);
+  assert.match(read("src/lib/data/whatsapp.ts"), /graphDocumentBody/);
+  assert.match(read("src/app/api/whatsapp/webhook/route.ts"), /WHATSAPP_APP_SECRET is not set/);
+  assert.match(read("src/app/api/whatsapp/webhook/route.ts"), /was not stored/);
+  const sql = read("supabase/migrations/055_whatsapp_routing.sql");
+  assert.match(sql, /add column if not exists routed_employee/i);
+  assert.match(sql, /add column if not exists route_reason/i);
+  assert.match(sql, /add column if not exists attachment_filename/i);
+  assert.match(sql, /DO NOT APPLY/);
+  assert.match(sql, /notify pgrst, 'reload schema'/);
+  assert.match(sql, /whatsapp-drafts/);
 });
 
 test("status update updates row", () => {
@@ -384,6 +574,28 @@ test("the draft line renders Send and does not send by rendering", () => {
   );
   assert.match(html, /Send/);
   assert.match(html, /Are you there/);
+  assert.equal(calls.length, 0);
+  const withFile = renderToStaticMarkup(
+    createElement(WhatsAppOnRecord, {
+      record: {
+        approvedTemplate: null,
+        waiting: [],
+        drafts: [
+          {
+            id: "draft-2",
+            to: "+15551212000",
+            body: "The contractor list.",
+            who: "A person",
+            inboundText: null,
+            windowOpen: true,
+            documentName: "cologne-contractors.csv",
+          },
+        ],
+      },
+    }),
+  );
+  assert.match(withFile, /Document: cologne-contractors\.csv/);
+  assert.match(withFile, /Send/);
   assert.equal(calls.length, 0);
   delete global.fetch;
 

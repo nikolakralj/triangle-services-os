@@ -1,10 +1,13 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
-import { wakeEmployee } from "@/lib/data/bot-runtime";
+import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { isScoutRole, wakeEmployee } from "@/lib/data/bot-runtime";
 import { isHannaEmployee } from "@/lib/data/ask-hanna-policy";
 import type { WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
   decideSend,
+  graphDocumentBody,
+  graphMediaUrl,
   graphMessagesUrl,
   graphSendBody,
   matchPersonByPhone,
@@ -21,12 +24,28 @@ import {
   type WakeContext,
   type WaStatus,
 } from "@/lib/whatsapp/pilot";
+import {
+  decodeDraftDocument,
+  draftTextAllowed,
+  employeeMayDraftWhatsApp,
+  isScoutEmployee,
+  parseModelRoute,
+  resolveRoute,
+  ROUTE_MODEL_INSTRUCTIONS,
+  WHATSAPP_DRAFT_BUCKET,
+  WHATSAPP_DRAFT_ENDPOINT,
+  workerProfileAttachment,
+  type NormalizedAttachment,
+  type RouteDecision,
+} from "@/lib/whatsapp/routing";
 
 // ---------------------------------------------------------------------------
-// WhatsApp pilot, on the database. The rules live in src/lib/whatsapp/pilot.ts.
-// This file stores, wakes Hanna once, files a draft, and — only after a person
-// approves — posts one message to Graph. A missing table or missing env is a
-// 503 with a log, never a crash and never a send.
+// WhatsApp pilot, on the database. The rules live in src/lib/whatsapp/pilot.ts
+// and src/lib/whatsapp/routing.ts. This file stores an inbound, routes it to
+// Scout or Hanna, wakes that employee once, files a draft, and — only after
+// a person approves — posts one message to Graph. A missing table or missing
+// env is a 503 with a log, never a crash and never a send. A CV or worker
+// profile is refused before it is stored and again before it could be sent.
 // ---------------------------------------------------------------------------
 
 type Svc = NonNullable<ReturnType<typeof createServiceSupabaseClient>>;
@@ -86,12 +105,14 @@ async function storeInbound(
 ): Promise<"ok" | "missing"> {
   const { data: existing, error: readError } = await svc
     .from("whatsapp_messages")
-    .select("id, woken_at, person_id, mission_id")
+    .select("id, woken_at, person_id, mission_id, routed_employee, route_reason")
     .eq("org_id", orgId)
     .eq("wamid", message.wamid)
     .maybeSingle();
   if (schemaMissing(readError)) {
-    console.error("whatsapp: whatsapp_messages is missing (migration 054). Inbound was not stored.");
+    console.error(
+      "whatsapp: whatsapp_messages is missing columns or the table (migrations 054 and 055). Inbound was not stored.",
+    );
     return "missing";
   }
   if (readError) {
@@ -113,6 +134,9 @@ async function storeInbound(
     allowlist,
   });
 
+  const storedRoute = routeFromRow(existing?.routed_employee, existing?.route_reason);
+  let route = plan.wake ? (storedRoute ?? (await classifyInbound(message.text))) : storedRoute;
+
   let id = (existing?.id as string | undefined) ?? null;
   if (plan.store) {
     const { data, error } = await svc
@@ -128,22 +152,28 @@ async function storeInbound(
         status: "received",
         person_id: filing.personId,
         mission_id: filing.missionId,
+        routed_employee: route?.employee ?? null,
+        route_reason: route?.reason ?? null,
       })
       .select("id")
       .maybeSingle();
     if (schemaMissing(error)) {
-      console.error("whatsapp: whatsapp_messages is missing (migration 054). Inbound was not stored.");
+      console.error(
+        "whatsapp: whatsapp_messages is missing columns or the table (migrations 054 and 055). Inbound was not stored.",
+      );
       return "missing";
     }
     if (error?.code === "23505") {
       const again = await svc
         .from("whatsapp_messages")
-        .select("id, woken_at")
+        .select("id, woken_at, routed_employee, route_reason")
         .eq("org_id", orgId)
         .eq("wamid", message.wamid)
         .maybeSingle();
       id = (again.data?.id as string | undefined) ?? null;
       if (again.data?.woken_at) return "ok";
+      const stored = routeFromRow(again.data?.routed_employee, again.data?.route_reason);
+      if (stored) route = stored;
     } else if (error || !data) {
       console.error("whatsapp: could not store an inbound message.");
       return "ok";
@@ -152,25 +182,57 @@ async function storeInbound(
     }
   }
 
-  if (!plan.wake || !id) return "ok";
-  const { data: claimed, error: claimError } = await svc
-    .from("whatsapp_messages")
-    .update({ woken_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .is("woken_at", null)
-    .select("id")
-    .maybeSingle();
-  if (schemaMissing(claimError)) return "missing";
-  if (!claimed) return "ok";
-
-  await wakeHanna(svc, orgId, {
+  if (!plan.wake || !id || !route) return "ok";
+  await wakeRoutedEmployee(svc, orgId, id, route, {
     messageId: message.wamid,
     sender: message.from,
+    text: message.text,
     personId: filing.personId,
     caseId: filing.missionId,
+    draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
+    employee: route.employee,
+    reason: route.reason,
   });
   return "ok";
+}
+
+function routeFromRow(employee: unknown, reason: unknown): RouteDecision | null {
+  if (employee !== "scout" && employee !== "hanna") return null;
+  return {
+    employee,
+    reason: typeof reason === "string" && reason.trim() ? reason : employee === "scout" ? "Scout." : "Hanna.",
+    unsure: false,
+  };
+}
+
+/**
+ * Model first, when a key is set. A missing key, a timeout, or an unsure
+ * answer uses the keyword rule. The keyword rule sends an unclear message
+ * to Hanna. This never throws and never sends.
+ */
+async function classifyInbound(text: string): Promise<RouteDecision> {
+  const model = await askRouteModel(text);
+  return resolveRoute(text, model);
+}
+
+async function askRouteModel(text: string): Promise<ReturnType<typeof parseModelRoute>> {
+  if (!process.env.OPENAI_API_KEY?.trim()) return null;
+  try {
+    const client = getOpenAIClient();
+    const response = await client.responses.create(
+      {
+        model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+        instructions: ROUTE_MODEL_INSTRUCTIONS,
+        input: text.slice(0, 2000),
+      },
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    const raw = typeof response.output_text === "string" ? response.output_text : "";
+    return parseModelRoute(raw);
+  } catch {
+    console.error("whatsapp: route model did not answer. Using the keyword rule.");
+    return null;
+  }
 }
 
 async function resolveFiling(
@@ -275,22 +337,47 @@ async function openCasesForPerson(
   return found;
 }
 
-async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<void> {
+async function wakeRoutedEmployee(
+  svc: Svc,
+  orgId: string,
+  messageRowId: string,
+  route: RouteDecision,
+  ctx: WakeContext,
+): Promise<void> {
   const { data: employees } = await svc
     .from("agent_instances")
     .select("id, role_key, display_name, status")
     .eq("org_id", orgId)
     .eq("status", "active");
-  const hanna = (employees ?? []).find((row) =>
-    isHannaEmployee({
-      roleKey: String(row.role_key ?? ""),
-      displayName: String(row.display_name ?? ""),
-    }),
-  );
-  if (!hanna) {
-    console.error("whatsapp: no Hanna on the workforce. Inbound is stored. Nobody was woken.");
+  const employee = (employees ?? []).find((row) => {
+    const who = { roleKey: String(row.role_key ?? ""), displayName: String(row.display_name ?? "") };
+    return route.employee === "scout" ? isScoutEmployee(who) || isScoutRole(who.roleKey) : isHannaEmployee(who);
+  });
+  if (!employee) {
+    console.error(
+      `whatsapp: no ${route.employee} on the workforce. Inbound is stored. Nobody was woken.`,
+    );
     return;
   }
+
+  const { data: claimed, error: claimError } = await svc
+    .from("whatsapp_messages")
+    .update({
+      woken_at: new Date().toISOString(),
+      routed_employee: route.employee,
+      route_reason: route.reason,
+      agent_instance_id: employee.id,
+    })
+    .eq("id", messageRowId)
+    .eq("org_id", orgId)
+    .is("woken_at", null)
+    .select("id")
+    .maybeSingle();
+  if (schemaMissing(claimError)) {
+    console.error("whatsapp: could not record the wake (migration 055). Nobody was woken.");
+    return;
+  }
+  if (!claimed) return;
 
   let stepId: string | null = null;
   if (ctx.caseId) {
@@ -299,7 +386,7 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
       .select("id")
       .eq("org_id", orgId)
       .eq("mission_id", ctx.caseId)
-      .eq("agent_instance_id", hanna.id as string)
+      .eq("agent_instance_id", employee.id as string)
       .in("status", ["queued", "active"])
       .order("created_at", { ascending: false })
       .limit(1)
@@ -317,15 +404,16 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
       .maybeSingle();
     stepId = (existing?.id as string | undefined) ?? null;
     if (!stepId) {
+      const who = route.employee === "scout" ? "Scout" : "Hanna";
       const { data: created, error } = await svc
         .from("agent_assignments")
         .insert({
           org_id: orgId,
-          agent_instance_id: hanna.id,
+          agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft a reply. Do not send.`,
-          expected_output: "A draft reply. Do not send.",
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}. Do not send. No CV or worker profile.`,
+          expected_output: "A draft reply. Do not send. No CV or worker profile.",
           status: "queued",
           priority: "high",
           idempotency_key: idempotencyKey,
@@ -337,6 +425,10 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
             sender: ctx.sender,
             person_id: ctx.personId,
             mission_id: ctx.caseId,
+            text: ctx.text.slice(0, 1500),
+            draft_endpoint: ctx.draftEndpoint,
+            routed_employee: route.employee,
+            route_reason: route.reason,
           },
         })
         .select("id")
@@ -361,7 +453,7 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
           });
         }
       } else {
-        console.error("whatsapp: could not queue Hanna's pickup.");
+        console.error(`whatsapp: could not queue ${route.employee}'s pickup.`);
       }
     }
   }
@@ -369,7 +461,7 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
   if (!stepId) return;
   await wakeEmployee({
     orgId,
-    agentInstanceId: hanna.id as string,
+    agentInstanceId: employee.id as string,
     stepId,
     missionId: ctx.caseId,
     event: "whatsapp_inbound",
@@ -378,6 +470,8 @@ async function wakeHanna(svc: Svc, orgId: string, ctx: WakeContext): Promise<voi
       sender: ctx.sender,
       personId: ctx.personId,
       caseId: ctx.caseId,
+      text: ctx.text,
+      draftEndpoint: ctx.draftEndpoint,
     },
   });
 }
@@ -429,12 +523,12 @@ export async function fileWhatsAppDraft(params: {
   if (
     !employee ||
     employee.status !== "active" ||
-    !isHannaEmployee({
+    !employeeMayDraftWhatsApp({
       roleKey: String(employee.role_key ?? ""),
       displayName: String(employee.display_name ?? ""),
     })
   ) {
-    return { ok: false, status: 403, error: "Only Hanna can draft a WhatsApp reply." };
+    return { ok: false, status: 403, error: "Only Scout or Hanna can draft a WhatsApp reply." };
   }
 
   const body = asRecord(params.body);
@@ -445,6 +539,13 @@ export async function fileWhatsAppDraft(params: {
   const templateName = typeof body.templateName === "string" ? body.templateName : null;
   let personId = typeof body.personId === "string" && UUID.test(body.personId) ? body.personId : null;
   let missionId = typeof body.caseId === "string" && UUID.test(body.caseId) ? body.caseId : null;
+  const document = asRecord(body.document);
+  let documentBytes: Buffer | null = null;
+  if (document && typeof document.contentBase64 === "string") {
+    const decoded = decodeDraftDocument(document.contentBase64);
+    if (!decoded.ok) return { ok: false, status: 400, error: decoded.error };
+    documentBytes = decoded.bytes;
+  }
 
   if (replyTo) {
     const inbound = await svc
@@ -470,8 +571,33 @@ export async function fileWhatsAppDraft(params: {
     text,
     replyTo,
     templateName,
+    attachment: document
+      ? {
+          filename: typeof document.filename === "string" ? document.filename : "",
+          mime: typeof document.mime === "string" ? document.mime : "",
+          kind: typeof document.kind === "string" ? document.kind : null,
+          sourceTable: typeof document.sourceTable === "string" ? document.sourceTable : null,
+          linkedEntityType: typeof document.linkedEntityType === "string" ? document.linkedEntityType : null,
+          storageBucket: typeof document.storageBucket === "string" ? document.storageBucket : null,
+          storagePath: typeof document.storagePath === "string" ? document.storagePath : null,
+          hasContent: Boolean(documentBytes),
+          title: typeof document.title === "string" ? document.title : null,
+        }
+      : null,
   });
   if (!planned.ok) return { ok: false, status: 400, error: planned.error };
+
+  let attachment = planned.attachment;
+  if (attachment) {
+    const stored = await guardStoredDocument(svc, params.orgId, attachment, document);
+    if (!stored.ok) return stored;
+    attachment = stored.attachment;
+    if (documentBytes) {
+      const uploaded = await storeDraftDocument(svc, params.orgId, planned.draftKey, attachment, documentBytes);
+      if (!uploaded.ok) return uploaded;
+      attachment = { ...attachment, path: uploaded.path, bucket: WHATSAPP_DRAFT_BUCKET };
+    }
+  }
 
   if (personId) {
     const person = await svc
@@ -506,6 +632,12 @@ export async function fileWhatsAppDraft(params: {
     template_name: templateName?.trim() || null,
     agent_instance_id: params.agentInstanceId,
     draft_key: planned.draftKey,
+    attachment_filename: attachment?.filename ?? null,
+    attachment_mime: attachment?.mime ?? null,
+    attachment_bucket: attachment?.bucket ?? null,
+    attachment_path: attachment?.path ?? null,
+    attachment_kind: attachment?.kind ?? null,
+    attachment_source_table: attachment?.sourceTable ?? null,
   };
   const { data, error } = await svc.from("whatsapp_messages").insert(insert).select("id").maybeSingle();
   if (error?.code === "23505") {
@@ -520,10 +652,76 @@ export async function fileWhatsAppDraft(params: {
     }
   }
   if (schemaMissing(error)) {
-    return { ok: false, status: 503, error: "Triangle cannot file this yet. Migration 054 has not been applied." };
+    return {
+      ok: false,
+      status: 503,
+      error: "Triangle cannot file this yet. Migrations 054 and 055 have not been applied.",
+    };
   }
-  if (error || !data) return { ok: false, status: 500, error: "Could not store that draft." };
+  if (error || !data) {
+    if (documentBytes && attachment?.path) {
+      await svc.storage.from(WHATSAPP_DRAFT_BUCKET).remove([attachment.path]);
+    }
+    return { ok: false, status: 500, error: "Could not store that draft." };
+  }
   return { ok: true, draftId: data.id as string, duplicate: false, sends: false };
+}
+
+async function guardStoredDocument(
+  svc: Svc,
+  orgId: string,
+  attachment: NormalizedAttachment,
+  document: Record<string, unknown> | null,
+): Promise<{ ok: true; attachment: NormalizedAttachment } | { ok: false; status: number; error: string }> {
+  if (!attachment) return { ok: false, status: 400, error: "That document is not usable." };
+  if (!attachment.path) return { ok: true, attachment };
+  const { data, error } = await svc
+    .from("documents")
+    .select("file_name, document_category, linked_entity_type, title, storage_bucket")
+    .eq("organization_id", orgId)
+    .eq("storage_path", attachment.path)
+    .limit(1)
+    .maybeSingle();
+  if (error && !schemaMissing(error)) {
+    return { ok: false, status: 400, error: "Could not check that document against worker records." };
+  }
+  const verdict = workerProfileAttachment({
+    filename: (data?.file_name as string | undefined) || attachment.filename,
+    kind: (data?.document_category as string | undefined) || attachment.kind,
+    sourceTable:
+      data?.linked_entity_type === "worker"
+        ? "workers"
+        : (typeof document?.sourceTable === "string" ? document.sourceTable : attachment.sourceTable),
+    linkedEntityType: (data?.linked_entity_type as string | undefined) ?? null,
+    storagePath: attachment.path,
+    title: (data?.title as string | undefined) ?? null,
+  });
+  if (verdict.blocked) return { ok: false, status: 400, error: verdict.reason };
+  return { ok: true, attachment };
+}
+
+async function storeDraftDocument(
+  svc: Svc,
+  orgId: string,
+  draftKey: string,
+  attachment: { filename: string; mime: string },
+  bytes: Buffer,
+): Promise<{ ok: true; path: string } | { ok: false; status: number; error: string }> {
+  const safeKey = draftKey.replace(/[^A-Za-z0-9_-]+/g, "-");
+  const path = `${orgId}/${safeKey}/${attachment.filename}`;
+  const { error } = await svc.storage.from(WHATSAPP_DRAFT_BUCKET).upload(path, bytes, {
+    contentType: attachment.mime,
+    upsert: true,
+  });
+  if (error) {
+    console.error("whatsapp: could not store the draft document. Nothing was sent.");
+    return {
+      ok: false,
+      status: 503,
+      error: "Could not store that document. Apply migration 055 so the whatsapp-drafts bucket exists.",
+    };
+  }
+  return { ok: true, path };
 }
 
 export async function sendApprovedWhatsAppDraft(params: {
@@ -544,7 +742,9 @@ export async function sendApprovedWhatsAppDraft(params: {
 
   const { data: draft, error } = await svc
     .from("whatsapp_messages")
-    .select("id, status, to_number, body, template_name, send_attempted_at, direction")
+    .select(
+      "id, status, to_number, body, template_name, send_attempted_at, direction, attachment_filename, attachment_mime, attachment_bucket, attachment_path, attachment_kind, attachment_source_table",
+    )
     .eq("id", params.draftId)
     .eq("org_id", params.orgId)
     .maybeSingle();
@@ -568,13 +768,51 @@ export async function sendApprovedWhatsAppDraft(params: {
     return { ok: false, status: 503, error: "Triangle cannot send this yet. Migration 054 has not been applied." };
   }
 
+  const outboundText = params.text || String(draft.body ?? "");
+  const words = draftTextAllowed(outboundText);
+  if (!words.ok) return { ok: false, status: 400, error: words.error };
+
+  const filename = (draft.attachment_filename as string | null) ?? null;
+  const attachmentPath = (draft.attachment_path as string | null) ?? null;
+  const attachmentBucket = (draft.attachment_bucket as string | null) ?? null;
+  if (filename && (!attachmentPath || !attachmentBucket)) {
+    return { ok: false, status: 409, error: "That draft names a document but the file is not stored." };
+  }
+  if (filename && attachmentPath) {
+    const verdict = workerProfileAttachment({
+      filename,
+      kind: (draft.attachment_kind as string | null) ?? null,
+      sourceTable: (draft.attachment_source_table as string | null) ?? null,
+      storageBucket: attachmentBucket,
+      storagePath: attachmentPath,
+    });
+    if (verdict.blocked) return { ok: false, status: 400, error: verdict.reason };
+    const guarded = await guardStoredDocument(
+      svc,
+      params.orgId,
+      {
+        filename,
+        mime: String(draft.attachment_mime ?? "application/octet-stream"),
+        kind: (draft.attachment_kind as string | null) ?? null,
+        sourceTable: (draft.attachment_source_table as string | null) ?? null,
+        bucket: attachmentBucket ?? "documents",
+        path: attachmentPath,
+      },
+      null,
+    );
+    if (!guarded.ok) return guarded;
+  }
+
   const decision = decideSend({
     actor: params.actor,
     approve: params.approve,
     status: String(draft.status),
     to: String(draft.to_number),
-    text: params.text || String(draft.body ?? ""),
+    text: outboundText,
     draftTemplate: (draft.template_name as string | null) ?? null,
+    document: filename
+      ? { filename, mime: String(draft.attachment_mime ?? "application/octet-stream") }
+      : null,
     allowlist: env.allowlist,
     lastInboundAt: (last.data?.wa_timestamp as string | undefined) ?? null,
     now: new Date(),
@@ -591,7 +829,7 @@ export async function sendApprovedWhatsAppDraft(params: {
       send_attempted_at: now,
       approved_at: now,
       approved_by: params.userId,
-      body: decision.mode === "text" ? decision.body : (draft.body as string | null),
+      body: decision.mode === "template" ? (draft.body as string | null) : decision.body,
       template_name: decision.mode === "template" ? decision.templateName : (draft.template_name as string | null),
       updated_at: now,
     })
@@ -608,11 +846,40 @@ export async function sendApprovedWhatsAppDraft(params: {
     return { ok: false, status: 409, error: "That draft is no longer waiting to be sent." };
   }
 
+  let graphBody: Record<string, unknown>;
+  if (decision.mode === "document") {
+    const file = await downloadDraftFile(svc, attachmentBucket ?? "", attachmentPath ?? "");
+    if (!file.ok) {
+      await releaseSendClaim(svc, params.orgId, params.draftId, file.error);
+      return file;
+    }
+    const media = await uploadGraphMedia({
+      version: env.graphVersion,
+      phoneNumberId: env.phoneNumberId,
+      accessToken: env.accessToken,
+      filename: decision.filename,
+      mime: decision.mime,
+      bytes: file.bytes,
+    });
+    if (!media.ok) {
+      await releaseSendClaim(svc, params.orgId, params.draftId, media.error);
+      return { ok: false, status: media.status, error: media.error };
+    }
+    graphBody = graphDocumentBody({
+      to: decision.to,
+      mediaId: media.mediaId,
+      filename: decision.filename,
+      caption: decision.body,
+    });
+  } else {
+    graphBody = graphSendBody(decision);
+  }
+
   const graph = await postToGraph({
     version: env.graphVersion,
     phoneNumberId: env.phoneNumberId,
     accessToken: env.accessToken,
-    body: graphSendBody(decision),
+    body: graphBody,
   });
   if (!graph.ok) {
     if (!graph.ambiguous) {
@@ -647,6 +914,72 @@ export async function sendApprovedWhatsAppDraft(params: {
     console.error("whatsapp: the message was accepted and was not sent again, but the row could not be marked sent.");
   }
   return { ok: true, wamid: graph.wamid };
+}
+
+async function releaseSendClaim(svc: Svc, orgId: string, draftId: string, error: string): Promise<void> {
+  await svc
+    .from("whatsapp_messages")
+    .update({ send_attempted_at: null, error, updated_at: new Date().toISOString() })
+    .eq("id", draftId)
+    .eq("org_id", orgId)
+    .eq("status", "draft");
+}
+
+async function downloadDraftFile(
+  svc: Svc,
+  bucket: string,
+  path: string,
+): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; status: number; error: string }> {
+  const { data, error } = await svc.storage.from(bucket).download(path);
+  if (error || !data) {
+    return { ok: false, status: 409, error: "The document is no longer stored. Nothing was sent." };
+  }
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  if (bytes.byteLength < 1) {
+    return { ok: false, status: 409, error: "The document was empty. Nothing was sent." };
+  }
+  return { ok: true, bytes };
+}
+
+async function uploadGraphMedia(args: {
+  version: string;
+  phoneNumberId: string;
+  accessToken: string;
+  filename: string;
+  mime: string;
+  bytes: Uint8Array;
+}): Promise<{ ok: true; mediaId: string } | { ok: false; status: number; error: string; ambiguous: boolean }> {
+  try {
+    const copy = new ArrayBuffer(args.bytes.byteLength);
+    new Uint8Array(copy).set(args.bytes);
+    const form = new FormData();
+    form.set("messaging_product", "whatsapp");
+    form.set("type", args.mime);
+    form.set("file", new File([copy], args.filename, { type: args.mime }));
+    const res = await fetch(graphMediaUrl(args.version, args.phoneNumberId), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${args.accessToken}` },
+      body: form,
+      signal: AbortSignal.timeout(20_000),
+      cache: "no-store",
+    });
+    const json = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
+    if (res.ok && typeof json?.id === "string" && json.id) return { ok: true, mediaId: json.id };
+    const message = typeof json?.error?.message === "string" ? json.error.message.slice(0, 300) : "";
+    return {
+      ok: false,
+      status: res.status >= 500 ? 502 : 400,
+      error: message || "WhatsApp did not accept the document. Nothing was sent.",
+      ambiguous: false,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 502,
+      error: "WhatsApp did not accept the document. Nothing was sent.",
+      ambiguous: false,
+    };
+  }
 }
 
 async function postToGraph(args: {
@@ -726,13 +1059,17 @@ async function listWhatsApp(
   if (!svc) return { ...EMPTY, approvedTemplate: env.templateName };
   const { data, error } = await svc
     .from("whatsapp_messages")
-    .select("id, wamid, direction, from_number, to_number, body, wa_timestamp, status, person_id, reply_to_wamid")
+    .select(
+      "id, wamid, direction, from_number, to_number, body, wa_timestamp, status, person_id, reply_to_wamid, attachment_filename",
+    )
     .eq("org_id", orgId)
     .eq(column, id)
     .order("wa_timestamp", { ascending: false })
     .limit(40);
   if (schemaMissing(error)) {
-    console.error("whatsapp: whatsapp_messages is missing (migration 054). Nothing to show.");
+    console.error(
+      "whatsapp: whatsapp_messages is missing columns or the table (migrations 054 and 055). Nothing to show.",
+    );
     return { ...EMPTY, approvedTemplate: env.templateName };
   }
   if (error || !data) return { ...EMPTY, approvedTemplate: env.templateName };
@@ -771,6 +1108,7 @@ async function listWhatsApp(
         who,
         inboundText: quoted?.body ? String(quoted.body) : null,
         windowOpen: serviceWindowOpen((latest?.wa_timestamp as string | undefined) ?? null, now),
+        documentName: (row.attachment_filename as string | null) ?? null,
       };
     }),
     waiting: inbound

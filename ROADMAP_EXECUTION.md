@@ -38,7 +38,12 @@ Triangle.
 **Exception (1 October 2026).** Nikola approved a WhatsApp Cloud API pilot:
 Meta's free test number, text only, Nikola and Ralph message Hanna, replies
 stay drafts until a person sends them. It is the one build outside this
-freeze. Decision: "WhatsApp pilot" in `DECISIONS.md`.
+freeze. Decision: "WhatsApp pilot" in `DECISIONS.md`. On 2 October 2026
+Nikola continued that exception: route each allowlisted inbound to Scout
+(contractor, company, or subcontractor lists and research) or Hanna
+(people, CVs, availability, roles; unsure goes to Hanna), wake only that
+employee, and allow one list document on a draft. No CV or worker profile
+leaves by WhatsApp.
 
 ### P0 — Clean the floor · `DONE` · PR #35 (`656ccca`)
 

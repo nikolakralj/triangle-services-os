@@ -38,14 +38,17 @@ function DraftCard({
 }) {
   const [words, setWords] = useState(draft.body);
   const [reviewing, setReviewing] = useState(false);
-  const canText = draft.windowOpen && words.trim().length > 0;
-  const canTemplate = !draft.windowOpen && Boolean(approvedTemplate);
+  const canText = draft.windowOpen && (words.trim().length > 0 || Boolean(draft.documentName));
+  const canTemplate = !draft.windowOpen && Boolean(approvedTemplate) && !draft.documentName;
 
   return (
     <article className="space-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
       <h3 className="text-[14px] font-semibold text-slate-950">WhatsApp to {draft.who}</h3>
       {draft.inboundText ? (
         <p className="text-[13px] leading-relaxed text-slate-600">They wrote: {draft.inboundText}</p>
+      ) : null}
+      {draft.documentName ? (
+        <p className="text-[13px] text-slate-700">Document: {draft.documentName}</p>
       ) : null}
       <EditableWords
         value={words}
@@ -54,7 +57,11 @@ function DraftCard({
         tone="light"
         label="The reply to send"
       />
-      {draft.windowOpen ? null : approvedTemplate ? (
+      {draft.windowOpen ? null : draft.documentName ? (
+        <p className="text-[13px] text-slate-600">
+          Outside the 24-hour window. This document cannot be sent, and the template does not carry it.
+        </p>
+      ) : approvedTemplate ? (
         <p className="text-[13px] text-slate-600">
           Outside 24 hours, so Send uses the approved template {approvedTemplate}.
         </p>
@@ -141,6 +148,12 @@ function Review({
         <dd className="font-mono">{draft.to}</dd>
         <dt className="text-slate-500">What</dt>
         <dd>{template ? `Approved template ${approvedTemplate ?? ""}` : words}</dd>
+        {draft.documentName ? (
+          <>
+            <dt className="text-slate-500">Document</dt>
+            <dd>{draft.documentName}</dd>
+          </>
+        ) : null}
       </dl>
       {sent ? (
         <p className="mt-3 text-[13px] text-emerald-800">Sent.</p>

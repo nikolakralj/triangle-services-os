@@ -56,13 +56,13 @@ chat with any AI.
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Default AI. Optional overrides: `OPENAI_RESEARCH_MODEL`, `OPENAI_OUTREACH_MODEL`, `OPENAI_SCOUT_MODEL`, `OPENAI_SUMMARY_MODEL`. |
 | `XAI_API_KEY`, `XAI_MISSION_MODEL` | When the key is set, mission steps run inside Triangle use Grok (default `grok-4.6`) instead of OpenAI. Employees on their own bots do not use it. |
 | `CRON_SECRET`, `CRON_ORGANIZATION_ID` | Scheduled jobs. Vercel Cron (`vercel.json`) calls `GET /api/job-intake/sync` at 06:00 UTC and `GET /api/agents/cron` at 07:00 UTC. Hobby cannot run a cron more than once a day, so mail is also read every 10 minutes by `.github/workflows/mail-sync.yml`. That workflow needs the same `CRON_SECRET` as a GitHub Actions secret (Settings → Secrets and variables → Actions). Optional, only if Deployment Protection blocks the call: `VERCEL_AUTOMATION_BYPASS_SECRET`. Optional tuning: `AGENT_CRON_BATCH` (default 3), `AGENT_STALL_HOURS` (default 6). |
-| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna, `INBOX_COORDINATOR` for Bob. Live Bob: `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`. Hanna's WhatsApp wake uses the same pair: `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`. |
+| `BOT_WAKE_URL_<ROLE>`, `BOT_WAKE_KEY_<ROLE>` | An employee's wake-up routine: its webhook URL and key. `<ROLE>` is the employee's role key in capitals — `PROJECT_RESEARCHER` for Scout, `HR` for Hanna, `INBOX_COORDINATOR` for Bob. Live Bob: `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`. WhatsApp uses the same pairs: `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when Hanna's role key is `hr`, and `BOT_WAKE_URL_PROJECT_RESEARCHER` / `BOT_WAKE_KEY_PROJECT_RESEARCHER` for Scout. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Meta's test phone number id. Required to send. |
 | `WHATSAPP_WABA_ID` | WhatsApp Business Account id. When set, webhooks for a different account are ignored. |
 | `WHATSAPP_ACCESS_TOKEN` | Graph API token. Required to send. Never a badge, never a person. |
-| `WHATSAPP_APP_SECRET` | App secret. The webhook checks `X-Hub-Signature-256` with it. |
+| `WHATSAPP_APP_SECRET` | App secret. The webhook checks `X-Hub-Signature-256` with it. Required for an inbound POST. If it is unset, the route logs an error and returns 503, and the message is not stored. GET verification only needs `WHATSAPP_VERIFY_TOKEN`, so a verified callback can still drop every inbound until this is set. |
 | `WHATSAPP_VERIFY_TOKEN` | The string you type in Meta's webhook form. GET verification compares it to `hub.verify_token`. |
-| `WHATSAPP_ALLOWED_NUMBERS` | Optional. Comma-separated E.164. Other inbound numbers are stored and do not wake Hanna. Sends to them are refused. Empty means no allowlist. |
+| `WHATSAPP_ALLOWED_NUMBERS` | Optional. Comma-separated E.164. Other inbound numbers are stored and do not wake anyone. Sends to them are refused. Empty means no allowlist. |
 | `WHATSAPP_GRAPH_VERSION` | Optional. Defaults to `v25.0`. |
 | `WHATSAPP_TEMPLATE_NAME` | Optional. The one approved template name. Outside the 24-hour window, a person may send only this. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Optional. Template language code. Defaults to `en`. |
@@ -162,28 +162,45 @@ How mission work flows is in the [workforce model](../../agents/WORKFORCE.md).
 - The changed screen or route works signed in.
 - After a bot change, a new mission step wakes its bot.
 
-## WhatsApp pilot — CEO sets Meta and applies 054
+## WhatsApp pilot — CEO sets Meta and applies 054 and 055
 
-Approved 1 October 2026 as the one exception to the P0–P4 freeze. Text only,
-on Meta's free test number. Triangle never sends by itself.
+Approved 1 October 2026 as the one exception to the P0–P4 freeze, and
+continued on 2 October: an allowlisted inbound is routed to Scout (a
+contractor, company, or subcontractor list, or research) or Hanna (people,
+CVs, availability, roles; unsure goes to Hanna). Only that employee is woken.
+A draft may carry one list document. No CV or worker profile leaves by
+WhatsApp — not as a file, and not as a name, email, phone, or rate in the
+words. An anonymised bio's facts (initials, role, tickets, languages,
+availability) may be written. Triangle never sends by itself.
 
-1. Apply `supabase/migrations/054_whatsapp_messages.sql` yourself. A coding
-   agent does not apply it. Until then the webhook answers 503 and files
-   nothing.
+1. Apply `supabase/migrations/054_whatsapp_messages.sql` and
+   `supabase/migrations/055_whatsapp_routing.sql` yourself. A coding agent
+   does not apply them. 055 adds `routed_employee`, `route_reason`, and the
+   attachment columns, and the private `whatsapp-drafts` storage bucket.
+   Until both are applied, the webhook answers 503 and files nothing.
 2. In Meta's app, set the callback URL to
    `https://triangle-services-os.vercel.app/api/whatsapp/webhook`, the verify
    token to the same value as `WHATSAPP_VERIFY_TOKEN`, and subscribe to the
    `messages` field.
 3. Add the two pilot recipients on the test number.
 4. Create one message template for outside the 24-hour window, and set
-   `WHATSAPP_TEMPLATE_NAME` to that name.
+   `WHATSAPP_TEMPLATE_NAME` to that name. A document cannot ride on that
+   template. Outside 24 hours, Send uses the template only when the draft
+   has no document.
 5. Set the WhatsApp variables above in Vercel (Production and Preview) and
-   redeploy. Hanna's wake is the existing pair `BOT_WAKE_URL_HR` /
-   `BOT_WAKE_KEY_HR` when her role key is `hr`.
-6. Inbound messages land on the person and the open case. Hanna drafts with
-   `POST /api/agent/whatsapp/drafts` and her badge. You approve and press Send
-   on that draft, on the case or the person. Free text only within 24 hours
-   of their last inbound.
+   redeploy. `WHATSAPP_APP_SECRET` has to be set or every inbound POST
+   returns 503 and is not stored — on 2 October Production had only
+   `WHATSAPP_VERIFY_TOKEN`, so the 09:51 inbound was not stored. Hanna's
+   wake is `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`.
+   Scout's wake is `BOT_WAKE_URL_PROJECT_RESEARCHER` /
+   `BOT_WAKE_KEY_PROJECT_RESEARCHER`.
+6. Inbound messages land on the person and the open case. The routed
+   employee drafts with `POST /api/agent/whatsapp/drafts` and their badge
+   (`tri_mc_…`). Scout may attach one CSV or PDF list (`contentBase64`, or
+   `storageBucket` + `storagePath` in `documents` or `whatsapp-drafts`).
+   You approve and press Send on that draft, on the case or the person.
+   Free text, or the document, only within 24 hours of their last inbound.
+   Nothing is sent when the draft is filed. The response is `sends: false`.
 
 ## Send from Triangle — CEO turns it on per mailbox
 

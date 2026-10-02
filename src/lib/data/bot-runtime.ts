@@ -150,12 +150,18 @@ export async function wakeEmployee(params: {
   stepId: string;
   missionId: string | null;
   event: WakeEvent;
-  /** Ids only. WhatsApp passes the message, the sender, and the person and case. */
+  /**
+   * WhatsApp passes the message id, the sender, the text, the person and
+   * case, and the draft endpoint the employee answers on. Other events pass
+   * ids only.
+   */
   context?: {
     messageId: string;
     sender: string;
     personId: string | null;
     caseId: string | null;
+    text?: string;
+    draftEndpoint?: string;
   };
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
@@ -196,6 +202,10 @@ export async function wakeEmployee(params: {
                 sender: params.context.sender,
                 personId: params.context.personId,
                 caseId: params.context.caseId,
+                ...(params.context.text !== undefined ? { text: params.context.text } : {}),
+                ...(params.context.draftEndpoint
+                  ? { draftEndpoint: params.context.draftEndpoint }
+                  : {}),
               }
             : {}),
         }),

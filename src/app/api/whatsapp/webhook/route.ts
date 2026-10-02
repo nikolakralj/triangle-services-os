@@ -36,8 +36,13 @@ export async function POST(request: Request) {
   const raw = await request.text();
   const decision = webhookPostDecision(request.headers.get("x-hub-signature-256"), raw, env.appSecret);
   if (decision === 503) {
-    console.error("whatsapp: WHATSAPP_APP_SECRET is missing. The webhook was not accepted.");
-    return NextResponse.json({ error: "WhatsApp app secret is not configured." }, { status: 503 });
+    console.error(
+      "whatsapp: WHATSAPP_APP_SECRET is not set. The inbound POST was not stored. Set the app secret so Meta's signature can be checked.",
+    );
+    return NextResponse.json(
+      { error: "WHATSAPP_APP_SECRET is not set. The inbound message was not stored." },
+      { status: 503 },
+    );
   }
   if (decision === 401) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 401 });

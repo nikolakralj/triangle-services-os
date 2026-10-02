@@ -20,7 +20,12 @@ until a person approves and sends it from the case or the person. Inside 24
 hours of the contact's last inbound, that send is free text. Outside it, only
 the configured approved template. A number that is not on
 `WHATSAPP_ALLOWED_NUMBERS` is stored and does not wake Hanna, and a send to
-it is refused.
+it is refused. On 2 October 2026 Nikola continued this exception: an
+allowlisted inbound is routed to Scout for a contractor, company, or
+subcontractor list or a research request, and to Hanna for resourcing
+(people, CVs, availability, roles), with unsure going to Hanna; only that
+employee is woken; a draft may carry one such list; no CV or worker profile
+leaves by WhatsApp.
 
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
 
