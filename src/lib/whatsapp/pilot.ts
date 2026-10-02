@@ -11,12 +11,15 @@
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import {
+  bindWhatsAppSenders,
   decideInbound,
   draftTextAllowed,
+  fieldSendersFor,
   planAttachment,
   WHATSAPP_DRAFT_ENDPOINT,
   type AttachmentInput,
   type NormalizedAttachment,
+  type SenderPermission,
 } from "@/lib/whatsapp/routing";
 
 export const DEFAULT_GRAPH_VERSION = "v25.0";
@@ -274,8 +277,12 @@ export function acceptCloudPayload(
     matchFor: (from: string) => { personId: string | null; missionId: string | null };
     expectedPhoneNumberId?: string | null;
     expectedWabaId?: string | null;
+    senders?: readonly SenderPermission[];
+    unmatched?: "unlisted" | "field";
   },
 ): { messages: PilotMessage[]; wakes: WakeContext[]; ignoredNonText: number } {
+  const senders = opts.senders ?? (opts.allowlist ? fieldSendersFor(opts.allowlist) : []);
+  const unmatched = opts.unmatched ?? (opts.allowlist ? "unlisted" : "field");
   const next = messages.map((row) => ({ ...row }));
   const wakes: WakeContext[] = [];
   let ignoredNonText = 0;
@@ -315,7 +322,12 @@ export function acceptCloudPayload(
       }
       const row = existing ?? next.find((item) => item.wamid === message.wamid);
       if (plan.wake && row && !row.woken) {
-        const decision = decideInbound({ text: message.text, from: message.from });
+        const decision = decideInbound({
+          text: message.text,
+          from: message.from,
+          senders,
+          unmatched,
+        });
         if (decision.action === "refuse" || !decision.employee) continue;
         row.woken = true;
         wakes.push({
@@ -569,6 +581,9 @@ export interface WhatsAppEnv {
   appSecret: string | null;
   verifyToken: string | null;
   allowlist: string[] | null;
+  senders: SenderPermission[];
+  /** field only when no sender list is configured, so an open pilot stays the field role. */
+  unmatched: "unlisted" | "field";
   graphVersion: string;
   templateName: string | null;
   templateLanguage: string;
@@ -582,13 +597,22 @@ function clean(value: string | undefined): string | null {
 
 export function readWhatsAppEnv(env: Record<string, string | undefined>): WhatsAppEnv {
   const org = clean(env.DEFAULT_ORGANIZATION_ID);
+  const directory = bindWhatsAppSenders(env.WHATSAPP_OWNER_NUMBERS, env.WHATSAPP_FIELD_NUMBERS);
+  const legacy = readAllowlist(env.WHATSAPP_ALLOWED_NUMBERS);
+  const access = directory.active
+    ? { allowlist: directory.allowlist, senders: directory.senders, unmatched: "unlisted" as const }
+    : legacy && legacy.length > 0
+      ? { allowlist: legacy, senders: fieldSendersFor(legacy), unmatched: "unlisted" as const }
+      : { allowlist: null, senders: [], unmatched: "field" as const };
   return {
     phoneNumberId: clean(env.WHATSAPP_PHONE_NUMBER_ID),
     wabaId: clean(env.WHATSAPP_WABA_ID),
     accessToken: clean(env.WHATSAPP_ACCESS_TOKEN),
     appSecret: clean(env.WHATSAPP_APP_SECRET),
     verifyToken: clean(env.WHATSAPP_VERIFY_TOKEN),
-    allowlist: readAllowlist(env.WHATSAPP_ALLOWED_NUMBERS),
+    allowlist: access.allowlist,
+    senders: access.senders,
+    unmatched: access.unmatched,
     graphVersion: graphVersion(env.WHATSAPP_GRAPH_VERSION),
     templateName: clean(env.WHATSAPP_TEMPLATE_NAME),
     templateLanguage: templateLanguage(env.WHATSAPP_TEMPLATE_LANGUAGE),

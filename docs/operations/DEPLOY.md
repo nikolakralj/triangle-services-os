@@ -62,7 +62,9 @@ chat with any AI.
 | `WHATSAPP_ACCESS_TOKEN` | Graph API token. Required to send. Never a badge, never a person. |
 | `WHATSAPP_APP_SECRET` | App secret. The webhook checks `X-Hub-Signature-256` with it. Required for an inbound POST. If it is unset, the route logs an error and returns 503, and the message is not stored. GET verification only needs `WHATSAPP_VERIFY_TOKEN`, so a verified callback can still drop every inbound until this is set. |
 | `WHATSAPP_VERIFY_TOKEN` | The string you type in Meta's webhook form. GET verification compares it to `hub.verify_token`. |
-| `WHATSAPP_ALLOWED_NUMBERS` | Optional. Comma-separated E.164. Other inbound numbers are stored and do not wake anyone. Sends to them are refused. Empty means no allowlist. |
+| `WHATSAPP_OWNER_NUMBERS` | Comma-separated E.164. These numbers may reach every bot, including ones added later. Set in Vercel, never in the repository. |
+| `WHATSAPP_FIELD_NUMBERS` | Comma-separated E.164. These numbers may reach only Hanna, Bob, and Scout. They cannot ask to change the software or to send an email. A number on both lists is the owner. |
+| `WHATSAPP_ALLOWED_NUMBERS` | Deprecated. Used only when both lists above are empty. Comma-separated E.164; other inbound numbers are stored and do not wake anyone, and sends to them are refused. Numbers on this fallback list are the field role. Empty, while the two lists above are also empty, means no allowlist. |
 | `WHATSAPP_GRAPH_VERSION` | Optional. Defaults to `v25.0`. |
 | `WHATSAPP_TEMPLATE_NAME` | Optional. The one approved template name. Outside the 24-hour window, a person may send only this. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Optional. Template language code. Defaults to `en`. |
@@ -168,15 +170,17 @@ Approved 1 October 2026 as the one exception to the P0–P4 freeze, and
 continued on 2 October: an allowlisted inbound is routed to Scout (a
 contractor, company, or subcontractor list, or research), Bob (a commercial
 or client follow-up), or Hanna (people, CVs, availability, roles; unsure
-goes to Hanna). Only that employee is woken. Who may reach whom is
-`WHATSAPP_SENDERS` in `src/lib/whatsapp/routing.ts`, not an environment
-variable. The `owner` row may reach every bot. The `field` row may reach
-only Hanna, Bob, and Scout, and may not ask to change the software or to
-send an email. Both E.164 values are null until you write the numbers in.
-Until the owner number is set, every sender — including you — is treated as
-the field row. A number that is not in the map stays on those same limits.
-A later bot is one more object on `WHATSAPP_EMPLOYEES` and its key on the
-senders who may reach it. A draft may carry one list document, including
+goes to Hanna). Only that employee is woken. Who may reach whom is the
+`owner` and `field` roles in `WHATSAPP_SENDERS`
+(`src/lib/whatsapp/routing.ts`). The phone numbers are
+`WHATSAPP_OWNER_NUMBERS` and `WHATSAPP_FIELD_NUMBERS`, because this
+repository is public. The owner role may reach every bot. The field role
+may reach only Hanna, Bob, and Scout, and may not ask to change the software
+or to send an email. A number on neither list is stored and does not wake
+anyone. When both lists are empty, `WHATSAPP_ALLOWED_NUMBERS` is still the
+allowlist, and every number on it is the field role. A later bot is one
+more object on `WHATSAPP_EMPLOYEES` and its key on the roles who may reach
+it. A draft may carry one list document, including
 xlsx. No CV or worker profile leaves by WhatsApp — not as a file, and not
 as a name, email, phone, or rate in the words. An anonymised bio's facts
 (initials, role, tickets, languages, availability) may be written. Triangle
@@ -184,9 +188,14 @@ never sends by itself.
 
 1. Apply `supabase/migrations/054_whatsapp_messages.sql` and
    `supabase/migrations/055_whatsapp_routing.sql` yourself. A coding agent
-   does not apply them. 055 adds `routed_employee`, `route_reason`, and the
-   attachment columns, and the private `whatsapp-drafts` storage bucket.
-   Until both are applied, the webhook answers 503 and files nothing.
+   does not apply them. 054 creates `whatsapp_messages`. 055 is required for
+   routing: the webhook reads and writes `routed_employee` and `route_reason`,
+   and a document draft writes `attachment_filename`, `attachment_mime`,
+   `attachment_bucket`, `attachment_path`, `attachment_kind`, and
+   `attachment_source_table`. 055 also creates the private `whatsapp-drafts`
+   bucket and reloads the PostgREST schema. `routed_employee` is a key
+   pattern, so a later bot does not need another migration. Until 055 is
+   applied, an inbound returns 503 and is not stored.
 2. In Meta's app, set the callback URL to
    `https://triangle-services-os.vercel.app/api/whatsapp/webhook`, the verify
    token to the same value as `WHATSAPP_VERIFY_TOKEN`, and subscribe to the
@@ -204,9 +213,11 @@ never sends by itself.
    Scout's wake is `BOT_WAKE_URL_PROJECT_RESEARCHER` /
    `BOT_WAKE_KEY_PROJECT_RESEARCHER`. Bob's wake is
    `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`.
-6. Write the two E.164 numbers into `WHATSAPP_SENDERS` (`owner` for you,
-   `field` for Ralph) and redeploy. Until `owner` is set, a software-change
-   request from your own number is refused the same way as Ralph's.
+6. Set `WHATSAPP_OWNER_NUMBERS` to your number and `WHATSAPP_FIELD_NUMBERS`
+   to Ralph's, comma-separated E.164, in Vercel, and redeploy. Do not put
+   the numbers in the repository. Until your number is on the owner list, a
+   software-change request from it is refused the same way as Ralph's. A
+   number on neither list is stored and does not wake anyone.
 7. Inbound messages land on the person and the open case. The routed
    employee drafts with `POST /api/agent/whatsapp/drafts` and their badge
    (`tri_mc_…`). Scout may attach one list (`contentBase64`, or

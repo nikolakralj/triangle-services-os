@@ -26,13 +26,16 @@ subcontractor list or a research request, to Bob for a commercial or client
 follow-up, and to Hanna for resourcing (people, CVs, availability, roles),
 with unsure going to Hanna; only that employee is woken; a draft may carry
 one such list, including an Excel file; no CV or worker profile
-leaves by WhatsApp. Later the same day he set who may reach whom in code, keyed by
-E.164 (`WHATSAPP_SENDERS`): Nikola may talk to every bot, including ones
-added later; Ralph may talk only to Hanna, Bob, and Scout. Until those
-numbers are written in, every sender is treated as Ralph. Ralph cannot ask
-to change the software and cannot ask Bob to send an email: each is a polite
-draft, flagged for Nikola, with nobody woken and nothing sent. When Ralph
-does reach Bob, the handoff says the requester may not trigger outbound
+leaves by WhatsApp. Later the same day he set who may reach whom: the roles
+stay in code (`WHATSAPP_SENDERS`), and the numbers stay in the environment,
+because the repository is public. `WHATSAPP_OWNER_NUMBERS` may talk to every
+bot, including ones added later. `WHATSAPP_FIELD_NUMBERS` may talk only to
+Hanna, Bob, and Scout. A number on neither list is stored and does not wake
+anyone. When both of those lists are empty, `WHATSAPP_ALLOWED_NUMBERS` is
+still the allowlist, and every number on it is the field role. Ralph cannot
+ask to change the software and cannot ask Bob to send an email: each is a
+polite draft, flagged for Nikola, with nobody woken and nothing sent. When
+Ralph does reach Bob, the handoff says the requester may not trigger outbound
 email. Nikola still approves before any WhatsApp message goes out.
 
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves

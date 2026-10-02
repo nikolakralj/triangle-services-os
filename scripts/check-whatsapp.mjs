@@ -63,6 +63,7 @@ const {
   graphMediaUrl,
   planDraft,
   readAllowlist,
+  readWhatsAppEnv,
   signatureHex,
   wakeEnvForRole,
   webhookGetDecision,
@@ -79,6 +80,7 @@ const {
   WHATSAPP_SENDERS,
   asksForSoftwareChange,
   asksToSendEmail,
+  bindWhatsAppSenders,
   decideInbound,
   employeeMayDraftWhatsApp,
   keywordRoute,
@@ -393,33 +395,45 @@ test("send requires approve, including a document", () => {
 test("sender permissions, Bob, software refusal, and no email from the field sender", () => {
   const ownerNumber = "+15551000001";
   const fieldNumber = "+15551000002";
-  const senders = [
-    {
-      id: "owner",
-      e164: ownerNumber,
-      employees: "all",
-      mayRequestSoftwareChange: true,
-      mayTriggerOutboundEmail: true,
-    },
-    {
-      id: "field",
-      e164: fieldNumber,
-      employees: ["hanna", "bob", "scout"],
-      mayRequestSoftwareChange: false,
-      mayTriggerOutboundEmail: false,
-    },
-  ];
+  const directory = bindWhatsAppSenders(`${ownerNumber}, ${ownerNumber}`, `${fieldNumber}, ${ownerNumber}`);
+  const senders = directory.senders;
+  assert.equal(directory.active, true);
+  assert.deepEqual(directory.allowlist, [ownerNumber, fieldNumber]);
+  assert.equal(senders.filter((sender) => sender.e164 === ownerNumber).length, 1);
   const field = permissionFor(fieldNumber, senders);
+  assert.equal(field.id, "field");
   assert.deepEqual([...field.employees].sort(), ["bob", "hanna", "scout"]);
   assert.equal(field.mayRequestSoftwareChange, false);
   assert.equal(field.mayTriggerOutboundEmail, false);
+  assert.equal(permissionFor(ownerNumber, senders).id, "owner");
   assert.equal(permissionFor(ownerNumber, senders).employees, "all");
-  assert.equal(permissionFor("+15559999999", senders).id, "unlisted");
+  const stranger = permissionFor("+15559999999", senders);
+  assert.equal(stranger.id, "unlisted");
+  assert.deepEqual(stranger.employees, []);
+  assert.equal(stranger.mayTriggerOutboundEmail, false);
   assert.equal(permissionFor("+15559999999").mayTriggerOutboundEmail, false);
   const shippedField = WHATSAPP_SENDERS.find((sender) => sender.id === "field");
   assert.deepEqual([...shippedField.employees].sort(), ["bob", "hanna", "scout"]);
-  assert.equal(shippedField.e164, null);
+  assert.equal("e164" in shippedField, false);
   assert.equal(WHATSAPP_SENDERS.find((sender) => sender.id === "owner").employees, "all");
+  assert.doesNotMatch(read("src/lib/whatsapp/routing.ts"), /\+\d{8,}/);
+  assert.doesNotMatch(read(".env.example"), /WHATSAPP_(OWNER|FIELD)_NUMBERS=\S/);
+  const fromEnv = readWhatsAppEnv({
+    WHATSAPP_OWNER_NUMBERS: ownerNumber,
+    WHATSAPP_FIELD_NUMBERS: fieldNumber,
+    WHATSAPP_ALLOWED_NUMBERS: "+15558880000",
+  });
+  assert.deepEqual(fromEnv.allowlist, [ownerNumber, fieldNumber]);
+  assert.equal(fromEnv.unmatched, "unlisted");
+  assert.equal(permissionFor("+15558880000", fromEnv.senders, fromEnv.unmatched).id, "unlisted");
+  const legacy = readWhatsAppEnv({ WHATSAPP_ALLOWED_NUMBERS: "+15551212000" });
+  assert.deepEqual(legacy.allowlist, ["+15551212000"]);
+  assert.equal(permissionFor("+15551212000", legacy.senders, legacy.unmatched).id, "field");
+  assert.equal(permissionFor("+15550000000", legacy.senders, legacy.unmatched).id, "unlisted");
+  const open = readWhatsAppEnv({});
+  assert.equal(open.allowlist, null);
+  assert.equal(open.unmatched, "field");
+  assert.equal(permissionFor(fieldNumber, open.senders, open.unmatched).id, "field");
 
   const followUp = decideInbound({
     text: "Please follow up with the client on the proposal",
@@ -507,12 +521,20 @@ test("sender permissions, Bob, software refusal, and no email from the field sen
   assert.equal(senderMayTalkTo(field, "scout"), true);
 
   const opts = {
-    allowlist: readAllowlist(`${fieldNumber},${ownerNumber}`),
+    allowlist: directory.allowlist,
+    senders: directory.senders,
     businessNumber: "+15550001111",
     matchFor: () => ({ personId: null, missionId: null }),
   };
-  const bobWake = acceptCloudPayload(
+  const strangerWake = acceptCloudPayload(
     [],
+    cloudText("wamid.STRANGER", "+15557770000", "Please follow up with the client"),
+    opts,
+  );
+  assert.equal(strangerWake.messages.length, 1);
+  assert.equal(strangerWake.wakes.length, 0);
+  const bobWake = acceptCloudPayload(
+    strangerWake.messages,
     cloudText("wamid.BOB", fieldNumber, "Please follow up with the client on the proposal"),
     opts,
   );
@@ -543,6 +565,7 @@ test("sender permissions, Bob, software refusal, and no email from the field sen
   assert.match(store, /NO_OUTBOUND_EMAIL_HANDOFF|handoffNote/);
   assert.match(store, /ensureRefusalDraft/);
   assert.match(store, /decideInbound/);
+  assert.match(store, /senders: access\.senders/);
   assert.doesNotMatch(store, /mail-send|sendMail|nodemailer/);
   assert.match(read("src/lib/data/bot-runtime.ts"), /handoffNote/);
 

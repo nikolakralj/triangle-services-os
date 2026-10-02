@@ -10,11 +10,13 @@
 // A model may decide first. An unsure or missing model answer uses the
 // keyword rule.
 //
-// Who a sender may reach lives in WHATSAPP_SENDERS, keyed by E.164. Add a
-// bot by appending one object to WHATSAPP_EMPLOYEES and listing its key on
-// a sender. An unlisted number gets the restricted grant, never "all".
-// A restricted sender cannot ask for a software change and cannot ask for
-// an email to be sent. Those are refused as drafts. Nothing here sends.
+// Who a role may reach lives in WHATSAPP_SENDERS. The numbers are not here:
+// the repository is public. WHATSAPP_OWNER_NUMBERS and WHATSAPP_FIELD_NUMBERS
+// supply the E.164 lists. Add a bot by appending one object to
+// WHATSAPP_EMPLOYEES and listing its key on a role. A number on neither list
+// is stored and does not wake anyone. A field number cannot ask for a
+// software change and cannot ask for an email to be sent. Those are refused
+// as drafts. Nothing here sends.
 //
 // Data rule. No CV or worker profile leaves Triangle by WhatsApp. A draft may
 // carry one contractor, company, or subcontractor list. The words may say
@@ -127,47 +129,55 @@ export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
   },
 ];
 
-export interface SenderPermission {
-  /** Stable id. Not a person's name. */
+export interface SenderRole {
+  /** Stable id. Not a person's name, and not a phone number. */
   id: string;
-  /** E.164. Null until the number is written in here. */
-  e164: string | null;
-  /** "all", or the employee keys this sender may wake. */
+  /** "all", or the employee keys this role may wake. */
   employees: "all" | readonly string[];
   mayRequestSoftwareChange: boolean;
   mayTriggerOutboundEmail: boolean;
 }
 
 /**
- * Keyed by E.164 once the number is filled in.
+ * Roles only. No E.164 values belong in this file.
  * owner — may talk to every bot, including ones added later.
  * field — Hanna, Bob, and Scout only. No software change. No outbound email.
- * An unlisted number uses the same limits as field.
  */
-export const WHATSAPP_SENDERS: readonly SenderPermission[] = [
+export const WHATSAPP_SENDERS: readonly SenderRole[] = [
   {
     id: "owner",
-    e164: null,
     employees: "all",
     mayRequestSoftwareChange: true,
     mayTriggerOutboundEmail: true,
   },
   {
     id: "field",
-    e164: null,
     employees: ["hanna", "bob", "scout"],
     mayRequestSoftwareChange: false,
     mayTriggerOutboundEmail: false,
   },
 ];
 
-export const RESTRICTED_SENDER: SenderPermission = {
+export interface SenderPermission extends SenderRole {
+  /** E.164 taken from the environment at startup. */
+  e164: string;
+}
+
+/** A number on neither list. Stored, and never woken. */
+export const UNLISTED_SENDER: SenderPermission = {
   id: "unlisted",
-  e164: null,
-  employees: ["hanna", "bob", "scout"],
+  e164: "",
+  employees: [],
   mayRequestSoftwareChange: false,
   mayTriggerOutboundEmail: false,
 };
+
+export interface SenderDirectory {
+  /** True when at least one owner or field number was parsed. */
+  active: boolean;
+  allowlist: string[];
+  senders: SenderPermission[];
+}
 
 export interface RouteDecision {
   employee: string;
@@ -223,14 +233,63 @@ function asE164(raw: string | null | undefined): string | null {
   return `+${digits}`;
 }
 
+export function parseE164List(raw: string | null | undefined): string[] {
+  if (raw == null || raw.trim() === "") return [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const number = asE164(part);
+    if (number) seen.add(number);
+  }
+  return [...seen];
+}
+
+function roleById(id: string): SenderRole {
+  const role = WHATSAPP_SENDERS.find((item) => item.id === id);
+  if (!role) return UNLISTED_SENDER;
+  return role;
+}
+
+/**
+ * Bind the role map to the numbers from the environment.
+ * A number on both lists is the owner. The allowlist is the union.
+ */
+export function bindWhatsAppSenders(
+  ownerRaw: string | null | undefined,
+  fieldRaw: string | null | undefined,
+): SenderDirectory {
+  const owners = parseE164List(ownerRaw);
+  const ownerSet = new Set(owners);
+  const fields = parseE164List(fieldRaw).filter((number) => !ownerSet.has(number));
+  const owner = roleById("owner");
+  const field = roleById("field");
+  const senders: SenderPermission[] = [
+    ...owners.map((e164) => ({ ...owner, e164 })),
+    ...fields.map((e164) => ({ ...field, e164 })),
+  ];
+  return {
+    active: senders.length > 0,
+    allowlist: senders.map((sender) => sender.e164),
+    senders,
+  };
+}
+
+/** Numbers from the deprecated allowlist. They are the field role, never owner. */
+export function fieldSendersFor(numbers: readonly string[]): SenderPermission[] {
+  const field = roleById("field");
+  return numbers.map((e164) => ({ ...field, e164 }));
+}
+
 export function permissionFor(
   from: string,
-  senders: readonly SenderPermission[] = WHATSAPP_SENDERS,
+  senders: readonly SenderPermission[] = [],
+  unmatched: "unlisted" | "field" = "unlisted",
 ): SenderPermission {
   const number = asE164(from);
-  if (!number) return RESTRICTED_SENDER;
-  const hit = senders.find((sender) => sender.e164 && asE164(sender.e164) === number);
-  return hit ?? RESTRICTED_SENDER;
+  if (!number) return UNLISTED_SENDER;
+  const hit = senders.find((sender) => asE164(sender.e164) === number);
+  if (hit) return hit;
+  if (unmatched === "field") return { ...roleById("field"), e164: number };
+  return UNLISTED_SENDER;
 }
 
 export function senderMayTalkTo(sender: SenderPermission, employeeKey: string): boolean {
@@ -356,10 +415,22 @@ export function decideInbound(input: {
   from: string;
   model?: ModelRoute | null;
   senders?: readonly SenderPermission[];
+  unmatched?: "unlisted" | "field";
   employees?: readonly WhatsAppEmployeeDef[];
 }): InboundPlan {
   const employees = input.employees ?? WHATSAPP_EMPLOYEES;
-  const sender = permissionFor(input.from, input.senders ?? WHATSAPP_SENDERS);
+  const sender = permissionFor(input.from, input.senders ?? [], input.unmatched ?? "unlisted");
+  if (sender.id === "unlisted") {
+    return {
+      action: "route",
+      employee: null,
+      reason: "Not on the sender list. Stored. Nobody was woken.",
+      unsure: false,
+      handoffNote: null,
+      draftText: null,
+      flagOwner: false,
+    };
+  }
   if (asksForSoftwareChange(input.text) && !sender.mayRequestSoftwareChange) {
     return refuse(
       "Refused: this sender may not ask for a software change. Flagged for the owner.",

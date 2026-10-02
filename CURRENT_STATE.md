@@ -15,15 +15,19 @@ woken, once, with the message id, sender, text, person, case, and
 stays `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`. Bob's
 is `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`.
 
-Who may reach whom is `WHATSAPP_SENDERS` in `src/lib/whatsapp/routing.ts`,
-keyed by E.164. The owner row (Nikola) may talk to every bot. The field row
-(Ralph) may talk only to Hanna, Bob, and Scout. Both numbers are still null,
-so until they are filled in every sender is treated as the field row. A
-later bot is one more object on `WHATSAPP_EMPLOYEES` and its key on the
-senders who may reach it. Ralph cannot ask to change the software and cannot
-ask for an email to be sent: each is stored as a polite draft, flagged for
-Nikola, with nobody woken and nothing sent. When Ralph's message does reach
-Bob, the handoff says the requester may not trigger outbound email.
+Who may reach whom is two roles in `WHATSAPP_SENDERS`
+(`src/lib/whatsapp/routing.ts`). The phone numbers are not in the repository.
+`WHATSAPP_OWNER_NUMBERS` (Nikola) may talk to every bot.
+`WHATSAPP_FIELD_NUMBERS` (Ralph) may talk only to Hanna, Bob, and Scout. A
+number on neither list is stored and does not wake anyone, and a send to it
+is refused. When both lists are empty, `WHATSAPP_ALLOWED_NUMBERS` is still
+the allowlist and every number on it is the field role; an empty legacy list
+still means no allowlist. A later bot is one more object on
+`WHATSAPP_EMPLOYEES` and its key on the roles who may reach it. Ralph cannot
+ask to change the software and cannot ask for an email to be sent: each is
+stored as a polite draft, flagged for Nikola, with nobody woken and nothing
+sent. When Ralph's message does reach Bob, the handoff says the requester
+may not trigger outbound email.
 
 Scout, Hanna, and Bob can draft. A draft may carry one list document,
 including an Excel file (xlsx), stored in the `whatsapp-drafts` bucket or as
@@ -37,7 +41,7 @@ set, so the 09:51 inbound was not stored.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
-| Routing after an allowlisted inbound to Scout, Bob, or Hanna; one wake; per-sender map; software and email refusals for the field sender; Scout, Hanna, and Bob draft; one list document including xlsx; CV and worker-profile refusal; 503 when the app secret is missing. Migration `055_whatsapp_routing.sql` (employee key is a pattern, so a later bot needs no new column) | this branch | `check:whatsapp` 13/13; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 14/14; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Migration 055 is written and not applied. Nothing was sent. No live webhook was called. The draft line, including a document name, was rendered in `check:whatsapp`. A signed-in browser pass waits on applying 054 and 055. Owner and field E.164 are still null, so every number is restricted until Nikola writes his number in |
+| Routing after an allowlisted inbound to Scout, Bob, or Hanna; one wake; roles in code and numbers in `WHATSAPP_OWNER_NUMBERS` / `WHATSAPP_FIELD_NUMBERS`; unlisted numbers stored with no wake; software and email refusals for the field role; Scout, Hanna, and Bob draft; one list document including xlsx; CV and worker-profile refusal; 503 when the app secret is missing. Migration `055_whatsapp_routing.sql` is required for this path (route and attachment columns, plus the `whatsapp-drafts` bucket) | this branch | `check:whatsapp` 13/13; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 14/14; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Migration 055 is written and not applied. Without it the webhook returns 503 and files nothing, because the inbound read and insert name the columns 055 adds. Nothing was sent. No live webhook was called. The draft line, including a document name, was rendered in `check:whatsapp`. A signed-in browser pass waits on applying 054 and 055. Phone numbers are environment variables, not in the repository |
 
 ## WhatsApp pilot — 1 October 2026
 

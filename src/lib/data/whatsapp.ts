@@ -31,6 +31,7 @@ import {
   employeeMayDraftWhatsApp,
   parseModelRoute,
   ROUTE_MODEL_INSTRUCTIONS,
+  type SenderPermission,
   WHATSAPP_DRAFT_BUCKET,
   WHATSAPP_DRAFT_ENDPOINT,
   workerProfileAttachment,
@@ -84,7 +85,7 @@ export async function ingestWhatsAppWebhook(rawBody: string): Promise<{ status: 
     }
     const business = change.displayNumber ?? "unknown";
     for (const message of change.messages) {
-      const outcome = await storeInbound(svc, env.orgId, env.allowlist, business, message);
+      const outcome = await storeInbound(svc, env.orgId, env, business, message);
       if (outcome === "missing") return { status: 503 };
     }
     for (const status of change.statuses) {
@@ -98,7 +99,11 @@ export async function ingestWhatsAppWebhook(rawBody: string): Promise<{ status: 
 async function storeInbound(
   svc: Svc,
   orgId: string,
-  allowlist: string[] | null,
+  access: {
+    allowlist: string[] | null;
+    senders: readonly SenderPermission[];
+    unmatched: "unlisted" | "field";
+  },
   business: string,
   message: ParsedText,
 ): Promise<"ok" | "missing"> {
@@ -130,7 +135,7 @@ async function storeInbound(
     exists: Boolean(existing),
     woken: Boolean(existing?.woken_at),
     from: message.from,
-    allowlist,
+    allowlist: access.allowlist,
   });
 
   const alreadyRefused = String(existing?.route_reason ?? "").startsWith("Refused:");
@@ -140,12 +145,16 @@ async function storeInbound(
   }
 
   const storedRoute = routeFromRow(existing?.routed_employee, existing?.route_reason);
-  let route = plan.wake ? (storedRoute ?? (await classifyInbound(message.from, message.text))) : storedRoute;
+  let route = plan.wake
+    ? (storedRoute ?? (await classifyInbound(message.from, message.text, access)))
+    : storedRoute;
   if (plan.wake && storedRoute?.employee) {
     route = decideInbound({
       text: message.text,
       from: message.from,
       model: { employee: storedRoute.employee, reason: storedRoute.reason },
+      senders: access.senders,
+      unmatched: access.unmatched,
     });
   }
 
@@ -237,9 +246,19 @@ function routeFromRow(employee: unknown, reason: unknown): InboundPlan | null {
  * answer uses the keyword rule. The keyword rule sends an unclear message
  * to Hanna. This never throws and never sends.
  */
-async function classifyInbound(from: string, text: string): Promise<InboundPlan> {
+async function classifyInbound(
+  from: string,
+  text: string,
+  access: { senders: readonly SenderPermission[]; unmatched: "unlisted" | "field" },
+): Promise<InboundPlan> {
   const model = await askRouteModel(text);
-  return decideInbound({ text, from, model });
+  return decideInbound({
+    text,
+    from,
+    model,
+    senders: access.senders,
+    unmatched: access.unmatched,
+  });
 }
 
 async function askRouteModel(text: string): Promise<ReturnType<typeof parseModelRoute>> {
@@ -520,7 +539,7 @@ async function ensureRefusalDraft(
 ): Promise<void> {
   const text =
     draftText?.trim() ||
-    decideInbound({ text: message.text, from: message.from }).draftText ||
+    decideInbound({ text: message.text, from: message.from, unmatched: "field" }).draftText ||
     "I've left this with the owner. Nothing was sent.";
   const words = draftTextAllowed(text);
   if (!words.ok) {
