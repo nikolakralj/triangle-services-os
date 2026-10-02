@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
+import { openCaseId } from "@/lib/data/employee-report-policy";
 import { wakeEmployee, WakeEvent, WakeResult } from "./bot-runtime";
 import { listFollowUpsDue } from "./follow-ups";
 import { CAPACITY_SHELF_LIFE_DAYS } from "./supply-partners";
@@ -129,6 +130,64 @@ async function resolveEmployeeForEvent(
   return roster[0];
 }
 
+function leadIdFrom(
+  metadata: Record<string, unknown> | undefined,
+  entityType: string | undefined,
+  entityId: string | undefined,
+): string | null {
+  const target = metadata?.target;
+  if (target && typeof target === "object" && !Array.isArray(target)) {
+    const leadId = (target as { leadId?: unknown }).leadId;
+    if (typeof leadId === "string" && leadId.trim()) return leadId.trim();
+  }
+  if (entityType === "job_lead" && entityId?.trim()) return entityId.trim();
+  return null;
+}
+
+/**
+ * Open recruiting case for the lead a follow-up is about.
+ * A missing roles table, or a lead with no open case, leaves the assignment
+ * without a mission.
+ */
+async function followUpMissionId(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  orgId: string,
+  metadata: Record<string, unknown> | undefined,
+  entityType: string | undefined,
+  entityId: string | undefined,
+): Promise<string | null> {
+  const leadId = leadIdFrom(metadata, entityType, entityId);
+  if (!leadId) return null;
+  const { data, error } = await svc
+    .from("requirement_roles")
+    .select("mission_id")
+    .eq("org_id", orgId)
+    .eq("job_lead_id", leadId);
+  if (error || !data?.length) return null;
+  const ids = [
+    ...new Set(
+      data
+        .map((row) => row.mission_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  if (ids.length === 0) return null;
+  const missions = await svc
+    .from("missions")
+    .select("id, closed_at, updated_at")
+    .eq("org_id", orgId)
+    .in("id", ids);
+  if (missions.error || !missions.data?.length) return null;
+  return openCaseId({
+    leadId,
+    cases: missions.data.map((row) => ({
+      missionId: String(row.id),
+      closed: row.closed_at != null,
+      updatedAt: (row.updated_at as string | null) ?? null,
+    })),
+  });
+}
+
 /**
  * Dispatches an event to the outbox:
  * 1. Verifies idempotency key (skips if already recorded)
@@ -199,6 +258,14 @@ export async function dispatchOutboxEvent(params: {
     metadata: params.metadata ?? {},
   };
 
+  // follow_up_due used to omit mission_id, so the wake carried missionId null
+  // and a report that named that id was rejected. The assignment sits on the
+  // lead's open case when there is one, and stays without a case otherwise.
+  const missionId =
+    params.kind === "follow_up_due"
+      ? await followUpMissionId(svc, params.orgId, params.metadata, params.entityType, params.entityId)
+      : null;
+
   const { data: created, error } = await svc
     .from("agent_assignments")
     .insert({
@@ -211,6 +278,7 @@ export async function dispatchOutboxEvent(params: {
       priority: params.priority ?? (params.kind === "client_reply" ? "high" : "normal"),
       constraints,
       idempotency_key: params.idempotencyKey,
+      ...(missionId ? { mission_id: missionId } : {}),
     })
     .select("id")
     .single();
@@ -241,7 +309,7 @@ export async function dispatchOutboxEvent(params: {
     orgId: params.orgId,
     agentInstanceId: target.id,
     stepId: assignmentId,
-    missionId: null,
+    missionId,
     event: params.kind as WakeEvent,
   });
 

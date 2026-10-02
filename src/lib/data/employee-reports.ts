@@ -6,7 +6,9 @@ import {
   caseReplyAttachment,
   planEmployeeReport,
   accessNeededLines,
+  decideReportCase,
   normalizeMessageId,
+  openCaseId,
   type AccessNeededLine,
   type PlannedReport,
   type ReportKind,
@@ -16,8 +18,10 @@ import { requirementIdentity } from "@/lib/job-intake/requirement-case";
 
 // ---------------------------------------------------------------------------
 // Filing a report, and reading it back onto the person, the company and the
-// case. The service client writes. A missing table (migration 053 not applied)
-// is a refusal the employee can read, not a crash of mail ingest.
+// case. The case is optional. A wake with no mission still files on the
+// person and the company, and on the lead when one was named. The service
+// client writes. A missing table (migration 053 not applied) is a refusal
+// the employee can read, not a crash of mail ingest.
 // ---------------------------------------------------------------------------
 
 type Svc = NonNullable<ReturnType<typeof createServiceSupabaseClient>>;
@@ -242,18 +246,157 @@ async function resolveTargets(
     }
   }
 
-  const missionId = planned.caseId;
-  if (missionId) {
-    const { data } = await svc
-      .from("missions")
-      .select("id")
-      .eq("id", missionId)
-      .eq("org_id", orgId)
-      .maybeSingle();
-    if (!data) return { ok: false, status: 400, error: "That case is not in this organisation." };
+  const attached = await attachCase(svc, orgId, planned, warnings);
+  if (!attached.ok) return attached;
+  if (attached.lead && !workerId && !personName && attached.lead.contactName) {
+    personName = attached.lead.contactName;
+  }
+  if (attached.lead && !companyId && !companyName && attached.lead.companyName) {
+    companyName = attached.lead.companyName;
+  }
+  if (
+    planned.kind !== "access_needed" &&
+    !workerId &&
+    !personName &&
+    !companyId &&
+    !companyName &&
+    !attached.missionId
+  ) {
+    return { ok: false, status: 400, error: "Name the person, the company, or the case." };
   }
 
-  return { ok: true, workerId, personName, companyId, companyName, missionId };
+  return {
+    ok: true,
+    workerId,
+    personName,
+    companyId,
+    companyName,
+    missionId: attached.missionId,
+  };
+}
+
+interface LeadNames {
+  contactName: string | null;
+  companyName: string | null;
+}
+
+function plainName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text || /[%_]/.test(text)) return null;
+  return text.slice(0, 200);
+}
+
+/**
+ * A missing case is skipped. A mission in another organisation is refused.
+ * An id that is a lead in this organisation is the lead: the report files on
+ * the person and the company, and on that lead's open case when it has one.
+ */
+async function attachCase(
+  svc: Svc,
+  orgId: string,
+  planned: PlannedReport,
+  warnings: string[],
+): Promise<
+  | { ok: true; missionId: string | null; lead: LeadNames | null }
+  | { ok: false; status: number; error: string }
+> {
+  let missionOrgId: string | null = null;
+  let leadInThisOrg = false;
+  let open: string | null = null;
+  let lead: LeadNames | null = null;
+
+  const leadId = planned.caseId ? null : planned.leadId;
+  const idToRead = planned.caseId ?? planned.leadId;
+  if (idToRead && !planned.caseId) {
+    const found = await readLead(svc, orgId, idToRead);
+    lead = found.names;
+    leadInThisOrg = found.inThisOrg;
+    if (found.inThisOrg) open = await openCaseForLead(svc, orgId, idToRead);
+  } else if (planned.caseId) {
+    const { data } = await svc
+      .from("missions")
+      .select("id, org_id")
+      .eq("id", planned.caseId)
+      .maybeSingle();
+    if (data?.org_id) {
+      missionOrgId = String(data.org_id);
+    } else {
+      const found = await readLead(svc, orgId, planned.caseId);
+      lead = found.names;
+      leadInThisOrg = found.inThisOrg;
+      if (found.inThisOrg) open = await openCaseForLead(svc, orgId, planned.caseId);
+    }
+  }
+
+  const decision = decideReportCase({
+    caseId: planned.caseId,
+    missionOrgId,
+    orgId,
+    leadInThisOrg,
+    openCaseId: open,
+  });
+  if (!decision.ok) return { ok: false, status: 400, error: decision.error };
+  if (planned.caseId && !decision.missionId && !leadInThisOrg) {
+    warnings.push("No case with that id. Filed on the person and the company.");
+  }
+  // An explicit lead, with no case id, still contributes its open case.
+  if (!planned.caseId && leadId && !leadInThisOrg && planned.leadId) {
+    warnings.push("That lead is not in this organisation. Filed without it.");
+  }
+  return { ok: true, missionId: decision.missionId, lead };
+}
+
+async function readLead(
+  svc: Svc,
+  orgId: string,
+  leadId: string,
+): Promise<{ inThisOrg: boolean; names: LeadNames | null }> {
+  const { data } = await svc
+    .from("job_leads")
+    .select("id, contact_name, agency_name, client_company")
+    .eq("id", leadId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!data) return { inThisOrg: false, names: null };
+  return {
+    inThisOrg: true,
+    names: {
+      contactName: plainName(data.contact_name),
+      companyName: plainName(data.agency_name) ?? plainName(data.client_company),
+    },
+  };
+}
+
+async function openCaseForLead(svc: Svc, orgId: string, leadId: string): Promise<string | null> {
+  const { data, error } = await svc
+    .from("requirement_roles")
+    .select("mission_id")
+    .eq("org_id", orgId)
+    .eq("job_lead_id", leadId);
+  if (error || !data?.length) return null;
+  const ids = [
+    ...new Set(
+      data
+        .map((row) => row.mission_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  if (ids.length === 0) return null;
+  const missions = await svc
+    .from("missions")
+    .select("id, closed_at, updated_at")
+    .eq("org_id", orgId)
+    .in("id", ids);
+  if (missions.error || !missions.data?.length) return null;
+  return openCaseId({
+    leadId,
+    cases: missions.data.map((row) => ({
+      missionId: String(row.id),
+      closed: row.closed_at != null,
+      updatedAt: (row.updated_at as string | null) ?? null,
+    })),
+  });
 }
 
 async function listReports(

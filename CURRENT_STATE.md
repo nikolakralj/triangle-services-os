@@ -1,5 +1,18 @@
 # Current state
 
+## Employee reports with no case — 2 October 2026
+
+Bob's `follow_up_due` wake for Tom Stocks (lead `0362e5f7`) filed an
+`email_drafted` report and was refused with "That case is not in this
+organisation". The assignment had no mission. A report now files on the
+person, the company, and the lead when the case is absent. A follow-up
+assignment takes the lead's open case when one exists, and stays without a
+mission otherwise. No migration. Nothing sent.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| `POST /api/agent/reports` skips the case check when `missionId` is absent. `follow_up_due` sets `mission_id` from the lead's open case | `3d6f9c4` | `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. The other `check:*` scripts passed. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | No migration. Nothing sent |
+
 ## WhatsApp pilot — 1 October 2026
 
 Nikola approved an explicit exception to the P0–P4 freeze (decision "WhatsApp

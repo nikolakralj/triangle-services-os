@@ -265,9 +265,10 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 
 Look the person up first (`GET /api/agent/lookup?q=…&type=worker`) and pass
 `personId` when Triangle already has them. Pass `companyId` the same way.
-`caseId` is the mission you were woken for. Triangle files the report on the
-person, the company and the case, and sets the follow-up date. Sending the
-same report again returns the one already filed.
+`caseId` is the mission you were woken for. When that wake has no mission,
+omit `caseId`. Pass `leadId` for the lead. Triangle files the report on the
+person, the company and the case. The case is optional. It sets the
+follow-up date. Sending the same report again returns the one already filed.
 
 `access_needed` is how you ask for a login or a file. `what` is the line the
 owner reads, for example `"your LinkedIn login"`. The step stays open. When
