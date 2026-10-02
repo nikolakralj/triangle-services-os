@@ -49,6 +49,9 @@ function mockDatabase(seed = {}) {
     workers: seed.workers ?? [],
     worker_notes: seed.worker_notes ?? [],
   };
+  for (const [key, rows] of Object.entries(seed)) {
+    if (!tables[key]) tables[key] = rows;
+  }
 
   const svc = {
     from(tableName) {
@@ -293,6 +296,69 @@ test('Event outbox sweep handles due follow-ups and wakes commercial ops', async
   assert.equal(wakes.length, 1);
   assert.equal(wakes[0].event, 'follow_up_due');
   assert.equal(wakes[0].agentInstanceId, 'inst-bob');
+  assert.equal(wakes[0].missionId, null);
+  assert.equal(tables.agent_assignments[0].mission_id ?? null, null);
+});
+
+test('follow_up_due sits on the lead open case and stays unset otherwise', async () => {
+  const orgId = '00000000-0000-0000-0000-000000000001';
+  const leadOpen = '0362e5f7-1111-4111-8111-111111111111';
+  const leadClosed = '0362e5f7-2222-4222-8222-222222222222';
+  const leadNone = '0362e5f7-3333-4333-8333-333333333333';
+  const openId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const closedId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const { svc, tables } = mockDatabase({
+    agent_instances: [
+      { id: 'inst-bob', org_id: orgId, role_key: 'inbox_coordinator', display_name: 'Bob', status: 'active' },
+    ],
+    requirement_roles: [
+      { org_id: orgId, job_lead_id: leadOpen, mission_id: closedId },
+      { org_id: orgId, job_lead_id: leadOpen, mission_id: openId },
+      { org_id: orgId, job_lead_id: leadClosed, mission_id: closedId },
+    ],
+    missions: [
+      { id: closedId, org_id: orgId, closed_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-01' },
+      { id: openId, org_id: orgId, closed_at: null, updated_at: '2026-10-01' },
+    ],
+  });
+
+  const wakes = [];
+  const loader = moduleLoader({
+    '@/lib/supabase/server': {
+      createServiceSupabaseClient: () => svc,
+    },
+    './bot-runtime': {
+      wakeEmployee: async (params) => {
+        wakes.push(params);
+        return { status: 'sent', httpStatus: 200 };
+      },
+    },
+    './follow-ups': {
+      listFollowUpsDue: async () => ({
+        items: [
+          { actionId: 'open-action', target: { leadId: leadOpen }, who: 'Tom Stocks', company: 'Stocks GmbH', subject: 'Follow-up', at: '2026-09-28', dueAt: '2026-10-02', daysOverdue: 0 },
+          { actionId: 'closed-action', target: { leadId: leadClosed }, who: 'Closed Lead', company: null, subject: 'Old', at: '2026-09-01', dueAt: '2026-09-05', daysOverdue: 1 },
+          { actionId: 'none-action', target: { leadId: leadNone }, who: 'No Case', company: null, subject: 'New', at: '2026-09-20', dueAt: '2026-09-24', daysOverdue: 1 },
+        ],
+        total: 3,
+      }),
+    },
+    './supply-partners': {
+      CAPACITY_SHELF_LIFE_DAYS: 14,
+    },
+  });
+
+  const { sweepDueFollowUps } = loader('src/lib/data/event-outbox.ts');
+  const res = await sweepDueFollowUps(orgId);
+  assert.equal(res.dispatched, 3);
+  assert.equal(tables.agent_assignments.length, 3);
+  const byTitle = Object.fromEntries(tables.agent_assignments.map((row) => [row.title, row.mission_id ?? null]));
+  assert.equal(byTitle['Follow-up due: Tom Stocks'], openId);
+  assert.equal(byTitle['Follow-up due: Closed Lead'], null);
+  assert.equal(byTitle['Follow-up due: No Case'], null);
+  const wakeFor = Object.fromEntries(wakes.map((wake) => [wake.missionId, wake.event]));
+  assert.equal(wakeFor[openId], 'follow_up_due');
+  assert.equal(wakes.filter((wake) => wake.missionId == null).length, 2);
 });
 
 test('Event outbox sweep handles stale availability (>14d) and wakes Hanna', async () => {

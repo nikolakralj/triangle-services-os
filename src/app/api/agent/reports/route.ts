@@ -10,7 +10,8 @@ import { fileEmployeeReport } from "@/lib/data/employee-reports";
 // invitation, an email drafted or sent by a person, a candidate (with the
 // evidence link), a reply, "not available until", or access they need.
 // Triangle files it on the person, the company and the case, and sets the
-// follow-up. Reporting does not finish the step, and it never sends mail.
+// follow-up. The case is optional. Reporting does not finish the step, and
+// it never sends mail.
 //
 // The legacy MCP key is not a badge and cannot file. A badge that is not
 // linked to an employee cannot file.

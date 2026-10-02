@@ -99,6 +99,8 @@ export interface PlannedReport {
   companyName: string | null;
   companyId: string | null;
   caseId: string | null;
+  /** A lead the work is about. Not a case. Null when the report did not name one. */
+  leadId: string | null;
   roleTitle: string | null;
   evidenceUrl: string | null;
   note: string | null;
@@ -166,6 +168,18 @@ function asDate(value: unknown): string | null {
 function asUuid(value: unknown): string | null {
   if (typeof value !== "string" || !UUID.test(value.trim())) return null;
   return value.trim();
+}
+
+/**
+ * A case id from the badge. Absent, blank, and the wake's JSON null
+ * (`null` or the string `"null"`) are no case. The case is optional.
+ */
+function caseIdFrom(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.toLowerCase() === "null") return null;
+  return asUuid(text);
 }
 
 function evidenceUrl(value: unknown): string | null {
@@ -256,7 +270,8 @@ export function planEmployeeReport(input: {
   const personFromText = personText && UUID.test(personText) ? personText : null;
   const companyId = asUuid(body.companyId);
   const companyName = cleanText(body.company, 200);
-  const caseId = asUuid(body.caseId) ?? asUuid(body.missionId);
+  const caseId = caseIdFrom(body.caseId) ?? caseIdFrom(body.missionId);
+  const leadId = caseIdFrom(body.leadId) ?? caseIdFrom(body.jobLeadId);
   const roleTitle = cleanText(body.role, 160);
   const note = cleanText(body.note, 2000);
   const accessWhat = cleanText(body.what, 160);
@@ -304,7 +319,8 @@ export function planEmployeeReport(input: {
     !personName &&
     !companyId &&
     !companyName &&
-    !caseId
+    !caseId &&
+    !leadId
   ) {
     return { ok: false, error: "Name the person, the company, or the case." };
   }
@@ -319,6 +335,7 @@ export function planEmployeeReport(input: {
     companyName: companyId ? null : companyName,
     companyId,
     caseId,
+    leadId,
     roleTitle,
     evidenceUrl: url,
     note,
@@ -332,6 +349,54 @@ export function planEmployeeReport(input: {
   planned.idempotencyKey = idempotencyKey(planned);
   planned.sentence = reportSentence(planned);
   return { ok: true, planned };
+}
+
+/**
+ * Where a report's case id lands.
+ *
+ * No case, or a case id that is not a mission, is filed without that case.
+ * A lead id in the case field is the lead, not a foreign case. The only
+ * rejection is a mission that belongs to another organisation.
+ */
+export function decideReportCase(input: {
+  caseId: string | null;
+  /** The mission row's organisation, when this id is a mission. Null when it is not. */
+  missionOrgId: string | null;
+  orgId: string;
+  /** The id is a lead in this organisation, not a mission. */
+  leadInThisOrg?: boolean;
+  /** Open case for that lead, when one exists. */
+  openCaseId?: string | null;
+}): { ok: true; missionId: string | null } | { ok: false; error: string } {
+  if (!input.caseId) {
+    return { ok: true, missionId: input.openCaseId ?? null };
+  }
+  if (input.missionOrgId) {
+    if (input.missionOrgId.toLowerCase() !== input.orgId.toLowerCase()) {
+      return { ok: false, error: "That case is not in this organisation." };
+    }
+    return { ok: true, missionId: input.caseId };
+  }
+  if (input.leadInThisOrg) {
+    return { ok: true, missionId: input.openCaseId ?? null };
+  }
+  return { ok: true, missionId: null };
+}
+
+/**
+ * The case a follow-up sits on. A lead with an open case uses that case.
+ * No lead, or only a closed case, leaves the assignment without a mission.
+ * When several are open, the newest one is the case.
+ */
+export function openCaseId(input: {
+  leadId: string | null;
+  cases: { missionId: string; closed: boolean; updatedAt?: string | null }[];
+}): string | null {
+  if (!input.leadId) return null;
+  const open = input.cases
+    .filter((item) => item.missionId && !item.closed)
+    .sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
+  return open[0]?.missionId ?? null;
 }
 
 /**
