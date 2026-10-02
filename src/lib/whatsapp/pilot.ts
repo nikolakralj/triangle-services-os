@@ -1,14 +1,26 @@
 // ---------------------------------------------------------------------------
 // WhatsApp Cloud API pilot. Decisions only: no database, no fetch, no send.
 //
-// A signed webhook is stored once per Meta wamid. Hanna is woken once when
-// the sender is allowed. A badge files a draft and that draft does not send.
-// A person approves, and only then does a later step build a Graph body.
-// Free text is inside 24 hours of the contact's last inbound. Outside it,
-// the configured template is the only thing that may go.
+// A signed webhook is stored once per Meta wamid. An allowlisted sender wakes
+// one employee once: Scout or Hanna, from the routing rule. A badge files a
+// draft and that draft does not send. A person approves, and only then does
+// a later step build a Graph body. Free text, and one list document, are
+// inside 24 hours of the contact's last inbound. Outside it, the configured
+// template is the only thing that may go, and it does not carry the document.
 // ---------------------------------------------------------------------------
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import {
+  bindWhatsAppSenders,
+  decideInbound,
+  draftTextAllowed,
+  fieldSendersFor,
+  planAttachment,
+  WHATSAPP_DRAFT_ENDPOINT,
+  type AttachmentInput,
+  type NormalizedAttachment,
+  type SenderPermission,
+} from "@/lib/whatsapp/routing";
 
 export const DEFAULT_GRAPH_VERSION = "v25.0";
 export const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -28,8 +40,13 @@ const STATUS_RANK: Record<WaStatus, number> = {
 export interface WakeContext {
   messageId: string;
   sender: string;
+  text: string;
   personId: string | null;
   caseId: string | null;
+  draftEndpoint: string;
+  employee: string;
+  reason: string;
+  handoffNote: string | null;
 }
 
 export interface PilotMessage {
@@ -260,8 +277,12 @@ export function acceptCloudPayload(
     matchFor: (from: string) => { personId: string | null; missionId: string | null };
     expectedPhoneNumberId?: string | null;
     expectedWabaId?: string | null;
+    senders?: readonly SenderPermission[];
+    unmatched?: "unlisted" | "field";
   },
 ): { messages: PilotMessage[]; wakes: WakeContext[]; ignoredNonText: number } {
+  const senders = opts.senders ?? (opts.allowlist ? fieldSendersFor(opts.allowlist) : []);
+  const unmatched = opts.unmatched ?? (opts.allowlist ? "unlisted" : "field");
   const next = messages.map((row) => ({ ...row }));
   const wakes: WakeContext[] = [];
   let ignoredNonText = 0;
@@ -301,12 +322,24 @@ export function acceptCloudPayload(
       }
       const row = existing ?? next.find((item) => item.wamid === message.wamid);
       if (plan.wake && row && !row.woken) {
+        const decision = decideInbound({
+          text: message.text,
+          from: message.from,
+          senders,
+          unmatched,
+        });
+        if (decision.action === "refuse" || !decision.employee) continue;
         row.woken = true;
         wakes.push({
           messageId: message.wamid,
           sender: message.from,
+          text: message.text,
           personId: row.personId,
           caseId: row.missionId,
+          draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
+          employee: decision.employee,
+          reason: decision.reason,
+          handoffNote: decision.handoffNote,
         });
       }
     }
@@ -345,9 +378,15 @@ export function serviceWindowOpen(lastInboundAt: string | null, now: Date): bool
   return now.getTime() - then < SERVICE_WINDOW_MS;
 }
 
-export function draftKey(agentId: string, to: string, replyTo: string | null, text: string): string {
+export function draftKey(
+  agentId: string,
+  to: string,
+  replyTo: string | null,
+  text: string,
+  attachmentName: string | null,
+): string {
   const hash = createHash("sha256")
-    .update(`${to}|${replyTo ?? ""}|${text}`)
+    .update(`${to}|${replyTo ?? ""}|${text}|${attachmentName ?? ""}`)
     .digest("hex")
     .slice(0, 24);
   return `draft|${agentId}|${hash}`;
@@ -359,26 +398,42 @@ export function planDraft(input: {
   text: string;
   replyTo: string | null;
   templateName: string | null;
-}): { ok: true; sends: false; to: string; text: string; draftKey: string } | { ok: false; error: string } {
+  attachment?: AttachmentInput | null;
+}):
+  | { ok: true; sends: false; to: string; text: string; draftKey: string; attachment: NormalizedAttachment | null }
+  | { ok: false; error: string } {
   const to = normalizeE164(input.to);
   if (!to) return { ok: false, error: "Say who to, as an E.164 number." };
   const text = input.text.trim();
   const templateName = input.templateName?.trim() || "";
-  if (!text && !templateName) {
+  const words = draftTextAllowed(text);
+  if (!words.ok) return words;
+  let attachment: NormalizedAttachment | null = null;
+  if (input.attachment) {
+    const planned = planAttachment(input.attachment);
+    if (!planned.ok) return planned;
+    attachment = planned.attachment;
+  }
+  if (!text && !templateName && !attachment) {
     return { ok: false, error: "Write the reply, or name the approved template." };
   }
   if (text.length > 4096) return { ok: false, error: "That reply is longer than WhatsApp allows." };
+  if (attachment && text.length > 1024) {
+    return { ok: false, error: "The document caption is longer than WhatsApp allows." };
+  }
   return {
     ok: true,
     sends: false,
     to,
     text,
-    draftKey: draftKey(input.agentId, to, input.replyTo, text || templateName),
+    attachment,
+    draftKey: draftKey(input.agentId, to, input.replyTo, text || templateName, attachment?.filename ?? null),
   };
 }
 
 export type SendPlan =
   | { ok: true; mode: "text"; to: string; body: string }
+  | { ok: true; mode: "document"; to: string; body: string; filename: string; mime: string }
   | { ok: true; mode: "template"; to: string; templateName: string; language: string }
   | { ok: false; status: number; error: string };
 
@@ -395,6 +450,7 @@ export function decideSend(input: {
   approvedTemplate: string | null;
   templateLanguageCode: string;
   sendAttempted: boolean;
+  document?: { filename: string; mime: string } | null;
 }): SendPlan {
   if (input.actor !== "human") {
     return { ok: false, status: 403, error: "Only a signed-in person can send a WhatsApp message." };
@@ -416,6 +472,27 @@ export function decideSend(input: {
   if (!to) return { ok: false, status: 400, error: "That recipient is not a usable number." };
   if (!numberAllowed(to, input.allowlist)) {
     return { ok: false, status: 403, error: "That number is not on the WhatsApp pilot allowlist." };
+  }
+  if (input.document) {
+    if (!serviceWindowOpen(input.lastInboundAt, input.now)) {
+      return {
+        ok: false,
+        status: 409,
+        error: "Outside the 24-hour window. A document cannot be sent then, and the template does not carry it.",
+      };
+    }
+    const caption = input.text.trim();
+    if (caption.length > 1024) {
+      return { ok: false, status: 400, error: "The document caption is longer than WhatsApp allows." };
+    }
+    return {
+      ok: true,
+      mode: "document",
+      to,
+      body: caption,
+      filename: input.document.filename,
+      mime: input.document.mime,
+    };
   }
   if (serviceWindowOpen(input.lastInboundAt, input.now)) {
     const body = input.text.trim();
@@ -449,6 +526,31 @@ export function graphMessagesUrl(version: string, phoneNumberId: string): string
   return `https://graph.facebook.com/${graphVersion(version)}/${phoneNumberId}/messages`;
 }
 
+export function graphMediaUrl(version: string, phoneNumberId: string): string {
+  return `https://graph.facebook.com/${graphVersion(version)}/${phoneNumberId}/media`;
+}
+
+export function graphDocumentBody(input: {
+  to: string;
+  mediaId: string;
+  filename: string;
+  caption: string;
+}): Record<string, unknown> {
+  const document: Record<string, unknown> = {
+    id: input.mediaId,
+    filename: input.filename,
+  };
+  const caption = input.caption.trim();
+  if (caption) document.caption = caption;
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: input.to,
+    type: "document",
+    document,
+  };
+}
+
 export function graphSendBody(
   plan: { mode: "text"; to: string; body: string } | { mode: "template"; to: string; templateName: string; language: string },
 ): Record<string, unknown> {
@@ -479,6 +581,9 @@ export interface WhatsAppEnv {
   appSecret: string | null;
   verifyToken: string | null;
   allowlist: string[] | null;
+  senders: SenderPermission[];
+  /** field only when no sender list is configured, so an open pilot stays the field role. */
+  unmatched: "unlisted" | "field";
   graphVersion: string;
   templateName: string | null;
   templateLanguage: string;
@@ -492,13 +597,22 @@ function clean(value: string | undefined): string | null {
 
 export function readWhatsAppEnv(env: Record<string, string | undefined>): WhatsAppEnv {
   const org = clean(env.DEFAULT_ORGANIZATION_ID);
+  const directory = bindWhatsAppSenders(env.WHATSAPP_OWNER_NUMBERS, env.WHATSAPP_FIELD_NUMBERS);
+  const legacy = readAllowlist(env.WHATSAPP_ALLOWED_NUMBERS);
+  const access = directory.active
+    ? { allowlist: directory.allowlist, senders: directory.senders, unmatched: "unlisted" as const }
+    : legacy && legacy.length > 0
+      ? { allowlist: legacy, senders: fieldSendersFor(legacy), unmatched: "unlisted" as const }
+      : { allowlist: null, senders: [], unmatched: "field" as const };
   return {
     phoneNumberId: clean(env.WHATSAPP_PHONE_NUMBER_ID),
     wabaId: clean(env.WHATSAPP_WABA_ID),
     accessToken: clean(env.WHATSAPP_ACCESS_TOKEN),
     appSecret: clean(env.WHATSAPP_APP_SECRET),
     verifyToken: clean(env.WHATSAPP_VERIFY_TOKEN),
-    allowlist: readAllowlist(env.WHATSAPP_ALLOWED_NUMBERS),
+    allowlist: access.allowlist,
+    senders: access.senders,
+    unmatched: access.unmatched,
     graphVersion: graphVersion(env.WHATSAPP_GRAPH_VERSION),
     templateName: clean(env.WHATSAPP_TEMPLATE_NAME),
     templateLanguage: templateLanguage(env.WHATSAPP_TEMPLATE_LANGUAGE),

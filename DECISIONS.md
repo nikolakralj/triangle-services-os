@@ -20,7 +20,23 @@ until a person approves and sends it from the case or the person. Inside 24
 hours of the contact's last inbound, that send is free text. Outside it, only
 the configured approved template. A number that is not on
 `WHATSAPP_ALLOWED_NUMBERS` is stored and does not wake Hanna, and a send to
-it is refused.
+it is refused. On 2 October 2026 Nikola continued this exception: an
+allowlisted inbound is routed to Scout for a contractor, company, or
+subcontractor list or a research request, to Bob for a commercial or client
+follow-up, and to Hanna for resourcing (people, CVs, availability, roles),
+with unsure going to Hanna; only that employee is woken; a draft may carry
+one such list, including an Excel file; no CV or worker profile
+leaves by WhatsApp. Later the same day he set who may reach whom: the roles
+stay in code (`WHATSAPP_SENDERS`), and the numbers stay in the environment,
+because the repository is public. `WHATSAPP_OWNER_NUMBERS` may talk to every
+bot, including ones added later. `WHATSAPP_FIELD_NUMBERS` may talk only to
+Hanna, Bob, and Scout. A number on neither list is stored and does not wake
+anyone. When both of those lists are empty, `WHATSAPP_ALLOWED_NUMBERS` is
+still the allowlist, and every number on it is the field role. Ralph cannot
+ask to change the software and cannot ask Bob to send an email: each is a
+polite draft, flagged for Nikola, with nobody woken and nothing sent. When
+Ralph does reach Bob, the handoff says the requester may not trigger outbound
+email. Nikola still approves before any WhatsApp message goes out.
 
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
 

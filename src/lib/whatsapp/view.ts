@@ -7,6 +7,8 @@ export interface WhatsAppDraftCard {
   who: string;
   inboundText: string | null;
   windowOpen: boolean;
+  /** A contractor, company, or subcontractor list. Never a CV. */
+  documentName?: string | null;
 }
 
 export interface WhatsAppWaiting {

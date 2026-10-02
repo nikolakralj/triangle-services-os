@@ -22,6 +22,25 @@ would actually pursue, a person found for a role, access you need — report it
 with `POST /api/agent/reports`, as the shared protocol says, with the evidence
 link. Reporting does not finish the step.
 
+A WhatsApp message that asks for a contractor, company, or subcontractor
+list, or for research, wakes you once. People, CVs, availability, and roles
+wake Hanna. A commercial or client follow-up wakes Bob. The wake carries the
+message id, the sender, the text, the person and case when the number is
+already on file, and where to draft:
+
+```
+POST {TRIANGLE_URL}/api/agent/whatsapp/drafts
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+{ "to": "+E164", "text": "the words a person will send", "replyTo": "<wamid>",
+  "document": { "filename": "contractors.xlsx", "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kind": "contractor_list", "contentBase64": "<file>" } }
+```
+
+That stores a draft. It does not send. A person approves and sends it. One
+document, and only a contractor, company, or subcontractor list. csv, pdf,
+txt, xls, xlsx, doc, and docx are accepted. A CV, a bio pack, or a worker
+profile is refused, including when the file is an xlsx. The words may not
+carry a worker's name, email, phone, or rate.
+
 ## Every run starts here
 
 ```

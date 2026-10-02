@@ -1,5 +1,48 @@
 # Current state
 
+## WhatsApp routing — 2 October 2026
+
+Nikola continued the 1 October WhatsApp exception (decision "WhatsApp pilot"
+in [DECISIONS](DECISIONS.md); the same entry in
+[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md)). An allowlisted inbound is routed
+to Scout for a contractor, company, or subcontractor list or a research
+request, to Bob for a commercial or client follow-up, and to Hanna for
+resourcing (people, CVs, availability, roles). Unsure goes to Hanna. The
+choice and the reason are stored on the message. Only that employee is
+woken, once, with the message id, sender, text, person, case, and
+`POST /api/agent/whatsapp/drafts`. Scout's wake is
+`BOT_WAKE_URL_PROJECT_RESEARCHER` / `BOT_WAKE_KEY_PROJECT_RESEARCHER`. Hanna's
+stays `BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`. Bob's
+is `BOT_WAKE_URL_INBOX_COORDINATOR` / `BOT_WAKE_KEY_INBOX_COORDINATOR`.
+
+Who may reach whom is two roles in `WHATSAPP_SENDERS`
+(`src/lib/whatsapp/routing.ts`). The phone numbers are not in the repository.
+`WHATSAPP_OWNER_NUMBERS` (Nikola) may talk to every bot.
+`WHATSAPP_FIELD_NUMBERS` (Ralph) may talk only to Hanna, Bob, and Scout. A
+number on neither list is stored and does not wake anyone, and a send to it
+is refused. When both lists are empty, `WHATSAPP_ALLOWED_NUMBERS` is still
+the allowlist and every number on it is the field role; an empty legacy list
+still means no allowlist. A later bot is one more object on
+`WHATSAPP_EMPLOYEES` and its key on the roles who may reach it. Ralph cannot
+ask to change the software and cannot ask for an email to be sent: each is
+stored as a polite draft, flagged for Nikola, with nobody woken and nothing
+sent. When Ralph's message does reach Bob, the handoff says the requester
+may not trigger outbound email.
+
+Scout, Hanna, and Bob can draft. A draft may carry one list document,
+including an Excel file (xlsx), stored in the `whatsapp-drafts` bucket or as
+a path in `documents`. A person approves and Send uploads it through the
+Graph media API as a document message, inside the 24-hour window. Outside
+that window the template is still the only send, and it does not carry the
+document. No CV or worker profile leaves by WhatsApp. If
+`WHATSAPP_APP_SECRET` is unset the webhook logs and returns 503; the inbound
+is not stored. On Production on 2 October only `WHATSAPP_VERIFY_TOKEN` was
+set, so the 09:51 inbound was not stored.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| Routing after an allowlisted inbound to Scout, Bob, or Hanna; one wake; roles in code and numbers in `WHATSAPP_OWNER_NUMBERS` / `WHATSAPP_FIELD_NUMBERS`; unlisted numbers stored with no wake; software and email refusals for the field role; Scout, Hanna, and Bob draft; one list document including xlsx; CV and worker-profile refusal; 503 when the app secret is missing. Migration `055_whatsapp_routing.sql` adds the route and attachment columns and the `whatsapp-drafts` bucket. Merged with the no-case report fix from main (`3288703`) | this branch | `check:whatsapp` 13/13; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | Nikola applied migration 055 on 2 October 2026. Nothing was sent. No live webhook was called from this branch. The draft line, including a document name, was rendered in `check:whatsapp`. Phone numbers are environment variables, not in the repository |
+
 ## Employee reports with no case — 2 October 2026
 
 Bob's `follow_up_due` wake for Tom Stocks (lead `0362e5f7`) filed an
@@ -17,13 +60,12 @@ mission otherwise. No migration. Nothing sent.
 
 Nikola approved an explicit exception to the P0–P4 freeze (decision "WhatsApp
 pilot" in [DECISIONS](DECISIONS.md); one entry in
-[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md)). Meta's free test number, text
-only. Inbound messages are stored once by wamid and filed on the person and
-their open case when the number matches. Hanna is woken once
-(`BOT_WAKE_URL_HR` / `BOT_WAKE_KEY_HR` when her role key is `hr`). She drafts
-with her badge; a person approves and sends from the existing draft line on
-the case and the person. Free text only inside 24 hours; outside that, only
-the configured template. Nothing is sent automatically.
+[ROADMAP_EXECUTION](ROADMAP_EXECUTION.md)). Meta's free test number. Inbound
+messages are stored once by wamid and filed on the person and their open case
+when the number matches. A person approves and sends from the existing draft
+line on the case and the person. Free text only inside 24 hours; outside
+that, only the configured template. Nothing is sent automatically. The 2
+October routing section above replaces the always-wake-Hanna behaviour.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
