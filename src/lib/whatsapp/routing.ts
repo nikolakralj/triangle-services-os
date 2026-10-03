@@ -15,15 +15,22 @@
 // supply the E.164 lists. Add a bot by appending one object to
 // WHATSAPP_EMPLOYEES and listing its key on a role. A number on neither list
 // is stored and does not wake anyone. A field number cannot ask for a
-// software change and cannot ask for an email to be sent. Those are refused
-// as drafts. Nothing here sends.
+// software change, cannot ask for an email to be sent, and cannot ask for an
+// employee who is not on its list. Those are refused as drafts for the
+// owner. Nothing here sends.
 //
-// Data rule. No CV or worker profile leaves Triangle by WhatsApp. A draft may
-// carry one contractor, company, or subcontractor list. The words may say
-// what an anonymised bio may say — initials, role, tickets, languages,
-// right-to-work, dated availability — and may not carry a name, an email, a
-// phone number, a rate, or a full CV. The anonymised packet itself stays in
-// Triangle; WhatsApp does not become a second way to send it.
+// Replies. The CEO's grant of 3 October 2026: a reply to the owner's or the
+// field sender's own message goes out as it is filed, with no person
+// approving it. That is repliesSendWithoutApproval on the role, and only a
+// number read from the owner and field lists carries it. A reply to anyone
+// else waits for a person, as before.
+//
+// Data rule. No CV, worker profile, or other file leaves Triangle by
+// WhatsApp unless the owner or the field sender asked for it in the message
+// being answered. A worker's document also needs that message to name the
+// worker; it comes from the worker's own record, so Triangle knows whose it
+// is; and it goes only to the number that asked. Asked for or not, the words
+// carry no email, no phone number, and no rate.
 // ---------------------------------------------------------------------------
 
 import { explicitPackIntent } from "@/lib/data/put-forward";
@@ -42,7 +49,7 @@ export const WHATSAPP_ATTACHMENT_BUCKETS = ["whatsapp-drafts", "documents"] as c
 export const WHATSAPP_DOCUMENT_MAX_BYTES = 4 * 1024 * 1024;
 
 export const WHATSAPP_DATA_RULE =
-  "No CV or worker profile leaves Triangle by WhatsApp. A draft may carry one contractor, company, or subcontractor list. The words may say what an anonymised bio may say — initials, role, tickets, languages, availability — and may not carry a name, an email, a phone number, or a rate.";
+  "No CV or worker profile leaves Triangle by WhatsApp unless the owner or the field sender asked for that person's document by name, in the message being answered. It then goes only to the number that asked. Any other file needs the same explicit ask before it goes without a person. The words carry no email, no phone number, and no rate.";
 
 export const ROUTE_MODEL_INSTRUCTIONS = [
   "You route one inbound WhatsApp message.",
@@ -63,6 +70,12 @@ export const SOFTWARE_REFUSAL_DRAFT =
 
 export const EMAIL_REFUSAL_DRAFT =
   "I can't send an email from this chat. I've left it with the owner. Nothing was sent.";
+
+export const OTHER_EMPLOYEE_REFUSAL_DRAFT =
+  "I can't pass that on from this chat. I've left it with the owner.";
+
+/** Replies that went out on their own for one inbound message. The next one waits for a person. */
+export const AUTO_REPLIES_PER_MESSAGE = 5;
 
 export const DEFAULT_WHATSAPP_EMPLOYEE = "hanna";
 
@@ -136,12 +149,24 @@ export interface SenderRole {
   employees: "all" | readonly string[];
   mayRequestSoftwareChange: boolean;
   mayTriggerOutboundEmail: boolean;
+  /**
+   * The CEO's grant of 3 October 2026. A reply to this sender's own message
+   * goes out as it is filed. No person approves it first.
+   */
+  repliesSendWithoutApproval: boolean;
+  /**
+   * "all", or the only Google Drive folders this sender may be given
+   * information from. The names are bound from the environment.
+   */
+  driveFolders: "all" | readonly string[];
 }
 
 /**
- * Roles only. No E.164 values belong in this file.
+ * Roles only. No E.164 values and no folder names belong in this file.
  * owner — may talk to every bot, including ones added later.
  * field — Hanna, Bob, and Scout only. No software change. No outbound email.
+ *         No other employee. One Drive folder.
+ * Both get their replies without a person approving them.
  */
 export const WHATSAPP_SENDERS: readonly SenderRole[] = [
   {
@@ -149,12 +174,16 @@ export const WHATSAPP_SENDERS: readonly SenderRole[] = [
     employees: "all",
     mayRequestSoftwareChange: true,
     mayTriggerOutboundEmail: true,
+    repliesSendWithoutApproval: true,
+    driveFolders: "all",
   },
   {
     id: "field",
     employees: ["hanna", "bob", "scout"],
     mayRequestSoftwareChange: false,
     mayTriggerOutboundEmail: false,
+    repliesSendWithoutApproval: true,
+    driveFolders: [],
   },
 ];
 
@@ -170,6 +199,8 @@ export const UNLISTED_SENDER: SenderPermission = {
   employees: [],
   mayRequestSoftwareChange: false,
   mayTriggerOutboundEmail: false,
+  repliesSendWithoutApproval: false,
+  driveFolders: [],
 };
 
 export interface SenderDirectory {
@@ -203,6 +234,12 @@ export interface InboundPlan {
   flagOwner: boolean;
 }
 
+/** One employee on the workforce, as the routing rule needs to know it. */
+export interface WorkforceMember {
+  roleKey: string;
+  displayName: string;
+}
+
 const SOFTWARE_PATTERNS: RegExp[] = [
   /\b(?:change|modify|fix|update|deploy|rewrite|patch)\b[\s\S]{0,48}\b(?:software|app|codebase|code|product)\b/i,
   /\btriangle\s+engineer\b/i,
@@ -223,6 +260,86 @@ export function asksForSoftwareChange(text: string): boolean {
 
 export function asksToSendEmail(text: string): boolean {
   return EMAIL_SEND_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+const OTHER_EMPLOYEE_PATTERNS: RegExp[] = [
+  /\b(?:talk|speak|chat|connect|switch|transfer|pass|forward|ask|tell|get|give|put|use|try|want|need)\b[^.?!\n]{0,40}\b(?:another|other|different)\s+(?:ai\s+)?(?:agent|bot)\b/i,
+  /\b(?:engineer|engineering|developer|dev|coding|programming)\s+(?:agent|bot)\b/i,
+];
+
+/** Verbs that take the person directly: "ask X", "tell X". */
+const REACH_DIRECT = "(?:ask|tell|ping|contact|reach|message)";
+/** Verbs that reach somebody through a preposition: "talk to X", "pass this to X". */
+const REACH_THROUGH =
+  "(?:talk|speak|chat|write|connect|switch|transfer|pass|forward|hand|route|send|give|put|loop|bring)";
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * True when a sender with a fixed list asks for an employee who is not on
+ * it: by name, or as "another agent". A sender who may reach everyone never
+ * matches. The names come from the workforce, not from this file.
+ */
+export function asksForAnotherEmployee(
+  text: string,
+  sender: SenderPermission,
+  workforce: readonly WorkforceMember[] = [],
+  employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
+): boolean {
+  if (sender.employees === "all") return false;
+  if (OTHER_EMPLOYEE_PATTERNS.some((pattern) => pattern.test(text))) return true;
+  for (const member of workforce) {
+    const key = employeeKeyOf(member, employees);
+    if (key && sender.employees.includes(key)) continue;
+    const name = member.displayName.trim();
+    if (name.length < 3) continue;
+    const named = escapeRegExp(name).replace(/\s+/g, "\\s+");
+    const direct = new RegExp(`\\b${REACH_DIRECT}\\s+(?:the\\s+)?${named}\\b`, "i");
+    const through = new RegExp(
+      `\\b${REACH_THROUGH}\\b[^.?!\\n]{0,24}\\b(?:to|with|in)\\s+(?:the\\s+)?${named}\\b`,
+      "i",
+    );
+    const addressed = new RegExp(`^\\s*(?:(?:hi|hey|hello|dear)\\s+)?@?${named}\\s*[,:!-]`, "i");
+    if (direct.test(text) || through.test(text) || addressed.test(text)) return true;
+  }
+  return false;
+}
+
+/** The polite words for a refusal, from the reason stored with the message. */
+export function refusalDraftFor(reason: string): string {
+  if (/software change/i.test(reason)) return SOFTWARE_REFUSAL_DRAFT;
+  if (/email/i.test(reason)) return EMAIL_REFUSAL_DRAFT;
+  return OTHER_EMPLOYEE_REFUSAL_DRAFT;
+}
+
+export function parseFolderList(raw: string | null | undefined): string[] {
+  if (raw == null || raw.trim() === "") return [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const name = part.replace(/\s+/g, " ").trim();
+    if (name && name.length <= 120 && !/[\r\n]/.test(name)) seen.add(name);
+  }
+  return [...seen];
+}
+
+/**
+ * The sentence an employee is handed about Google Drive for this sender.
+ * Null for a sender with no limit. When no folder is configured, the
+ * organisation's own name is the folder; with neither, nothing from Drive.
+ * Triangle does not hold the Drive key, so this is an instruction the
+ * employee follows, not a lock.
+ */
+export function driveNote(sender: SenderPermission, organisationFolder: string | null = null): string | null {
+  if (sender.driveFolders === "all") return null;
+  const fallback = organisationFolder?.replace(/\s+/g, " ").trim() ?? "";
+  const folders = sender.driveFolders.length > 0 ? sender.driveFolders : fallback ? [fallback] : [];
+  if (folders.length === 0) return "This sender may not be given anything from Google Drive.";
+  if (folders.length === 1) {
+    return `This sender may be given information from one Google Drive folder only: ${folders[0]}. Nothing from any other folder.`;
+  }
+  return `This sender may be given information from these Google Drive folders only: ${folders.join(", ")}. Nothing from any other folder.`;
 }
 
 function asE164(raw: string | null | undefined): string | null {
@@ -252,16 +369,18 @@ function roleById(id: string): SenderRole {
 /**
  * Bind the role map to the numbers from the environment.
  * A number on both lists is the owner. The allowlist is the union.
+ * The field sender's Drive folders come from the environment too.
  */
 export function bindWhatsAppSenders(
   ownerRaw: string | null | undefined,
   fieldRaw: string | null | undefined,
+  fieldFoldersRaw: string | null | undefined = null,
 ): SenderDirectory {
   const owners = parseE164List(ownerRaw);
   const ownerSet = new Set(owners);
   const fields = parseE164List(fieldRaw).filter((number) => !ownerSet.has(number));
   const owner = roleById("owner");
-  const field = roleById("field");
+  const field = withFolders(roleById("field"), parseFolderList(fieldFoldersRaw));
   const senders: SenderPermission[] = [
     ...owners.map((e164) => ({ ...owner, e164 })),
     ...fields.map((e164) => ({ ...field, e164 })),
@@ -273,9 +392,26 @@ export function bindWhatsAppSenders(
   };
 }
 
-/** Numbers from the deprecated allowlist. They are the field role, never owner. */
-export function fieldSendersFor(numbers: readonly string[]): SenderPermission[] {
-  const field = roleById("field");
+function withFolders(role: SenderRole, folders: readonly string[]): SenderRole {
+  if (role.driveFolders === "all" || folders.length === 0) return role;
+  return { ...role, driveFolders: folders };
+}
+
+/**
+ * The field role without the grant. The CEO's grant names the owner and
+ * field lists; a number that is "field" only because the pilot is open, or
+ * because it sits on the deprecated allowlist, still waits for a person.
+ */
+function ungrantedField(folders: readonly string[] = []): SenderRole {
+  return { ...withFolders(roleById("field"), folders), repliesSendWithoutApproval: false };
+}
+
+/** Numbers from the deprecated allowlist. They are the field role, never owner, and never auto-sent. */
+export function fieldSendersFor(
+  numbers: readonly string[],
+  fieldFoldersRaw: string | null | undefined = null,
+): SenderPermission[] {
+  const field = ungrantedField(parseFolderList(fieldFoldersRaw));
   return numbers.map((e164) => ({ ...field, e164 }));
 }
 
@@ -288,7 +424,7 @@ export function permissionFor(
   if (!number) return UNLISTED_SENDER;
   const hit = senders.find((sender) => asE164(sender.e164) === number);
   if (hit) return hit;
-  if (unmatched === "field") return { ...roleById("field"), e164: number };
+  if (unmatched === "field") return { ...ungrantedField(), e164: number };
   return UNLISTED_SENDER;
 }
 
@@ -406,9 +542,10 @@ function refuse(reason: string, draftText: string): InboundPlan {
 }
 
 /**
- * Permissions first, then the route. A software change or an email-send ask
- * from a sender who may not make it never wakes a bot. A routed employee the
- * sender cannot reach falls back to Hanna when Hanna is allowed.
+ * Permissions first, then the route. A software change, an email-send ask,
+ * or an ask for an employee off the sender's list never wakes a bot. A
+ * routed employee the sender cannot reach falls back to Hanna when Hanna is
+ * allowed.
  */
 export function decideInbound(input: {
   text: string;
@@ -417,6 +554,8 @@ export function decideInbound(input: {
   senders?: readonly SenderPermission[];
   unmatched?: "unlisted" | "field";
   employees?: readonly WhatsAppEmployeeDef[];
+  /** Every active employee, so a name off the sender's list is recognised. */
+  workforce?: readonly WorkforceMember[];
 }): InboundPlan {
   const employees = input.employees ?? WHATSAPP_EMPLOYEES;
   const sender = permissionFor(input.from, input.senders ?? [], input.unmatched ?? "unlisted");
@@ -443,6 +582,12 @@ export function decideInbound(input: {
       EMAIL_REFUSAL_DRAFT,
     );
   }
+  if (asksForAnotherEmployee(input.text, sender, input.workforce ?? [], employees)) {
+    return refuse(
+      "Refused: this sender asked for an employee they cannot reach. Flagged for the owner.",
+      OTHER_EMPLOYEE_REFUSAL_DRAFT,
+    );
+  }
 
   let route = resolveRoute(input.text, input.model ?? null, employees);
   if (!employees.some((item) => item.key === route.employee)) {
@@ -458,7 +603,7 @@ export function decideInbound(input: {
     } else {
       return refuse(
         "Refused: this sender cannot reach that employee. Flagged for the owner.",
-        "I can't pass that on from this chat. I've left it with the owner.",
+        OTHER_EMPLOYEE_REFUSAL_DRAFT,
       );
     }
   }
@@ -566,6 +711,129 @@ export function workerProfileAttachment(
   return { blocked: false };
 }
 
+/** Letters without their marks, so a name typed plainly still matches the record. */
+function foldLetters(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/ß/g, "ss");
+}
+
+const ASK_VERB =
+  /\b(?:send|share|forward|attach|give|show|provide|get|need|want|have|whatsapp|posalji|posaljite|daj|dajte|treba|trebam|trebamo|schick|schicke|schicken|sende|senden|brauche|brauchen)\b/;
+
+const PERSON_DOCUMENT_WORD =
+  /\b(?:cvs?|c\.v\.?|resumes?|curriculum(?:\s+vitae)?|profiles?|bios?|bio[\s-]?packs?|passports?|certificates?|certs?|documents?|papers|zivotopis\w*|lebenslauf\w*|zertifikat\w*)(?![a-z])/;
+
+const FILE_WORD =
+  /\b(?:lists?|files?|documents?|attachments?|spreadsheets?|excel|xlsx?|csv|pdfs?|sheets?|tables?|exports?|reports?|popis\w*|liste|listu|datei\w*|tabelle\w*)\b/;
+
+const DECLINES =
+  /\b(?:don['’]?t|do not|never|no need to|stop|nemoj|nemojte|nicht|kein\w*)\b[^.?!\n]{0,24}\b(?:send|share|forward|attach|posalji|posaljite|schick\w*|sende\w*)\b/;
+
+/** "Don't send me the CV" is not an ask. */
+export function declinesDocument(text: string): boolean {
+  return DECLINES.test(foldLetters(text ?? "").toLowerCase());
+}
+
+/** The words ask for a person's CV, profile, or other document. */
+export function asksForPersonDocument(text: string): boolean {
+  const words = foldLetters(text ?? "").toLowerCase();
+  return ASK_VERB.test(words) && PERSON_DOCUMENT_WORD.test(words) && !DECLINES.test(words);
+}
+
+/** The words ask for a list or a file of any kind. */
+export function asksForFile(text: string): boolean {
+  const words = foldLetters(text ?? "").toLowerCase();
+  return ASK_VERB.test(words) && FILE_WORD.test(words) && !DECLINES.test(words);
+}
+
+/**
+ * The words name this person: a first name or a surname from the record, as a
+ * whole word. One letter of ending may differ, so "Mattie" and "Mattia's" are
+ * Mattia.
+ */
+export function namesPerson(text: string, fullName: string): boolean {
+  const words = foldLetters(text ?? "")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+  const all = foldLetters(fullName ?? "")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+  const long = all.filter((part) => part.length >= 3);
+  const parts = long.length > 0 ? long : all.filter((part) => part.length >= 2);
+  return parts.some((part) =>
+    words.some(
+      (word) =>
+        word === part ||
+        (part.length >= 5 && word.length >= part.length - 1 && word.startsWith(part.slice(0, -1))),
+    ),
+  );
+}
+
+/**
+ * Whether the file on a reply was asked for in the message being answered.
+ * A worker's document needs the ask and the worker's name. Any other file
+ * needs the ask. This does not decide who the reply goes to.
+ */
+export function attachmentAskedFor(input: {
+  /** The words of the message being answered. */
+  request: string;
+  /** True for a CV, a profile, or any other file on a worker's record. */
+  workerDocument: boolean;
+  /** Whose it is, from Triangle's own record. Null when that is not known. */
+  workerName: string | null;
+}): { ok: true } | { ok: false; error: string } {
+  const request = input.request ?? "";
+  if (declinesDocument(request)) {
+    return { ok: false, error: "That message says not to send it." };
+  }
+  if (!input.workerDocument) {
+    if (asksForFile(request) || asksForPersonDocument(request)) return { ok: true };
+    return { ok: false, error: "Nobody asked for a file in that message, so it does not go on its own." };
+  }
+  if (!input.workerName?.trim()) {
+    return {
+      ok: false,
+      error: "It is not known whose document that is. Attach it from the person's record in Triangle.",
+    };
+  }
+  if (!asksForPersonDocument(request)) {
+    return {
+      ok: false,
+      error:
+        "Nobody asked for a CV or a profile in that message. It leaves by WhatsApp only when the owner or the field sender asks for it.",
+    };
+  }
+  if (!namesPerson(request, input.workerName)) {
+    return {
+      ok: false,
+      error:
+        "That message does not name this person. A CV or profile leaves by WhatsApp only when the owner or the field sender asks for that person's by name.",
+    };
+  }
+  return { ok: true };
+}
+
+/** A stored file's own name, made safe for WhatsApp. Null when the type cannot be sent. */
+export function storedDocumentFilename(name: string): string | null {
+  const base = (name ?? "").trim().split(/[/\\]/).pop()?.trim() ?? "";
+  const dot = base.lastIndexOf(".");
+  if (dot < 1) return null;
+  const ext = base.slice(dot + 1).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.has(ext)) return null;
+  const stem = foldLetters(base.slice(0, dot))
+    .replace(/[^A-Za-z0-9._ ()-]+/g, "-")
+    .replace(/^[^A-Za-z0-9]+/, "")
+    .slice(0, 120)
+    .trim();
+  return `${stem || "document"}.${ext}`;
+}
+
 export function filenameLooksLikeWorkerProfile(name: string): boolean {
   const file = name.trim();
   if (!file) return false;
@@ -604,13 +872,17 @@ function mimeFor(filename: string, given: string | null | undefined): string | n
 
 /**
  * One document on a draft, or a refusal. A worker profile is refused here,
- * before any bytes are stored.
+ * before any bytes are stored, unless the caller has already established
+ * that the owner or the field sender asked for that person's document by
+ * name (workerDocumentAsked). Nothing in this file can establish that; the
+ * data layer does, from the stored message and the worker's record.
  */
 export function planAttachment(
   input: AttachmentInput,
+  opts: { workerDocumentAsked?: boolean } = {},
 ): { ok: true; attachment: NormalizedAttachment } | { ok: false; error: string } {
   const profile = workerProfileAttachment(input);
-  if (profile.blocked) return { ok: false, error: profile.reason };
+  if (profile.blocked && opts.workerDocumentAsked !== true) return { ok: false, error: profile.reason };
 
   const filename = safeDocumentFilename(input.filename ?? "");
   if (!filename) {
@@ -661,9 +933,14 @@ const IDENTITY_LABEL =
 
 /**
  * The words on the draft. Anonymised bio facts may stay. Contact details, a
- * rate, an identity field, or a request to send the full CV may not.
+ * rate, an identity field, or a request to send the full CV may not. The
+ * last of those is lifted when the reply carries a CV that was asked for:
+ * "the full CV, as you asked" is then a true description, not a leak.
  */
-export function draftTextAllowed(text: string): { ok: true } | { ok: false; error: string } {
+export function draftTextAllowed(
+  text: string,
+  opts: { carriesAskedDocument?: boolean } = {},
+): { ok: true } | { ok: false; error: string } {
   const body = text ?? "";
   if (!body.trim()) return { ok: true };
   if (EMAIL.test(body)) {
@@ -687,7 +964,7 @@ export function draftTextAllowed(text: string): { ok: true } | { ok: false; erro
       error: "That reply includes a worker's identity. An anonymised bio uses initials, role, tickets, and availability.",
     };
   }
-  if (explicitPackIntent(body) === "full_cv") {
+  if (opts.carriesAskedDocument !== true && explicitPackIntent(body) === "full_cv") {
     return {
       ok: false,
       error: "That reply would send a full CV. A CV does not leave by WhatsApp. Initials, role, tickets, and availability may.",

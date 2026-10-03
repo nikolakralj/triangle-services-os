@@ -1,5 +1,48 @@
 # Current state
 
+## WhatsApp replies without approval — 3 October 2026
+
+Nikola removed the approval step for WhatsApp replies to his own and Ralph's
+messages (decision "WhatsApp replies to the owner and the field sender go
+without approval" in [DECISIONS](DECISIONS.md)). When a number on
+`WHATSAPP_OWNER_NUMBERS` or `WHATSAPP_FIELD_NUMBERS` writes, the routed
+employee's reply is posted to WhatsApp as it is filed with
+`POST /api/agent/whatsapp/drafts`. The response says `sends: true`, or `held`
+with the reason the reply is waiting for a person. The wake tells the
+employee which it will be (`replySends`).
+
+A reply goes on its own only when all of this holds: it answers a stored
+message; that message's sender is on the owner or field list; the reply is
+addressed to that same number; an employee was woken on the message and the
+sender may reach that employee; it is inside 24 hours of the sender's last
+message; `WHATSAPP_APP_SECRET` is set; `WHATSAPP_AUTO_SEND` is not off; and
+fewer than five replies to that message have already gone. Otherwise it is a
+draft, and for the owner and the field sender the draft says why ("Not sent
+on its own: …").
+
+A file goes on its own only when the message being answered asked for one. A
+CV or any other file on a worker's record needs that message to ask for it
+and to name the worker, comes from the worker's record
+(`document: { "workerId": … }`), and goes only to the number that asked;
+without that it is refused before it is stored, and a person cannot send it
+either. A CV an employee uploads itself is refused: Triangle cannot tell
+whose it is.
+
+Meta's signature is now checked inside `ingestWhatsAppWebhook`, the one
+function that stores an inbound, as well as in the route. Ralph's message is
+also refused when it asks for an employee who is not Hanna, Bob, or Scout.
+Every wake for a field sender carries the one Google Drive folder that
+sender may be given information from (`WHATSAPP_FIELD_DRIVE_FOLDERS`, or the
+organisation's name when that is unset).
+
+The case and the person now show a reply that has gone — who wrote it, what
+it said, and "Sent without approval" or "A person sent it" — and an answered
+message is no longer listed as "No draft yet".
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| `decideAutoSend`, `workerDocumentMayLeave`, and the ask rules (`attachmentAskedFor`, `namesPerson`); auto-send in `fileWhatsAppDraft`; one `transmitWhatsAppDraft` for both ways a message leaves; signature check inside `ingestWhatsAppWebhook`; refusal when the field sender asks for another employee; the Drive folder on the wake; `WHATSAPP_AUTO_SEND` and `WHATSAPP_FIELD_DRIVE_FOLDERS`; sent lines and hold reasons on the record. No migration: the audit sentence is stored in `route_reason` on the outbound row | this branch | `check:whatsapp` 13/13 and 18/18 (the second file runs the whole flow on an in-memory database with Graph stubbed: field and owner replies sent to the number that wrote; redirected, unanswered, stranger, legacy-allowlist and open-pilot replies kept as drafts; "send me CV from Mattia" sent and every other CV refused; forged, unsigned and borrowed signatures stored nothing); `check:tenant-identity` passed; lint 0; `tsc --noEmit` 0; production build 0 | Not run against the real number: no WhatsApp message was sent and no webhook was called from this branch. The first message from Nikola's phone after the merge is the live test. The Drive-folder limit is an instruction to the employee, not a lock: Triangle does not hold the Drive key. Triangle cannot read inside a file an employee uploads, so it knows whose document it is only for files on a worker's record |
+
 ## WhatsApp routing — 2 October 2026
 
 Nikola continued the 1 October WhatsApp exception (decision "WhatsApp pilot"

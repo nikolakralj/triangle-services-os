@@ -649,6 +649,9 @@ test("status update updates row", () => {
   assert.equal(older.messages[0].status, "delivered");
 });
 
+// The owner's and the field sender's own replies go without a person since
+// 3 October 2026; scripts/check-whatsapp-auto-send.mjs covers that. This is
+// the gate for everybody else, and it has not moved.
 test("draft-only (no send without approval)", () => {
   const draft = planDraft({
     agentId: "hanna",
@@ -683,7 +686,8 @@ test("draft-only (no send without approval)", () => {
   const webhook = read("src/app/api/whatsapp/webhook/route.ts");
   const sendRoute = read("src/app/api/whatsapp/send/route.ts");
   assert.match(draftsRoute, /verifyMachineToken/);
-  assert.match(draftsRoute, /sends: false/);
+  assert.match(draftsRoute, /sends: result\.sends/);
+  assert.match(draftsRoute, /held: result\.held/);
   assert.doesNotMatch(draftsRoute, /graph\.facebook|postToGraph|sendApprovedWhatsAppDraft/);
   assert.doesNotMatch(webhook, /postToGraph|graph\.facebook/);
   assert.match(sendRoute, /refuseUnlessHuman/);

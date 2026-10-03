@@ -65,6 +65,8 @@ chat with any AI.
 | `WHATSAPP_OWNER_NUMBERS` | Comma-separated E.164. These numbers may reach every bot, including ones added later. Set in Vercel, never in the repository. |
 | `WHATSAPP_FIELD_NUMBERS` | Comma-separated E.164. These numbers may reach only Hanna, Bob, and Scout. They cannot ask to change the software or to send an email. A number on both lists is the owner. |
 | `WHATSAPP_ALLOWED_NUMBERS` | Deprecated. Used only when both lists above are empty. Comma-separated E.164; other inbound numbers are stored and do not wake anyone, and sends to them are refused. Numbers on this fallback list are the field role. Empty, while the two lists above are also empty, means no allowlist. |
+| `WHATSAPP_AUTO_SEND` | Optional. Leave it unset and a reply to an owner or field number is sent as the employee files it (the CEO's grant of 3 October 2026). Set it to `off` to turn every reply back into a draft a person approves. Anything other than `on`, `true`, `yes`, or `1` is off. |
+| `WHATSAPP_FIELD_DRIVE_FOLDERS` | Optional. Comma-separated Google Drive folder names. The only folders a field number may be given information from; every wake for that sender carries them. Unset, it is the folder named after the organisation. Triangle does not hold the Drive key: this is an instruction to the employee, not a lock. |
 | `WHATSAPP_GRAPH_VERSION` | Optional. Defaults to `v25.0`. |
 | `WHATSAPP_TEMPLATE_NAME` | Optional. The one approved template name. Outside the 24-hour window, a person may send only this. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Optional. Template language code. Defaults to `en`. |
@@ -183,8 +185,15 @@ more object on `WHATSAPP_EMPLOYEES` and its key on the roles who may reach
 it. A draft may carry one list document, including
 xlsx. No CV or worker profile leaves by WhatsApp — not as a file, and not
 as a name, email, phone, or rate in the words. An anonymised bio's facts
-(initials, role, tickets, languages, availability) may be written. Triangle
-never sends by itself.
+(initials, role, tickets, languages, availability) may be written.
+
+Since 3 October 2026 a reply to an owner or field number is sent as the
+employee files it, with no approval: only to the number that wrote, only
+inside the 24-hour window, and only for a message that arrived with Meta's
+signature. A file goes with it only when that message asked for one; a
+person's CV only when it asked for that person's by name. A reply to anyone
+else is still a draft you approve. `WHATSAPP_AUTO_SEND=off` turns the whole
+thing off.
 
 1. Nikola applied `supabase/migrations/055_whatsapp_routing.sql` on
    2 October 2026. Do not apply it again. It adds `routed_employee` and
@@ -221,13 +230,20 @@ never sends by itself.
    employee drafts with `POST /api/agent/whatsapp/drafts` and their badge
    (`tri_mc_…`). Scout may attach one list (`contentBase64`, or
    `storageBucket` + `storagePath` in `documents` or `whatsapp-drafts`):
-   csv, pdf, txt, xls, xlsx, doc, or docx. You approve and press Send on
-   that draft, on the case or the person. Free text, or the document, only
-   within 24 hours of their last inbound. Nothing is sent when the draft is
-   filed. The response is `sends: false`. A request from Ralph to change the
-   software, or to have Bob send an email, is stored as a draft for you and
-   wakes nobody. When Ralph's message does reach Bob, the handoff says the
-   requester may not trigger outbound email, and Bob does not send one.
+   csv, pdf, txt, xls, xlsx, doc, or docx. A reply to your number or
+   Ralph's is sent when it is filed, and the response is `sends: true`. A
+   reply to anyone else, or one that is held, answers `sends: false` with
+   `held` and the reason; you approve and press Send on that draft, on the
+   case or the person. Free text, or the document, only within 24 hours of
+   their last inbound. A request from Ralph to change the software, to have
+   Bob send an email, or for an employee who is not Hanna, Bob, or Scout is
+   stored as a draft for you and wakes nobody. When Ralph's message does
+   reach Bob, the handoff says the requester may not trigger outbound email,
+   and Bob does not send one.
+8. To send a named person's CV that you or Ralph asked for ("send me CV from
+   Mattia"), Hanna files `"document": { "workerId": "<id>" }`. Triangle takes
+   the CV from that person's record, checks that the message asked for it by
+   name, and sends it to the number that asked.
 
 ## Send from Triangle — CEO turns it on per mailbox
 

@@ -48,7 +48,15 @@ may reach every bot; Ralph's (`WHATSAPP_FIELD_NUMBERS`) may reach only Hanna,
 Bob, and Scout. The numbers live in the environment, not in the repository.
 A number on neither list is stored and does not wake anyone. A request from
 Ralph to change the software or to send an email is refused as a draft. No
-CV or worker profile leaves by WhatsApp.
+CV or worker profile leaves by WhatsApp. On 3 October 2026 Nikola removed
+the approval step for replies to his own and Ralph's messages: such a reply
+is sent as the employee files it, only to the number that wrote, inside the
+24-hour window; a file goes only when that message asked for it, and a
+person's CV only when it asked for that person's by name; a forged message
+is never stored. Ralph also cannot ask for any other employee, and may be
+given information from one Drive folder only. Everyone else still waits for
+a person. Decision: "WhatsApp replies to the owner and the field sender go
+without approval" in `DECISIONS.md`.
 
 ### P0 — Clean the floor · `DONE` · PR #35 (`656ccca`)
 

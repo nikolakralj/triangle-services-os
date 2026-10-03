@@ -9,17 +9,31 @@ import type { WhatsAppDraftCard, WhatsAppRecord } from "@/lib/whatsapp/view";
 // ---------------------------------------------------------------------------
 // The WhatsApp draft, on the case and the person that already hold it.
 // Same shape as the letter: edit the words, look once more, press Send.
-// Rendering this does not send. Waiting lines have no button.
+// Rendering this does not send. Waiting lines have no button. A reply that
+// has already gone is one line: who wrote it, what it said, and whether a
+// person approved it.
 // ---------------------------------------------------------------------------
 
 export function WhatsAppOnRecord({ record }: { record: WhatsAppRecord }) {
-  if (record.drafts.length === 0 && record.waiting.length === 0) return null;
+  const sent = record.sent ?? [];
+  if (record.drafts.length === 0 && record.waiting.length === 0 && sent.length === 0) return null;
   return (
     <div className="space-y-3">
       {record.waiting.map((line) => (
         <p key={line.id} className="text-[13.5px] leading-relaxed text-slate-700">
           <span className="text-slate-500">{line.at ? `${line.at} · ` : ""}</span>
           WhatsApp from {line.who}: {line.text} No draft yet.
+        </p>
+      ))}
+      {sent.map((line) => (
+        <p key={line.id} className="text-[13.5px] leading-relaxed text-slate-700">
+          <span className="text-slate-500">{line.at ? `${line.at} · ` : ""}</span>
+          {line.by ? `${line.by} replied` : "Replied"} on WhatsApp to {line.to}: {line.text}
+          {line.documentName ? ` Document: ${line.documentName}.` : ""}
+          <span className="text-slate-500">
+            {line.withoutApproval ? " Sent without approval." : " A person sent it."}
+          </span>
+          {line.failed ? <span className="text-rose-600"> WhatsApp could not deliver it.</span> : null}
         </p>
       ))}
       {record.drafts.map((draft) => (
@@ -49,6 +63,9 @@ function DraftCard({
       ) : null}
       {draft.documentName ? (
         <p className="text-[13px] text-slate-700">Document: {draft.documentName}</p>
+      ) : null}
+      {draft.heldBecause ? (
+        <p className="text-[13px] text-slate-600">Not sent on its own: {draft.heldBecause}</p>
       ) : null}
       <EditableWords
         value={words}

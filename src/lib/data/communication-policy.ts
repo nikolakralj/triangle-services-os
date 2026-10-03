@@ -11,6 +11,11 @@
 //     employee's to make;
 //   - "auto" only takes effect once Triangle records what was sent. Until that
 //     exists, an "auto" class is treated as approval-required and says why.
+//
+// One thing is not external communication and is not a class here: a
+// WhatsApp reply to the owner's or the field sender's own message. Since the
+// CEO's grant of 3 October 2026 Triangle sends it as the employee files it,
+// and records it. The rule is in src/lib/whatsapp/pilot.ts (decideAutoSend).
 // ---------------------------------------------------------------------------
 
 export type CommunicationMode = "auto" | "approval" | "forbidden";
@@ -80,6 +85,7 @@ export function communicationPolicyFor(config: Record<string, unknown> | null | 
     classes,
     rule:
       "approval: write the draft into Triangle (the words on the target, or your reply) and stop — a person sends it. " +
-      "forbidden: never, not even as a draft offer. auto: you may send it yourself through an account you legitimately hold, and must record exactly what you sent.",
+      "forbidden: never, not even as a draft offer. auto: you may send it yourself through an account you legitimately hold, and must record exactly what you sent. " +
+      "A WhatsApp reply to the owner's or the field sender's own message is not one of these classes: Triangle sends it as you file it, when the wake says replySends.",
   };
 }

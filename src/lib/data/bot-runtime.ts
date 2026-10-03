@@ -164,6 +164,10 @@ export async function wakeEmployee(params: {
     draftEndpoint?: string;
     /** Set when this sender must not cause an outbound email. */
     handoffNote?: string;
+    /** True when the reply goes to the sender as it is filed, with no person approving it. */
+    replySends?: boolean;
+    /** What this sender may be given from Google Drive. */
+    senderNote?: string;
   };
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
@@ -209,6 +213,10 @@ export async function wakeEmployee(params: {
                   ? { draftEndpoint: params.context.draftEndpoint }
                   : {}),
                 ...(params.context.handoffNote ? { handoffNote: params.context.handoffNote } : {}),
+                ...(params.context.replySends !== undefined
+                  ? { replySends: params.context.replySends }
+                  : {}),
+                ...(params.context.senderNote ? { senderNote: params.context.senderNote } : {}),
               }
             : {}),
         }),

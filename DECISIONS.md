@@ -6,6 +6,64 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-03: WhatsApp replies to the owner and the field sender go without approval
+
+Nikola decided this on 3 October 2026, in his own words: "Yes, remove the
+approval step for my and Ralph's WhatsApp." It is the first grant under
+"Employees, not buttons": one kind of action — a WhatsApp reply to the owner's
+or the field sender's own message — moves from "a person sends it" to "acts
+and reports", for Hanna, Bob, and Scout. For those two senders it replaces the
+last sentence of the 1 October decision below.
+
+What changed. When a number on `WHATSAPP_OWNER_NUMBERS` (Nikola) or
+`WHATSAPP_FIELD_NUMBERS` (Ralph) writes, the employee's reply is sent as the
+employee files it. Nobody presses Send. The message is recorded as sent, with
+the employee who wrote it, the message it answers, and "Sent without
+approval". A reply to anyone else is a draft a person approves, as before.
+
+The three conditions, enforced in code (`decideAutoSend` and
+`workerDocumentMayLeave` in `src/lib/whatsapp/pilot.ts`, checked by
+`npm run check:whatsapp`):
+
+1. **A reply goes only to the number that wrote, and only if that number is
+   Nikola's or Ralph's.** The reply must answer a stored message and be
+   addressed to that message's sender. A reply addressed anywhere else, or
+   answering nothing, stays a draft. The deprecated allowlist and an open
+   pilot do not carry the grant.
+2. **No CV, profile, or other file leaves by WhatsApp unless Nikola or Ralph
+   asked for it in that message.** "Send me CV from Mattia" sends Mattia's
+   CV, from Mattia's own record in Triangle, to the number that asked. The
+   message has to ask for a document and name the person. A CV nobody asked
+   for is refused before it is stored, and a person cannot send one either. A
+   list or other file that was not asked for stays a draft for a person.
+3. **A message has to really come from WhatsApp.** Meta's signature is
+   checked in the function that stores the message. A forged message is never
+   stored, so it cannot be answered. Without `WHATSAPP_APP_SECRET` nothing is
+   stored and nothing is sent.
+
+Unchanged: the 24-hour window (outside it a reply waits for a person, and
+only the approved template can go); approval for everyone else; and the words
+of a reply carry no email address, phone number, or rate.
+
+Ralph's limits, all of them:
+
+- He reaches only Hanna, Bob, and Scout. A message that asks for anyone else —
+  another employee by name, "another agent", the Triangle Engineer — is
+  refused: a polite draft for Nikola, nobody woken, nothing sent.
+- He cannot ask for a change to the software, and cannot get Bob or anyone
+  else to send an email. Each is refused the same way.
+- A reply to him never goes to Nikola's number, and a reply to Nikola never
+  goes to his.
+- The only Google Drive folder he may be given information from is "Triangle
+  Services" (`WHATSAPP_FIELD_DRIVE_FOLDERS`; when that is unset, the folder
+  named after the organisation). Triangle does not hold the Drive key, so
+  this one is an instruction every wake carries to the employee, not a lock.
+
+Safety valves: `WHATSAPP_AUTO_SEND=off` turns every reply back into a draft;
+at most five replies to one message go on their own; a refusal draft is never
+sent automatically; and when WhatsApp refuses a send, the reply stays a draft
+that says why.
+
 ### 2026-10-01: WhatsApp pilot — one approved exception to the P0–P4 freeze
 
 Nikola approved this on 1 October 2026. It is the one build outside the
@@ -36,7 +94,9 @@ still the allowlist, and every number on it is the field role. Ralph cannot
 ask to change the software and cannot ask Bob to send an email: each is a
 polite draft, flagged for Nikola, with nobody woken and nothing sent. When
 Ralph does reach Bob, the handoff says the requester may not trigger outbound
-email. Nikola still approves before any WhatsApp message goes out.
+email. Nikola still approves before any WhatsApp message goes out. (On
+3 October that last sentence, and the CV rule, changed for Nikola's and
+Ralph's own messages — the decision above.)
 
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
 

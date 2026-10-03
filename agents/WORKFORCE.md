@@ -88,7 +88,10 @@ Her privacy rules are stricter than the other roles because she is the only
 employee holding real people's personal data: nothing from a CV leaves
 Triangle, she never contacts a candidate, she does not record protected
 characteristics, and she does not enrich from outside sources. Scout searches
-the open web about companies; Hanna does not do that about people.
+the open web about companies; Hanna does not do that about people. One thing
+is not "leaving Triangle": since 3 October 2026 the owner or the field sender
+may ask on WhatsApp for a named person's CV, and it goes to the number that
+asked (`agents/hanna.md`).
 
 Scope changes remain a management decision. `worker.propose` is the whole job.
 
