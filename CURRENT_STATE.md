@@ -1,5 +1,32 @@
 # Current state
 
+## WhatsApp auto-send for owner and field — 3 October 2026
+
+Nikola decided on 3 October 2026 that a WhatsApp reply to an owner or field
+sender sends itself (decision "WhatsApp replies to owner and field senders
+auto-send" in [DECISIONS](DECISIONS.md)). Filing a draft through
+`POST /api/agent/whatsapp/drafts` still requires the employee badge. When the
+recipient is on `WHATSAPP_OWNER_NUMBERS` or `WHATSAPP_FIELD_NUMBERS`, the
+reply is not a refusal, the contact's last inbound is inside 24 hours, and
+`WHATSAPP_AUTO_SEND` is unset or on, Triangle posts it through the existing
+Graph send and stores the row as sent. The note is "Auto-sent to the owner."
+or "Auto-sent to the field." The employee on the row is who filed it. The
+response is `sent: true` with a `wamid` when it went, and `sent: false` with
+`held` when it stayed a draft.
+
+A field sender's software-change or email request stays a draft flagged for
+the owner and is not auto-sent. Outside 24 hours, free text and documents
+stay drafts; a person may still send the approved template. A number on
+neither list is stored, nobody is woken, and nothing is sent. Any other
+recipient still needs a person on `/api/whatsapp/send`. A list document that
+passes the existing guards, including a spreadsheet, sends with the reply
+inside the window. A CV or worker profile still does not leave. No migration.
+`WHATSAPP_AUTO_SEND=off` (also `0`, `false`, `no`) keeps every reply as a draft.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| Owner and field WhatsApp replies auto-send inside 24 hours, with the refusal, window, unlisted, and other-recipient guards. `WHATSAPP_AUTO_SEND` defaults on. | `a0edec9` | `check:whatsapp` 14/14; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | No migration. Nothing was sent from this agent. No live Graph call. The draft line was rendered in `check:whatsapp`. A signed-in send was not exercised. |
+
 ## WhatsApp routing — 2 October 2026
 
 Nikola continued the 1 October WhatsApp exception (decision "WhatsApp pilot"

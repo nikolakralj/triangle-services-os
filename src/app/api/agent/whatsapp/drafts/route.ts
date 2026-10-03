@@ -4,10 +4,12 @@ import { badgeMayReport } from "@/lib/data/employee-report-policy";
 import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
 
 // ---------------------------------------------------------------------------
-// POST /api/agent/whatsapp/drafts — Scout or Hanna files a reply. It is a draft.
+// POST /api/agent/whatsapp/drafts — Scout, Bob, or Hanna files a reply.
 //
 // Same badge check as POST /api/agent/reports. The legacy MCP key is not a
-// badge. This route does not call Graph and does not send.
+// badge. This route does not call Graph. The data layer sends when the
+// recipient is an owner or field number and the auto-send rule allows it.
+// The JSON says sent: true only after Graph has accepted the message.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -41,7 +43,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
   return NextResponse.json(
-    { ok: true, draftId: result.draftId, duplicate: result.duplicate, sends: false },
+    {
+      ok: true,
+      draftId: result.draftId,
+      duplicate: result.duplicate,
+      sends: result.sends,
+      sent: result.sent,
+      autoSent: result.autoSent,
+      status: result.status,
+      wamid: result.wamid,
+      held: result.held,
+    },
     { status: result.duplicate ? 200 : 201, headers: { "Cache-Control": "no-store" } },
   );
 }

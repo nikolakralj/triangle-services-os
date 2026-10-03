@@ -3,10 +3,12 @@
 //
 // A signed webhook is stored once per Meta wamid. An allowlisted sender wakes
 // one employee once: Scout or Hanna, from the routing rule. A badge files a
-// draft and that draft does not send. A person approves, and only then does
-// a later step build a Graph body. Free text, and one list document, are
-// inside 24 hours of the contact's last inbound. Outside it, the configured
-// template is the only thing that may go, and it does not carry the document.
+// draft. decideAutoSend says when that draft may leave on its own: an owner
+// or field number, inside 24 hours, and not a refusal. Anyone else waits for
+// a person. Free text, and one list document, are inside 24 hours of the
+// contact's last inbound. Outside it, the configured template is the only
+// thing a person may send, and it does not carry the document. This file
+// does not fetch and does not send.
 // ---------------------------------------------------------------------------
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -14,9 +16,12 @@ import {
   bindWhatsAppSenders,
   decideInbound,
   draftTextAllowed,
+  EMAIL_REFUSAL_DRAFT,
   fieldSendersFor,
   planAttachment,
+  SOFTWARE_REFUSAL_DRAFT,
   WHATSAPP_DRAFT_ENDPOINT,
+  workerProfileAttachment,
   type AttachmentInput,
   type NormalizedAttachment,
   type SenderPermission,
@@ -588,6 +593,8 @@ export interface WhatsAppEnv {
   templateName: string | null;
   templateLanguage: string;
   orgId: string | null;
+  /** Unset is on. Off keeps every reply as a draft. */
+  autoSend: boolean;
 }
 
 function clean(value: string | undefined): string | null {
@@ -617,7 +624,143 @@ export function readWhatsAppEnv(env: Record<string, string | undefined>): WhatsA
     templateName: clean(env.WHATSAPP_TEMPLATE_NAME),
     templateLanguage: templateLanguage(env.WHATSAPP_TEMPLATE_LANGUAGE),
     orgId: org && UUID.test(org) ? org : null,
+    autoSend: whatsAppAutoSendEnabled(env.WHATSAPP_AUTO_SEND),
   };
+}
+
+const AUTO_SEND_ON = new Set(["1", "true", "on", "yes"]);
+const AUTO_SEND_OFF = new Set(["0", "false", "off", "no"]);
+
+/**
+ * Kill switch. Unset or empty is on, so owner and field replies send.
+ * `off`, `0`, `false`, and `no` keep the draft. Any other value is off.
+ */
+export function whatsAppAutoSendEnabled(raw: string | null | undefined): boolean {
+  const value = (raw ?? "").trim().toLowerCase();
+  if (!value) return true;
+  if (AUTO_SEND_ON.has(value)) return true;
+  if (AUTO_SEND_OFF.has(value)) return false;
+  return false;
+}
+
+export function isAutoSentAudit(reason: string | null | undefined): boolean {
+  return (reason ?? "").trim().startsWith("Auto-sent");
+}
+
+export type AutoSendPlan =
+  | {
+      send: true;
+      role: "owner" | "field";
+      mode: "text" | "document";
+      to: string;
+      body: string;
+      filename?: string;
+      mime?: string;
+      audit: string;
+    }
+  | { send: false; reason: string };
+
+/**
+ * Whether a filed reply leaves without a person.
+ * The recipient must be an explicit owner or field number. An open pilot,
+ * where every unmatched number is treated as field, does not qualify.
+ * A refusal stays a draft. Outside 24 hours, free text and documents stay
+ * drafts; the approved template is still a person's send. A list document
+ * that passed the attachment guard may leave with the reply, inside the window.
+ */
+export function decideAutoSend(input: {
+  enabled: boolean;
+  to: string;
+  text: string;
+  senders: readonly SenderPermission[];
+  inboundReason?: string | null;
+  flagged?: boolean;
+  lastInboundAt: string | null;
+  now: Date;
+  document?: {
+    filename: string;
+    mime: string;
+    kind?: string | null;
+    sourceTable?: string | null;
+  } | null;
+}): AutoSendPlan {
+  if (!input.enabled) {
+    return { send: false, reason: "Auto-send is switched off. The reply stays a draft." };
+  }
+  const to = normalizeE164(input.to);
+  if (!to) return { send: false, reason: "That recipient is not a usable number." };
+
+  const listed = input.senders.find((sender) => normalizeE164(sender.e164) === to);
+  const role = listed?.id === "owner" ? "owner" : listed?.id === "field" ? "field" : null;
+  if (!role) {
+    return {
+      send: false,
+      reason: "That recipient is not an owner or field number, so the reply stays a draft.",
+    };
+  }
+
+  const inboundReason = (input.inboundReason ?? "").trim();
+  const text = input.text.trim();
+  if (
+    input.flagged === true ||
+    inboundReason.startsWith("Refused:") ||
+    text === SOFTWARE_REFUSAL_DRAFT ||
+    text === EMAIL_REFUSAL_DRAFT
+  ) {
+    return { send: false, reason: "A refused or flagged reply stays a draft for the owner." };
+  }
+
+  const words = draftTextAllowed(text);
+  if (!words.ok) return { send: false, reason: words.error };
+
+  if (input.document) {
+    const profile = workerProfileAttachment({
+      filename: input.document.filename,
+      mime: input.document.mime,
+      kind: input.document.kind ?? null,
+      sourceTable: input.document.sourceTable ?? null,
+    });
+    if (profile.blocked) return { send: false, reason: profile.reason };
+  }
+
+  if (!serviceWindowOpen(input.lastInboundAt, input.now)) {
+    return {
+      send: false,
+      reason: input.document
+        ? "Outside the 24-hour window. The document stays a draft, and free text is not auto-sent."
+        : "Outside the 24-hour window. Free text is not auto-sent; the draft stays for a person.",
+    };
+  }
+
+  const audit =
+    input.document
+      ? role === "owner"
+        ? "Auto-sent to the owner, with a document."
+        : "Auto-sent to the field, with a document."
+      : role === "owner"
+        ? "Auto-sent to the owner."
+        : "Auto-sent to the field.";
+
+  if (input.document) {
+    if (text.length > 1024) {
+      return { send: false, reason: "The document caption is longer than WhatsApp allows." };
+    }
+    return {
+      send: true,
+      role,
+      mode: "document",
+      to,
+      body: text,
+      filename: input.document.filename,
+      mime: input.document.mime,
+      audit,
+    };
+  }
+
+  if (text.length < 1 || text.length > 4096) {
+    return { send: false, reason: "Write the reply before it can be sent." };
+  }
+  return { send: true, role, mode: "text", to, body: text, audit };
 }
 
 export function schemaMissing(error: { code?: string; message?: string } | null): boolean {

@@ -43,12 +43,16 @@ A WhatsApp message that is a commercial or client follow-up wakes you once.
 People, CVs, availability, and roles wake Hanna. A contractor, company, or
 subcontractor list, or research, wakes Scout. The wake carries the message
 id, the sender, the text, the person and case when the number is already on
-file, and `POST /api/agent/whatsapp/drafts`. You answer by drafting a
-WhatsApp reply only. It does not send. If the handoff says `requester may
+file, and `POST /api/agent/whatsapp/drafts`. You answer by filing a
+WhatsApp reply. When the recipient is an owner or field number, the reply
+is not a refusal, and their last message was inside 24 hours, Triangle
+sends it. `"sent": true` means it went out. A refusal stays a draft, and
+so does a reply to anyone else. If the handoff says `requester may
 not trigger outbound email`, you do not draft an email, you do not send
 one, and you do not ask the mailbox to send one. A request from that sender
 to send an email never reaches you: Triangle stores a refusal draft and
-flags the owner. A request to change the software is the same.
+flags the owner. A request to change the software is the same. Nothing
+there is auto-sent.
 
 Do:
 
