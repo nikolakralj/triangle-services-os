@@ -733,21 +733,36 @@ const FILE_WORD =
 const DECLINES =
   /\b(?:don['’]?t|do not|never|no need to|stop|nemoj|nemojte|nicht|kein\w*)\b[^.?!\n]{0,24}\b(?:send|share|forward|attach|posalji|posaljite|schick\w*|sende\w*)\b/;
 
+const POLITE = /\b(?:please|pls|plz|molim|bitte)\b/;
+
+const NEGATION = /\b(?:no|not|none|nema|nije|nicht|kein\w*)\b/;
+
 /** "Don't send me the CV" is not an ask. */
 export function declinesDocument(text: string): boolean {
   return DECLINES.test(foldLetters(text ?? "").toLowerCase());
 }
 
+/**
+ * The words ask for the thing: a verb that asks ("send me…", "can I have…"),
+ * a "please", or a question of a few words ("Mattia CV?"). Naming the thing
+ * in passing — "thanks for the list", "the CV is outdated" — is not an ask.
+ */
+function asksFor(text: string, thing: RegExp): boolean {
+  const words = foldLetters(text ?? "").toLowerCase().trim();
+  if (!thing.test(words) || DECLINES.test(words)) return false;
+  if (ASK_VERB.test(words) || POLITE.test(words)) return true;
+  const count = words.split(/\s+/).filter(Boolean).length;
+  return count <= 4 && words.endsWith("?") && !NEGATION.test(words);
+}
+
 /** The words ask for a person's CV, profile, or other document. */
 export function asksForPersonDocument(text: string): boolean {
-  const words = foldLetters(text ?? "").toLowerCase();
-  return ASK_VERB.test(words) && PERSON_DOCUMENT_WORD.test(words) && !DECLINES.test(words);
+  return asksFor(text, PERSON_DOCUMENT_WORD);
 }
 
 /** The words ask for a list or a file of any kind. */
 export function asksForFile(text: string): boolean {
-  const words = foldLetters(text ?? "").toLowerCase();
-  return ASK_VERB.test(words) && FILE_WORD.test(words) && !DECLINES.test(words);
+  return asksFor(text, FILE_WORD);
 }
 
 /**
@@ -806,14 +821,14 @@ export function attachmentAskedFor(input: {
     return {
       ok: false,
       error:
-        "Nobody asked for a CV or a profile in that message. It leaves by WhatsApp only when the owner or the field sender asks for it.",
+        "Nobody asked for a CV or a profile in that message. It leaves by WhatsApp only when the owner or the field sender asks for it, in words like \"send me <name>'s CV\".",
     };
   }
   if (!namesPerson(request, input.workerName)) {
     return {
       ok: false,
       error:
-        "That message does not name this person. A CV or profile leaves by WhatsApp only when the owner or the field sender asks for that person's by name.",
+        "That message does not name this person. A CV or profile leaves by WhatsApp only when the owner or the field sender asks for that person's by name, in words like \"send me <name>'s CV\".",
     };
   }
   return { ok: true };

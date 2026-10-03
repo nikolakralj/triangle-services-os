@@ -1133,6 +1133,14 @@ test("what counts as asking, and whose name it is", () => {
   assert.equal(asksForPersonDocument("Who is available in November?"), false);
   assert.equal(asksForPersonDocument("Don't send me the CV yet"), false);
   assert.equal(asksForPersonDocument("Mattia has a strong biography"), false);
+  // A short question, or a please, is an ask. Naming the thing in passing is not.
+  assert.equal(asksForPersonDocument("Mattia CV?"), true);
+  assert.equal(asksForPersonDocument("CV from Mattia please"), true);
+  assert.equal(asksForPersonDocument("Mattia CV"), false);
+  assert.equal(asksForPersonDocument("No CV yet?"), false);
+  assert.equal(asksForPersonDocument("The CV is outdated"), false);
+  assert.equal(asksForFile("Thanks for the list"), false);
+  assert.equal(asksForFile("Contractor list?"), true);
   assert.equal(asksForFile("Send me the subcontractor list for Cologne"), true);
   assert.equal(asksForFile("Who are the subcontractors in Cologne?"), false);
 
