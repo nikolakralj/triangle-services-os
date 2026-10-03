@@ -25,7 +25,7 @@ inside the window. A CV or worker profile still does not leave. No migration.
 
 | Change | Commit | Checked | Limit |
 | --- | --- | --- | --- |
-| Owner and field WhatsApp replies auto-send inside 24 hours, with the refusal, window, unlisted, and other-recipient guards. `WHATSAPP_AUTO_SEND` defaults on. | this branch | checks not recorded yet | No migration. Nothing was sent from this agent. No live Graph call. |
+| Owner and field WhatsApp replies auto-send inside 24 hours, with the refusal, window, unlisted, and other-recipient guards. `WHATSAPP_AUTO_SEND` defaults on. | `a0edec9` | `check:whatsapp` 14/14; `check:case-page` 3/3; `check:tenant-identity` passed; `check:today-slim` 13/13; `check:dev-013` 32/32; `check:dev-015` 20/20; `check:dev-011` 9/9; `check:ask-hanna` 37/37; `check:one-ask` 30/30; `check:workspace` 29/29; `check:requirement-case` 7/7; `check:mail-sync` 9/9; `check:employee-reports` 17/17; `check:event-outbox` 5/5; lint 0; `tsc --noEmit` 0; production build 0. `check:dev-004` 12/13 and `check:dev-010` 13/14 still fail on roadmap wording that was already on main | No migration. Nothing was sent from this agent. No live Graph call. The draft line was rendered in `check:whatsapp`. A signed-in send was not exercised. |
 
 ## WhatsApp routing — 2 October 2026
 
