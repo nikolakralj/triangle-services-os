@@ -6,6 +6,35 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-03: WhatsApp replies to owner and field senders auto-send
+
+Nikola decided this on 3 October 2026. It is an exception to the human-Send
+rule, and only for WhatsApp replies to owner and field senders.
+
+When an employee files a reply to a number on `WHATSAPP_OWNER_NUMBERS` or
+`WHATSAPP_FIELD_NUMBERS`, Triangle sends it immediately when all of these
+hold:
+
+- The reply is not a refusal. A field sender's request to change the software,
+  or to have an email sent, stays a draft flagged for the owner. It is never
+  auto-sent.
+- The contact's last inbound is inside 24 hours. Outside that window, free
+  text is not sent. The draft stays, and a person may still send the approved
+  template. A document is not sent outside the window.
+- `WHATSAPP_AUTO_SEND` is unset or on. Set it to `off` (or `0`, `false`, or
+  `no`) to keep every reply as a draft, without a deploy.
+
+A list document that already passes the WhatsApp guards — a contractor,
+company, or subcontractor list, including a spreadsheet — sends with that
+reply. A CV or worker profile still does not leave. A number on neither list
+is unchanged: stored, nobody woken, no send. Any other recipient still needs
+a person to approve. The row is stored as sent, with the employee who filed
+it and the note "Auto-sent to the owner." or "Auto-sent to the field." The
+draft response says `sent: true` when it went out. No new migration. When
+both sender lists are empty, numbers on the deprecated allowlist are still
+the field role and follow this same rule; an open pilot with no list does
+not auto-send.
+
 ### 2026-10-01: WhatsApp pilot — one approved exception to the P0–P4 freeze
 
 Nikola approved this on 1 October 2026. It is the one build outside the
@@ -37,6 +66,9 @@ ask to change the software and cannot ask Bob to send an email: each is a
 polite draft, flagged for Nikola, with nobody woken and nothing sent. When
 Ralph does reach Bob, the handoff says the requester may not trigger outbound
 email. Nikola still approves before any WhatsApp message goes out.
+Superseded on 3 October 2026 for replies to owner and field numbers; see
+that decision. Refusals, anyone else, and sends outside the 24-hour window
+still wait for a person.
 
 ### 2026-09-29: The plan — an email arrives, the team acts, the CEO approves
 

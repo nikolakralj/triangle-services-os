@@ -68,6 +68,7 @@ chat with any AI.
 | `WHATSAPP_GRAPH_VERSION` | Optional. Defaults to `v25.0`. |
 | `WHATSAPP_TEMPLATE_NAME` | Optional. The one approved template name. Outside the 24-hour window, a person may send only this. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Optional. Template language code. Defaults to `en`. |
+| `WHATSAPP_AUTO_SEND` | Unset or `on`: a reply to an owner or field number sends as soon as the employee files it, inside 24 hours, unless it is a refusal. Set to `off` (or `0`, `false`, `no`) to keep every reply as a draft. No deploy is required beyond changing the variable. |
 | `MCP_API_KEY`, `MCP_ORGANIZATION_ID`, `MCP_USER_ID` | Legacy static key for the MCP route. It borrows a user id, so it must never count as a person. |
 | `IMPORT_API_SECRET`, `EMAIL_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY`, `SCOUT_SEARCH_COUNTRY`, `SCOUT_SEARCH_TIMEZONE` | Legacy or optional. |
 
@@ -183,8 +184,11 @@ more object on `WHATSAPP_EMPLOYEES` and its key on the roles who may reach
 it. A draft may carry one list document, including
 xlsx. No CV or worker profile leaves by WhatsApp — not as a file, and not
 as a name, email, phone, or rate in the words. An anonymised bio's facts
-(initials, role, tickets, languages, availability) may be written. Triangle
-never sends by itself.
+(initials, role, tickets, languages, availability) may be written. A reply
+to an owner or field number sends itself when `WHATSAPP_AUTO_SEND` is unset
+or on, the reply is not a refusal, and the contact's last inbound is inside
+24 hours. A list document sends with that reply. Everyone else, and every
+refusal, stays a draft a person sends.
 
 1. Nikola applied `supabase/migrations/055_whatsapp_routing.sql` on
    2 October 2026. Do not apply it again. It adds `routed_employee` and
@@ -221,12 +225,15 @@ never sends by itself.
    employee drafts with `POST /api/agent/whatsapp/drafts` and their badge
    (`tri_mc_…`). Scout may attach one list (`contentBase64`, or
    `storageBucket` + `storagePath` in `documents` or `whatsapp-drafts`):
-   csv, pdf, txt, xls, xlsx, doc, or docx. You approve and press Send on
-   that draft, on the case or the person. Free text, or the document, only
-   within 24 hours of their last inbound. Nothing is sent when the draft is
-   filed. The response is `sends: false`. A request from Ralph to change the
-   software, or to have Bob send an email, is stored as a draft for you and
-   wakes nobody. When Ralph's message does reach Bob, the handoff says the
+   csv, pdf, txt, xls, xlsx, doc, or docx. A reply to your number or to a
+   field number is sent as it is filed, inside 24 hours, unless
+   `WHATSAPP_AUTO_SEND` is `off`. The response is `sent: true` with a
+   `wamid` when it went, and `sent: false` with `held` when it stayed a
+   draft. You still approve and press Send for anyone else, and for a reply
+   that is outside 24 hours (the approved template only, and not a document).
+   A request from a field sender to change the software, or to have Bob send
+   an email, is stored as a draft for you and wakes nobody; it is not
+   auto-sent. When that sender's message does reach Bob, the handoff says the
    requester may not trigger outbound email, and Bob does not send one.
 
 ## Send from Triangle — CEO turns it on per mailbox
