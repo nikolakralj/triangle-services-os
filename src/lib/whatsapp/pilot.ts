@@ -20,8 +20,10 @@ import {
   fieldSendersFor,
   planAttachment,
   SOFTWARE_REFUSAL_DRAFT,
+  documentBlockedForRecipient,
   WHATSAPP_DRAFT_ENDPOINT,
-  workerProfileAttachment,
+  whatsAppEmployeeLabel,
+  type DocumentRecipient,
   type AttachmentInput,
   type NormalizedAttachment,
   type SenderPermission,
@@ -52,6 +54,8 @@ export interface WakeContext {
   employee: string;
   reason: string;
   handoffNote: string | null;
+  /** True when Triangle already sent the fixed acknowledgment for this inbound. */
+  acknowledgementSent?: boolean;
 }
 
 export interface PilotMessage {
@@ -404,6 +408,7 @@ export function planDraft(input: {
   replyTo: string | null;
   templateName: string | null;
   attachment?: AttachmentInput | null;
+  recipientRole?: DocumentRecipient | null;
 }):
   | { ok: true; sends: false; to: string; text: string; draftKey: string; attachment: NormalizedAttachment | null }
   | { ok: false; error: string } {
@@ -411,11 +416,11 @@ export function planDraft(input: {
   if (!to) return { ok: false, error: "Say who to, as an E.164 number." };
   const text = input.text.trim();
   const templateName = input.templateName?.trim() || "";
-  const words = draftTextAllowed(text);
+  const words = draftTextAllowed(text, input.recipientRole ?? "other");
   if (!words.ok) return words;
   let attachment: NormalizedAttachment | null = null;
   if (input.attachment) {
-    const planned = planAttachment(input.attachment);
+    const planned = planAttachment(input.attachment, input.recipientRole ?? "other");
     if (!planned.ok) return planned;
     attachment = planned.attachment;
   }
@@ -647,6 +652,90 @@ export function isAutoSentAudit(reason: string | null | undefined): boolean {
   return (reason ?? "").trim().startsWith("Auto-sent");
 }
 
+/** Stored on the acknowledgment row. Not an employee reply, and not an auto-send audit. */
+export const INSTANT_ACK_REASON = "Instant acknowledgment.";
+
+export function isInstantAcknowledgment(reason: string | null | undefined): boolean {
+  return (reason ?? "").trim().startsWith("Instant acknowledgment");
+}
+
+/**
+ * An acknowledgment does not answer the inbound. The employee's later draft
+ * still binds with replyTo and can auto-send. The waiting list uses this so
+ * the fixed note does not clear the inbound.
+ */
+export function outboundCountsAsReply(routeReason: string | null | undefined): boolean {
+  return !isInstantAcknowledgment(routeReason);
+}
+
+/** The only fixed WhatsApp text Triangle sends. The employee's reply is not this. */
+export function instantAckCopy(employee: string | null | undefined): string {
+  const label = whatsAppEmployeeLabel(employee);
+  return label ? `${label} is looking into it.` : "Looking into it.";
+}
+
+export function instantAckKey(wamid: string): string {
+  return `ack|${wamid.trim()}`;
+}
+
+export type InstantAckPlan =
+  | { send: true; to: string; body: string; audit: string; draftKey: string }
+  | { send: false; reason: string };
+
+/**
+ * Fixed acknowledgment for one stored inbound. Same owner/field gate as
+ * auto-send: the number must be on the sender list. Unlisted numbers, open
+ * pilots, refusals, and a wamid that already has an acknowledgment do not
+ * send. No template. The plan carries no replyTo, so it does not bind the
+ * inbound for the employee's reply.
+ */
+export function decideInstantAck(input: {
+  enabled: boolean;
+  to: string;
+  senders: readonly SenderPermission[];
+  route: {
+    action: "route" | "refuse";
+    employee: string | null;
+    reason: string;
+    flagOwner: boolean;
+  };
+  wamid: string;
+  alreadyAcked: boolean;
+}): InstantAckPlan {
+  if (!input.enabled) {
+    return { send: false, reason: "Auto-send is switched off. No acknowledgment was sent." };
+  }
+  if (input.alreadyAcked) {
+    return { send: false, reason: "An acknowledgment was already stored for this message." };
+  }
+  if (input.route.action === "refuse" || input.route.flagOwner || isRefusalReason(input.route.reason)) {
+    return { send: false, reason: "A refused or flagged message gets no acknowledgment." };
+  }
+  if (!input.route.employee) {
+    return { send: false, reason: "Nobody was routed, so no acknowledgment was sent." };
+  }
+  const to = normalizeE164(input.to);
+  if (!to) return { send: false, reason: "That sender is not a usable number." };
+  const listed = input.senders.find((sender) => normalizeE164(sender.e164) === to);
+  const role = listed?.id === "owner" ? "owner" : listed?.id === "field" ? "field" : null;
+  if (!role) {
+    return {
+      send: false,
+      reason: "That sender is not an owner or field number, so no acknowledgment was sent.",
+    };
+  }
+  const body = instantAckCopy(input.route.employee);
+  const words = draftTextAllowed(body);
+  if (!words.ok) return { send: false, reason: words.error };
+  return {
+    send: true,
+    to,
+    body,
+    audit: INSTANT_ACK_REASON,
+    draftKey: instantAckKey(input.wamid),
+  };
+}
+
 export type AutoSendPlan =
   | {
       send: true;
@@ -744,17 +833,20 @@ export function decideAutoSend(input: {
     return { send: false, reason: "A refused or flagged reply stays a draft for the owner." };
   }
 
-  const words = draftTextAllowed(text);
+  const words = draftTextAllowed(text, role);
   if (!words.ok) return { send: false, reason: words.error };
 
   if (input.document) {
-    const profile = workerProfileAttachment({
-      filename: input.document.filename,
-      mime: input.document.mime,
-      kind: input.document.kind ?? null,
-      sourceTable: input.document.sourceTable ?? null,
-    });
-    if (profile.blocked) return { send: false, reason: profile.reason };
+    const blocked = documentBlockedForRecipient(
+      {
+        filename: input.document.filename,
+        mime: input.document.mime,
+        kind: input.document.kind ?? null,
+        sourceTable: input.document.sourceTable ?? null,
+      },
+      role,
+    );
+    if (blocked.blocked) return { send: false, reason: blocked.reason };
   }
 
   if (!serviceWindowOpen(input.lastInboundAt, input.now)) {

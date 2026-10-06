@@ -7,8 +7,10 @@ import { readWhatsAppEnv, webhookGetDecision, webhookPostDecision } from "@/lib/
 //
 // GET answers the verification challenge. POST checks X-Hub-Signature-256
 // against the raw body, then stores text and status updates. A valid signed
-// call answers 200. A missing table or a missing org answers 503 so Meta
-// retries after the migration. This route never sends a message.
+// call answers 200 without waiting for the acknowledgment or the employee
+// wake. A missing table or a missing org answers 503 so Meta retries after
+// the migration. This file does not call Graph. The data layer sends the
+// fixed acknowledgment after the response, and only for a stored text message.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";

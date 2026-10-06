@@ -6,6 +6,98 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-06: Nikola and Ralph may receive any WhatsApp document
+
+Nikola decided this on the 6 October 2026 call, in his own words. Only he
+raises a bot's freedom. He said: "Lift the WhatsApp document block for Nikola
+and Ralph — they are the only two people allowed to talk to the bot's WhatsApp
+account, and they should be able to receive all possible documents including
+CVs and worker profiles, financial documents like unpaid invoices from Triangle
+Services and monthly bank PDFs, data from missions, and Scout research outputs
+as files (e.g. Excel for 'give me five best EPC contractors'). Everyone else
+still gets blocked."
+
+The reply still goes only to the number that wrote in, inside 24 hours, and
+only while `WHATSAPP_AUTO_SEND` is on. A CV, a worker profile, or a financial
+document to anyone else is refused, including when a person would approve the
+send. A list or other ordinary file to anyone else still needs that approval.
+A software-change request or a request to email someone else from Ralph stays
+a draft for Nikola. A document may be pdf, csv, txt, xls, xlsx, doc, docx,
+ppt, or pptx, up to WhatsApp's 100 MB document limit. A larger file or a type
+WhatsApp does not take is refused with a reason. The 4 MB figure in the
+document note below is replaced by that limit. No new migration.
+
+### 2026-10-06: WhatsApp documents for the owner and the field
+
+Nikola decided this on 6 October 2026. The owner and the field sender may
+receive CVs, worker profiles, financial documents (unpaid invoices, bank
+statements, payroll, and tax), and mission documents on WhatsApp. Hanna,
+Bob, and Scout may each attach one file on the draft — PDF, xlsx, csv, docx,
+and the other types already accepted, inside the existing 4 MB limit. Hanna
+attaches CVs and worker profiles. Bob attaches bank statements and invoices.
+Scout attaches a spreadsheet he already has, including mission or research
+data; Triangle does not build that workbook. The file has to answer that
+sender's own inbound, inside 24 hours, with auto-send on. The caption still
+may not carry an IBAN; a neutral caption is enough for the file to go.
+Everyone else stays blocked from CVs, worker profiles, and financial
+documents, including when a person would otherwise approve the send. A path
+in the documents bucket is sent only when that organisation has the row.
+Asking to be sent a document ("send me …", "pošalji mi …") is not a request
+to email someone else. Asking to email a client, or asking Bob to send an
+email, stays a draft for the owner. The 24-hour window, who the field sender
+may reach, and the field sender's software-change hold are unchanged. No new
+migration.
+
+### 2026-10-06: Payment status is a read-only question to the accounting bot
+
+Nikola decided this on 6 October 2026. When he or Ralph asks on WhatsApp
+about unpaid invoices, payment status, or what has been paid, the words route
+to Bob, including when they also mention a project or a worker. Whichever
+employee is woken asks the Triangle Services Accounting bot — a separate
+assistant, outside Triangle, that can read the Mare e-invoicing app — and
+waits. The question is read-only. The employee never asks that bot to pay,
+change, send, or email anything. The answer comes back to the asker as a
+WhatsApp reply on the original inbound: a short summary, or one pdf, xlsx, or
+csv when it is a list. Financial documents still go only to the owner and the
+field. The reply still auto-sends when it is filed minutes later, inside the
+same 24-hour window; the instant acknowledgment covers the wait. A
+software-change request or a request to email someone else still stays a
+draft for Nikola. Triangle does not integrate with Mare and does not store
+Mare credentials. Triangle has no channel an employee can use to message that
+bot; the employee uses their own runtime's agent-to-agent messaging. No new
+migration.
+
+### 2026-10-06: Ralph is answered by Hanna, Bob, or Scout
+
+Nikola decided this on 6 October 2026. Ralph is a field sender and a
+first-class recipient for all three. A resourcing ask (a CV, a worker, talent)
+wakes Hanna. Finance and accounting (a bank statement, an izvod, an invoice,
+unpaid invoices, a payment, a račun, and the same in German) wake Bob.
+Research (companies, EPC contractors, projects, the market, and the same in
+Croatian and German) wakes Scout. Words that match more than one stay with
+Hanna, as before. Bob may read finance mail Triangle already stored — subject,
+sender, and classification; the body of a finance mail is discarded — and the
+`invoices`, `payments`, and `timesheets` rows, and reply with a document
+Triangle already holds. He still never sends email. No Mare integration, and
+no new migration.
+
+### 2026-10-06: WhatsApp instant acknowledgment
+
+Nikola decided this on 6 October 2026, after a live text took about two
+minutes to come back. The wait was the employee waking and drafting. Triangle
+now sends one fixed line as soon as an owner or field text is stored and
+routed — "Hanna is looking into it.", or Bob or Scout in that employee's
+place, or "Looking into it." when the key has no name. It goes only to the
+number that wrote in, only when that number is an owner or field sender, and
+only when auto-send is on. A refusal, a flagged hold, an unlisted number, a
+status receipt, and a repeat of the same inbound do not send one. It is
+stored on the message row as outbound with the reason "Instant acknowledgment."
+It does not quote the inbound, it does not set the reply link, and it does
+not count as the employee's answer. The employee's own draft still auto-sends
+afterwards, inside the same 24-hour window. The webhook answers Meta before
+that send and before the wake. The employee's words are still whatever they
+draft. No new migration.
+
 ### 2026-10-03: WhatsApp replies to owner and field senders auto-send
 
 Nikola decided this on 3 October 2026. It is an exception to the human-Send
