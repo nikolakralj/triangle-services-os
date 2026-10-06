@@ -660,20 +660,53 @@ export type AutoSendPlan =
     }
   | { send: false; reason: string };
 
+function isRefusalReason(reason: string | null | undefined): boolean {
+  return (reason ?? "").trim().startsWith("Refused:");
+}
+
+/**
+ * Auto-send goes only to the number on the inbound being answered.
+ * A missing replyTo, or a `to` for anyone else, stays a draft.
+ */
+export function autoSendBoundToInbound(input: {
+  to: string;
+  replyTo?: string | null;
+  replyFrom?: string | null;
+}): { ok: true; to: string } | { ok: false; reason: string } {
+  const replyTo = (input.replyTo ?? "").trim();
+  if (!replyTo) {
+    return { ok: false, reason: "A reply with no inbound to answer stays a draft." };
+  }
+  const to = normalizeE164(input.to);
+  const from = normalizeE164(input.replyFrom);
+  if (!to || !from || to !== from) {
+    return { ok: false, reason: "The reply is not to the number that wrote in, so it stays a draft." };
+  }
+  return { ok: true, to };
+}
+
 /**
  * Whether a filed reply leaves without a person.
- * The recipient must be an explicit owner or field number. An open pilot,
+ * It must answer a stored inbound, and `to` must be that inbound's sender.
+ * That sender must be an explicit owner or field number. An open pilot,
  * where every unmatched number is treated as field, does not qualify.
- * A refusal stays a draft. Outside 24 hours, free text and documents stay
- * drafts; the approved template is still a person's send. A list document
- * that passed the attachment guard may leave with the reply, inside the window.
+ * A refusal on the answered inbound or on that sender's latest inbound
+ * stays a draft. Outside 24 hours, free text and documents stay drafts;
+ * the approved template is still a person's send. A list document that
+ * passed the attachment guard may leave with the reply, inside the window.
  */
 export function decideAutoSend(input: {
   enabled: boolean;
   to: string;
   text: string;
   senders: readonly SenderPermission[];
+  replyTo?: string | null;
+  /** from_number of the inbound `replyTo` names. */
+  replyFrom?: string | null;
+  /** route_reason of the inbound being answered. */
   inboundReason?: string | null;
+  /** route_reason of that sender's latest inbound. */
+  latestInboundReason?: string | null;
   flagged?: boolean;
   lastInboundAt: string | null;
   now: Date;
@@ -687,8 +720,9 @@ export function decideAutoSend(input: {
   if (!input.enabled) {
     return { send: false, reason: "Auto-send is switched off. The reply stays a draft." };
   }
-  const to = normalizeE164(input.to);
-  if (!to) return { send: false, reason: "That recipient is not a usable number." };
+  const bound = autoSendBoundToInbound(input);
+  if (!bound.ok) return { send: false, reason: bound.reason };
+  const to = bound.to;
 
   const listed = input.senders.find((sender) => normalizeE164(sender.e164) === to);
   const role = listed?.id === "owner" ? "owner" : listed?.id === "field" ? "field" : null;
@@ -699,11 +733,11 @@ export function decideAutoSend(input: {
     };
   }
 
-  const inboundReason = (input.inboundReason ?? "").trim();
   const text = input.text.trim();
   if (
     input.flagged === true ||
-    inboundReason.startsWith("Refused:") ||
+    isRefusalReason(input.inboundReason) ||
+    isRefusalReason(input.latestInboundReason) ||
     text === SOFTWARE_REFUSAL_DRAFT ||
     text === EMAIL_REFUSAL_DRAFT
   ) {

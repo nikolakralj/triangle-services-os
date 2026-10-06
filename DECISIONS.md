@@ -15,9 +15,13 @@ When an employee files a reply to a number on `WHATSAPP_OWNER_NUMBERS` or
 `WHATSAPP_FIELD_NUMBERS`, Triangle sends it immediately when all of these
 hold:
 
+- The reply names the inbound it answers (`replyTo`), and `to` is that
+  inbound's sender. A missing `replyTo`, or a `to` for a different number,
+  stays a draft for a person. An empty `to` is taken from that inbound.
 - The reply is not a refusal. A field sender's request to change the software,
   or to have an email sent, stays a draft flagged for the owner. It is never
-  auto-sent.
+  auto-sent. The same hold applies when either the answered inbound or that
+  sender's latest inbound is a refusal.
 - The contact's last inbound is inside 24 hours. Outside that window, free
   text is not sent. The draft stays, and a person may still send the approved
   template. A document is not sent outside the window.

@@ -278,7 +278,7 @@ test("Scout can draft, a list document is a draft, a CV is refused", () => {
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "inbox_coordinator", displayName: "Bob" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "viewer", displayName: "Pat" }), false);
   assert.match(read("src/lib/data/whatsapp.ts"), /employeeMayDraftWhatsApp/);
-  assert.match(read("src/lib/data/whatsapp.ts"), /Only Scout or Hanna can draft/);
+  assert.match(read("src/lib/data/whatsapp.ts"), /Only Scout, Bob, or Hanna can draft/);
 
   const list = planDraft({
     agentId: "scout",
@@ -704,12 +704,15 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
     enabled: true,
     text: "Two people can start in November.",
     senders: directory.senders,
+    replyTo: "wamid.IN",
     inboundReason: "Unsure, so Hanna.",
+    latestInboundReason: "Unsure, so Hanna.",
     flagged: false,
     lastInboundAt: "2026-10-01T08:00:00.000Z",
     now: new Date("2026-10-01T12:00:00.000Z"),
     document: null,
   };
+  const answering = (to, extra = {}) => decideAutoSend({ ...inside, to, replyFrom: to, ...extra });
 
   assert.equal(whatsAppAutoSendEnabled(undefined), true);
   assert.equal(whatsAppAutoSendEnabled(""), true);
@@ -722,7 +725,7 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(readWhatsAppEnv({}).autoSend, true);
   assert.equal(readWhatsAppEnv({ WHATSAPP_AUTO_SEND: "off" }).autoSend, false);
 
-  const owner = decideAutoSend({ ...inside, to: ownerNumber });
+  const owner = answering(ownerNumber);
   assert.equal(owner.send, true);
   assert.equal(owner.role, "owner");
   assert.equal(owner.mode, "text");
@@ -730,19 +733,17 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(isAutoSentAudit(owner.audit), true);
   assert.doesNotMatch(owner.audit, /\d{6,}/);
 
-  const field = decideAutoSend({ ...inside, to: fieldNumber });
+  const field = answering(fieldNumber);
   assert.equal(field.send, true);
   assert.equal(field.role, "field");
   assert.equal(field.mode, "text");
   assert.match(field.audit, /^Auto-sent to the field\.$/);
 
-  const switchedOff = decideAutoSend({ ...inside, to: ownerNumber, enabled: false });
+  const switchedOff = answering(ownerNumber, { enabled: false });
   assert.equal(switchedOff.send, false);
   assert.match(switchedOff.reason, /switched off/);
 
-  const sheet = decideAutoSend({
-    ...inside,
-    to: fieldNumber,
+  const sheet = answering(fieldNumber, {
     text: "The company list is attached.",
     document: {
       filename: "companies.xlsx",
@@ -753,9 +754,7 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(sheet.send, true);
   assert.equal(sheet.mode, "document");
   assert.match(sheet.audit, /with a document/);
-  const cvSheet = decideAutoSend({
-    ...inside,
-    to: ownerNumber,
+  const cvSheet = answering(ownerNumber, {
     document: { filename: "worker-cv.xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
   });
   assert.equal(cvSheet.send, false);
@@ -768,9 +767,7 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   });
   assert.equal(software.action, "refuse");
   assert.equal(software.flagOwner, true);
-  const softwareHeld = decideAutoSend({
-    ...inside,
-    to: fieldNumber,
+  const softwareHeld = answering(fieldNumber, {
     text: software.draftText,
     inboundReason: software.reason,
     flagged: software.flagOwner,
@@ -784,26 +781,20 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
     senders: directory.senders,
   });
   assert.equal(email.action, "refuse");
-  const emailHeld = decideAutoSend({
-    ...inside,
-    to: fieldNumber,
+  const emailHeld = answering(fieldNumber, {
     text: email.draftText,
     inboundReason: email.reason,
     flagged: email.flagOwner,
   });
   assert.equal(emailHeld.send, false);
 
-  const outside = decideAutoSend({
-    ...inside,
-    to: ownerNumber,
+  const outside = answering(ownerNumber, {
     now: new Date("2026-10-03T12:00:00.000Z"),
   });
   assert.equal(outside.send, false);
   assert.match(outside.reason, /24-hour/);
   assert.equal("mode" in outside, false);
-  const outsideDoc = decideAutoSend({
-    ...inside,
-    to: fieldNumber,
+  const outsideDoc = answering(fieldNumber, {
     now: new Date("2026-10-03T12:00:00.000Z"),
     text: "The company list is attached.",
     document: { filename: "companies.xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", kind: "company_list" },
@@ -811,13 +802,11 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(outsideDoc.send, false);
   assert.match(outsideDoc.reason, /24-hour/);
 
-  const unlisted = decideAutoSend({ ...inside, to: "+15559999999" });
+  const unlisted = answering("+15559999999");
   assert.equal(unlisted.send, false);
   assert.match(unlisted.reason, /not an owner or field/);
   const open = readWhatsAppEnv({});
-  const openPilot = decideAutoSend({
-    ...inside,
-    to: fieldNumber,
+  const openPilot = answering(fieldNumber, {
     senders: open.senders,
     enabled: open.autoSend,
   });
@@ -825,11 +814,11 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(openPilot.send, false);
 
   const legacy = readWhatsAppEnv({ WHATSAPP_ALLOWED_NUMBERS: fieldNumber });
-  const legacyField = decideAutoSend({ ...inside, to: fieldNumber, senders: legacy.senders });
+  const legacyField = answering(fieldNumber, { senders: legacy.senders });
   assert.equal(legacyField.send, true);
   assert.equal(legacyField.role, "field");
 
-  const other = decideAutoSend({ ...inside, to: otherNumber });
+  const other = answering(otherNumber);
   assert.equal(other.send, false);
   const stillNeedsApproval = decideSend({
     actor: "human",
@@ -873,6 +862,9 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   );
   assert.match(filing, /considerAutoSend/);
   assert.match(filing, /routeReason: decision\.audit/);
+  assert.match(filing, /replyFrom: context\.replyFrom/);
+  assert.match(filing, /latestInboundReason: context\.latestInboundReason/);
+  assert.match(filing, /if \(!to\) to = String\(inbound\.data\.from_number/);
   const refusal = store.slice(store.indexOf("async function ensureRefusalDraft"), store.indexOf("async function applyStatus"));
   assert.doesNotMatch(refusal, /decideAutoSend|postToGraph|considerAutoSend/);
   assert.match(store, /whatsAppInboundHasReply/);
@@ -883,6 +875,77 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.match(decision, /field/);
   assert.doesNotMatch(decision, /\+\d{8,}/);
   assert.match(read(".env.example"), /^WHATSAPP_AUTO_SEND=$/m);
+});
+
+test("auto-send stays a draft unless it answers the inbound sender", () => {
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const senders = bindWhatsAppSenders(ownerNumber, fieldNumber).senders;
+  const base = {
+    enabled: true,
+    text: "Two people can start in November.",
+    senders,
+    inboundReason: "Unsure, so Hanna.",
+    latestInboundReason: "Unsure, so Hanna.",
+    flagged: false,
+    lastInboundAt: "2026-10-01T08:00:00.000Z",
+    now: new Date("2026-10-01T12:00:00.000Z"),
+    document: null,
+  };
+
+  const mismatch = decideAutoSend({
+    ...base,
+    to: ownerNumber,
+    replyTo: "wamid.FIELD",
+    replyFrom: fieldNumber,
+  });
+  assert.equal(mismatch.send, false);
+  assert.match(mismatch.reason, /number that wrote in/);
+
+  const missing = decideAutoSend({ ...base, to: ownerNumber, replyTo: null, replyFrom: ownerNumber });
+  assert.equal(missing.send, false);
+  assert.match(missing.reason, /no inbound/);
+
+  const blank = decideAutoSend({ ...base, to: fieldNumber, replyTo: "  ", replyFrom: fieldNumber });
+  assert.equal(blank.send, false);
+  assert.match(blank.reason, /no inbound/);
+
+  const dodge = decideAutoSend({
+    ...base,
+    to: fieldNumber,
+    replyTo: "wamid.OLDER",
+    replyFrom: fieldNumber,
+    inboundReason: "Unsure, so Hanna.",
+    latestInboundReason: "Refused: this sender may not ask for a software change. Flagged for the owner.",
+  });
+  assert.equal(dodge.send, false);
+  assert.match(dodge.reason, /refused|flagged/i);
+
+  const answered = decideAutoSend({
+    ...base,
+    to: "+1 555 100 0001",
+    replyTo: "wamid.OWNER",
+    replyFrom: ownerNumber,
+  });
+  assert.equal(answered.send, true);
+  assert.equal(answered.to, ownerNumber);
+
+  const humanStillApproves = decideSend({
+    actor: "human",
+    approve: true,
+    status: "draft",
+    to: ownerNumber,
+    text: base.text,
+    draftTemplate: null,
+    allowlist: [ownerNumber, fieldNumber],
+    lastInboundAt: base.lastInboundAt,
+    now: base.now,
+    approvedTemplate: null,
+    templateLanguageCode: "en",
+    sendAttempted: false,
+  });
+  assert.equal(humanStillApproves.ok, true);
+  assert.equal(humanStillApproves.mode, "text");
 });
 
 test("24h window enforcement", () => {

@@ -44,9 +44,11 @@ People, CVs, availability, and roles wake Hanna. A contractor, company, or
 subcontractor list, or research, wakes Scout. The wake carries the message
 id, the sender, the text, the person and case when the number is already on
 file, and `POST /api/agent/whatsapp/drafts`. You answer by filing a
-WhatsApp reply. When the recipient is an owner or field number, the reply
-is not a refusal, and their last message was inside 24 hours, Triangle
-sends it. `"sent": true` means it went out. A refusal stays a draft, and
+WhatsApp reply. `to` is the sender on `replyTo`. When that number is an
+owner or field number, the reply is not a refusal, their latest message is
+not a refusal, and it was inside 24 hours, Triangle sends it back to that
+number. A missing `replyTo`, or a different `to`, stays a draft.
+`"sent": true` means it went out. A refusal stays a draft, and
 so does a reply to anyone else. If the handoff says `requester may
 not trigger outbound email`, you do not draft an email, you do not send
 one, and you do not ask the mailbox to send one. A request from that sender

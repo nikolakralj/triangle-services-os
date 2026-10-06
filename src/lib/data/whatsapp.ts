@@ -644,7 +644,7 @@ export async function fileWhatsAppDraft(params: {
       displayName: String(employee.display_name ?? ""),
     })
   ) {
-    return { ok: false, status: 403, error: "Only Scout or Hanna can draft a WhatsApp reply." };
+    return { ok: false, status: 403, error: "Only Scout, Bob, or Hanna can draft a WhatsApp reply." };
   }
 
   const body = asRecord(params.body);
@@ -866,45 +866,77 @@ function attachmentFromRow(row: {
 async function autoSendContext(
   svc: Svc,
   orgId: string,
-  to: string,
   replyTo: string | null,
 ): Promise<
-  { ok: true; inboundReason: string | null; lastInboundAt: string | null } | { ok: false; held: string }
+  | {
+      ok: true;
+      replyTo: string | null;
+      replyFrom: string | null;
+      inboundReason: string | null;
+      latestInboundReason: string | null;
+      lastInboundAt: string | null;
+    }
+  | { ok: false; held: string }
 > {
+  const answered = replyTo?.trim() || null;
+  if (!answered) {
+    return {
+      ok: true,
+      replyTo: null,
+      replyFrom: null,
+      inboundReason: null,
+      latestInboundReason: null,
+      lastInboundAt: null,
+    };
+  }
+  const inbound = await svc
+    .from("whatsapp_messages")
+    .select("from_number, route_reason, wa_timestamp")
+    .eq("org_id", orgId)
+    .eq("wamid", answered)
+    .eq("direction", "inbound")
+    .maybeSingle();
+  if (schemaMissing(inbound.error) || inbound.error) {
+    return { ok: false, held: "Could not read the message this replies to, so it stayed a draft." };
+  }
+  const replyFrom = typeof inbound.data?.from_number === "string" ? inbound.data.from_number : null;
+  if (!inbound.data || !replyFrom) {
+    return {
+      ok: true,
+      replyTo: answered,
+      replyFrom: null,
+      inboundReason: null,
+      latestInboundReason: null,
+      lastInboundAt: null,
+    };
+  }
   const last = await svc
     .from("whatsapp_messages")
-    .select("wa_timestamp, route_reason, wamid")
+    .select("wa_timestamp, route_reason")
     .eq("org_id", orgId)
     .eq("direction", "inbound")
-    .eq("from_number", to)
+    .eq("from_number", replyFrom)
     .order("wa_timestamp", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (schemaMissing(last.error) || last.error) {
+  if (schemaMissing(last.error) || last.error || !last.data) {
     return { ok: false, held: "Could not confirm the 24-hour window, so the reply stayed a draft." };
   }
-  let inboundReason = (last.data?.route_reason as string | null) ?? null;
-  const lastInboundAt = (last.data?.wa_timestamp as string | undefined) ?? null;
-  if (replyTo && replyTo !== last.data?.wamid) {
-    const inbound = await svc
-      .from("whatsapp_messages")
-      .select("route_reason")
-      .eq("org_id", orgId)
-      .eq("wamid", replyTo)
-      .eq("direction", "inbound")
-      .maybeSingle();
-    if (schemaMissing(inbound.error) || inbound.error) {
-      return { ok: false, held: "Could not read the message this replies to, so it stayed a draft." };
-    }
-    if (inbound.data) inboundReason = (inbound.data.route_reason as string | null) ?? null;
-  }
-  return { ok: true, inboundReason, lastInboundAt };
+  return {
+    ok: true,
+    replyTo: answered,
+    replyFrom,
+    inboundReason: (inbound.data.route_reason as string | null) ?? null,
+    latestInboundReason: (last.data.route_reason as string | null) ?? null,
+    lastInboundAt: (last.data.wa_timestamp as string | undefined) ?? null,
+  };
 }
 
 /**
- * After the row is stored as a draft. Owner and field replies that
- * decideAutoSend accepts are posted to Graph and marked sent. Everything
- * else stays a draft. A refusal row is never passed here.
+ * After the row is stored as a draft. Auto-send runs only when the reply
+ * answers a stored inbound and `to` is that inbound's sender. A refusal on
+ * that inbound or on the sender's latest inbound stays a draft. The human
+ * approval path is unchanged: a mismatched `to` is still stored.
  */
 async function considerAutoSend(
   svc: Svc,
@@ -938,7 +970,7 @@ async function considerAutoSend(
   }
 
   const env = readWhatsAppEnv(process.env);
-  const context = await autoSendContext(svc, orgId, input.to, input.replyTo);
+  const context = await autoSendContext(svc, orgId, input.replyTo);
   if (!context.ok) return heldDraft(input.draftId, input.duplicate, context.held);
 
   const decision = decideAutoSend({
@@ -946,7 +978,10 @@ async function considerAutoSend(
     to: input.to,
     text: input.text,
     senders: env.senders,
+    replyTo: context.replyTo,
+    replyFrom: context.replyFrom,
     inboundReason: context.inboundReason,
+    latestInboundReason: context.latestInboundReason,
     lastInboundAt: context.lastInboundAt,
     now: new Date(),
     document: input.attachment

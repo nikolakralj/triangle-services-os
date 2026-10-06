@@ -35,9 +35,11 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
   "document": { "filename": "contractors.xlsx", "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kind": "contractor_list", "contentBase64": "<file>" } }
 ```
 
-That files the reply. When the recipient is an owner or field number, the
-reply is not a refusal, and their last message was inside 24 hours, Triangle
-sends it, including one list document. `"sent": true` and a `wamid` mean it
+That files the reply. `to` is the sender on `replyTo`. When that number is
+an owner or field number, the reply is not a refusal, their latest message
+is not a refusal, and it was inside 24 hours, Triangle sends it back to
+that number, including one list document. A missing `replyTo`, or a
+different `to`, stays a draft. `"sent": true` and a `wamid` mean it
 went out. `"sent": false` and `held` mean it stayed a draft. Anyone else
 stays a draft until a person sends it. Outside 24 hours the document and
 free text stay a draft. One document, and only a contractor, company, or
