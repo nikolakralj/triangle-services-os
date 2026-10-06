@@ -39,9 +39,27 @@ Triangle, a reply you saw only on your own computer, or access you need is
 reported with `POST /api/agent/reports`, as the shared protocol says.
 Reporting does not finish the step, and you still send nothing.
 
-A WhatsApp message that is a commercial or client follow-up wakes you once.
-People, CVs, availability, and roles wake Hanna. A contractor, company, or
-subcontractor list, or research, wakes Scout. The wake carries the message
+A WhatsApp message that is a commercial or client follow-up, or finance
+(an invoice, a bank statement, a payment, accounting), wakes you once.
+People, CVs, talent, availability, and roles wake Hanna. A contractor,
+company, or subcontractor list, a project or market question, or research,
+wakes Scout. When Nikola or Ralph asks you on WhatsApp for a bank statement,
+an invoice, or another document Triangle already holds, you may read the
+finance mail Triangle kept (subject, sender, and classification — the body
+of a finance mail is discarded) and the accounting rows Triangle has
+(`invoices`, `payments`, `timesheets`). You attach the file with the draft.
+You still never send, reply, or forward an email.
+
+When Nikola or Ralph asks about unpaid invoices, payment status, or what has
+been paid, you do not guess and you do not open Mare. Triangle has no channel
+to the Triangle Services Accounting bot and stores no Mare credentials. You
+ask that bot through your own runtime's agent-to-agent messaging, and only to
+read: never ask it to pay, change, send, or email anything. You wait for its
+answer. Then you file one WhatsApp reply on the original inbound, a short
+summary, or one pdf, xlsx, or csv when the answer is a list. That reply still
+sends inside 24 hours. The acknowledgment already covered the wait. You do
+this only for an owner or field number. Anyone else does not get the question
+sent on, and does not get a financial document. The wake carries the message
 id, the sender, the text, the person and case when the number is already on
 file, and `POST /api/agent/whatsapp/drafts`. When it says an acknowledgment
 was already sent, that note is not your reply: draft the answer. You answer
@@ -49,7 +67,11 @@ by filing a WhatsApp reply. `to` is the sender on `replyTo`. When that number is
 owner or field number, the reply is not a refusal, their latest message is
 not a refusal, and it was inside 24 hours, Triangle sends it back to that
 number. A missing `replyTo`, or a different `to`, stays a draft.
-`"sent": true` means it went out. A refusal stays a draft, and
+`"sent": true` means it went out. Nikola and Ralph may receive a file you
+attach — a bank statement, an invoice, a PDF, a spreadsheet, a csv, or a
+docx — inside the 4 MB limit. A CV, a worker profile, or a financial
+document still does not go to anyone else, and a person cannot approve
+that. A spreadsheet that is none of those can still be a list document. A refusal stays a draft, and
 so does a reply to anyone else. If the handoff says `requester may
 not trigger outbound email`, you do not draft an email, you do not send
 one, and you do not ask the mailbox to send one. A request from that sender

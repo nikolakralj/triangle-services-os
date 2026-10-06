@@ -18,12 +18,14 @@
 // software change and cannot ask for an email to be sent. Those are refused
 // as drafts. Nothing here sends.
 //
-// Data rule. No CV or worker profile leaves Triangle by WhatsApp. A draft may
-// carry one contractor, company, or subcontractor list. The words may say
-// what an anonymised bio may say — initials, role, tickets, languages,
-// right-to-work, dated availability — and may not carry a name, an email, a
-// phone number, a rate, or a full CV. The anonymised packet itself stays in
-// Triangle; WhatsApp does not become a second way to send it.
+// Data rule. An owner or field number may receive a CV, a worker profile, a
+// financial document, or a mission document. Everyone else is blocked from
+// CVs, worker profiles, and financial documents. A draft may still carry one
+// contractor, company, or subcontractor list. The words may say what an
+// anonymised bio may say — initials, role, tickets, languages, right-to-work,
+// dated availability — and may not carry an email, a phone number, a rate,
+// or an IBAN. Asking to be sent a document is not a request to email someone
+// else.
 // ---------------------------------------------------------------------------
 
 import { explicitPackIntent } from "@/lib/data/put-forward";
@@ -42,14 +44,14 @@ export const WHATSAPP_ATTACHMENT_BUCKETS = ["whatsapp-drafts", "documents"] as c
 export const WHATSAPP_DOCUMENT_MAX_BYTES = 4 * 1024 * 1024;
 
 export const WHATSAPP_DATA_RULE =
-  "No CV or worker profile leaves Triangle by WhatsApp. A draft may carry one contractor, company, or subcontractor list. The words may say what an anonymised bio may say — initials, role, tickets, languages, availability — and may not carry a name, an email, a phone number, or a rate.";
+  "No CV or worker profile leaves Triangle by WhatsApp except to an owner or field number, and a financial document is the same. A draft may carry one contractor, company, or subcontractor list. The words may say what an anonymised bio may say — initials, role, tickets, languages, availability — and may not carry an email, a phone number, a rate, or an IBAN.";
 
 export const ROUTE_MODEL_INSTRUCTIONS = [
   "You route one inbound WhatsApp message.",
   'Reply with JSON only: {"employee":"<employee key or unsure>","reason":"short"}',
-  "scout: a contractor, company, or subcontractor list, or a research request.",
-  "bob: a commercial or client follow-up.",
-  "hanna: resourcing — people, CVs, availability, or roles.",
+  "scout: a contractor, company, or subcontractor list, a research request, or a project or market question.",
+  "bob: a commercial or client follow-up, or finance — an invoice, a bank statement, a payment, accounting, or payment status (unpaid, paid, invoice status).",
+  "hanna: resourcing — people, CVs, talent, availability, or roles.",
   "unsure: more than one, none, or you are not sure.",
   "Use only an employee key you were given, or unsure.",
   "The reason is one short sentence and does not quote the message.",
@@ -83,9 +85,9 @@ export interface WhatsAppEmployeeDef {
 export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
   {
     key: "scout",
-    roleKeys: ["project_researcher"],
+    roleKeys: ["project_researcher", "triangle_scout"],
     displayNames: ["scout"],
-    reason: "Contractor, company, subcontractor, or research request, so Scout.",
+    reason: "Contractor, company, subcontractor, project, market, or research request, so Scout.",
     patterns: [
       /\bsub[\s-]?contractors?\b/i,
       /\bcontractors?\b/i,
@@ -94,13 +96,20 @@ export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
       /\bresearch\b/i,
       /\b(?:epc|general contractor)\b/i,
       /\bwho\s+(?:is|are)\s+(?:the\s+)?(?:owner|developer|buyer)\b/i,
+      /\bprojects?\b/i,
+      /\bmarkets?\b/i,
+      /\b(?:unternehmen|recherche|firmen|markt|projekte?)\b/i,
+      /istra[zž]iv/i,
+      /tr[zž]i[sš]t/i,
+      /poduze[cć]/i,
+      /\btvrtk/i,
     ],
   },
   {
     key: "bob",
-    roleKeys: ["inbox_coordinator", "inbox_courier", "commercial_ops"],
+    roleKeys: ["inbox_coordinator", "inbox_courier", "commercial_ops", "triangle_bob_nikola"],
     displayNames: ["bob"],
-    reason: "Commercial or client follow-up, so Bob.",
+    reason: "Commercial, client, or finance, so Bob.",
     patterns: [
       /\bfollow[\s-]?ups?\b/i,
       /\bclients?\b/i,
@@ -108,13 +117,30 @@ export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
       /\b(?:quotes?|quotations?|proposals?|invoices?)\b/i,
       /\bchas(?:e|ing)\b/i,
       /\bcontracts?\b/i,
+      /\bbank\s+statements?\b/i,
+      /\bizvod(?:i|a)?\b/i,
+      /ra[cč]un(?:i|a|e)?(?![a-zčćđšž])/i,
+      /\bpayments?\b/i,
+      /\b(?:payroll|accounting|bookkeeping)\b/i,
+      /\bkontoausz(?:ug|üge)\b/i,
+      /\brechnungen?\b/i,
+      /\bzahlungen?\b/i,
+      /\buplat[aei]\b/i,
+      /pla[cć]anj/i,
+      /nepla[cć]en/i,
+      /\bunpaid\b/i,
+      /\bpaid\b/i,
+      /\bpayment\s+status\b/i,
+      /\binvoice\s+status\b/i,
+      /\boffene\s+rechnungen\b/i,
+      /\bwhat(?:'s|s| has)\s+been\s+paid\b/i,
     ],
   },
   {
     key: "hanna",
     roleKeys: ["hr", "triangle_hr", "resourcing"],
     displayNames: ["hanna"],
-    reason: "Resourcing — people, CVs, availability, or roles — so Hanna.",
+    reason: "Resourcing — people, CVs, talent, availability, or roles — so Hanna.",
     patterns: [
       /\b(?:cvs?|resumes?|curriculum(?:\s+vitae)?)\b/i,
       /\bavailab(?:le|ility)\b/i,
@@ -125,6 +151,11 @@ export const WHATSAPP_EMPLOYEES: readonly WhatsAppEmployeeDef[] = [
       /\bput\s+forward\b/i,
       /\bbios?\b/i,
       /\bheadcount\b/i,
+      /\btalents?\b/i,
+      /\blebenslauf\b/i,
+      /lebensl[aä]uf/i,
+      /[zž]ivotopis/i,
+      /\bradni(?:k|ci|ka|ke)\b/i,
     ],
   },
 ];
@@ -221,7 +252,22 @@ export function asksForSoftwareChange(text: string): boolean {
   return SOFTWARE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+/** The sender wants the document back on this chat, not emailed to someone else. */
+function asksForDocumentBack(text: string): boolean {
+  return /\bsend\s+me\b/i.test(text) || /\bpo[sš]alji\s+mi\b/i.test(text);
+}
+
+/** An email that would leave to a third party, including through Bob. */
+function asksToEmailSomeoneElse(text: string): boolean {
+  return (
+    /\b(?:ask|tell|have)\s+bob\s+to\s+(?:e-?mail|mail|send)\b/i.test(text) ||
+    /\be-?mail\s+(?:the\s+)?(?:client|buyer|customer|them|him|her)\b/i.test(text) ||
+    /\b(?:send|shoot|dispatch)\b[\s\S]{0,48}\be-?mails?\b[\s\S]{0,40}\bto\s+(?!me\b)\w+/i.test(text)
+  );
+}
+
 export function asksToSendEmail(text: string): boolean {
+  if (asksForDocumentBack(text) && !asksToEmailSomeoneElse(text)) return false;
   return EMAIL_SEND_PATTERNS.some((pattern) => pattern.test(text));
 }
 
@@ -297,10 +343,29 @@ export function senderMayTalkTo(sender: SenderPermission, employeeKey: string): 
   return sender.employees.includes(employeeKey);
 }
 
+const PAYMENT_STATUS_PATTERNS: readonly RegExp[] = [
+  /\bunpaid\b/i,
+  /\bpaid\b/i,
+  /\bpayment\s+status\b/i,
+  /\binvoice\s+status\b/i,
+  /nepla[cć]en[a-zčćđšž]*\s+ra[cč]un/i,
+  /\boffene\s+rechnungen\b/i,
+  /\bwhat(?:'s|s| has)\s+been\s+paid\b/i,
+];
+
+/** Unpaid, paid, or invoice status. These go to Bob even when other words also match. */
+export function asksPaymentStatus(text: string): boolean {
+  return PAYMENT_STATUS_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 export function keywordRoute(
   text: string,
   employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
 ): RouteDecision {
+  if (asksPaymentStatus(text)) {
+    const bob = employees.find((employee) => employee.key === "bob");
+    if (bob) return { employee: "bob", reason: bob.reason, unsure: false };
+  }
   const hits = employees.filter((employee) => employee.patterns.some((pattern) => pattern.test(text)));
   if (hits.length === 1) {
     return { employee: hits[0].key, reason: hits[0].reason, unsure: false };
@@ -547,6 +612,98 @@ export interface NormalizedAttachment {
   path: string | null;
 }
 
+export type DocumentRecipient = "owner" | "field" | "other";
+
+export function whatsAppRecipientRole(
+  to: string,
+  senders: readonly SenderPermission[],
+): DocumentRecipient {
+  const number = asE164(to);
+  if (!number) return "other";
+  const listed = senders.find((sender) => asE164(sender.e164) === number);
+  if (listed?.id === "owner") return "owner";
+  if (listed?.id === "field") return "field";
+  return "other";
+}
+
+const FINANCIAL_KINDS = new Set([
+  "invoice",
+  "unpaid_invoice",
+  "bank",
+  "bank_statement",
+  "bank_pdf",
+  "izvod",
+  "payroll",
+  "payslip",
+  "tax",
+  "tax_return",
+  "financial",
+  "finance",
+]);
+
+const FINANCIAL_SOURCES = new Set([
+  "invoices",
+  "invoice",
+  "bank_statements",
+  "bank_statement",
+  "payroll",
+  "payslips",
+  "tax",
+  "finance",
+  "financial",
+]);
+
+/** Invoices, bank statements, izvod, payroll, and tax. Not a contractor list. */
+export function financialDocument(
+  input: AttachmentInput,
+): { blocked: true; reason: string } | { blocked: false } {
+  const kind = (input.kind ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const source = (input.sourceTable ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const file = (input.filename ?? "").trim();
+  const label = `${file} ${input.title ?? ""}`;
+  if ((kind && FINANCIAL_KINDS.has(kind)) || (source && FINANCIAL_SOURCES.has(source))) {
+    return { blocked: true, reason: "A financial document does not leave by WhatsApp." };
+  }
+  if (
+    /\b(?:invoices?|izvod(?:i|a)?|payrolls?|payslips?)\b/i.test(label) ||
+    /\bbank[\s_-]+(?:statements?|pdfs?|exports?)\b/i.test(label) ||
+    /(?:^|[\s_-])bank\.pdf$/i.test(file) ||
+    /\b(?:tax[\s_-]*(?:returns?|pdfs?|statements?)|account[\s_-]*statements?)\b/i.test(label)
+  ) {
+    return { blocked: true, reason: "A financial document does not leave by WhatsApp." };
+  }
+  return { blocked: false };
+}
+
+/**
+ * Owner and field may receive a CV, a worker profile, a financial document,
+ * or a mission document. Everyone else is blocked from the first three.
+ * A missing role is everyone else.
+ */
+export function documentBlockedForRecipient(
+  input: AttachmentInput,
+  recipient: DocumentRecipient | null | undefined,
+): { blocked: true; reason: string } | { blocked: false } {
+  if (recipient === "owner" || recipient === "field") return { blocked: false };
+  const profile = workerProfileAttachment(input);
+  if (profile.blocked) return profile;
+  return financialDocument(input);
+}
+
+/**
+ * A path in the documents bucket is usable only when this organisation has
+ * the row. A draft uploaded into whatsapp-drafts has no such row.
+ */
+export function storedDocumentRowRequired(
+  bucket: string | null | undefined,
+  rowFound: boolean,
+): { ok: true } | { ok: false; error: string } {
+  if ((bucket ?? "").trim() === "documents" && !rowFound) {
+    return { ok: false, error: "That file is not stored for this organisation." };
+  }
+  return { ok: true };
+}
+
 export function workerProfileAttachment(
   input: AttachmentInput,
 ): { blocked: true; reason: string } | { blocked: false } {
@@ -617,9 +774,10 @@ function mimeFor(filename: string, given: string | null | undefined): string | n
  */
 export function planAttachment(
   input: AttachmentInput,
+  recipient: DocumentRecipient | null = "other",
 ): { ok: true; attachment: NormalizedAttachment } | { ok: false; error: string } {
-  const profile = workerProfileAttachment(input);
-  if (profile.blocked) return { ok: false, error: profile.reason };
+  const blocked = documentBlockedForRecipient(input, recipient);
+  if (blocked.blocked) return { ok: false, error: blocked.reason };
 
   const filename = safeDocumentFilename(input.filename ?? "");
   if (!filename) {

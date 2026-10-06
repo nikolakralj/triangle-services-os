@@ -35,15 +35,17 @@ import {
 import {
   decodeDraftDocument,
   decideInbound,
+  documentBlockedForRecipient,
   draftTextAllowed,
   employeeKeyOf,
   employeeMayDraftWhatsApp,
   parseModelRoute,
   ROUTE_MODEL_INSTRUCTIONS,
   type SenderPermission,
+  storedDocumentRowRequired,
   WHATSAPP_DRAFT_BUCKET,
   WHATSAPP_DRAFT_ENDPOINT,
-  workerProfileAttachment,
+  whatsAppRecipientRole,
   type InboundPlan,
   type NormalizedAttachment,
 } from "@/lib/whatsapp/routing";
@@ -537,7 +539,7 @@ async function wakeRoutedEmployee(
           agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.acknowledgementSent ? " An acknowledgment was already sent. Draft the answer, not another note that you are looking." : ""} Do not send. No CV or worker profile.`,
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.acknowledgementSent ? " An acknowledgment was already sent. Draft the answer, not another note that you are looking." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
           expected_output: "A draft reply. Do not send. No CV or worker profile. Do not send email when the handoff forbids it.",
           status: "queued",
           priority: "high",
@@ -859,12 +861,14 @@ export async function fileWhatsAppDraft(params: {
     }
   }
 
+  const recipientRole = whatsAppRecipientRole(to, readWhatsAppEnv(process.env).senders);
   const planned = planDraft({
     agentId: params.agentInstanceId,
     to,
     text,
     replyTo,
     templateName,
+    recipientRole,
     attachment: document
       ? {
           filename: typeof document.filename === "string" ? document.filename : "",
@@ -883,7 +887,7 @@ export async function fileWhatsAppDraft(params: {
 
   let attachment = planned.attachment;
   if (attachment) {
-    const stored = await guardStoredDocument(svc, params.orgId, attachment, document);
+    const stored = await guardStoredDocument(svc, params.orgId, attachment, document, recipientRole);
     if (!stored.ok) return stored;
     attachment = stored.attachment;
     if (documentBytes) {
@@ -1233,12 +1237,13 @@ async function guardStoredDocument(
   orgId: string,
   attachment: NormalizedAttachment,
   document: Record<string, unknown> | null,
+  recipientRole: "owner" | "field" | "other",
 ): Promise<{ ok: true; attachment: NormalizedAttachment } | { ok: false; status: number; error: string }> {
   if (!attachment) return { ok: false, status: 400, error: "That document is not usable." };
   if (!attachment.path) return { ok: true, attachment };
   const { data, error } = await svc
     .from("documents")
-    .select("file_name, document_category, linked_entity_type, title, storage_bucket")
+    .select("file_name, document_category, linked_entity_type, title, storage_bucket, organization_id")
     .eq("organization_id", orgId)
     .eq("storage_path", attachment.path)
     .limit(1)
@@ -1246,17 +1251,23 @@ async function guardStoredDocument(
   if (error && !schemaMissing(error)) {
     return { ok: false, status: 400, error: "Could not check that document against worker records." };
   }
-  const verdict = workerProfileAttachment({
-    filename: (data?.file_name as string | undefined) || attachment.filename,
-    kind: (data?.document_category as string | undefined) || attachment.kind,
-    sourceTable:
-      data?.linked_entity_type === "worker"
-        ? "workers"
-        : (typeof document?.sourceTable === "string" ? document.sourceTable : attachment.sourceTable),
-    linkedEntityType: (data?.linked_entity_type as string | undefined) ?? null,
-    storagePath: attachment.path,
-    title: (data?.title as string | undefined) ?? null,
-  });
+  const row = data?.organization_id === orgId ? data : null;
+  const listed = storedDocumentRowRequired(attachment.bucket, Boolean(row));
+  if (!listed.ok) return { ok: false, status: 400, error: listed.error };
+  const verdict = documentBlockedForRecipient(
+    {
+      filename: (row?.file_name as string | undefined) || attachment.filename,
+      kind: (row?.document_category as string | undefined) || attachment.kind,
+      sourceTable:
+        row?.linked_entity_type === "worker"
+          ? "workers"
+          : (typeof document?.sourceTable === "string" ? document.sourceTable : attachment.sourceTable),
+      linkedEntityType: (row?.linked_entity_type as string | undefined) ?? null,
+      storagePath: attachment.path,
+      title: (row?.title as string | undefined) ?? null,
+    },
+    recipientRole,
+  );
   if (verdict.blocked) return { ok: false, status: 400, error: verdict.reason };
   return { ok: true, attachment };
 }
@@ -1340,13 +1351,17 @@ export async function sendApprovedWhatsAppDraft(params: {
     return { ok: false, status: 409, error: "That draft names a document but the file is not stored." };
   }
   if (filename && attachmentPath) {
-    const verdict = workerProfileAttachment({
-      filename,
-      kind: (draft.attachment_kind as string | null) ?? null,
-      sourceTable: (draft.attachment_source_table as string | null) ?? null,
-      storageBucket: attachmentBucket,
-      storagePath: attachmentPath,
-    });
+    const recipientRole = whatsAppRecipientRole(String(draft.to_number ?? ""), env.senders);
+    const verdict = documentBlockedForRecipient(
+      {
+        filename,
+        kind: (draft.attachment_kind as string | null) ?? null,
+        sourceTable: (draft.attachment_source_table as string | null) ?? null,
+        storageBucket: attachmentBucket,
+        storagePath: attachmentPath,
+      },
+      recipientRole,
+    );
     if (verdict.blocked) return { ok: false, status: 400, error: verdict.reason };
     const guarded = await guardStoredDocument(
       svc,
@@ -1360,6 +1375,7 @@ export async function sendApprovedWhatsAppDraft(params: {
         path: attachmentPath,
       },
       null,
+      recipientRole,
     );
     if (!guarded.ok) return guarded;
   }

@@ -23,8 +23,9 @@ with `POST /api/agent/reports`, as the shared protocol says, with the evidence
 link. Reporting does not finish the step.
 
 A WhatsApp message that asks for a contractor, company, or subcontractor
-list, or for research, wakes you once. People, CVs, availability, and roles
-wake Hanna. A commercial or client follow-up wakes Bob. The wake carries the
+list, a project or market question, or research, wakes you once. People,
+CVs, talent, availability, and roles wake Hanna. A commercial or client
+follow-up, or finance (an invoice, a bank statement, a payment), wakes Bob. The wake carries the
 message id, the sender, the text, the person and case when the number is
 already on file, and where to draft. When it says an acknowledgment was
 already sent, that note is not your reply: draft the answer.
@@ -39,14 +40,25 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 That files the reply. `to` is the sender on `replyTo`. When that number is
 an owner or field number, the reply is not a refusal, their latest message
 is not a refusal, and it was inside 24 hours, Triangle sends it back to
-that number, including one list document. A missing `replyTo`, or a
+that number, including one document you attach. Triangle does not build
+the workbook. You attach a file that already exists — a spreadsheet of
+mission or research data included. A missing `replyTo`, or a
 different `to`, stays a draft. `"sent": true` and a `wamid` mean it
 went out. `"sent": false` and `held` mean it stayed a draft. Anyone else
 stays a draft until a person sends it. Outside 24 hours the document and
-free text stay a draft. One document, and only a contractor, company, or
-subcontractor list. csv, pdf, txt, xls, xlsx, doc, and docx are accepted. A
-CV, a bio pack, or a worker profile is refused, including when the file is
-an xlsx. The words may not carry a worker's name, email, phone, or rate.
+free text stay a draft. One document. csv, pdf, txt, xls, xlsx, doc, and docx are accepted. A CV, a
+worker profile, or a financial document may be attached only when the
+recipient is an owner or field number. Anyone else is refused, including
+when a person would approve it. A payment-status question is routed to Bob. If one reaches you anyway, from
+Nikola or Ralph, you do not guess and you do not open Mare. Triangle has no
+channel to the Triangle Services Accounting bot. You ask that bot through your
+own runtime's agent-to-agent messaging, read-only: never ask it to pay,
+change, send, or email anything. You wait, then file one WhatsApp reply on
+the original inbound: a short summary, or one pdf, xlsx, or csv when the
+answer is a list. That reply still sends inside 24 hours. Anyone who is not
+an owner or field number does not get that question sent on, and does not get
+a financial document. The words may not carry a worker's email,
+phone, rate, or IBAN.
 
 ## Every run starts here
 

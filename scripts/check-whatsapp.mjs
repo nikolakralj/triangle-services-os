@@ -91,8 +91,10 @@ const {
   asksToSendEmail,
   bindWhatsAppSenders,
   decideInbound,
+  documentBlockedForRecipient,
   employeeMayDraftWhatsApp,
   keywordRoute,
+  storedDocumentRowRequired,
   whatsAppEmployeeLabel,
   parseModelRoute,
   permissionFor,
@@ -254,6 +256,31 @@ test("routing to Scout or Hanna, and unsure to Hanna", () => {
   assert.equal(both.employee, "hanna");
   assert.equal(both.unsure, true);
 
+  assert.equal(keywordRoute("Send the unpaid invoices").employee, "bob");
+  assert.equal(keywordRoute("Send the unpaid invoices").unsure, false);
+  assert.equal(keywordRoute("Pošalji mi izvod").employee, "bob");
+  assert.equal(keywordRoute("Kontoauszug bitte").employee, "bob");
+  assert.equal(keywordRoute("Gdje je račun?").employee, "bob");
+  assert.equal(keywordRoute("Send the CV").employee, "hanna");
+  assert.equal(keywordRoute("Lebenslauf bitte").employee, "hanna");
+  assert.equal(keywordRoute("Pošalji životopis").employee, "hanna");
+  assert.equal(keywordRoute("Wer sind die Unternehmen?").employee, "scout");
+  assert.equal(keywordRoute("Istraživanje tržišta").employee, "scout");
+  assert.equal(keywordRoute("Five best EPC contractors").employee, "scout");
+  const mixed = keywordRoute("invoice for the engineers");
+  assert.equal(mixed.employee, "hanna");
+  assert.equal(mixed.unsure, true);
+  assert.equal(keywordRoute("What's the payment status?").employee, "bob");
+  assert.equal(keywordRoute("What's the payment status?").unsure, false);
+  assert.equal(keywordRoute("what has been paid").employee, "bob");
+  assert.equal(keywordRoute("invoice status").employee, "bob");
+  assert.equal(keywordRoute("neplaćeni računi").employee, "bob");
+  assert.equal(keywordRoute("offene Rechnungen").employee, "bob");
+  assert.equal(keywordRoute("payment status of the project").employee, "bob");
+  assert.equal(keywordRoute("payment status of the project").unsure, false);
+  assert.equal(keywordRoute("neplaćeni računi za radnike").employee, "bob");
+  assert.equal(keywordRoute("neplaćeni računi za radnike").unsure, false);
+
   const model = resolveRoute("Thanks", { employee: "scout", reason: "Contractor list." });
   assert.equal(model.employee, "scout");
   assert.equal(model.unsure, false);
@@ -282,6 +309,8 @@ test("Scout can draft, a list document is a draft, a CV is refused", () => {
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "project_researcher", displayName: "Scout" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "hr", displayName: "Hanna" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_hr", displayName: "Hanna" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_bob_nikola", displayName: "Bob" }), true);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_scout", displayName: "Scout" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "inbox_coordinator", displayName: "Bob" }), true);
   assert.equal(employeeMayDraftWhatsApp({ roleKey: "viewer", displayName: "Pat" }), false);
   assert.match(read("src/lib/data/whatsapp.ts"), /employeeMayDraftWhatsApp/);
@@ -484,6 +513,22 @@ test("sender permissions, Bob, software refusal, and no email from the field sen
 
   assert.equal(asksToSendEmail("Ask Bob to email the client"), true);
   assert.equal(asksToSendEmail("What did the client email say?"), false);
+  assert.equal(asksToSendEmail("send me the statement from email"), false);
+  assert.equal(asksToSendEmail("pošalji mi izvod"), false);
+  assert.equal(asksToSendEmail("Send an email to the client"), true);
+  const statement = decideInbound({
+    text: "send me the statement from email",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(statement.action, "route");
+  assert.notEqual(statement.employee, null);
+  const poslaji = decideInbound({
+    text: "pošalji mi izvod",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(poslaji.action, "route");
   const email = decideInbound({
     text: "Ask Bob to email the client the proposal",
     from: fieldNumber,
@@ -702,6 +747,90 @@ test("draft-only (no send without approval)", () => {
   assert.doesNotMatch(read("src/lib/whatsapp/pilot.ts"), /\bfetch\s*\(/);
 });
 
+test("each badge can attach a document that auto-sends to the owner and the field", () => {
+  const fieldNumber = "+15551000002";
+  const ownerNumber = "+15551000001";
+  const otherNumber = "+15551000003";
+  const directory = bindWhatsAppSenders(ownerNumber, fieldNumber);
+  const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const badges = [
+    {
+      roleKey: "triangle_hr",
+      displayName: "Hanna",
+      filename: "matej-cv.pdf",
+      mime: "application/pdf",
+      kind: "cv",
+      to: ownerNumber,
+    },
+    {
+      roleKey: "triangle_bob_nikola",
+      displayName: "Bob",
+      filename: "unpaid-invoices.pdf",
+      mime: "application/pdf",
+      kind: "invoice",
+      to: fieldNumber,
+    },
+    {
+      roleKey: "triangle_scout",
+      displayName: "Scout",
+      filename: "mission-research.xlsx",
+      mime: xlsx,
+      kind: "research",
+      to: fieldNumber,
+    },
+  ];
+  for (const badge of badges) {
+    assert.equal(employeeMayDraftWhatsApp(badge), true);
+    const filed = planDraft({
+      agentId: badge.roleKey,
+      to: badge.to,
+      text: "Attached.",
+      replyTo: "wamid.IN",
+      templateName: null,
+      recipientRole: badge.to === ownerNumber ? "owner" : "field",
+      attachment: { filename: badge.filename, mime: badge.mime, kind: badge.kind, hasContent: true },
+    });
+    assert.equal(filed.ok, true, badge.roleKey);
+    const sent = decideAutoSend({
+      enabled: true,
+      text: "Attached.",
+      senders: directory.senders,
+      to: badge.to,
+      replyTo: "wamid.IN",
+      replyFrom: badge.to,
+      inboundReason: "Routed.",
+      latestInboundReason: "Routed.",
+      flagged: false,
+      lastInboundAt: "2026-10-01T08:00:00.000Z",
+      now: new Date("2026-10-01T12:00:00.000Z"),
+      document: { filename: badge.filename, mime: badge.mime, kind: badge.kind },
+    });
+    assert.equal(sent.send, true, badge.roleKey);
+    assert.equal(sent.mode, "document");
+  }
+
+  assert.equal(documentBlockedForRecipient({ filename: "matej-cv.pdf", mime: "application/pdf" }, "other").blocked, true);
+  assert.equal(documentBlockedForRecipient({ filename: "unpaid-invoices.pdf", mime: "application/pdf" }, "other").blocked, true);
+  assert.equal(documentBlockedForRecipient({ filename: "izvod.pdf", mime: "application/pdf" }, "owner").blocked, false);
+  assert.equal(documentBlockedForRecipient({ filename: "companies.xlsx", mime: xlsx }, "other").blocked, false);
+  const held = planDraft({
+    agentId: "triangle_hr",
+    to: otherNumber,
+    text: "Attached.",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+    attachment: { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv", hasContent: true },
+  });
+  assert.equal(held.ok, false);
+  assert.equal(storedDocumentRowRequired("documents", false).ok, false);
+  assert.equal(storedDocumentRowRequired("documents", true).ok, true);
+  assert.equal(storedDocumentRowRequired("case-attachments", false).ok, true);
+  assert.match(read("src/lib/data/whatsapp.ts"), /documentBlockedForRecipient/);
+  assert.match(read("src/lib/data/whatsapp.ts"), /storedDocumentRowRequired/);
+  assert.doesNotMatch(read("src/lib/whatsapp/pilot.ts"), /only Hanna|hanna only/i);
+});
+
 test("owner and field replies auto-send; refusals, the window, and everyone else stay drafts", () => {
   const ownerNumber = "+15551000001";
   const fieldNumber = "+15551000002";
@@ -762,10 +891,23 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.equal(sheet.mode, "document");
   assert.match(sheet.audit, /with a document/);
   const cvSheet = answering(ownerNumber, {
+    text: "Attached.",
     document: { filename: "worker-cv.xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
   });
-  assert.equal(cvSheet.send, false);
-  assert.match(cvSheet.reason, /CV|worker profile/i);
+  assert.equal(cvSheet.send, true);
+  assert.equal(cvSheet.mode, "document");
+
+  const statement = answering(fieldNumber, {
+    text: "The bank statement is attached.",
+    document: { filename: "izvod-2026-09.pdf", mime: "application/pdf", kind: "bank_statement" },
+  });
+  assert.equal(statement.send, true);
+  assert.equal(statement.mode, "document");
+  const ibanCaption = answering(ownerNumber, {
+    text: "IBAN GB00TEST",
+    document: { filename: "unpaid-invoice.pdf", mime: "application/pdf", kind: "invoice" },
+  });
+  assert.equal(ibanCaption.send, false);
 
   const software = decideInbound({
     text: "Please change the software and add a button",
@@ -794,6 +936,21 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
     flagged: email.flagOwner,
   });
   assert.equal(emailHeld.send, false);
+
+  const tenMinutes = answering(fieldNumber, {
+    text: "Three invoices are still unpaid.",
+    lastInboundAt: "2026-10-01T08:00:00.000Z",
+    now: new Date("2026-10-01T08:10:00.000Z"),
+  });
+  assert.equal(tenMinutes.send, true);
+  const tenMinuteFile = answering(ownerNumber, {
+    text: "Unpaid invoices are attached.",
+    lastInboundAt: "2026-10-01T08:00:00.000Z",
+    now: new Date("2026-10-01T08:10:00.000Z"),
+    document: { filename: "unpaid-invoices.pdf", mime: "application/pdf", kind: "invoice" },
+  });
+  assert.equal(tenMinuteFile.send, true);
+  assert.equal(tenMinuteFile.mode, "document");
 
   const outside = answering(ownerNumber, {
     now: new Date("2026-10-03T12:00:00.000Z"),

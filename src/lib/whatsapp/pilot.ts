@@ -20,9 +20,10 @@ import {
   fieldSendersFor,
   planAttachment,
   SOFTWARE_REFUSAL_DRAFT,
+  documentBlockedForRecipient,
   WHATSAPP_DRAFT_ENDPOINT,
   whatsAppEmployeeLabel,
-  workerProfileAttachment,
+  type DocumentRecipient,
   type AttachmentInput,
   type NormalizedAttachment,
   type SenderPermission,
@@ -407,6 +408,7 @@ export function planDraft(input: {
   replyTo: string | null;
   templateName: string | null;
   attachment?: AttachmentInput | null;
+  recipientRole?: DocumentRecipient | null;
 }):
   | { ok: true; sends: false; to: string; text: string; draftKey: string; attachment: NormalizedAttachment | null }
   | { ok: false; error: string } {
@@ -418,7 +420,7 @@ export function planDraft(input: {
   if (!words.ok) return words;
   let attachment: NormalizedAttachment | null = null;
   if (input.attachment) {
-    const planned = planAttachment(input.attachment);
+    const planned = planAttachment(input.attachment, input.recipientRole ?? "other");
     if (!planned.ok) return planned;
     attachment = planned.attachment;
   }
@@ -835,13 +837,16 @@ export function decideAutoSend(input: {
   if (!words.ok) return { send: false, reason: words.error };
 
   if (input.document) {
-    const profile = workerProfileAttachment({
-      filename: input.document.filename,
-      mime: input.document.mime,
-      kind: input.document.kind ?? null,
-      sourceTable: input.document.sourceTable ?? null,
-    });
-    if (profile.blocked) return { send: false, reason: profile.reason };
+    const blocked = documentBlockedForRecipient(
+      {
+        filename: input.document.filename,
+        mime: input.document.mime,
+        kind: input.document.kind ?? null,
+        sourceTable: input.document.sourceTable ?? null,
+      },
+      role,
+    );
+    if (blocked.blocked) return { send: false, reason: blocked.reason };
   }
 
   if (!serviceWindowOpen(input.lastInboundAt, input.now)) {

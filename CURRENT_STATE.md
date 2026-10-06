@@ -1,5 +1,21 @@
 # Current state
 
+## WhatsApp documents and routing — 6 October 2026
+
+An owner or field inbound gets one fixed acknowledgment as soon as it is
+stored, then the employee's own reply. Nikola and Ralph may receive a CV, a
+worker profile, a financial document, or a mission document from Hanna, Bob,
+or Scout, bound to their own inbound inside 24 hours. Everyone else stays
+blocked from CVs, worker profiles, and financial documents. Finance wakes
+Bob. A payment-status question wakes Bob even when other words also match.
+Research wakes Scout. Resourcing wakes Hanna. Other ambiguous words stay with
+Hanna. A reply filed minutes later still auto-sends inside 24 hours. Payment
+status is answered by asking the Triangle Services Accounting bot through the
+employee's own runtime; Triangle has no channel to that bot and no Mare
+integration. Finance mail bodies are still discarded; `invoices`, `payments`,
+and `timesheets` exist as tables. No migration.
+`check:whatsapp` 17/17. `tsc --noEmit` passed. Eslint on the WhatsApp modules passed. Nothing was pushed.
+
 ## WhatsApp auto-send for owner and field — 3 October 2026
 
 Nikola decided on 3 October 2026 that a WhatsApp reply to an owner or field
