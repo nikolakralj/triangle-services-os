@@ -58,11 +58,17 @@ const pilot = load("src/lib/whatsapp/pilot.ts");
 const routing = load("src/lib/whatsapp/routing.ts");
 const {
   acceptCloudPayload,
+  autoSendBoundToInbound,
   decideAutoSend,
+  decideInstantAck,
   decideSend,
   graphDocumentBody,
   graphMediaUrl,
+  instantAckCopy,
   isAutoSentAudit,
+  isInstantAcknowledgment,
+  outboundCountsAsReply,
+  parseWebhook,
   planDraft,
   readAllowlist,
   readWhatsAppEnv,
@@ -87,6 +93,7 @@ const {
   decideInbound,
   employeeMayDraftWhatsApp,
   keywordRoute,
+  whatsAppEmployeeLabel,
   parseModelRoute,
   permissionFor,
   resolveRoute,
@@ -946,6 +953,159 @@ test("auto-send stays a draft unless it answers the inbound sender", () => {
   });
   assert.equal(humanStillApproves.ok, true);
   assert.equal(humanStillApproves.mode, "text");
+});
+
+test("instant acknowledgment for owner and field, not a reply, and not for anyone else", () => {
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const senders = bindWhatsAppSenders(ownerNumber, fieldNumber).senders;
+  const routed = (employee, extra = {}) => ({
+    action: "route",
+    employee,
+    reason: "Unsure, so Hanna.",
+    flagOwner: false,
+    ...extra,
+  });
+  const ackFor = (to, route, extra = {}) =>
+    decideInstantAck({
+      enabled: true,
+      to,
+      senders,
+      route,
+      wamid: "wamid.IN",
+      alreadyAcked: false,
+      ...extra,
+    });
+
+  assert.equal(whatsAppEmployeeLabel("hanna"), "Hanna");
+  assert.equal(whatsAppEmployeeLabel("bob"), "Bob");
+  assert.equal(whatsAppEmployeeLabel("scout"), "Scout");
+  assert.equal(whatsAppEmployeeLabel("nobody"), null);
+  assert.equal(instantAckCopy("hanna"), "Hanna is looking into it.");
+  assert.equal(instantAckCopy("bob"), "Bob is looking into it.");
+  assert.equal(instantAckCopy("scout"), "Scout is looking into it.");
+  assert.equal(instantAckCopy(null), "Looking into it.");
+  assert.equal(instantAckCopy("nobody"), "Looking into it.");
+
+  const owner = ackFor(ownerNumber, routed("hanna"));
+  assert.equal(owner.send, true);
+  assert.equal(owner.body, "Hanna is looking into it.");
+  assert.equal(owner.audit, "Instant acknowledgment.");
+  assert.equal(owner.draftKey, "ack|wamid.IN");
+  assert.equal("replyTo" in owner, false);
+  assert.equal(isInstantAcknowledgment(owner.audit), true);
+  assert.equal(isAutoSentAudit(owner.audit), false);
+  assert.equal(outboundCountsAsReply(owner.audit), false);
+  assert.equal(draftTextAllowed(owner.body).ok, true);
+
+  const field = ackFor(fieldNumber, routed("scout", { reason: "Contractor list, so Scout." }));
+  assert.equal(field.send, true);
+  assert.equal(field.body, "Scout is looking into it.");
+  const bob = ackFor(ownerNumber, routed("bob"));
+  assert.equal(bob.send, true);
+  assert.equal(bob.body, "Bob is looking into it.");
+
+  const unknown = ackFor("+15559999999", routed("hanna"));
+  assert.equal(unknown.send, false);
+  assert.match(unknown.reason, /not an owner or field/);
+
+  const open = ackFor(ownerNumber, routed("hanna"), { senders: [] });
+  assert.equal(open.send, false);
+
+  const off = ackFor(ownerNumber, routed("hanna"), { enabled: false });
+  assert.equal(off.send, false);
+  assert.match(off.reason, /switched off/);
+
+  const duplicate = ackFor(fieldNumber, routed("hanna"), { alreadyAcked: true });
+  assert.equal(duplicate.send, false);
+  assert.match(duplicate.reason, /already stored/);
+
+  const software = decideInbound({
+    text: "Please change the software and add a button",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(software.action, "refuse");
+  const refused = ackFor(fieldNumber, software);
+  assert.equal(refused.send, false);
+  assert.match(refused.reason, /refused|flagged/i);
+  const email = decideInbound({
+    text: "Ask Bob to email the client the proposal",
+    from: fieldNumber,
+    senders,
+  });
+  assert.equal(ackFor(fieldNumber, email).send, false);
+
+  const unlisted = decideInbound({
+    text: "Hello",
+    from: "+15559999999",
+    senders,
+    unmatched: "unlisted",
+  });
+  assert.equal(unlisted.employee, null);
+  assert.equal(ackFor("+15559999999", unlisted).send, false);
+
+  const statusOnly = parseWebhook({
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        changes: [
+          {
+            value: {
+              statuses: [
+                { id: "wamid.OUT", status: "delivered", timestamp: "1760000002", recipient_id: "15551000001" },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(statusOnly.length, 1);
+  assert.equal(statusOnly[0].messages.length, 0);
+  assert.equal(statusOnly[0].statuses.length, 1);
+  const statusAcks = statusOnly[0].messages.map((message) =>
+    ackFor(message.from, routed("hanna"), { wamid: message.wamid }),
+  );
+  assert.equal(statusAcks.length, 0);
+
+  const reply = decideAutoSend({
+    enabled: true,
+    to: ownerNumber,
+    text: "Two people can start in November.",
+    senders,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    inboundReason: "Unsure, so Hanna.",
+    latestInboundReason: "Unsure, so Hanna.",
+    flagged: false,
+    lastInboundAt: "2026-10-01T08:00:00.000Z",
+    now: new Date("2026-10-01T12:00:00.000Z"),
+    document: null,
+  });
+  assert.equal(reply.send, true);
+  assert.equal(isAutoSentAudit(reply.audit), true);
+  assert.notEqual(reply.audit, owner.audit);
+  assert.equal(outboundCountsAsReply(reply.audit), true);
+  const unbound = autoSendBoundToInbound({ to: ownerNumber, replyTo: null, replyFrom: ownerNumber });
+  assert.equal(unbound.ok, false);
+
+  const store = read("src/lib/data/whatsapp.ts");
+  const ackFn = store.slice(store.indexOf("async function sendInstantAck"), store.indexOf("async function applyStatus"));
+  assert.match(ackFn, /reply_to_wamid: null/);
+  assert.match(ackFn, /decideInstantAck/);
+  assert.doesNotMatch(ackFn, /template/);
+  const statusFn = store.slice(store.indexOf("async function applyStatus"), store.indexOf("export async function fileWhatsAppDraft"));
+  assert.doesNotMatch(statusFn, /sendInstantAck|decideInstantAck/);
+  assert.match(store, /after\(/);
+  assert.match(store, /classifyInbound/);
+  const background = store.slice(store.indexOf("runAfterResponse(async () => {"), store.indexOf("function runAfterResponse"));
+  assert.match(background, /sendInstantAck/);
+  const ackAt = background.indexOf("sendInstantAck");
+  const wakeAt = background.indexOf("wakeRoutedEmployee");
+  assert.ok(ackAt >= 0 && wakeAt > ackAt);
+  assert.match(read("src/app/api/whatsapp/webhook/route.ts"), /does not call Graph/);
+  assert.doesNotMatch(read("DECISIONS.md").split("### 2026-10-06")[1]?.split("### ")[0] ?? "", /\+\d{8,}/);
 });
 
 test("24h window enforcement", () => {

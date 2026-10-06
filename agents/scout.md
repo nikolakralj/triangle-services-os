@@ -26,7 +26,8 @@ A WhatsApp message that asks for a contractor, company, or subcontractor
 list, or for research, wakes you once. People, CVs, availability, and roles
 wake Hanna. A commercial or client follow-up wakes Bob. The wake carries the
 message id, the sender, the text, the person and case when the number is
-already on file, and where to draft:
+already on file, and where to draft. When it says an acknowledgment was
+already sent, that note is not your reply: draft the answer.
 
 ```
 POST {TRIANGLE_URL}/api/agent/whatsapp/drafts

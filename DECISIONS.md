@@ -6,6 +6,23 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-06: WhatsApp instant acknowledgment
+
+Nikola decided this on 6 October 2026, after a live text took about two
+minutes to come back. The wait was the employee waking and drafting. Triangle
+now sends one fixed line as soon as an owner or field text is stored and
+routed — "Hanna is looking into it.", or Bob or Scout in that employee's
+place, or "Looking into it." when the key has no name. It goes only to the
+number that wrote in, only when that number is an owner or field sender, and
+only when auto-send is on. A refusal, a flagged hold, an unlisted number, a
+status receipt, and a repeat of the same inbound do not send one. It is
+stored on the message row as outbound with the reason "Instant acknowledgment."
+It does not quote the inbound, it does not set the reply link, and it does
+not count as the employee's answer. The employee's own draft still auto-sends
+afterwards, inside the same 24-hour window. The webhook answers Meta before
+that send and before the wake. The employee's words are still whatever they
+draft. No new migration.
+
 ### 2026-10-03: WhatsApp replies to owner and field senders auto-send
 
 Nikola decided this on 3 October 2026. It is an exception to the human-Send

@@ -1,11 +1,16 @@
 import "server-only";
+import { after } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { wakeEmployee } from "@/lib/data/bot-runtime";
 import { whatsAppInboundHasReply, type WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
   decideAutoSend,
+  decideInstantAck,
   decideSend,
+  INSTANT_ACK_REASON,
+  instantAckKey,
+  isInstantAcknowledgment,
   graphDocumentBody,
   graphMediaUrl,
   graphMessagesUrl,
@@ -15,6 +20,7 @@ import {
   nextStatus,
   parseWebhook,
   pickOpenCase,
+  outboundCountsAsReply,
   planDraft,
   planInbound,
   readWhatsAppEnv,
@@ -44,13 +50,16 @@ import {
 
 // ---------------------------------------------------------------------------
 // WhatsApp pilot, on the database. The rules live in src/lib/whatsapp/pilot.ts
-// and src/lib/whatsapp/routing.ts. This file stores an inbound, routes it to
-// Scout, Bob, or Hanna, and wakes that employee once. A reply to an owner or
-// field number is sent on filing when decideAutoSend says so. Every other
-// reply stays a draft until a person approves, and only then is it posted to
-// Graph. A refusal stays a draft. A missing table or missing env is a 503
-// with a log, never a crash. A CV or worker profile is refused before it is
-// stored and again before it could be sent.
+// and src/lib/whatsapp/routing.ts. This file stores an inbound, routes it by
+// keywords, and after the response sends a fixed acknowledgment to an owner
+// or field number and wakes the employee once. The route model runs only when
+// the keywords are unsure, and only after that response. A reply to an owner
+// or field number is sent on filing when decideAutoSend says so. The
+// acknowledgment is not that reply. Every other reply stays a draft until a
+// person approves, and only then is it posted to Graph. A refusal stays a
+// draft. A missing table or missing env is a 503 with a log, never a crash.
+// A CV or worker profile is refused before it is stored and again before it
+// could be sent.
 // ---------------------------------------------------------------------------
 
 type Svc = NonNullable<ReturnType<typeof createServiceSupabaseClient>>;
@@ -150,8 +159,16 @@ async function storeInbound(
   }
 
   const storedRoute = routeFromRow(existing?.routed_employee, existing?.route_reason);
+  // Keywords first. The route model, when the words are unsure, runs after
+  // the response so it does not hold Meta's 200 or the acknowledgment.
   let route = plan.wake
-    ? (storedRoute ?? (await classifyInbound(message.from, message.text, access)))
+    ? (storedRoute ??
+      decideInbound({
+        text: message.text,
+        from: message.from,
+        senders: access.senders,
+        unmatched: access.unmatched,
+      }))
     : storedRoute;
   if (plan.wake && storedRoute?.employee) {
     route = decideInbound({
@@ -219,18 +236,71 @@ async function storeInbound(
     return "ok";
   }
   if (!route.employee) return "ok";
-  await wakeRoutedEmployee(svc, orgId, id, route, {
-    messageId: message.wamid,
-    sender: message.from,
-    text: message.text,
-    personId: filing.personId,
-    caseId: filing.missionId,
-    draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
-    employee: route.employee,
-    reason: route.reason,
-    handoffNote: route.handoffNote,
+  const messageRowId = id;
+  const keywordRoute = route;
+  const ack = decideInstantAck({
+    enabled: readWhatsAppEnv(process.env).autoSend,
+    to: message.from,
+    senders: access.senders,
+    route: keywordRoute,
+    wamid: message.wamid,
+    alreadyAcked: false,
+  });
+  runAfterResponse(async () => {
+    const acknowledgment = sendInstantAck(svc, orgId, business, message, filing, keywordRoute).catch(() => {
+      console.error("whatsapp: the acknowledgment failed. The wake continues.");
+    });
+    try {
+      let chosen = keywordRoute;
+      if (chosen.unsure && chosen.action === "route") {
+        const refined = await classifyInbound(message.from, message.text, access);
+        if (refined.action === "route" && refined.employee) {
+          chosen = refined;
+          if (refined.employee !== keywordRoute.employee || refined.reason !== keywordRoute.reason) {
+            await svc
+              .from("whatsapp_messages")
+              .update({
+                routed_employee: refined.employee,
+                route_reason: refined.reason,
+              })
+              .eq("id", messageRowId)
+              .eq("org_id", orgId);
+          }
+        }
+      }
+      if (chosen.action === "route" && chosen.employee) {
+        await wakeRoutedEmployee(svc, orgId, messageRowId, chosen, {
+          messageId: message.wamid,
+          sender: message.from,
+          text: message.text,
+          personId: filing.personId,
+          caseId: filing.missionId,
+          draftEndpoint: WHATSAPP_DRAFT_ENDPOINT,
+          employee: chosen.employee,
+          reason: chosen.reason,
+          handoffNote: chosen.handoffNote,
+          acknowledgementSent: ack.send,
+        });
+      }
+    } catch {
+      console.error("whatsapp: the wake failed.");
+    }
+    await acknowledgment;
   });
   return "ok";
+}
+
+function runAfterResponse(work: () => Promise<void>): void {
+  const safe = () =>
+    work().catch(() => {
+      console.error("whatsapp: background work after the webhook failed.");
+    });
+  try {
+    after(safe);
+  } catch {
+    console.error("whatsapp: could not schedule work after the response.");
+    void safe();
+  }
 }
 
 function routeFromRow(employee: unknown, reason: unknown): InboundPlan | null {
@@ -247,9 +317,9 @@ function routeFromRow(employee: unknown, reason: unknown): InboundPlan | null {
 }
 
 /**
- * Model first, when a key is set. A missing key, a timeout, or an unsure
- * answer uses the keyword rule. The keyword rule sends an unclear message
- * to Hanna. This never throws and never sends.
+ * Model refinement for an unsure keyword route. Runs after the webhook has
+ * stored the row and scheduled the acknowledgment. A missing key, a timeout,
+ * or an unsure answer keeps the keyword route. This never throws and never sends.
  */
 async function classifyInbound(
   from: string,
@@ -467,7 +537,7 @@ async function wakeRoutedEmployee(
           agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff} Do not send. No CV or worker profile.`,
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.acknowledgementSent ? " An acknowledgment was already sent. Draft the answer, not another note that you are looking." : ""} Do not send. No CV or worker profile.`,
           expected_output: "A draft reply. Do not send. No CV or worker profile. Do not send email when the handoff forbids it.",
           status: "queued",
           priority: "high",
@@ -485,6 +555,7 @@ async function wakeRoutedEmployee(
             routed_employee: route.employee,
             route_reason: route.reason,
             ...(ctx.handoffNote ? { handoff_note: ctx.handoffNote } : {}),
+            ...(ctx.acknowledgementSent ? { acknowledgement_sent: true } : {}),
           },
         })
         .select("id")
@@ -529,6 +600,7 @@ async function wakeRoutedEmployee(
       text: ctx.text,
       draftEndpoint: ctx.draftEndpoint,
       ...(ctx.handoffNote ? { handoffNote: ctx.handoffNote } : {}),
+      ...(ctx.acknowledgementSent ? { acknowledgementSent: true } : {}),
     },
   });
 }
@@ -577,6 +649,112 @@ async function ensureRefusalDraft(
   });
   if (error?.code === "23505") return;
   if (error) console.error("whatsapp: the refusal draft was not stored. Nothing was sent.");
+}
+
+/**
+ * Fixed acknowledgment for one inbound. Not the employee's reply: no
+ * reply_to_wamid, no employee badge, and a route reason the auto-send
+ * binding ignores. A failure here must not throw. Status webhooks never
+ * call this. A duplicate wamid hits the draft key and does not send again.
+ */
+async function sendInstantAck(
+  svc: Svc,
+  orgId: string,
+  business: string,
+  message: ParsedText,
+  filing: { personId: string | null; missionId: string | null },
+  route: InboundPlan,
+): Promise<void> {
+  try {
+    const env = readWhatsAppEnv(process.env);
+    const draftKey = instantAckKey(message.wamid);
+    const { data: existing, error: readError } = await svc
+      .from("whatsapp_messages")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("draft_key", draftKey)
+      .maybeSingle();
+    if (schemaMissing(readError) || readError) {
+      console.error("whatsapp: could not check for an acknowledgment. Nothing was sent.");
+      return;
+    }
+    const decision = decideInstantAck({
+      enabled: env.autoSend,
+      to: message.from,
+      senders: env.senders,
+      route,
+      wamid: message.wamid,
+      alreadyAcked: Boolean(existing?.id),
+    });
+    if (!decision.send) return;
+    if (!env.phoneNumberId || !env.accessToken) {
+      console.error("whatsapp: phone number id or access token is missing. The acknowledgment was not sent.");
+      return;
+    }
+    const { data, error } = await svc
+      .from("whatsapp_messages")
+      .insert({
+        org_id: orgId,
+        direction: "outbound",
+        from_number: business,
+        to_number: decision.to,
+        body: decision.body,
+        wa_timestamp: new Date().toISOString(),
+        status: "draft",
+        person_id: filing.personId,
+        mission_id: filing.missionId,
+        reply_to_wamid: null,
+        draft_key: decision.draftKey,
+        route_reason: decision.audit,
+      })
+      .select("id")
+      .maybeSingle();
+    if (error?.code === "23505") return;
+    if (schemaMissing(error) || error || !data?.id) {
+      console.error("whatsapp: the acknowledgment was not stored. Nothing was sent.");
+      return;
+    }
+    const draftId = data.id as string;
+    const transmitted = await transmitWhatsAppDraft({
+      svc,
+      orgId,
+      draftId,
+      env: {
+        graphVersion: env.graphVersion,
+        phoneNumberId: env.phoneNumberId,
+        accessToken: env.accessToken,
+      },
+      decision: { ok: true, mode: "text", to: decision.to, body: decision.body },
+      routeReason: INSTANT_ACK_REASON,
+      approvedBy: null,
+      attachmentBucket: null,
+      attachmentPath: null,
+      priorTemplate: null,
+      priorBody: decision.body,
+    });
+    if (!transmitted.ok) {
+      const again = await svc
+        .from("whatsapp_messages")
+        .select("send_attempted_at")
+        .eq("id", draftId)
+        .eq("org_id", orgId)
+        .maybeSingle();
+      const ambiguous = Boolean(again.data?.send_attempted_at);
+      await svc
+        .from("whatsapp_messages")
+        .update({
+          route_reason: INSTANT_ACK_REASON,
+          ...(ambiguous ? {} : { status: "failed" }),
+          error: transmitted.error,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", draftId)
+        .eq("org_id", orgId);
+      console.error("whatsapp: the acknowledgment was not sent.");
+    }
+  } catch {
+    console.error("whatsapp: the acknowledgment failed. The wake continues.");
+  }
 }
 
 async function applyStatus(svc: Svc, orgId: string, status: ParsedStatus): Promise<"ok" | "missing"> {
@@ -1496,7 +1674,7 @@ async function listWhatsApp(
   const { data, error } = await svc
     .from("whatsapp_messages")
     .select(
-      "id, wamid, direction, from_number, to_number, body, wa_timestamp, status, person_id, reply_to_wamid, attachment_filename",
+      "id, wamid, direction, from_number, to_number, body, wa_timestamp, status, person_id, reply_to_wamid, attachment_filename, route_reason",
     )
     .eq("org_id", orgId)
     .eq(column, id)
@@ -1522,8 +1700,18 @@ async function listWhatsApp(
   }
 
   const inbound = data.filter((row) => row.direction === "inbound");
-  const drafts = data.filter((row) => row.direction === "outbound" && row.status === "draft");
-  const outboundTo = data.filter((row) => row.direction === "outbound").map((row) => String(row.to_number));
+  const drafts = data.filter(
+    (row) =>
+      row.direction === "outbound" &&
+      row.status === "draft" &&
+      !isInstantAcknowledgment(row.route_reason as string | null),
+  );
+  const outboundTo = data
+    .filter(
+      (row) =>
+        row.direction === "outbound" && outboundCountsAsReply(row.route_reason as string | null),
+    )
+    .map((row) => String(row.to_number));
   const now = new Date();
 
   return {

@@ -43,8 +43,9 @@ A WhatsApp message that is a commercial or client follow-up wakes you once.
 People, CVs, availability, and roles wake Hanna. A contractor, company, or
 subcontractor list, or research, wakes Scout. The wake carries the message
 id, the sender, the text, the person and case when the number is already on
-file, and `POST /api/agent/whatsapp/drafts`. You answer by filing a
-WhatsApp reply. `to` is the sender on `replyTo`. When that number is an
+file, and `POST /api/agent/whatsapp/drafts`. When it says an acknowledgment
+was already sent, that note is not your reply: draft the answer. You answer
+by filing a WhatsApp reply. `to` is the sender on `replyTo`. When that number is an
 owner or field number, the reply is not a refusal, their latest message is
 not a refusal, and it was inside 24 hours, Triangle sends it back to that
 number. A missing `replyTo`, or a different `to`, stays a draft.

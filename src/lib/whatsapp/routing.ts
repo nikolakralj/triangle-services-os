@@ -370,6 +370,15 @@ export function resolveRoute(
   return keywordRoute(text, employees);
 }
 
+/** Display name for the acknowledgment. Unknown keys have no label. */
+export function whatsAppEmployeeLabel(key: string | null | undefined): string | null {
+  if (!key) return null;
+  const known = WHATSAPP_EMPLOYEES.find((item) => item.key === key);
+  const raw = known?.displayNames[0];
+  if (!raw) return null;
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 export function employeeKeyOf(
   employee: { roleKey: string; displayName: string },
   employees: readonly WhatsAppEmployeeDef[] = WHATSAPP_EMPLOYEES,
