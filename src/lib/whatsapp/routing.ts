@@ -882,7 +882,7 @@ export function planAttachment(
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE = /(?:\+|00)\d[\d\s().-]{6,}\d/;
 const RATE =
-  /\b(?:hourly[\s_-]*rates?|daily[\s_-]*rates?|salar(?:y|ies)|€\s?\d|\d+\s?(?:€|eur)\s*\/\s*(?:h|hr|hour|day))\b/i;
+  /\b(?:hourly[\s_-]*rates?|daily[\s_-]*rates?|salar(?:y|ies))\b|€\s?\d|\b\d+\s?(?:€|eur)\s*\/\s*(?:h|hr|hour|day)\b/i;
 const IDENTITY_LABEL =
   /\b(?:full[\s_-]*names?|date\s+of\s+birth|d\.?\s?o\.?\s?b\.?|passport\s*(?:number|no\.?|#)|national[\s_-]*ids?|ibans?)\b/i;
 
@@ -896,6 +896,9 @@ export function draftTextAllowed(
 ): { ok: true } | { ok: false; error: string } {
   const body = text ?? "";
   if (!body.trim()) return { ok: true };
+  // Owner and field may receive the document they asked for, caption included.
+  // A missing role keeps every check.
+  if (recipient === "owner" || recipient === "field") return { ok: true };
   if (EMAIL.test(body)) {
     return {
       ok: false,
@@ -917,7 +920,7 @@ export function draftTextAllowed(
       error: "That reply includes a worker's identity. An anonymised bio uses initials, role, tickets, and availability.",
     };
   }
-  if (explicitPackIntent(body) === "full_cv" && recipient !== "owner" && recipient !== "field") {
+  if (explicitPackIntent(body) === "full_cv") {
     return {
       ok: false,
       error: "That reply would send a full CV. A CV leaves by WhatsApp only to an owner or field number.",

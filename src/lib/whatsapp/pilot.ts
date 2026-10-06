@@ -22,7 +22,6 @@ import {
   SOFTWARE_REFUSAL_DRAFT,
   documentBlockedForRecipient,
   WHATSAPP_DRAFT_ENDPOINT,
-  whatsAppEmployeeLabel,
   type DocumentRecipient,
   type AttachmentInput,
   type NormalizedAttachment,
@@ -54,8 +53,8 @@ export interface WakeContext {
   employee: string;
   reason: string;
   handoffNote: string | null;
-  /** True when Triangle already sent the fixed acknowledgment for this inbound. */
-  acknowledgementSent?: boolean;
+  /** True when Triangle is showing the sender a typing indicator. No text was sent. */
+  typingShown?: boolean;
 }
 
 export interface PilotMessage {
@@ -561,6 +560,29 @@ export function graphDocumentBody(input: {
   };
 }
 
+/** Mark the inbound read and show typing. No text is sent. */
+export function graphTypingBody(wamid: string): Record<string, unknown> {
+  return {
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: wamid,
+    typing_indicator: { type: "text" },
+  };
+}
+
+/** A 400 about a file or a caption. The employee can still answer in words. */
+export function draftFailureHint(status: number, error: string): string | null {
+  if (status !== 400) return null;
+  if (
+    /document|attach|caption|file type|filename|larger than|not readable|CV|rate|email address|phone number|identity|IBAN/i.test(
+      error,
+    )
+  ) {
+    return "You may file a text-only reply with the same replyTo.";
+  }
+  return null;
+}
+
 export function graphSendBody(
   plan: { mode: "text"; to: string; body: string } | { mode: "template"; to: string; templateName: string; language: string },
 ): Record<string, unknown> {
@@ -652,44 +674,41 @@ export function isAutoSentAudit(reason: string | null | undefined): boolean {
   return (reason ?? "").trim().startsWith("Auto-sent");
 }
 
-/** Stored on the acknowledgment row. Not an employee reply, and not an auto-send audit. */
+/** Older rows. A typing indicator is not an employee reply either. */
 export const INSTANT_ACK_REASON = "Instant acknowledgment.";
+
+export const TYPING_REASON = "Typing indicator.";
 
 export function isInstantAcknowledgment(reason: string | null | undefined): boolean {
   return (reason ?? "").trim().startsWith("Instant acknowledgment");
 }
 
-/**
- * An acknowledgment does not answer the inbound. The employee's later draft
- * still binds with replyTo and can auto-send. The waiting list uses this so
- * the fixed note does not clear the inbound.
- */
-export function outboundCountsAsReply(routeReason: string | null | undefined): boolean {
-  return !isInstantAcknowledgment(routeReason);
+export function isTypingIndicator(reason: string | null | undefined): boolean {
+  return (reason ?? "").trim().startsWith("Typing indicator");
 }
 
-/** The only fixed WhatsApp text Triangle sends. The employee's reply is not this. */
-export function instantAckCopy(employee: string | null | undefined): string {
-  const label = whatsAppEmployeeLabel(employee);
-  return label ? `${label} is looking into it.` : "Looking into it.";
+/**
+ * Neither the old fixed line nor the typing marker answers the inbound.
+ * The employee's later draft still binds with replyTo and can auto-send.
+ */
+export function outboundCountsAsReply(routeReason: string | null | undefined): boolean {
+  return !isInstantAcknowledgment(routeReason) && !isTypingIndicator(routeReason);
 }
 
 export function instantAckKey(wamid: string): string {
   return `ack|${wamid.trim()}`;
 }
 
-export type InstantAckPlan =
-  | { send: true; to: string; body: string; audit: string; draftKey: string }
+export type TypingPlan =
+  | { send: true; to: string; audit: string; draftKey: string }
   | { send: false; reason: string };
 
 /**
- * Fixed acknowledgment for one stored inbound. Same owner/field gate as
- * auto-send: the number must be on the sender list. Unlisted numbers, open
- * pilots, refusals, and a wamid that already has an acknowledgment do not
- * send. No template. The plan carries no replyTo, so it does not bind the
- * inbound for the employee's reply.
+ * Show typing on one stored inbound. Same owner/field gate as auto-send.
+ * Unlisted numbers, open pilots, refusals, and a wamid already marked do not.
+ * No text is sent.
  */
-export function decideInstantAck(input: {
+export function decideTypingIndicator(input: {
   enabled: boolean;
   to: string;
   senders: readonly SenderPermission[];
@@ -701,18 +720,18 @@ export function decideInstantAck(input: {
   };
   wamid: string;
   alreadyAcked: boolean;
-}): InstantAckPlan {
+}): TypingPlan {
   if (!input.enabled) {
-    return { send: false, reason: "Auto-send is switched off. No acknowledgment was sent." };
+    return { send: false, reason: "Auto-send is switched off. No typing indicator was sent." };
   }
   if (input.alreadyAcked) {
-    return { send: false, reason: "An acknowledgment was already stored for this message." };
+    return { send: false, reason: "A typing indicator was already stored for this message." };
   }
   if (input.route.action === "refuse" || input.route.flagOwner || isRefusalReason(input.route.reason)) {
-    return { send: false, reason: "A refused or flagged message gets no acknowledgment." };
+    return { send: false, reason: "A refused or flagged message gets no typing indicator." };
   }
   if (!input.route.employee) {
-    return { send: false, reason: "Nobody was routed, so no acknowledgment was sent." };
+    return { send: false, reason: "Nobody was routed, so no typing indicator was sent." };
   }
   const to = normalizeE164(input.to);
   if (!to) return { send: false, reason: "That sender is not a usable number." };
@@ -721,17 +740,14 @@ export function decideInstantAck(input: {
   if (!role) {
     return {
       send: false,
-      reason: "That sender is not an owner or field number, so no acknowledgment was sent.",
+      reason: "That sender is not an owner or field number, so no typing indicator was sent.",
     };
   }
-  const body = instantAckCopy(input.route.employee);
-  const words = draftTextAllowed(body);
-  if (!words.ok) return { send: false, reason: words.error };
+  if (!input.wamid.trim()) return { send: false, reason: "That message has no id." };
   return {
     send: true,
     to,
-    body,
-    audit: INSTANT_ACK_REASON,
+    audit: TYPING_REASON,
     draftKey: instantAckKey(input.wamid),
   };
 }
@@ -745,6 +761,15 @@ export type AutoSendPlan =
       body: string;
       filename?: string;
       mime?: string;
+      audit: string;
+    }
+  | {
+      send: true;
+      role: "owner" | "field";
+      mode: "template";
+      to: string;
+      templateName: string;
+      language: string;
       audit: string;
     }
   | { send: false; reason: string };
@@ -776,7 +801,8 @@ export function autoSendBoundToInbound(input: {
 
 /**
  * A CV or other file named from Triangle storage, not uploaded with the draft.
- * It has to answer an owner or field sender, inside 24 hours.
+ * Owner or field only, inside 24 hours. A replyTo still has to be that
+ * sender's own inbound. With no replyTo, the latest inbound of `to` is enough.
  */
 export function storedDocumentReplyAllowed(input: {
   to: string;
@@ -789,9 +815,12 @@ export function storedDocumentReplyAllowed(input: {
   if (input.recipientRole !== "owner" && input.recipientRole !== "field") {
     return { ok: false, status: 400, error: "A stored document goes only to an owner or field number." };
   }
-  const bound = autoSendBoundToInbound(input);
-  if (!bound.ok) {
-    return { ok: false, status: 400, error: "A stored document has to answer that sender's own inbound." };
+  const replyTo = (input.replyTo ?? "").trim();
+  if (replyTo) {
+    const bound = autoSendBoundToInbound(input);
+    if (!bound.ok) {
+      return { ok: false, status: 400, error: "A stored document has to answer that sender's own inbound." };
+    }
   }
   if (!serviceWindowOpen(input.lastInboundAt, input.now)) {
     return { ok: false, status: 400, error: "Outside the 24-hour window. That document was not attached." };
@@ -799,15 +828,126 @@ export function storedDocumentReplyAllowed(input: {
   return { ok: true };
 }
 
+function startedByEmployeeAudit(role: "owner" | "field"): string {
+  return role === "owner"
+    ? "Auto-sent to the owner, started by employee."
+    : "Auto-sent to the field, started by employee.";
+}
+
+/**
+ * Hanna, Bob, or Scout started this. There is no inbound to answer.
+ * Owner and field only, and only when that number's latest inbound is not
+ * a refusal. Inside 24 hours the text or document goes. Outside it, only
+ * the configured parameterless template, and only when the draft names it.
+ */
+function decideEmployeeStarted(input: {
+  to: string;
+  text: string;
+  senders: readonly SenderPermission[];
+  inboundReason?: string | null;
+  latestInboundReason?: string | null;
+  flagged?: boolean;
+  lastInboundAt: string | null;
+  now: Date;
+  templateName?: string | null;
+  approvedTemplate?: string | null;
+  templateLanguage?: string | null;
+  document?: {
+    filename: string;
+    mime: string;
+    kind?: string | null;
+    sourceTable?: string | null;
+  } | null;
+}): AutoSendPlan {
+  const to = normalizeE164(input.to);
+  const listed = to ? input.senders.find((sender) => normalizeE164(sender.e164) === to) : undefined;
+  const role = listed?.id === "owner" ? "owner" : listed?.id === "field" ? "field" : null;
+  if (!to || !role) {
+    return { send: false, reason: "A reply with no inbound to answer stays a draft." };
+  }
+
+  const text = input.text.trim();
+  if (
+    input.flagged === true ||
+    isRefusalReason(input.inboundReason) ||
+    isRefusalReason(input.latestInboundReason) ||
+    text === SOFTWARE_REFUSAL_DRAFT ||
+    text === EMAIL_REFUSAL_DRAFT
+  ) {
+    return { send: false, reason: "A refused or flagged reply stays a draft for the owner." };
+  }
+
+  const words = draftTextAllowed(text, role);
+  if (!words.ok) return { send: false, reason: words.error };
+
+  if (input.document) {
+    const blocked = documentBlockedForRecipient(
+      {
+        filename: input.document.filename,
+        mime: input.document.mime,
+        kind: input.document.kind ?? null,
+        sourceTable: input.document.sourceTable ?? null,
+      },
+      role,
+    );
+    if (blocked.blocked) return { send: false, reason: blocked.reason };
+  }
+
+  if (serviceWindowOpen(input.lastInboundAt, input.now)) {
+    const audit = startedByEmployeeAudit(role);
+    if (input.document) {
+      if (text.length > 1024) {
+        return { send: false, reason: "The document caption is longer than WhatsApp allows." };
+      }
+      return {
+        send: true,
+        role,
+        mode: "document",
+        to,
+        body: text,
+        filename: input.document.filename,
+        mime: input.document.mime,
+        audit,
+      };
+    }
+    if (text.length < 1 || text.length > 4096) {
+      return { send: false, reason: "Write the reply before it can be sent." };
+    }
+    return { send: true, role, mode: "text", to, body: text, audit };
+  }
+
+  if (input.document) {
+    return {
+      send: false,
+      reason: "Outside the 24-hour window. A document cannot be sent then.",
+    };
+  }
+  const requested = (input.templateName ?? "").trim();
+  const approved = (input.approvedTemplate ?? "").trim();
+  if (requested && approved && requested === approved) {
+    return {
+      send: true,
+      role,
+      mode: "template",
+      to,
+      templateName: approved,
+      language: templateLanguage(input.templateLanguage),
+      audit: startedByEmployeeAudit(role),
+    };
+  }
+  return { send: false, reason: "outside 24h, no template configured" };
+}
+
 /**
  * Whether a filed reply leaves without a person.
- * It must answer a stored inbound, and `to` must be that inbound's sender.
- * That sender must be an explicit owner or field number. An open pilot,
- * where every unmatched number is treated as field, does not qualify.
- * A refusal on the answered inbound or on that sender's latest inbound
- * stays a draft. Outside 24 hours, free text and documents stay drafts;
- * the approved template is still a person's send. A list document that
- * passed the attachment guard may leave with the reply, inside the window.
+ * A reply must answer a stored inbound, and `to` must be that inbound's sender.
+ * With no replyTo, only an explicit owner or field number can leave, and only
+ * on the rule in decideEmployeeStarted. An open pilot, where every unmatched
+ * number is treated as field, does not qualify. A refusal stays a draft.
+ * Outside 24 hours, a document stays a draft. Free text to anyone else stays
+ * a draft. Owner and field may get the configured template when the draft
+ * names it. A list document that passed the attachment guard may leave with
+ * a reply, inside the window.
  */
 export function decideAutoSend(input: {
   enabled: boolean;
@@ -824,6 +964,10 @@ export function decideAutoSend(input: {
   flagged?: boolean;
   lastInboundAt: string | null;
   now: Date;
+  /** Set on a message the employee started, with no inbound to answer. */
+  templateName?: string | null;
+  approvedTemplate?: string | null;
+  templateLanguage?: string | null;
   document?: {
     filename: string;
     mime: string;
@@ -834,6 +978,7 @@ export function decideAutoSend(input: {
   if (!input.enabled) {
     return { send: false, reason: "Auto-send is switched off. The reply stays a draft." };
   }
+  if (!(input.replyTo ?? "").trim()) return decideEmployeeStarted(input);
   const bound = autoSendBoundToInbound(input);
   if (!bound.ok) return { send: false, reason: bound.reason };
   const to = bound.to;

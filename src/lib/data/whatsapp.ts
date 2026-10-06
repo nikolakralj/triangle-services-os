@@ -6,18 +6,20 @@ import { wakeEmployee } from "@/lib/data/bot-runtime";
 import { whatsAppInboundHasReply, type WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
   decideAutoSend,
-  decideInstantAck,
   decideSend,
-  INSTANT_ACK_REASON,
-  instantAckKey,
-  isInstantAcknowledgment,
+  decideTypingIndicator,
   graphDocumentBody,
   graphMediaUrl,
   graphMessagesUrl,
   graphSendBody,
+  graphTypingBody,
+  instantAckKey,
+  isInstantAcknowledgment,
+  isTypingIndicator,
   isAutoSentAudit,
   matchPersonByPhone,
   nextStatus,
+  normalizeE164,
   parseWebhook,
   pickOpenCase,
   outboundCountsAsReply,
@@ -245,7 +247,7 @@ async function storeInbound(
   if (!route.employee) return "ok";
   const messageRowId = id;
   const keywordRoute = route;
-  const ack = decideInstantAck({
+  const typing = decideTypingIndicator({
     enabled: readWhatsAppEnv(process.env).autoSend,
     to: message.from,
     senders: access.senders,
@@ -254,8 +256,8 @@ async function storeInbound(
     alreadyAcked: false,
   });
   runAfterResponse(async () => {
-    const acknowledgment = sendInstantAck(svc, orgId, business, message, filing, keywordRoute).catch(() => {
-      console.error("whatsapp: the acknowledgment failed. The wake continues.");
+    const indicator = showTypingIndicator(svc, orgId, business, message, filing, keywordRoute).catch(() => {
+      console.error("whatsapp: the typing indicator failed. The wake continues.");
     });
     try {
       let chosen = keywordRoute;
@@ -286,13 +288,13 @@ async function storeInbound(
           employee: chosen.employee,
           reason: chosen.reason,
           handoffNote: chosen.handoffNote,
-          acknowledgementSent: ack.send,
+          typingShown: typing.send,
         });
       }
     } catch {
       console.error("whatsapp: the wake failed.");
     }
-    await acknowledgment;
+    await indicator;
   });
   return "ok";
 }
@@ -544,7 +546,7 @@ async function wakeRoutedEmployee(
           agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.acknowledgementSent ? " An acknowledgment was already sent. Draft the answer, not another note that you are looking." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.typingShown ? " The sender sees typing." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
           expected_output: wakeExpectedOutput(
             whatsAppRecipientRole(ctx.sender, readWhatsAppEnv(process.env).senders),
           ),
@@ -564,7 +566,7 @@ async function wakeRoutedEmployee(
             routed_employee: route.employee,
             route_reason: route.reason,
             ...(ctx.handoffNote ? { handoff_note: ctx.handoffNote } : {}),
-            ...(ctx.acknowledgementSent ? { acknowledgement_sent: true } : {}),
+            ...(ctx.typingShown ? { typing_shown: true } : {}),
           },
         })
         .select("id")
@@ -609,7 +611,7 @@ async function wakeRoutedEmployee(
       text: ctx.text,
       draftEndpoint: ctx.draftEndpoint,
       ...(ctx.handoffNote ? { handoffNote: ctx.handoffNote } : {}),
-      ...(ctx.acknowledgementSent ? { acknowledgementSent: true } : {}),
+      ...(ctx.typingShown ? { typingShown: true } : {}),
     },
   });
 }
@@ -661,12 +663,13 @@ async function ensureRefusalDraft(
 }
 
 /**
- * Fixed acknowledgment for one inbound. Not the employee's reply: no
- * reply_to_wamid, no employee badge, and a route reason the auto-send
- * binding ignores. A failure here must not throw. Status webhooks never
- * call this. A duplicate wamid hits the draft key and does not send again.
+ * Mark one inbound read and show typing. Not the employee's reply: no
+ * reply_to_wamid, no employee badge, and a route reason that does not count
+ * as an answer. No text is sent, including when Graph refuses. A failure
+ * here must not throw. Status webhooks never call this. A duplicate wamid
+ * hits the draft key and does not call Graph again.
  */
-async function sendInstantAck(
+async function showTypingIndicator(
   svc: Svc,
   orgId: string,
   business: string,
@@ -684,10 +687,10 @@ async function sendInstantAck(
       .eq("draft_key", draftKey)
       .maybeSingle();
     if (schemaMissing(readError) || readError) {
-      console.error("whatsapp: could not check for an acknowledgment. Nothing was sent.");
+      console.error("whatsapp: could not check for a typing indicator. Nothing was sent.");
       return;
     }
-    const decision = decideInstantAck({
+    const decision = decideTypingIndicator({
       enabled: env.autoSend,
       to: message.from,
       senders: env.senders,
@@ -697,7 +700,7 @@ async function sendInstantAck(
     });
     if (!decision.send) return;
     if (!env.phoneNumberId || !env.accessToken) {
-      console.error("whatsapp: phone number id or access token is missing. The acknowledgment was not sent.");
+      console.error("whatsapp: phone number id or access token is missing. The typing indicator was not sent.");
       return;
     }
     const { data, error } = await svc
@@ -707,7 +710,7 @@ async function sendInstantAck(
         direction: "outbound",
         from_number: business,
         to_number: decision.to,
-        body: decision.body,
+        body: null,
         wa_timestamp: new Date().toISOString(),
         status: "draft",
         person_id: filing.personId,
@@ -720,49 +723,69 @@ async function sendInstantAck(
       .maybeSingle();
     if (error?.code === "23505") return;
     if (schemaMissing(error) || error || !data?.id) {
-      console.error("whatsapp: the acknowledgment was not stored. Nothing was sent.");
+      console.error("whatsapp: the typing indicator was not stored. Nothing was sent.");
       return;
     }
     const draftId = data.id as string;
-    const transmitted = await transmitWhatsAppDraft({
-      svc,
-      orgId,
-      draftId,
-      env: {
-        graphVersion: env.graphVersion,
-        phoneNumberId: env.phoneNumberId,
-        accessToken: env.accessToken,
-      },
-      decision: { ok: true, mode: "text", to: decision.to, body: decision.body },
-      routeReason: INSTANT_ACK_REASON,
-      approvedBy: null,
-      attachmentBucket: null,
-      attachmentPath: null,
-      priorTemplate: null,
-      priorBody: decision.body,
+    const posted = await postTypingIndicator({
+      version: env.graphVersion,
+      phoneNumberId: env.phoneNumberId,
+      accessToken: env.accessToken,
+      wamid: message.wamid,
     });
-    if (!transmitted.ok) {
-      const again = await svc
-        .from("whatsapp_messages")
-        .select("send_attempted_at")
-        .eq("id", draftId)
-        .eq("org_id", orgId)
-        .maybeSingle();
-      const ambiguous = Boolean(again.data?.send_attempted_at);
+    if (!posted.ok) {
       await svc
         .from("whatsapp_messages")
         .update({
-          route_reason: INSTANT_ACK_REASON,
-          ...(ambiguous ? {} : { status: "failed" }),
-          error: transmitted.error,
+          status: "failed",
+          route_reason: decision.audit,
+          error: posted.error,
           updated_at: new Date().toISOString(),
         })
         .eq("id", draftId)
         .eq("org_id", orgId);
-      console.error("whatsapp: the acknowledgment was not sent.");
+      console.error("whatsapp: the typing indicator was not sent.");
+      return;
     }
+    await svc
+      .from("whatsapp_messages")
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        route_reason: decision.audit,
+        error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", draftId)
+      .eq("org_id", orgId);
   } catch {
-    console.error("whatsapp: the acknowledgment failed. The wake continues.");
+    console.error("whatsapp: the typing indicator failed. The wake continues.");
+  }
+}
+
+async function postTypingIndicator(args: {
+  version: string;
+  phoneNumberId: string;
+  accessToken: string;
+  wamid: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(graphMessagesUrl(args.version, args.phoneNumberId), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${args.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(graphTypingBody(args.wamid)),
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (res.ok) return { ok: true };
+    const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    const message = typeof json?.error?.message === "string" ? json.error.message.slice(0, 300) : "";
+    return { ok: false, error: message || `WhatsApp refused the typing indicator (${res.status}).` };
+  } catch {
+    return { ok: false, error: "WhatsApp did not answer the typing indicator." };
   }
 }
 
@@ -1000,6 +1023,26 @@ export async function fileWhatsAppDraft(params: {
   }
 
   const recipientRole = whatsAppRecipientRole(to, readWhatsAppEnv(process.env).senders);
+  if (referenced && !replyTo) {
+    const number = normalizeE164(to);
+    if (!number) {
+      return { ok: false, status: 400, error: "Say who to, as an E.164 number." };
+    }
+    const last = await svc
+      .from("whatsapp_messages")
+      .select("wa_timestamp")
+      .eq("org_id", params.orgId)
+      .eq("direction", "inbound")
+      .eq("from_number", number)
+      .order("wa_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (schemaMissing(last.error) || last.error) {
+      return { ok: false, status: 400, error: "Could not confirm the 24-hour window. That document was not attached." };
+    }
+    inboundFrom = number;
+    inboundAt = (last.data?.wa_timestamp as string | null) ?? null;
+  }
   let referenceFields: StoredDocumentFields | null = null;
   if (referenced) {
     const allowed = storedDocumentReplyAllowed({
@@ -1204,6 +1247,7 @@ async function autoSendContext(
   svc: Svc,
   orgId: string,
   replyTo: string | null,
+  to: string,
 ): Promise<
   | {
       ok: true;
@@ -1217,13 +1261,37 @@ async function autoSendContext(
 > {
   const answered = replyTo?.trim() || null;
   if (!answered) {
+    const number = normalizeE164(to);
+    if (!number) {
+      return {
+        ok: true,
+        replyTo: null,
+        replyFrom: null,
+        inboundReason: null,
+        latestInboundReason: null,
+        lastInboundAt: null,
+      };
+    }
+    const last = await svc
+      .from("whatsapp_messages")
+      .select("wa_timestamp, route_reason")
+      .eq("org_id", orgId)
+      .eq("direction", "inbound")
+      .eq("from_number", number)
+      .order("wa_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (schemaMissing(last.error) || last.error) {
+      return { ok: false, held: "Could not confirm the 24-hour window, so the reply stayed a draft." };
+    }
+    const reason = (last.data?.route_reason as string | null) ?? null;
     return {
       ok: true,
       replyTo: null,
-      replyFrom: null,
-      inboundReason: null,
-      latestInboundReason: null,
-      lastInboundAt: null,
+      replyFrom: number,
+      inboundReason: reason,
+      latestInboundReason: reason,
+      lastInboundAt: (last.data?.wa_timestamp as string | undefined) ?? null,
     };
   }
   const inbound = await svc
@@ -1270,10 +1338,11 @@ async function autoSendContext(
 }
 
 /**
- * After the row is stored as a draft. Auto-send runs only when the reply
- * answers a stored inbound and `to` is that inbound's sender. A refusal on
- * that inbound or on the sender's latest inbound stays a draft. The human
- * approval path is unchanged: a mismatched `to` is still stored.
+ * After the row is stored as a draft. A reply auto-sends when it answers a
+ * stored inbound and `to` is that inbound's sender. With no replyTo, an
+ * owner or field number can still leave when their latest inbound is inside
+ * 24 hours and is not a refusal; outside that window only the configured
+ * template goes. The human approval path is unchanged.
  */
 async function considerAutoSend(
   svc: Svc,
@@ -1307,7 +1376,7 @@ async function considerAutoSend(
   }
 
   const env = readWhatsAppEnv(process.env);
-  const context = await autoSendContext(svc, orgId, input.replyTo);
+  const context = await autoSendContext(svc, orgId, input.replyTo, input.to);
   if (!context.ok) return heldDraft(input.draftId, input.duplicate, context.held);
 
   const decision = decideAutoSend({
@@ -1321,6 +1390,9 @@ async function considerAutoSend(
     latestInboundReason: context.latestInboundReason,
     lastInboundAt: context.lastInboundAt,
     now: new Date(),
+    templateName: input.templateName,
+    approvedTemplate: env.templateName,
+    templateLanguage: env.templateLanguage,
     document: input.attachment
       ? {
           filename: input.attachment.filename,
@@ -1350,7 +1422,15 @@ async function considerAutoSend(
           filename: decision.filename ?? input.attachment?.filename ?? "list",
           mime: decision.mime ?? input.attachment?.mime ?? "application/octet-stream",
         }
-      : { ok: true, mode: "text", to: decision.to, body: decision.body };
+      : decision.mode === "template"
+        ? {
+            ok: true,
+            mode: "template",
+            to: decision.to,
+            templateName: decision.templateName,
+            language: decision.language,
+          }
+        : { ok: true, mode: "text", to: decision.to, body: decision.body };
 
   const transmitted = await transmitWhatsAppDraft({
     svc,
@@ -1879,7 +1959,8 @@ async function listWhatsApp(
     (row) =>
       row.direction === "outbound" &&
       row.status === "draft" &&
-      !isInstantAcknowledgment(row.route_reason as string | null),
+      !isInstantAcknowledgment(row.route_reason as string | null) &&
+      !isTypingIndicator(row.route_reason as string | null),
   );
   const outboundTo = data
     .filter(

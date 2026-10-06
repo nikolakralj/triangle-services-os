@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { verifyMachineToken } from "@/lib/auth/machine";
 import { badgeMayReport } from "@/lib/data/employee-report-policy";
 import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
+import { draftFailureHint } from "@/lib/whatsapp/pilot";
 
 // ---------------------------------------------------------------------------
-// POST /api/agent/whatsapp/drafts — Scout, Bob, or Hanna files a reply.
+// POST /api/agent/whatsapp/drafts — Scout, Bob, or Hanna files a reply,
+// or starts a message to an owner or field number.
 //
 // Same badge check as POST /api/agent/reports. The legacy MCP key is not a
 // badge. This route does not call Graph. The data layer sends when the
@@ -12,12 +14,20 @@ import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
 // The JSON says sent: true only after Graph has accepted the message.
 // The response never includes the file.
 //
+// Reply: { "to", "text", "replyTo" }
+// Started, no replyTo, owner or field only:
+//   { "to", "text" } inside 24 hours of their latest inbound
+//   { "to", "text", "templateName" } outside that window, parameterless,
+//   and only when templateName is WHATSAPP_TEMPLATE_NAME
 // A document is either bytes or a reference, not both:
 // { "filename", "mime", "contentBase64" }
 // { "workerId": "<uuid>" } — that person's current CV in the documents bucket
 // { "documentId": "<uuid>" } — one documents row in this organisation
-// A reference is resolved here and is accepted only as a reply to an owner
-// or field inbound inside 24 hours. Anyone else is refused.
+// A reference goes to an owner or field number inside 24 hours. With a
+// replyTo it has to be that sender's inbound. With no replyTo, their latest
+// inbound inside 24 hours is enough. Anyone else is refused.
+// A 400 about a file or a caption includes hint: file a text-only reply
+// with the same replyTo.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -48,7 +58,14 @@ export async function POST(request: Request) {
     body,
   });
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    const hadDocument = Boolean(
+      body && typeof body === "object" && "document" in body && (body as { document?: unknown }).document,
+    );
+    const hint = hadDocument ? draftFailureHint(result.status, result.error) : null;
+    return NextResponse.json(
+      hint ? { error: result.error, hint } : { error: result.error },
+      { status: result.status },
+    );
   }
   return NextResponse.json(
     {

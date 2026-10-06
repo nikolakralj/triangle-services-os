@@ -6,6 +6,42 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-06: WhatsApp should feel like a chat, and Hanna may start one
+
+Nikola decided this in chat on 6 October 2026. Only he raises a bot's
+freedom. His goal, in his words: "Experience with Hanna or other bots should
+be same as here [his Grok chat]", "It's quite boring when she writes I'm
+looking into it", "She should be creative and funny". At 20:13 UTC+2 he
+said: "Yes, Hanna may start WhatsApp messages to me and Ralph."
+
+An owner or field inbound is marked read and shown a typing indicator. No
+fixed line is sent, and a failed typing call does not send a fallback text.
+The earlier "Instant acknowledgment." decision is replaced for new messages.
+Old rows with that reason still do not count as the employee's answer.
+
+Hanna, Bob, and Scout may start a WhatsApp message to the owner or the field
+with no inbound to answer. Inside 24 hours of that number's latest inbound,
+when that inbound is not a refusal and auto-send is on, the text or document
+goes. The audit is "Auto-sent to the owner, started by employee." or the
+same for the field. Outside 24 hours only the configured parameterless
+template goes, and only when the draft names it. Otherwise the draft stays,
+and the response says outside 24h, no template configured. A document cannot
+ride on the template. A stored CV or other stored file follows the same
+window: owner or field, inside 24 hours, with or without a replyTo. A replyTo
+that is present still has to be that sender's own inbound. Everyone else
+stays a draft a person approves. A reply whose `to` is not the inbound's
+sender stays a draft.
+
+A caption to the owner or the field may say what they asked for, including a
+rate or a date of birth. The same words to anyone else, or when no role is
+known, are still refused. If a file or caption is refused, the error says
+the employee may file a text-only reply with the same replyTo.
+
+On WhatsApp they write like a witty, warm colleague: creative, a bit funny,
+varied, and short. Facts stay accurate. They do not use a canned line, and
+they do not leave silence when a file fails. Safety is unchanged: no email,
+no money, no mobilization, and a refusal stays a draft. No new migration.
+
 ### 2026-10-06: Nikola and Ralph may receive any WhatsApp document
 
 Nikola decided this on the 6 October 2026 call, in his own words. Only he
@@ -37,8 +73,9 @@ and the other types already accepted, inside the existing 4 MB limit. Hanna
 attaches CVs and worker profiles. Bob attaches bank statements and invoices.
 Scout attaches a spreadsheet he already has, including mission or research
 data; Triangle does not build that workbook. The file has to answer that
-sender's own inbound, inside 24 hours, with auto-send on. The caption still
-may not carry an IBAN; a neutral caption is enough for the file to go.
+sender's own inbound, inside 24 hours, with auto-send on. A later decision the same day lets a caption to the owner or the field say
+what they asked for, including an IBAN. A caption to anyone else still may
+not.
 Everyone else stays blocked from CVs, worker profiles, and financial
 documents, including when a person would otherwise approve the send. A path
 in the documents bucket is sent only when that organisation has the row.
@@ -96,7 +133,9 @@ It does not quote the inbound, it does not set the reply link, and it does
 not count as the employee's answer. The employee's own draft still auto-sends
 afterwards, inside the same 24-hour window. The webhook answers Meta before
 that send and before the wake. The employee's words are still whatever they
-draft. No new migration.
+draft. No new migration. Replaced later the same day: new inbounds show a
+typing indicator and do not send this line. See "WhatsApp should feel like
+a chat".
 
 ### 2026-10-03: WhatsApp replies to owner and field senders auto-send
 
@@ -108,8 +147,10 @@ When an employee files a reply to a number on `WHATSAPP_OWNER_NUMBERS` or
 hold:
 
 - The reply names the inbound it answers (`replyTo`), and `to` is that
-  inbound's sender. A missing `replyTo`, or a `to` for a different number,
-  stays a draft for a person. An empty `to` is taken from that inbound.
+  inbound's sender. A `to` for a different number stays a draft for a person.
+  An empty `to` is taken from that inbound. A later decision the same week
+  lets Hanna, Bob, or Scout start a message to the owner or the field with
+  no `replyTo`. See "WhatsApp should feel like a chat".
 - The reply is not a refusal. A field sender's request to change the software,
   or to have an email sent, stays a draft flagged for the owner. It is never
   auto-sent. The same hold applies when either the answered inbound or that

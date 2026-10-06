@@ -1,20 +1,35 @@
 # Current state
 
+## WhatsApp chat — 6 October 2026
+
+An owner or field inbound is marked read and shown typing. No canned line is
+sent. Hanna, Bob, or Scout may start a message to Nikola or Ralph with no
+`replyTo` when that number's latest inbound is inside 24 hours and is not a
+refusal. Outside 24 hours only the configured parameterless template goes,
+when the draft names it. A caption to them may include a rate or a date of
+birth. The same words to anyone else are refused. A stored CV
+(`document.workerId`) or other stored file (`document.documentId`) follows
+the same owner/field window, with or without a replyTo. Bytes are not
+returned. A CV that is only generated from the worker row is not attached.
+If a file or caption is refused, the error says to file a text-only reply
+with the same replyTo. No migration.
+
 ## WhatsApp stored documents — 6 October 2026
 
 A wake's expected output depends on the sender. Owner and field may be sent
 the document they asked for. Everyone else is told no CV, worker profile, or
 financial document. Hanna, Bob, or Scout may name a stored file on the draft
 with `document.workerId` (that person's current CV) or `document.documentId`.
-Triangle resolves it in the organisation and does not return the bytes. The
-reply still has to answer that owner or field inbound inside 24 hours. A CV
+Triangle resolves it in the organisation and does not return the bytes. For
+an owner or field number the file answers their inbound, or goes with no
+replyTo while their latest inbound is inside 24 hours. A CV
 that is only generated from the worker row, with no file stored, is not
 attached. No migration.
 
 ## WhatsApp documents and routing — 6 October 2026
 
-An owner or field inbound gets one fixed acknowledgment as soon as it is
-stored, then the employee's own reply. Nikola and Ralph may receive a CV, a
+An owner or field inbound is shown typing as soon as it is stored, then the
+employee's own reply. Nikola and Ralph may receive a CV, a
 worker profile, a financial document, or a mission document from Hanna, Bob,
 or Scout, bound to their own inbound inside 24 hours. Everyone else stays
 blocked from CVs, worker profiles, and financial documents. Finance wakes
