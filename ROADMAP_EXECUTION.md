@@ -48,7 +48,12 @@ may reach every bot; Ralph's (`WHATSAPP_FIELD_NUMBERS`) may reach only Hanna,
 Bob, and Scout. The numbers live in the environment, not in the repository.
 A number on neither list is stored and does not wake anyone. A request from
 Ralph to change the software or to send an email is refused as a draft. No
-CV or worker profile leaves by WhatsApp.
+CV or worker profile leaves by WhatsApp. On 3 October 2026 Nikola removed
+the approve-and-send step for replies to those owner and field numbers:
+inside 24 hours the reply sends itself, including one allowed list document.
+A refused software or email ask stays a draft. Outside 24 hours, free text
+does not send itself. Any other recipient still waits for a person.
+`WHATSAPP_AUTO_SEND=off` keeps every reply as a draft.
 
 ### P0 — Clean the floor · `DONE` · PR #35 (`656ccca`)
 

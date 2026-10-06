@@ -2,13 +2,15 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { wakeEmployee } from "@/lib/data/bot-runtime";
-import type { WhatsAppRecord } from "@/lib/whatsapp/view";
+import { whatsAppInboundHasReply, type WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
+  decideAutoSend,
   decideSend,
   graphDocumentBody,
   graphMediaUrl,
   graphMessagesUrl,
   graphSendBody,
+  isAutoSentAudit,
   matchPersonByPhone,
   nextStatus,
   parseWebhook,
@@ -20,6 +22,7 @@ import {
   serviceWindowOpen,
   type ParsedStatus,
   type ParsedText,
+  type SendPlan,
   type WakeContext,
   type WaStatus,
 } from "@/lib/whatsapp/pilot";
@@ -42,10 +45,12 @@ import {
 // ---------------------------------------------------------------------------
 // WhatsApp pilot, on the database. The rules live in src/lib/whatsapp/pilot.ts
 // and src/lib/whatsapp/routing.ts. This file stores an inbound, routes it to
-// Scout or Hanna, wakes that employee once, files a draft, and — only after
-// a person approves — posts one message to Graph. A missing table or missing
-// env is a 503 with a log, never a crash and never a send. A CV or worker
-// profile is refused before it is stored and again before it could be sent.
+// Scout, Bob, or Hanna, and wakes that employee once. A reply to an owner or
+// field number is sent on filing when decideAutoSend says so. Every other
+// reply stays a draft until a person approves, and only then is it posted to
+// Graph. A refusal stays a draft. A missing table or missing env is a 503
+// with a log, never a crash. A CV or worker profile is refused before it is
+// stored and again before it could be sent.
 // ---------------------------------------------------------------------------
 
 type Svc = NonNullable<ReturnType<typeof createServiceSupabaseClient>>;
@@ -555,6 +560,7 @@ async function ensureRefusalDraft(
     .maybeSingle();
   if (schemaMissing(readError)) return;
   if (existing?.id) return;
+  // Stays a draft for the owner. Nothing in this function sends.
   const { error } = await svc.from("whatsapp_messages").insert({
     org_id: orgId,
     direction: "outbound",
@@ -600,14 +606,27 @@ async function applyStatus(svc: Svc, orgId: string, status: ParsedStatus): Promi
   return "ok";
 }
 
+export type WhatsAppDraftFiling =
+  | {
+      ok: true;
+      draftId: string;
+      duplicate: boolean;
+      /** True when this reply is on its way, including a retry of one already sent. */
+      sends: boolean;
+      sent: boolean;
+      autoSent: boolean;
+      status: "draft" | "sent";
+      wamid: string | null;
+      /** Why it stayed a draft. Null when it was sent. */
+      held: string | null;
+    }
+  | { ok: false; status: number; error: string };
+
 export async function fileWhatsAppDraft(params: {
   orgId: string;
   agentInstanceId: string;
   body: unknown;
-}): Promise<
-  | { ok: true; draftId: string; duplicate: boolean; sends: false }
-  | { ok: false; status: number; error: string }
-> {
+}): Promise<WhatsAppDraftFiling> {
   const svc = createServiceSupabaseClient();
   if (!svc) return { ok: false, status: 503, error: "Database unavailable." };
 
@@ -625,7 +644,7 @@ export async function fileWhatsAppDraft(params: {
       displayName: String(employee.display_name ?? ""),
     })
   ) {
-    return { ok: false, status: 403, error: "Only Scout or Hanna can draft a WhatsApp reply." };
+    return { ok: false, status: 403, error: "Only Scout, Bob, or Hanna can draft a WhatsApp reply." };
   }
 
   const body = asRecord(params.body);
@@ -740,12 +759,29 @@ export async function fileWhatsAppDraft(params: {
   if (error?.code === "23505") {
     const existing = await svc
       .from("whatsapp_messages")
-      .select("id")
+      .select(
+        "id, status, wamid, send_attempted_at, route_reason, body, to_number, reply_to_wamid, template_name, attachment_filename, attachment_mime, attachment_bucket, attachment_path, attachment_kind, attachment_source_table",
+      )
       .eq("org_id", params.orgId)
       .eq("draft_key", planned.draftKey)
       .maybeSingle();
     if (existing.data?.id) {
-      return { ok: true, draftId: existing.data.id as string, duplicate: true, sends: false };
+      const row = existing.data;
+      return considerAutoSend(svc, params.orgId, {
+        draftId: row.id as string,
+        duplicate: true,
+        to: String(row.to_number ?? planned.to),
+        text: String(row.body ?? planned.text),
+        replyTo: (row.reply_to_wamid as string | null) ?? replyTo,
+        templateName: (row.template_name as string | null) ?? null,
+        attachment: attachmentFromRow(row),
+        existing: {
+          status: String(row.status ?? ""),
+          wamid: (row.wamid as string | null) ?? null,
+          sendAttempted: Boolean(row.send_attempted_at),
+          routeReason: (row.route_reason as string | null) ?? null,
+        },
+      });
     }
   }
   if (schemaMissing(error)) {
@@ -761,7 +797,257 @@ export async function fileWhatsAppDraft(params: {
     }
     return { ok: false, status: 500, error: "Could not store that draft." };
   }
-  return { ok: true, draftId: data.id as string, duplicate: false, sends: false };
+  return considerAutoSend(svc, params.orgId, {
+    draftId: data.id as string,
+    duplicate: false,
+    to: planned.to,
+    text: planned.text,
+    replyTo,
+    templateName: templateName?.trim() || null,
+    attachment,
+  });
+}
+
+function heldDraft(draftId: string, duplicate: boolean, held: string): Extract<WhatsAppDraftFiling, { ok: true }> {
+  return {
+    ok: true,
+    draftId,
+    duplicate,
+    sends: false,
+    sent: false,
+    autoSent: false,
+    status: "draft",
+    wamid: null,
+    held,
+  };
+}
+
+function sentFiling(
+  draftId: string,
+  duplicate: boolean,
+  wamid: string,
+  autoSent: boolean,
+): Extract<WhatsAppDraftFiling, { ok: true }> {
+  return {
+    ok: true,
+    draftId,
+    duplicate,
+    sends: true,
+    sent: true,
+    autoSent,
+    status: "sent",
+    wamid,
+    held: null,
+  };
+}
+
+function attachmentFromRow(row: {
+  attachment_filename?: unknown;
+  attachment_mime?: unknown;
+  attachment_bucket?: unknown;
+  attachment_path?: unknown;
+  attachment_kind?: unknown;
+  attachment_source_table?: unknown;
+}): NormalizedAttachment | null {
+  const filename = typeof row.attachment_filename === "string" ? row.attachment_filename : "";
+  const path = typeof row.attachment_path === "string" ? row.attachment_path : "";
+  const bucket = typeof row.attachment_bucket === "string" ? row.attachment_bucket : "";
+  if (!filename || !path || !bucket) return null;
+  return {
+    filename,
+    mime: typeof row.attachment_mime === "string" && row.attachment_mime ? row.attachment_mime : "application/octet-stream",
+    kind: typeof row.attachment_kind === "string" ? row.attachment_kind : null,
+    sourceTable: typeof row.attachment_source_table === "string" ? row.attachment_source_table : null,
+    bucket,
+    path,
+  };
+}
+
+async function autoSendContext(
+  svc: Svc,
+  orgId: string,
+  replyTo: string | null,
+): Promise<
+  | {
+      ok: true;
+      replyTo: string | null;
+      replyFrom: string | null;
+      inboundReason: string | null;
+      latestInboundReason: string | null;
+      lastInboundAt: string | null;
+    }
+  | { ok: false; held: string }
+> {
+  const answered = replyTo?.trim() || null;
+  if (!answered) {
+    return {
+      ok: true,
+      replyTo: null,
+      replyFrom: null,
+      inboundReason: null,
+      latestInboundReason: null,
+      lastInboundAt: null,
+    };
+  }
+  const inbound = await svc
+    .from("whatsapp_messages")
+    .select("from_number, route_reason, wa_timestamp")
+    .eq("org_id", orgId)
+    .eq("wamid", answered)
+    .eq("direction", "inbound")
+    .maybeSingle();
+  if (schemaMissing(inbound.error) || inbound.error) {
+    return { ok: false, held: "Could not read the message this replies to, so it stayed a draft." };
+  }
+  const replyFrom = typeof inbound.data?.from_number === "string" ? inbound.data.from_number : null;
+  if (!inbound.data || !replyFrom) {
+    return {
+      ok: true,
+      replyTo: answered,
+      replyFrom: null,
+      inboundReason: null,
+      latestInboundReason: null,
+      lastInboundAt: null,
+    };
+  }
+  const last = await svc
+    .from("whatsapp_messages")
+    .select("wa_timestamp, route_reason")
+    .eq("org_id", orgId)
+    .eq("direction", "inbound")
+    .eq("from_number", replyFrom)
+    .order("wa_timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (schemaMissing(last.error) || last.error || !last.data) {
+    return { ok: false, held: "Could not confirm the 24-hour window, so the reply stayed a draft." };
+  }
+  return {
+    ok: true,
+    replyTo: answered,
+    replyFrom,
+    inboundReason: (inbound.data.route_reason as string | null) ?? null,
+    latestInboundReason: (last.data.route_reason as string | null) ?? null,
+    lastInboundAt: (last.data.wa_timestamp as string | undefined) ?? null,
+  };
+}
+
+/**
+ * After the row is stored as a draft. Auto-send runs only when the reply
+ * answers a stored inbound and `to` is that inbound's sender. A refusal on
+ * that inbound or on the sender's latest inbound stays a draft. The human
+ * approval path is unchanged: a mismatched `to` is still stored.
+ */
+async function considerAutoSend(
+  svc: Svc,
+  orgId: string,
+  input: {
+    draftId: string;
+    duplicate: boolean;
+    to: string;
+    text: string;
+    replyTo: string | null;
+    templateName: string | null;
+    attachment: NormalizedAttachment | null;
+    existing?: {
+      status: string;
+      wamid: string | null;
+      sendAttempted: boolean;
+      routeReason: string | null;
+    };
+  },
+): Promise<Extract<WhatsAppDraftFiling, { ok: true }>> {
+  const existing = input.existing;
+  if (existing?.status === "sent" && existing.wamid) {
+    return sentFiling(input.draftId, true, existing.wamid, isAutoSentAudit(existing.routeReason));
+  }
+  if (existing?.sendAttempted) {
+    return heldDraft(
+      input.draftId,
+      input.duplicate,
+      "A send was already attempted and WhatsApp did not confirm it. Check the phone before asking for a new draft.",
+    );
+  }
+
+  const env = readWhatsAppEnv(process.env);
+  const context = await autoSendContext(svc, orgId, input.replyTo);
+  if (!context.ok) return heldDraft(input.draftId, input.duplicate, context.held);
+
+  const decision = decideAutoSend({
+    enabled: env.autoSend,
+    to: input.to,
+    text: input.text,
+    senders: env.senders,
+    replyTo: context.replyTo,
+    replyFrom: context.replyFrom,
+    inboundReason: context.inboundReason,
+    latestInboundReason: context.latestInboundReason,
+    lastInboundAt: context.lastInboundAt,
+    now: new Date(),
+    document: input.attachment
+      ? {
+          filename: input.attachment.filename,
+          mime: input.attachment.mime,
+          kind: input.attachment.kind,
+          sourceTable: input.attachment.sourceTable,
+        }
+      : null,
+  });
+  if (!decision.send) return heldDraft(input.draftId, input.duplicate, decision.reason);
+
+  if (!env.phoneNumberId || !env.accessToken) {
+    console.error("whatsapp: phone number id or access token is missing. The reply stayed a draft.");
+    return heldDraft(input.draftId, input.duplicate, "WhatsApp sending is not configured. The reply stayed a draft.");
+  }
+  if (decision.mode === "document" && (!input.attachment?.path || !input.attachment.bucket)) {
+    return heldDraft(input.draftId, input.duplicate, "That draft names a document but the file is not stored.");
+  }
+
+  const plan: Extract<SendPlan, { ok: true }> =
+    decision.mode === "document"
+      ? {
+          ok: true,
+          mode: "document",
+          to: decision.to,
+          body: decision.body,
+          filename: decision.filename ?? input.attachment?.filename ?? "list",
+          mime: decision.mime ?? input.attachment?.mime ?? "application/octet-stream",
+        }
+      : { ok: true, mode: "text", to: decision.to, body: decision.body };
+
+  const transmitted = await transmitWhatsAppDraft({
+    svc,
+    orgId,
+    draftId: input.draftId,
+    env: {
+      graphVersion: env.graphVersion,
+      phoneNumberId: env.phoneNumberId,
+      accessToken: env.accessToken,
+    },
+    decision: plan,
+    routeReason: decision.audit,
+    approvedBy: null,
+    attachmentBucket: input.attachment?.bucket ?? null,
+    attachmentPath: input.attachment?.path ?? null,
+    priorTemplate: input.templateName,
+    priorBody: input.text,
+  });
+  if (!transmitted.ok) {
+    if (transmitted.status === 409) {
+      const again = await svc
+        .from("whatsapp_messages")
+        .select("status, wamid, route_reason")
+        .eq("id", input.draftId)
+        .eq("org_id", orgId)
+        .maybeSingle();
+      const wamid = (again.data?.wamid as string | null) ?? null;
+      if (again.data?.status === "sent" && wamid) {
+        return sentFiling(input.draftId, true, wamid, isAutoSentAudit(again.data.route_reason as string | null));
+      }
+    }
+    return heldDraft(input.draftId, input.duplicate, transmitted.error);
+  }
+  return sentFiling(input.draftId, input.duplicate, transmitted.wamid, true);
 }
 
 async function guardStoredDocument(
@@ -919,19 +1205,56 @@ export async function sendApprovedWhatsAppDraft(params: {
   });
   if (!decision.ok) return decision;
 
+  return transmitWhatsAppDraft({
+    svc,
+    orgId: params.orgId,
+    draftId: params.draftId,
+    env: {
+      graphVersion: env.graphVersion,
+      phoneNumberId: env.phoneNumberId,
+      accessToken: env.accessToken,
+    },
+    decision,
+    routeReason: null,
+    approvedBy: params.userId,
+    attachmentBucket,
+    attachmentPath,
+    priorTemplate: (draft.template_name as string | null) ?? null,
+    priorBody: (draft.body as string | null) ?? null,
+  });
+}
+
+async function transmitWhatsAppDraft(args: {
+  svc: Svc;
+  orgId: string;
+  draftId: string;
+  env: { graphVersion: string; phoneNumberId: string; accessToken: string };
+  decision: Extract<SendPlan, { ok: true }>;
+  routeReason: string | null;
+  approvedBy: string | null;
+  attachmentBucket: string | null;
+  attachmentPath: string | null;
+  priorTemplate: string | null;
+  priorBody: string | null;
+}): Promise<{ ok: true; wamid: string } | { ok: false; status: number; error: string }> {
   const now = new Date().toISOString();
-  const { data: claimed, error: claimError } = await svc
+  const patch: Record<string, unknown> = {
+    send_attempted_at: now,
+    body: args.decision.mode === "template" ? args.priorBody : args.decision.body,
+    template_name: args.decision.mode === "template" ? args.decision.templateName : args.priorTemplate,
+    updated_at: now,
+  };
+  if (args.approvedBy) {
+    patch.approved_at = now;
+    patch.approved_by = args.approvedBy;
+  }
+  if (args.routeReason) patch.route_reason = args.routeReason;
+
+  const { data: claimed, error: claimError } = await args.svc
     .from("whatsapp_messages")
-    .update({
-      send_attempted_at: now,
-      approved_at: now,
-      approved_by: params.userId,
-      body: decision.mode === "template" ? (draft.body as string | null) : decision.body,
-      template_name: decision.mode === "template" ? decision.templateName : (draft.template_name as string | null),
-      updated_at: now,
-    })
-    .eq("id", params.draftId)
-    .eq("org_id", params.orgId)
+    .update(patch)
+    .eq("id", args.draftId)
+    .eq("org_id", args.orgId)
     .eq("status", "draft")
     .is("send_attempted_at", null)
     .select("id")
@@ -944,59 +1267,64 @@ export async function sendApprovedWhatsAppDraft(params: {
   }
 
   let graphBody: Record<string, unknown>;
-  if (decision.mode === "document") {
-    const file = await downloadDraftFile(svc, attachmentBucket ?? "", attachmentPath ?? "");
+  if (args.decision.mode === "document") {
+    const file = await downloadDraftFile(args.svc, args.attachmentBucket ?? "", args.attachmentPath ?? "");
     if (!file.ok) {
-      await releaseSendClaim(svc, params.orgId, params.draftId, file.error);
+      await releaseSendClaim(args.svc, args.orgId, args.draftId, file.error, Boolean(args.routeReason));
       return file;
     }
     const media = await uploadGraphMedia({
-      version: env.graphVersion,
-      phoneNumberId: env.phoneNumberId,
-      accessToken: env.accessToken,
-      filename: decision.filename,
-      mime: decision.mime,
+      version: args.env.graphVersion,
+      phoneNumberId: args.env.phoneNumberId,
+      accessToken: args.env.accessToken,
+      filename: args.decision.filename,
+      mime: args.decision.mime,
       bytes: file.bytes,
     });
     if (!media.ok) {
-      await releaseSendClaim(svc, params.orgId, params.draftId, media.error);
+      await releaseSendClaim(args.svc, args.orgId, args.draftId, media.error, Boolean(args.routeReason));
       return { ok: false, status: media.status, error: media.error };
     }
     graphBody = graphDocumentBody({
-      to: decision.to,
+      to: args.decision.to,
       mediaId: media.mediaId,
-      filename: decision.filename,
-      caption: decision.body,
+      filename: args.decision.filename,
+      caption: args.decision.body,
     });
   } else {
-    graphBody = graphSendBody(decision);
+    graphBody = graphSendBody(args.decision);
   }
 
   const graph = await postToGraph({
-    version: env.graphVersion,
-    phoneNumberId: env.phoneNumberId,
-    accessToken: env.accessToken,
+    version: args.env.graphVersion,
+    phoneNumberId: args.env.phoneNumberId,
+    accessToken: args.env.accessToken,
     body: graphBody,
   });
   if (!graph.ok) {
     if (!graph.ambiguous) {
-      await svc
+      await args.svc
         .from("whatsapp_messages")
-        .update({ send_attempted_at: null, error: graph.error, updated_at: new Date().toISOString() })
-        .eq("id", params.draftId)
-        .eq("org_id", params.orgId)
+        .update({
+          send_attempted_at: null,
+          error: graph.error,
+          ...(args.routeReason ? { route_reason: null } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", args.draftId)
+        .eq("org_id", args.orgId)
         .eq("status", "draft");
     } else {
-      await svc
+      await args.svc
         .from("whatsapp_messages")
         .update({ error: graph.error, updated_at: new Date().toISOString() })
-        .eq("id", params.draftId)
-        .eq("org_id", params.orgId);
+        .eq("id", args.draftId)
+        .eq("org_id", args.orgId);
     }
     return { ok: false, status: graph.status, error: graph.error };
   }
 
-  const { error: sentError } = await svc
+  const { error: sentError } = await args.svc
     .from("whatsapp_messages")
     .update({
       status: "sent",
@@ -1005,18 +1333,29 @@ export async function sendApprovedWhatsAppDraft(params: {
       error: null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", params.draftId)
-    .eq("org_id", params.orgId);
+    .eq("id", args.draftId)
+    .eq("org_id", args.orgId);
   if (sentError) {
     console.error("whatsapp: the message was accepted and was not sent again, but the row could not be marked sent.");
   }
   return { ok: true, wamid: graph.wamid };
 }
 
-async function releaseSendClaim(svc: Svc, orgId: string, draftId: string, error: string): Promise<void> {
+async function releaseSendClaim(
+  svc: Svc,
+  orgId: string,
+  draftId: string,
+  error: string,
+  clearAudit = false,
+): Promise<void> {
   await svc
     .from("whatsapp_messages")
-    .update({ send_attempted_at: null, error, updated_at: new Date().toISOString() })
+    .update({
+      send_attempted_at: null,
+      error,
+      ...(clearAudit ? { route_reason: null } : {}),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", draftId)
     .eq("org_id", orgId)
     .eq("status", "draft");
@@ -1184,7 +1523,7 @@ async function listWhatsApp(
 
   const inbound = data.filter((row) => row.direction === "inbound");
   const drafts = data.filter((row) => row.direction === "outbound" && row.status === "draft");
-  const draftNumbers = new Set(drafts.map((row) => String(row.to_number)));
+  const outboundTo = data.filter((row) => row.direction === "outbound").map((row) => String(row.to_number));
   const now = new Date();
 
   return {
@@ -1209,7 +1548,7 @@ async function listWhatsApp(
       };
     }),
     waiting: inbound
-      .filter((row) => !draftNumbers.has(String(row.from_number)))
+      .filter((row) => !whatsAppInboundHasReply(String(row.from_number), outboundTo))
       .slice(0, 5)
       .map((row) => ({
         id: String(row.id),

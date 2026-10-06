@@ -25,3 +25,8 @@ export interface WhatsAppRecord {
   /** The one template a person may send outside the 24-hour window. */
   approvedTemplate: string | null;
 }
+
+/** An inbound is no longer waiting once any outbound — draft or already sent — is addressed to that sender. */
+export function whatsAppInboundHasReply(from: string, outboundTo: readonly string[]): boolean {
+  return outboundTo.includes(from);
+}

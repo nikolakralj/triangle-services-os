@@ -65,9 +65,15 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 { "to": "+E164", "text": "the words a person will send", "replyTo": "<wamid>" }
 ```
 
-That stores a draft. It does not send. A person approves and sends it from
-the case. Outside 24 hours of the contact's last message, only the approved
-template can go, and only after that same approval.
+That files the reply. `to` is the sender on `replyTo`. When that number is
+an owner or field number, the reply is not a refusal, their latest message
+is not a refusal, and it was inside 24 hours, Triangle sends it back to
+that number. A missing `replyTo`, or a different `to`, stays a draft.
+`"sent": true` and a `wamid` mean it went out. `"sent": false` and
+`held` mean it stayed a draft. A refused or flagged case stays a draft.
+Anyone else stays a draft until a person sends it from the case. Outside 24
+hours, free text is not sent on its own; only the approved template can go,
+and only after a person approves.
 
 On a mission, `pool` lists people by initials and matching facts — never a
 name, email, phone, rate or CV text. File as you go:
