@@ -204,10 +204,12 @@ refusal, stays a draft a person sends.
    token to the same value as `WHATSAPP_VERIFY_TOKEN`, and subscribe to the
    `messages` field.
 3. Add the two pilot recipients on the test number.
-4. Create one message template for outside the 24-hour window, and set
-   `WHATSAPP_TEMPLATE_NAME` to that name. A document cannot ride on that
-   template. Outside 24 hours, Send uses the template only when the draft
-   has no document.
+4. Create one message template for outside the 24-hour window, with no
+   parameters, and set `WHATSAPP_TEMPLATE_NAME` to that name. Set
+   `WHATSAPP_TEMPLATE_LANGUAGE` to the template's language (default `en`).
+   A document cannot ride on that template. Outside 24 hours, a person may
+   send it, and Hanna, Bob, or Scout may send it to the owner or the field
+   when the draft's `templateName` is exactly that name.
 5. Set the WhatsApp variables above in Vercel (Production and Preview) and
    redeploy. `WHATSAPP_APP_SECRET` has to be set or every inbound POST
    returns 503 and is not stored — on 2 October Production had only

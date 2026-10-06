@@ -60,17 +60,21 @@ const {
   acceptCloudPayload,
   autoSendBoundToInbound,
   decideAutoSend,
-  decideInstantAck,
+  decideTypingIndicator,
   decideSend,
+  draftFailureHint,
   graphDocumentBody,
   graphMediaUrl,
-  instantAckCopy,
+  graphTypingBody,
   isAutoSentAudit,
   isInstantAcknowledgment,
+  isTypingIndicator,
   outboundCountsAsReply,
+  TYPING_REASON,
   parseWebhook,
   planDraft,
   readAllowlist,
+  storedDocumentReplyAllowed,
   readWhatsAppEnv,
   signatureHex,
   wakeEnvForRole,
@@ -97,7 +101,10 @@ const {
   documentBytesAllowed,
   employeeMayDraftWhatsApp,
   keywordRoute,
+  pickWorkerCv,
+  storedDocumentForRecipient,
   storedDocumentRowRequired,
+  wakeExpectedOutput,
   whatsAppEmployeeLabel,
   parseModelRoute,
   permissionFor,
@@ -380,6 +387,77 @@ test("Scout can draft, a list document is a draft, a CV is refused", () => {
   assert.equal(named.ok, false);
   assert.equal(draftTextAllowed("Here is the full named CV", "owner").ok, true);
   assert.equal(draftTextAllowed("Here is the full named CV", "field").ok, true);
+  assert.equal(draftTextAllowed("initials only, no date of birth", "owner").ok, true);
+  assert.equal(draftTextAllowed("€ 1,200", "field").ok, true);
+  assert.equal(draftTextAllowed("initials only, no date of birth", "other").ok, false);
+  assert.equal(draftTextAllowed("€ 1,200", "other").ok, false);
+  assert.equal(draftTextAllowed("initials only, no date of birth").ok, false);
+  assert.equal(draftTextAllowed("€ 1,200").ok, false);
+  const captionFile = { filename: "notes.csv", mime: "text/csv", kind: "notes", hasContent: true };
+  const ownerCaption = planDraft({
+    agentId: "triangle_hr",
+    to: "+15551000001",
+    text: "initials only, no date of birth",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "owner",
+    attachment: captionFile,
+  });
+  assert.equal(ownerCaption.ok, true);
+  const fieldCaption = planDraft({
+    agentId: "triangle_bob_nikola",
+    to: "+15551000002",
+    text: "€ 1,200",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "field",
+    attachment: captionFile,
+  });
+  assert.equal(fieldCaption.ok, true);
+  const otherCaption = planDraft({
+    agentId: "triangle_bob_nikola",
+    to: "+15551000003",
+    text: "€ 1,200",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+    attachment: captionFile,
+  });
+  assert.equal(otherCaption.ok, false);
+  assert.match(otherCaption.error, /rate/);
+  const otherIdentity = planDraft({
+    agentId: "triangle_hr",
+    to: "+15551000003",
+    text: "initials only, no date of birth",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+    attachment: captionFile,
+  });
+  assert.equal(otherIdentity.ok, false);
+  assert.match(otherIdentity.error, /identity|date of birth/i);
+  const refusedFile = planDraft({
+    agentId: "triangle_bob_nikola",
+    to: "+15551000003",
+    text: "€ 1,200",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+    attachment: captionFile,
+  });
+  assert.equal(draftFailureHint(400, refusedFile.error), "You may file a text-only reply with the same replyTo.");
+  const textOnly = planDraft({
+    agentId: "triangle_bob_nikola",
+    to: "+15551000003",
+    text: "The file stayed here. I'll put the figure in the next note once you want it in words.",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+  });
+  assert.equal(textOnly.ok, true);
+  assert.equal(textOnly.attachment, null);
+  assert.equal(draftFailureHint(400, "Say who to, as an E.164 number."), null);
+  assert.equal(draftFailureHint(403, refusedFile.error), null);
   assert.match(WHATSAPP_DATA_RULE, /owner or field number may receive any document/);
   assert.match(read("DECISIONS.md"), /no CV or worker profile\s+leaves by WhatsApp/i);
 });
@@ -930,6 +1008,129 @@ test("Nikola and Ralph receive any document; everyone else stays blocked from CV
   assert.match(read(".env.example"), /100 MB/);
 });
 
+test("the wake follows the sender, and a stored document answers only that sender", () => {
+  const owner = wakeExpectedOutput("owner");
+  const field = wakeExpectedOutput("field");
+  const other = wakeExpectedOutput("other");
+  assert.match(owner, /Do not send/);
+  assert.match(owner, /may be attached on the reply to their inbound/);
+  assert.match(owner, /CV, worker profile, financial document, or mission document/);
+  assert.match(field, /may be attached on the reply to their inbound/);
+  assert.match(other, /Do not send/);
+  assert.match(other, /No CV or worker profile or financial document/);
+  assert.doesNotMatch(other, /may be attached on the reply/);
+  const wake = read("src/lib/data/whatsapp.ts");
+  assert.match(wake, /wakeExpectedOutput/);
+  assert.doesNotMatch(wake, /No CV or worker profile\. Do not send email/);
+  assert.match(wake, /There is no CV on file for this person/);
+  assert.match(wake, /workerId/);
+  assert.match(wake, /documentId/);
+  assert.match(wake, /storedDocumentForRecipient/);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_hr", displayName: "Hanna" }), true);
+
+  const now = new Date("2026-10-06T12:00:00.000Z");
+  const inside = "2026-10-06T08:00:00.000Z";
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const allowed = storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "owner",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(allowed.ok, true);
+  assert.equal(storedDocumentReplyAllowed({
+    to: fieldNumber,
+    replyTo: "wamid.IN",
+    replyFrom: fieldNumber,
+    recipientRole: "field",
+    lastInboundAt: inside,
+    now,
+  }).ok, true);
+  const stranger = storedDocumentReplyAllowed({
+    to: "+15551000003",
+    replyTo: "wamid.IN",
+    replyFrom: "+15551000003",
+    recipientRole: "other",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(stranger.ok, false);
+  assert.match(stranger.error, /owner or field/);
+  const misbound = storedDocumentReplyAllowed({
+    to: fieldNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "field",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(misbound.ok, false);
+  const late = storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "owner",
+    lastInboundAt: inside,
+    now: new Date("2026-10-07T12:00:01.000Z"),
+  });
+  assert.equal(late.ok, false);
+  assert.match(late.reason ?? late.error, /24-hour/);
+  assert.equal(storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: null,
+    replyFrom: null,
+    recipientRole: "owner",
+    lastInboundAt: inside,
+    now,
+  }).ok, true);
+  assert.equal(storedDocumentReplyAllowed({
+    to: fieldNumber,
+    replyTo: "  ",
+    replyFrom: null,
+    recipientRole: "field",
+    lastInboundAt: inside,
+    now,
+  }).ok, true);
+  const startedLate = storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: null,
+    recipientRole: "owner",
+    lastInboundAt: null,
+    now,
+  });
+  assert.equal(startedLate.ok, false);
+  assert.match(startedLate.error, /24-hour/);
+  assert.equal(storedDocumentForRecipient("stored_document", "other").ok, false);
+  assert.equal(storedDocumentForRecipient("stored_document", "field").ok, true);
+  assert.equal(storedDocumentForRecipient("contractor_list", "other").ok, true);
+
+  const current = {
+    id: "cv-new",
+    category: "cv",
+    bucket: "documents",
+    path: "org/workers/a/cv.pdf",
+    isCurrent: true,
+    createdAt: "2026-10-02T00:00:00.000Z",
+  };
+  const older = { ...current, id: "cv-old", createdAt: "2026-01-01T00:00:00.000Z" };
+  const retired = { ...current, id: "cv-retired", isCurrent: false, createdAt: "2026-10-05T00:00:00.000Z" };
+  const otherBucket = { ...current, id: "cv-other", bucket: "whatsapp-drafts" };
+  const passport = { ...current, id: "passport", category: "id_passport" };
+  assert.equal(pickWorkerCv([older, retired, otherBucket, passport, current])?.id, "cv-new");
+  assert.equal(pickWorkerCv([retired, passport]), null);
+
+  const route = read("src/app/api/agent/whatsapp/drafts/route.ts");
+  assert.match(route, /workerId/);
+  assert.match(route, /documentId/);
+  assert.match(route, /never includes the file/);
+  assert.match(read("agents/hanna.md"), /workerId/);
+  assert.match(read("agents/bob.md"), /documentId/);
+  assert.match(read("agents/scout.md"), /documentId/);
+});
+
 test("each badge can attach a document that auto-sends to the owner and the field", () => {
   const fieldNumber = "+15551000002";
   const ownerNumber = "+15551000001";
@@ -1090,7 +1291,9 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
     text: "IBAN GB00TEST",
     document: { filename: "unpaid-invoice.pdf", mime: "application/pdf", kind: "invoice" },
   });
-  assert.equal(ibanCaption.send, false);
+  assert.equal(ibanCaption.send, true);
+  assert.equal(draftTextAllowed("IBAN GB00TEST", "other").ok, false);
+  assert.equal(draftTextAllowed("IBAN GB00TEST").ok, false);
 
   const software = decideInbound({
     text: "Please change the software and add a button",
@@ -1211,7 +1414,8 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.match(filing, /routeReason: decision\.audit/);
   assert.match(filing, /replyFrom: context\.replyFrom/);
   assert.match(filing, /latestInboundReason: context\.latestInboundReason/);
-  assert.match(filing, /if \(!to\) to = String\(inbound\.data\.from_number/);
+  assert.match(filing, /if \(!to\) to = inboundFrom/);
+  assert.match(filing, /from_number/);
   const refusal = store.slice(store.indexOf("async function ensureRefusalDraft"), store.indexOf("async function applyStatus"));
   assert.doesNotMatch(refusal, /decideAutoSend|postToGraph|considerAutoSend/);
   assert.match(store, /whatsAppInboundHasReply/);
@@ -1250,12 +1454,99 @@ test("auto-send stays a draft unless it answers the inbound sender", () => {
   assert.match(mismatch.reason, /number that wrote in/);
 
   const missing = decideAutoSend({ ...base, to: ownerNumber, replyTo: null, replyFrom: ownerNumber });
-  assert.equal(missing.send, false);
-  assert.match(missing.reason, /no inbound/);
+  assert.equal(missing.send, true);
+  assert.equal(missing.mode, "text");
+  assert.equal(missing.audit, "Auto-sent to the owner, started by employee.");
 
   const blank = decideAutoSend({ ...base, to: fieldNumber, replyTo: "  ", replyFrom: fieldNumber });
-  assert.equal(blank.send, false);
-  assert.match(blank.reason, /no inbound/);
+  assert.equal(blank.send, true);
+  assert.equal(blank.audit, "Auto-sent to the field, started by employee.");
+
+  const otherStarted = decideAutoSend({
+    ...base,
+    to: "+15551000003",
+    replyTo: null,
+    replyFrom: "+15551000003",
+  });
+  assert.equal(otherStarted.send, false);
+  assert.match(otherStarted.reason, /no inbound/);
+
+  const startedDoc = decideAutoSend({
+    ...base,
+    to: ownerNumber,
+    replyTo: null,
+    text: "The CV is attached.",
+    document: { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv", sourceTable: "stored_document" },
+  });
+  assert.equal(startedDoc.send, true);
+  assert.equal(startedDoc.mode, "document");
+  assert.equal(startedDoc.audit, "Auto-sent to the owner, started by employee.");
+
+  const outside = decideAutoSend({
+    ...base,
+    to: fieldNumber,
+    replyTo: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    templateName: null,
+    approvedTemplate: "pilot_hello",
+  });
+  assert.equal(outside.send, false);
+  assert.match(outside.reason, /outside 24h, no template configured/);
+
+  const wrongTemplate = decideAutoSend({
+    ...base,
+    to: ownerNumber,
+    replyTo: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    templateName: "other_template",
+    approvedTemplate: "pilot_hello",
+  });
+  assert.equal(wrongTemplate.send, false);
+  assert.match(wrongTemplate.reason, /outside 24h, no template configured/);
+
+  const templated = decideAutoSend({
+    ...base,
+    to: ownerNumber,
+    replyTo: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    templateName: "pilot_hello",
+    approvedTemplate: "pilot_hello",
+    templateLanguage: "en",
+  });
+  assert.equal(templated.send, true);
+  assert.equal(templated.mode, "template");
+  assert.equal(templated.templateName, "pilot_hello");
+  assert.equal(templated.language, "en");
+  assert.equal(templated.audit, "Auto-sent to the owner, started by employee.");
+
+  const lateDoc = decideAutoSend({
+    ...base,
+    to: fieldNumber,
+    replyTo: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    templateName: "pilot_hello",
+    approvedTemplate: "pilot_hello",
+    document: { filename: "notes.csv", mime: "text/csv", kind: "notes" },
+  });
+  assert.equal(lateDoc.send, false);
+  assert.match(lateDoc.reason, /document cannot be sent/);
+
+  const startedRefusal = decideAutoSend({
+    ...base,
+    to: fieldNumber,
+    replyTo: null,
+    latestInboundReason: "Refused: this sender may not ask for a software change. Flagged for the owner.",
+  });
+  assert.equal(startedRefusal.send, false);
+  assert.match(startedRefusal.reason, /refused|flagged/i);
+
+  for (const badge of [
+    { roleKey: "triangle_hr", displayName: "Hanna" },
+    { roleKey: "triangle_bob_nikola", displayName: "Bob" },
+    { roleKey: "triangle_scout", displayName: "Scout" },
+  ]) {
+    assert.equal(employeeMayDraftWhatsApp(badge), true);
+  }
 
   const dodge = decideAutoSend({
     ...base,
@@ -1295,7 +1586,7 @@ test("auto-send stays a draft unless it answers the inbound sender", () => {
   assert.equal(humanStillApproves.mode, "text");
 });
 
-test("instant acknowledgment for owner and field, not a reply, and not for anyone else", () => {
+test("typing indicator for owner and field, not a reply, and not for anyone else", () => {
   const ownerNumber = "+15551000001";
   const fieldNumber = "+15551000002";
   const senders = bindWhatsAppSenders(ownerNumber, fieldNumber).senders;
@@ -1306,8 +1597,8 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
     flagOwner: false,
     ...extra,
   });
-  const ackFor = (to, route, extra = {}) =>
-    decideInstantAck({
+  const typingFor = (to, route, extra = {}) =>
+    decideTypingIndicator({
       enabled: true,
       to,
       senders,
@@ -1321,42 +1612,43 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
   assert.equal(whatsAppEmployeeLabel("bob"), "Bob");
   assert.equal(whatsAppEmployeeLabel("scout"), "Scout");
   assert.equal(whatsAppEmployeeLabel("nobody"), null);
-  assert.equal(instantAckCopy("hanna"), "Hanna is looking into it.");
-  assert.equal(instantAckCopy("bob"), "Bob is looking into it.");
-  assert.equal(instantAckCopy("scout"), "Scout is looking into it.");
-  assert.equal(instantAckCopy(null), "Looking into it.");
-  assert.equal(instantAckCopy("nobody"), "Looking into it.");
+  assert.deepEqual(graphTypingBody("wamid.IN"), {
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: "wamid.IN",
+    typing_indicator: { type: "text" },
+  });
 
-  const owner = ackFor(ownerNumber, routed("hanna"));
+  const owner = typingFor(ownerNumber, routed("hanna"));
   assert.equal(owner.send, true);
-  assert.equal(owner.body, "Hanna is looking into it.");
-  assert.equal(owner.audit, "Instant acknowledgment.");
+  assert.equal("body" in owner, false);
+  assert.equal(owner.audit, TYPING_REASON);
+  assert.equal(owner.audit, "Typing indicator.");
   assert.equal(owner.draftKey, "ack|wamid.IN");
-  assert.equal("replyTo" in owner, false);
-  assert.equal(isInstantAcknowledgment(owner.audit), true);
+  assert.equal(isTypingIndicator(owner.audit), true);
+  assert.equal(isInstantAcknowledgment("Instant acknowledgment."), true);
+  assert.equal(outboundCountsAsReply("Instant acknowledgment."), false);
   assert.equal(isAutoSentAudit(owner.audit), false);
   assert.equal(outboundCountsAsReply(owner.audit), false);
-  assert.equal(draftTextAllowed(owner.body).ok, true);
 
-  const field = ackFor(fieldNumber, routed("scout", { reason: "Contractor list, so Scout." }));
+  const field = typingFor(fieldNumber, routed("scout", { reason: "Contractor list, so Scout." }));
   assert.equal(field.send, true);
-  assert.equal(field.body, "Scout is looking into it.");
-  const bob = ackFor(ownerNumber, routed("bob"));
+  assert.equal("body" in field, false);
+  const bob = typingFor(ownerNumber, routed("bob"));
   assert.equal(bob.send, true);
-  assert.equal(bob.body, "Bob is looking into it.");
 
-  const unknown = ackFor("+15559999999", routed("hanna"));
+  const unknown = typingFor("+15559999999", routed("hanna"));
   assert.equal(unknown.send, false);
   assert.match(unknown.reason, /not an owner or field/);
 
-  const open = ackFor(ownerNumber, routed("hanna"), { senders: [] });
+  const open = typingFor(ownerNumber, routed("hanna"), { senders: [] });
   assert.equal(open.send, false);
 
-  const off = ackFor(ownerNumber, routed("hanna"), { enabled: false });
+  const off = typingFor(ownerNumber, routed("hanna"), { enabled: false });
   assert.equal(off.send, false);
-  assert.match(off.reason, /switched off/);
+  assert.match(off.reason, /switched off|No typing indicator/);
 
-  const duplicate = ackFor(fieldNumber, routed("hanna"), { alreadyAcked: true });
+  const duplicate = typingFor(fieldNumber, routed("hanna"), { alreadyAcked: true });
   assert.equal(duplicate.send, false);
   assert.match(duplicate.reason, /already stored/);
 
@@ -1366,7 +1658,7 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
     senders,
   });
   assert.equal(software.action, "refuse");
-  const refused = ackFor(fieldNumber, software);
+  const refused = typingFor(fieldNumber, software);
   assert.equal(refused.send, false);
   assert.match(refused.reason, /refused|flagged/i);
   const email = decideInbound({
@@ -1374,7 +1666,7 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
     from: fieldNumber,
     senders,
   });
-  assert.equal(ackFor(fieldNumber, email).send, false);
+  assert.equal(typingFor(fieldNumber, email).send, false);
 
   const unlisted = decideInbound({
     text: "Hello",
@@ -1383,7 +1675,7 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
     unmatched: "unlisted",
   });
   assert.equal(unlisted.employee, null);
-  assert.equal(ackFor("+15559999999", unlisted).send, false);
+  assert.equal(typingFor("+15559999999", unlisted).send, false);
 
   const statusOnly = parseWebhook({
     object: "whatsapp_business_account",
@@ -1404,10 +1696,10 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
   assert.equal(statusOnly.length, 1);
   assert.equal(statusOnly[0].messages.length, 0);
   assert.equal(statusOnly[0].statuses.length, 1);
-  const statusAcks = statusOnly[0].messages.map((message) =>
-    ackFor(message.from, routed("hanna"), { wamid: message.wamid }),
+  const statusTyping = statusOnly[0].messages.map((message) =>
+    typingFor(message.from, routed("hanna"), { wamid: message.wamid }),
   );
-  assert.equal(statusAcks.length, 0);
+  assert.equal(statusTyping.length, 0);
 
   const reply = decideAutoSend({
     enabled: true,
@@ -1431,21 +1723,41 @@ test("instant acknowledgment for owner and field, not a reply, and not for anyon
   assert.equal(unbound.ok, false);
 
   const store = read("src/lib/data/whatsapp.ts");
-  const ackFn = store.slice(store.indexOf("async function sendInstantAck"), store.indexOf("async function applyStatus"));
-  assert.match(ackFn, /reply_to_wamid: null/);
-  assert.match(ackFn, /decideInstantAck/);
-  assert.doesNotMatch(ackFn, /template/);
+  const typingFn = store.slice(store.indexOf("async function showTypingIndicator"), store.indexOf("async function applyStatus"));
+  assert.match(typingFn, /reply_to_wamid: null/);
+  assert.match(typingFn, /decideTypingIndicator/);
+  assert.match(typingFn, /graphTypingBody/);
+  assert.doesNotMatch(typingFn, /is looking into it/);
+  assert.doesNotMatch(store, /is looking into it/);
+  assert.match(store, /The sender sees typing/);
+  assert.doesNotMatch(store, /acknowledgment was already sent/);
   const statusFn = store.slice(store.indexOf("async function applyStatus"), store.indexOf("export async function fileWhatsAppDraft"));
-  assert.doesNotMatch(statusFn, /sendInstantAck|decideInstantAck/);
+  assert.doesNotMatch(statusFn, /showTypingIndicator|decideTypingIndicator/);
   assert.match(store, /after\(/);
   assert.match(store, /classifyInbound/);
   const background = store.slice(store.indexOf("runAfterResponse(async () => {"), store.indexOf("function runAfterResponse"));
-  assert.match(background, /sendInstantAck/);
-  const ackAt = background.indexOf("sendInstantAck");
+  assert.match(background, /showTypingIndicator/);
+  const typingAt = background.indexOf("showTypingIndicator");
   const wakeAt = background.indexOf("wakeRoutedEmployee");
-  assert.ok(ackAt >= 0 && wakeAt > ackAt);
+  assert.ok(typingAt >= 0 && wakeAt > typingAt);
   assert.match(read("src/app/api/whatsapp/webhook/route.ts"), /does not call Graph/);
-  assert.doesNotMatch(read("DECISIONS.md").split("### 2026-10-06")[1]?.split("### ")[0] ?? "", /\+\d{8,}/);
+  const route = read("src/app/api/agent/whatsapp/drafts/route.ts");
+  assert.match(route, /draftFailureHint/);
+  assert.match(route, /same replyTo/);
+  for (const file of ["agents/hanna.md", "agents/bob.md", "agents/scout.md"]) {
+    const doc = read(file);
+    assert.match(doc, /replyTo/);
+    assert.match(doc, /templateName/);
+    assert.match(doc, /witty/);
+    assert.match(doc, /looking into it/);
+  }
+  assert.match(read("agents/hanna.md"), /workerId/);
+  assert.match(read("agents/bob.md"), /documentId/);
+  assert.match(read("agents/scout.md"), /documentId/);
+  const decision = read("DECISIONS.md").split("### 2026-10-06")[1]?.split("### ")[0] ?? "";
+  assert.doesNotMatch(decision, /\+\d{8,}/);
+  assert.match(decision, /creative and funny/);
+  assert.match(decision, /Hanna may start WhatsApp messages to me and Ralph/);
 });
 
 test("24h window enforcement", () => {

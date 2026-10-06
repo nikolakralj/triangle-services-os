@@ -164,8 +164,8 @@ export async function wakeEmployee(params: {
     draftEndpoint?: string;
     /** Set when this sender must not cause an outbound email. */
     handoffNote?: string;
-    /** Triangle already sent the fixed acknowledgment. The draft is the answer. */
-    acknowledgementSent?: boolean;
+    /** Triangle is showing the sender a typing indicator. The draft is the answer. */
+    typingShown?: boolean;
   };
 }): Promise<WakeResult> {
   const svc = createServiceSupabaseClient();
@@ -211,7 +211,7 @@ export async function wakeEmployee(params: {
                   ? { draftEndpoint: params.context.draftEndpoint }
                   : {}),
                 ...(params.context.handoffNote ? { handoffNote: params.context.handoffNote } : {}),
-                ...(params.context.acknowledgementSent ? { acknowledgementSent: true } : {}),
+                ...(params.context.typingShown ? { typingShown: true } : {}),
               }
             : {}),
         }),
