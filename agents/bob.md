@@ -69,7 +69,15 @@ not a refusal, and it was inside 24 hours, Triangle sends it back to that
 number. A missing `replyTo`, or a different `to`, stays a draft.
 `"sent": true` means it went out. Nikola and Ralph may receive a file you
 attach — a bank statement, an invoice, a PDF, a spreadsheet, a csv, or a
-docx — up to WhatsApp's 100 MB document limit. A CV, a worker profile, or a financial
+docx — up to WhatsApp's 100 MB document limit. A file already stored in this
+organisation is named, not uploaded, and the bytes are not returned to you:
+
+```
+{ "to": "+E164", "text": "The invoice is attached.", "replyTo": "<wamid>",
+  "document": { "documentId": "<documents uuid>" } }
+```
+
+That still has to answer their inbound inside 24 hours. Anyone else is refused. A CV, a worker profile, or a financial
 document still does not go to anyone else, and a person cannot approve
 that. A spreadsheet that is none of those can still be a list document. A refusal stays a draft, and
 so does a reply to anyone else. If the handoff says `requester may

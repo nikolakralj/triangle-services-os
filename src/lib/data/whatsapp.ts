@@ -24,6 +24,7 @@ import {
   planDraft,
   planInbound,
   readWhatsAppEnv,
+  storedDocumentReplyAllowed,
   schemaMissing,
   serviceWindowOpen,
   type ParsedStatus,
@@ -41,9 +42,12 @@ import {
   employeeKeyOf,
   employeeMayDraftWhatsApp,
   parseModelRoute,
+  pickWorkerCv,
   ROUTE_MODEL_INSTRUCTIONS,
   type SenderPermission,
+  storedDocumentForRecipient,
   storedDocumentRowRequired,
+  wakeExpectedOutput,
   WHATSAPP_DRAFT_BUCKET,
   WHATSAPP_DRAFT_ENDPOINT,
   whatsAppRecipientRole,
@@ -541,7 +545,9 @@ async function wakeRoutedEmployee(
           mission_id: ctx.caseId,
           title: "WhatsApp",
           objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.acknowledgementSent ? " An acknowledgment was already sent. Draft the answer, not another note that you are looking." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
-          expected_output: "A draft reply. Do not send. No CV or worker profile. Do not send email when the handoff forbids it.",
+          expected_output: wakeExpectedOutput(
+            whatsAppRecipientRole(ctx.sender, readWhatsAppEnv(process.env).senders),
+          ),
           status: "queued",
           priority: "high",
           idempotency_key: idempotencyKey,
@@ -803,6 +809,120 @@ export type WhatsAppDraftFiling =
     }
   | { ok: false; status: number; error: string };
 
+interface StoredDocumentFields {
+  filename: string;
+  mime: string;
+  kind: string | null;
+  sourceTable: "stored_document";
+  linkedEntityType: string | null;
+  storageBucket: string;
+  storagePath: string;
+  title: string | null;
+}
+
+function fieldsFromDocumentRow(row: {
+  file_name: string | null;
+  mime_type: string | null;
+  file_size: number | string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  document_category: string | null;
+  linked_entity_type: string | null;
+  title: string | null;
+}): { ok: true; fields: StoredDocumentFields } | { ok: false; status: number; error: string } {
+  const bucket = (row.storage_bucket ?? "").trim();
+  const path = (row.storage_path ?? "").trim();
+  if (bucket !== "documents" || !path) {
+    return { ok: false, status: 400, error: "That file is not in the documents bucket." };
+  }
+  if (row.file_size != null && row.file_size !== "") {
+    const size = Number(row.file_size);
+    const allowed = documentBytesAllowed(size);
+    if (!allowed.ok) return { ok: false, status: 400, error: allowed.error };
+  }
+  const filename = (row.file_name ?? "").trim();
+  if (!filename) return { ok: false, status: 400, error: "That document has no filename." };
+  return {
+    ok: true,
+    fields: {
+      filename,
+      mime: (row.mime_type ?? "").trim(),
+      kind: (row.document_category ?? "").trim() || null,
+      sourceTable: "stored_document",
+      linkedEntityType: row.linked_entity_type,
+      storageBucket: bucket,
+      storagePath: path,
+      title: row.title,
+    },
+  };
+}
+
+/**
+ * A workerId is that person's current CV. A documentId is one documents row
+ * in this organisation. The bytes stay in storage; the draft only keeps the path.
+ * A CV drawn from the worker row, with no file stored, is not built here.
+ */
+async function resolveStoredDocument(
+  svc: Svc,
+  orgId: string,
+  workerId: string,
+  documentId: string,
+): Promise<{ ok: true; fields: StoredDocumentFields } | { ok: false; status: number; error: string }> {
+  if (workerId && documentId) {
+    return { ok: false, status: 400, error: "Name the worker or the document, not both." };
+  }
+  const columns =
+    "id, file_name, mime_type, file_size, storage_bucket, storage_path, document_category, linked_entity_type, linked_entity_id, is_current_version, title, created_at";
+  if (workerId) {
+    if (!UUID.test(workerId)) return { ok: false, status: 400, error: "That worker id is not usable." };
+    const worker = await svc
+      .from("workers")
+      .select("id")
+      .eq("id", workerId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (worker.error && !schemaMissing(worker.error)) {
+      return { ok: false, status: 400, error: "Could not read that person." };
+    }
+    if (!worker.data) return { ok: false, status: 404, error: "That person is not in this organisation." };
+    const docs = await svc
+      .from("documents")
+      .select(columns)
+      .eq("organization_id", orgId)
+      .eq("linked_entity_type", "worker")
+      .eq("linked_entity_id", workerId)
+      .limit(20);
+    if (docs.error && !schemaMissing(docs.error)) {
+      return { ok: false, status: 400, error: "Could not read that document." };
+    }
+    const picked = pickWorkerCv(
+      (docs.data ?? []).map((row) => ({
+        id: String(row.id),
+        category: (row.document_category as string | null) ?? null,
+        bucket: (row.storage_bucket as string | null) ?? null,
+        path: (row.storage_path as string | null) ?? null,
+        isCurrent: (row.is_current_version as boolean | null) ?? null,
+        createdAt: (row.created_at as string | null) ?? null,
+      })),
+    );
+    const row = (docs.data ?? []).find((item) => String(item.id) === picked?.id);
+    if (!row) return { ok: false, status: 404, error: "There is no CV on file for this person." };
+    return fieldsFromDocumentRow(row);
+  }
+  if (!UUID.test(documentId)) return { ok: false, status: 400, error: "That document id is not usable." };
+  const doc = await svc
+    .from("documents")
+    .select(columns)
+    .eq("id", documentId)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (doc.error && !schemaMissing(doc.error)) {
+    return { ok: false, status: 400, error: "Could not read that document." };
+  }
+  if (!doc.data) return { ok: false, status: 404, error: "That document is not stored for this organisation." };
+  return fieldsFromDocumentRow(doc.data);
+}
+
 export async function fileWhatsAppDraft(params: {
   orgId: string;
   agentInstanceId: string;
@@ -837,17 +957,32 @@ export async function fileWhatsAppDraft(params: {
   let personId = typeof body.personId === "string" && UUID.test(body.personId) ? body.personId : null;
   let missionId = typeof body.caseId === "string" && UUID.test(body.caseId) ? body.caseId : null;
   const document = asRecord(body.document);
+  const workerRef = typeof document?.workerId === "string" ? document.workerId.trim() : "";
+  const documentRef = typeof document?.documentId === "string" ? document.documentId.trim() : "";
+  const referenced = Boolean(workerRef || documentRef);
   let documentBytes: Buffer | null = null;
   if (document && typeof document.contentBase64 === "string") {
+    if (referenced) {
+      return { ok: false, status: 400, error: "Name the stored document, or attach the file, not both." };
+    }
     const decoded = decodeDraftDocument(document.contentBase64);
     if (!decoded.ok) return { ok: false, status: 400, error: decoded.error };
     documentBytes = decoded.bytes;
   }
+  if (
+    referenced &&
+    ((typeof document?.storagePath === "string" && document.storagePath.trim()) ||
+      (typeof document?.storageBucket === "string" && document.storageBucket.trim()))
+  ) {
+    return { ok: false, status: 400, error: "Name the stored document, or attach the file, not both." };
+  }
 
+  let inboundFrom: string | null = null;
+  let inboundAt: string | null = null;
   if (replyTo) {
     const inbound = await svc
       .from("whatsapp_messages")
-      .select("from_number, person_id, mission_id")
+      .select("from_number, person_id, mission_id, wa_timestamp")
       .eq("org_id", params.orgId)
       .eq("wamid", replyTo)
       .eq("direction", "inbound")
@@ -856,13 +991,30 @@ export async function fileWhatsAppDraft(params: {
       return { ok: false, status: 503, error: "Triangle cannot file this yet. Migration 054 has not been applied." };
     }
     if (inbound.data) {
-      if (!to) to = String(inbound.data.from_number ?? "");
+      inboundFrom = String(inbound.data.from_number ?? "");
+      inboundAt = (inbound.data.wa_timestamp as string | null) ?? null;
+      if (!to) to = inboundFrom;
       personId = personId ?? ((inbound.data.person_id as string | null) ?? null);
       missionId = missionId ?? ((inbound.data.mission_id as string | null) ?? null);
     }
   }
 
   const recipientRole = whatsAppRecipientRole(to, readWhatsAppEnv(process.env).senders);
+  let referenceFields: StoredDocumentFields | null = null;
+  if (referenced) {
+    const allowed = storedDocumentReplyAllowed({
+      to,
+      replyTo,
+      replyFrom: inboundFrom,
+      recipientRole,
+      lastInboundAt: inboundAt,
+      now: new Date(),
+    });
+    if (!allowed.ok) return allowed;
+    const resolved = await resolveStoredDocument(svc, params.orgId, workerRef, documentRef);
+    if (!resolved.ok) return resolved;
+    referenceFields = resolved.fields;
+  }
   const planned = planDraft({
     agentId: params.agentInstanceId,
     to,
@@ -870,19 +1022,21 @@ export async function fileWhatsAppDraft(params: {
     replyTo,
     templateName,
     recipientRole,
-    attachment: document
-      ? {
-          filename: typeof document.filename === "string" ? document.filename : "",
-          mime: typeof document.mime === "string" ? document.mime : "",
-          kind: typeof document.kind === "string" ? document.kind : null,
-          sourceTable: typeof document.sourceTable === "string" ? document.sourceTable : null,
-          linkedEntityType: typeof document.linkedEntityType === "string" ? document.linkedEntityType : null,
-          storageBucket: typeof document.storageBucket === "string" ? document.storageBucket : null,
-          storagePath: typeof document.storagePath === "string" ? document.storagePath : null,
-          hasContent: Boolean(documentBytes),
-          title: typeof document.title === "string" ? document.title : null,
-        }
-      : null,
+    attachment: referenceFields
+      ? { ...referenceFields, hasContent: false }
+      : document
+        ? {
+            filename: typeof document.filename === "string" ? document.filename : "",
+            mime: typeof document.mime === "string" ? document.mime : "",
+            kind: typeof document.kind === "string" ? document.kind : null,
+            sourceTable: typeof document.sourceTable === "string" ? document.sourceTable : null,
+            linkedEntityType: typeof document.linkedEntityType === "string" ? document.linkedEntityType : null,
+            storageBucket: typeof document.storageBucket === "string" ? document.storageBucket : null,
+            storagePath: typeof document.storagePath === "string" ? document.storagePath : null,
+            hasContent: Boolean(documentBytes),
+            title: typeof document.title === "string" ? document.title : null,
+          }
+        : null,
   });
   if (!planned.ok) return { ok: false, status: 400, error: planned.error };
 
@@ -1353,6 +1507,11 @@ export async function sendApprovedWhatsAppDraft(params: {
     return { ok: false, status: 409, error: "That draft names a document but the file is not stored." };
   }
   if (filename && attachmentPath) {
+    const referenced = storedDocumentForRecipient(
+      (draft.attachment_source_table as string | null) ?? null,
+      recipientRole,
+    );
+    if (!referenced.ok) return { ok: false, status: 400, error: referenced.error };
     const verdict = documentBlockedForRecipient(
       {
         filename,

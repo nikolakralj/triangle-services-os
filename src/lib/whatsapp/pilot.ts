@@ -775,6 +775,31 @@ export function autoSendBoundToInbound(input: {
 }
 
 /**
+ * A CV or other file named from Triangle storage, not uploaded with the draft.
+ * It has to answer an owner or field sender, inside 24 hours.
+ */
+export function storedDocumentReplyAllowed(input: {
+  to: string;
+  replyTo?: string | null;
+  replyFrom?: string | null;
+  recipientRole: "owner" | "field" | "other" | null;
+  lastInboundAt: string | null;
+  now: Date;
+}): { ok: true } | { ok: false; status: number; error: string } {
+  if (input.recipientRole !== "owner" && input.recipientRole !== "field") {
+    return { ok: false, status: 400, error: "A stored document goes only to an owner or field number." };
+  }
+  const bound = autoSendBoundToInbound(input);
+  if (!bound.ok) {
+    return { ok: false, status: 400, error: "A stored document has to answer that sender's own inbound." };
+  }
+  if (!serviceWindowOpen(input.lastInboundAt, input.now)) {
+    return { ok: false, status: 400, error: "Outside the 24-hour window. That document was not attached." };
+  }
+  return { ok: true };
+}
+
+/**
  * Whether a filed reply leaves without a person.
  * It must answer a stored inbound, and `to` must be that inbound's sender.
  * That sender must be an explicit owner or field number. An open pilot,

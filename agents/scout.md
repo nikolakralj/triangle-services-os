@@ -37,6 +37,15 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
   "document": { "filename": "contractors.xlsx", "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kind": "contractor_list", "contentBase64": "<file>" } }
 ```
 
+A file already stored in this organisation can be named instead of uploaded.
+The bytes are not returned to you. It still has to answer an owner or field
+inbound inside 24 hours. Anyone else is refused.
+
+```
+{ "to": "+E164", "text": "The spreadsheet is attached.", "replyTo": "<wamid>",
+  "document": { "documentId": "<documents uuid>" } }
+```
+
 That files the reply. `to` is the sender on `replyTo`. When that number is
 an owner or field number, the reply is not a refusal, their latest message
 is not a refusal, and it was inside 24 hours, Triangle sends it back to

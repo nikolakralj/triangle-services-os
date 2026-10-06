@@ -1,5 +1,16 @@
 # Current state
 
+## WhatsApp stored documents — 6 October 2026
+
+A wake's expected output depends on the sender. Owner and field may be sent
+the document they asked for. Everyone else is told no CV, worker profile, or
+financial document. Hanna, Bob, or Scout may name a stored file on the draft
+with `document.workerId` (that person's current CV) or `document.documentId`.
+Triangle resolves it in the organisation and does not return the bytes. The
+reply still has to answer that owner or field inbound inside 24 hours. A CV
+that is only generated from the worker row, with no file stored, is not
+attached. No migration.
+
 ## WhatsApp documents and routing — 6 October 2026
 
 An owner or field inbound gets one fixed acknowledgment as soon as it is

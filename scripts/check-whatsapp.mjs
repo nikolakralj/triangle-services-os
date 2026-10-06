@@ -71,6 +71,7 @@ const {
   parseWebhook,
   planDraft,
   readAllowlist,
+  storedDocumentReplyAllowed,
   readWhatsAppEnv,
   signatureHex,
   wakeEnvForRole,
@@ -97,7 +98,10 @@ const {
   documentBytesAllowed,
   employeeMayDraftWhatsApp,
   keywordRoute,
+  pickWorkerCv,
+  storedDocumentForRecipient,
   storedDocumentRowRequired,
+  wakeExpectedOutput,
   whatsAppEmployeeLabel,
   parseModelRoute,
   permissionFor,
@@ -930,6 +934,104 @@ test("Nikola and Ralph receive any document; everyone else stays blocked from CV
   assert.match(read(".env.example"), /100 MB/);
 });
 
+test("the wake follows the sender, and a stored document answers only that sender", () => {
+  const owner = wakeExpectedOutput("owner");
+  const field = wakeExpectedOutput("field");
+  const other = wakeExpectedOutput("other");
+  assert.match(owner, /Do not send/);
+  assert.match(owner, /may be attached on the reply to their inbound/);
+  assert.match(owner, /CV, worker profile, financial document, or mission document/);
+  assert.match(field, /may be attached on the reply to their inbound/);
+  assert.match(other, /Do not send/);
+  assert.match(other, /No CV or worker profile or financial document/);
+  assert.doesNotMatch(other, /may be attached on the reply/);
+  const wake = read("src/lib/data/whatsapp.ts");
+  assert.match(wake, /wakeExpectedOutput/);
+  assert.doesNotMatch(wake, /No CV or worker profile\. Do not send email/);
+  assert.match(wake, /There is no CV on file for this person/);
+  assert.match(wake, /workerId/);
+  assert.match(wake, /documentId/);
+  assert.match(wake, /storedDocumentForRecipient/);
+  assert.equal(employeeMayDraftWhatsApp({ roleKey: "triangle_hr", displayName: "Hanna" }), true);
+
+  const now = new Date("2026-10-06T12:00:00.000Z");
+  const inside = "2026-10-06T08:00:00.000Z";
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const allowed = storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "owner",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(allowed.ok, true);
+  assert.equal(storedDocumentReplyAllowed({
+    to: fieldNumber,
+    replyTo: "wamid.IN",
+    replyFrom: fieldNumber,
+    recipientRole: "field",
+    lastInboundAt: inside,
+    now,
+  }).ok, true);
+  const stranger = storedDocumentReplyAllowed({
+    to: "+15551000003",
+    replyTo: "wamid.IN",
+    replyFrom: "+15551000003",
+    recipientRole: "other",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(stranger.ok, false);
+  assert.match(stranger.error, /owner or field/);
+  const misbound = storedDocumentReplyAllowed({
+    to: fieldNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "field",
+    lastInboundAt: inside,
+    now,
+  });
+  assert.equal(misbound.ok, false);
+  const late = storedDocumentReplyAllowed({
+    to: ownerNumber,
+    replyTo: "wamid.IN",
+    replyFrom: ownerNumber,
+    recipientRole: "owner",
+    lastInboundAt: inside,
+    now: new Date("2026-10-07T12:00:01.000Z"),
+  });
+  assert.equal(late.ok, false);
+  assert.match(late.reason ?? late.error, /24-hour/);
+  assert.equal(storedDocumentForRecipient("stored_document", "other").ok, false);
+  assert.equal(storedDocumentForRecipient("stored_document", "field").ok, true);
+  assert.equal(storedDocumentForRecipient("contractor_list", "other").ok, true);
+
+  const current = {
+    id: "cv-new",
+    category: "cv",
+    bucket: "documents",
+    path: "org/workers/a/cv.pdf",
+    isCurrent: true,
+    createdAt: "2026-10-02T00:00:00.000Z",
+  };
+  const older = { ...current, id: "cv-old", createdAt: "2026-01-01T00:00:00.000Z" };
+  const retired = { ...current, id: "cv-retired", isCurrent: false, createdAt: "2026-10-05T00:00:00.000Z" };
+  const otherBucket = { ...current, id: "cv-other", bucket: "whatsapp-drafts" };
+  const passport = { ...current, id: "passport", category: "id_passport" };
+  assert.equal(pickWorkerCv([older, retired, otherBucket, passport, current])?.id, "cv-new");
+  assert.equal(pickWorkerCv([retired, passport]), null);
+
+  const route = read("src/app/api/agent/whatsapp/drafts/route.ts");
+  assert.match(route, /workerId/);
+  assert.match(route, /documentId/);
+  assert.match(route, /never includes the file/);
+  assert.match(read("agents/hanna.md"), /workerId/);
+  assert.match(read("agents/bob.md"), /documentId/);
+  assert.match(read("agents/scout.md"), /documentId/);
+});
+
 test("each badge can attach a document that auto-sends to the owner and the field", () => {
   const fieldNumber = "+15551000002";
   const ownerNumber = "+15551000001";
@@ -1211,7 +1313,8 @@ test("owner and field replies auto-send; refusals, the window, and everyone else
   assert.match(filing, /routeReason: decision\.audit/);
   assert.match(filing, /replyFrom: context\.replyFrom/);
   assert.match(filing, /latestInboundReason: context\.latestInboundReason/);
-  assert.match(filing, /if \(!to\) to = String\(inbound\.data\.from_number/);
+  assert.match(filing, /if \(!to\) to = inboundFrom/);
+  assert.match(filing, /from_number/);
   const refusal = store.slice(store.indexOf("async function ensureRefusalDraft"), store.indexOf("async function applyStatus"));
   assert.doesNotMatch(refusal, /decideAutoSend|postToGraph|considerAutoSend/);
   assert.match(store, /whatsAppInboundHasReply/);

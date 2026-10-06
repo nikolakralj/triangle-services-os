@@ -78,6 +78,19 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 { "to": "+E164", "text": "the words a person will send", "replyTo": "<wamid>" }
 ```
 
+When Nikola or Ralph asked for a person's CV, name the file Triangle already
+stores. You do not receive the bytes back. `to` is still their number, and
+`replyTo` is still their inbound, inside 24 hours. Anyone else is refused.
+
+```
+{ "to": "+E164", "text": "The CV is attached.", "replyTo": "<wamid>",
+  "document": { "workerId": "<worker uuid>" } }
+```
+
+`document: { "documentId": "<documents uuid>" }` names some other file in
+this organisation's documents. A CV that exists only as fields on the worker
+row, with no file stored, is not attached this way.
+
 That files the reply. `to` is the sender on `replyTo`. When that number is
 an owner or field number, the reply is not a refusal, their latest message
 is not a refusal, and it was inside 24 hours, Triangle sends it back to

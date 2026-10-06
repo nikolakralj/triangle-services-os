@@ -631,6 +631,58 @@ export function whatsAppRecipientRole(
   return "other";
 }
 
+/**
+ * What the wake tells the employee to produce. Owner and field may be sent
+ * the document they asked for. Everyone else may not receive a CV, a worker
+ * profile, or a financial document. The employee still does not send; Triangle does.
+ */
+export function wakeExpectedOutput(role: DocumentRecipient | null | undefined): string {
+  const close = " Do not send email when the handoff forbids it.";
+  if (role === "owner" || role === "field") {
+    return (
+      "A draft reply. Do not send. A requested CV, worker profile, financial document, or mission document may be attached on the reply to their inbound." +
+      close
+    );
+  }
+  return "A draft reply. Do not send. No CV or worker profile or financial document." + close;
+}
+
+/** A document named by id, not by uploaded bytes. Human approve uses this too. */
+export function storedDocumentForRecipient(
+  sourceTable: string | null | undefined,
+  recipient: DocumentRecipient | null | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if ((sourceTable ?? "").trim() !== "stored_document") return { ok: true };
+  if (recipient === "owner" || recipient === "field") return { ok: true };
+  return { ok: false, error: "A stored document goes only to an owner or field number." };
+}
+
+export interface WorkerCvCandidate {
+  id: string;
+  category: string | null;
+  bucket: string | null;
+  path: string | null;
+  isCurrent: boolean | null;
+  createdAt: string | null;
+}
+
+/** The worker's current CV in the documents bucket, latest first. */
+export function pickWorkerCv(rows: readonly WorkerCvCandidate[]): WorkerCvCandidate | null {
+  const usable = rows.filter((row) => {
+    if ((row.category ?? "").trim().toLowerCase() !== "cv") return false;
+    if ((row.bucket ?? "").trim() !== "documents") return false;
+    if (!(row.path ?? "").trim()) return false;
+    if (row.isCurrent === false) return false;
+    return true;
+  });
+  usable.sort((a, b) => {
+    const left = Date.parse(a.createdAt ?? "");
+    const right = Date.parse(b.createdAt ?? "");
+    return (Number.isNaN(right) ? 0 : right) - (Number.isNaN(left) ? 0 : left);
+  });
+  return usable[0] ?? null;
+}
+
 const FINANCIAL_KINDS = new Set([
   "invoice",
   "unpaid_invoice",

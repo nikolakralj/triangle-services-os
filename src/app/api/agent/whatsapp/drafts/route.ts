@@ -10,6 +10,14 @@ import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
 // badge. This route does not call Graph. The data layer sends when the
 // recipient is an owner or field number and the auto-send rule allows it.
 // The JSON says sent: true only after Graph has accepted the message.
+// The response never includes the file.
+//
+// A document is either bytes or a reference, not both:
+// { "filename", "mime", "contentBase64" }
+// { "workerId": "<uuid>" } — that person's current CV in the documents bucket
+// { "documentId": "<uuid>" } — one documents row in this organisation
+// A reference is resolved here and is accepted only as a reply to an owner
+// or field inbound inside 24 hours. Anyone else is refused.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
