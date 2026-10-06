@@ -80,6 +80,7 @@ const {
 } = pilot;
 const {
   WHATSAPP_DATA_RULE,
+  WHATSAPP_DOCUMENT_MAX_BYTES,
   WHATSAPP_DRAFT_ENDPOINT,
   draftTextAllowed,
   EMAIL_REFUSAL_DRAFT,
@@ -91,7 +92,9 @@ const {
   asksToSendEmail,
   bindWhatsAppSenders,
   decideInbound,
+  decodeDraftDocument,
   documentBlockedForRecipient,
+  documentBytesAllowed,
   employeeMayDraftWhatsApp,
   keywordRoute,
   storedDocumentRowRequired,
@@ -375,7 +378,9 @@ test("Scout can draft, a list document is a draft, a CV is refused", () => {
   assert.equal(rate.ok, false);
   const named = draftTextAllowed("Here is the full named CV");
   assert.equal(named.ok, false);
-  assert.match(WHATSAPP_DATA_RULE, /No CV or worker profile/);
+  assert.equal(draftTextAllowed("Here is the full named CV", "owner").ok, true);
+  assert.equal(draftTextAllowed("Here is the full named CV", "field").ok, true);
+  assert.match(WHATSAPP_DATA_RULE, /owner or field number may receive any document/);
   assert.match(read("DECISIONS.md"), /no CV or worker profile\s+leaves by WhatsApp/i);
 });
 
@@ -745,6 +750,184 @@ test("draft-only (no send without approval)", () => {
   assert.match(sendRoute, /refuseUnlessHuman/);
   assert.match(sendRoute, /approve: body\?\.approve === true/);
   assert.doesNotMatch(read("src/lib/whatsapp/pilot.ts"), /\bfetch\s*\(/);
+});
+
+test("Nikola and Ralph receive any document; everyone else stays blocked from CVs and finance", () => {
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const otherNumber = "+15551000003";
+  const directory = bindWhatsAppSenders(ownerNumber, fieldNumber);
+  const xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const inside = {
+    enabled: true,
+    senders: directory.senders,
+    replyTo: "wamid.IN",
+    inboundReason: "Routed.",
+    latestInboundReason: "Routed.",
+    flagged: false,
+    lastInboundAt: "2026-10-06T08:00:00.000Z",
+    now: new Date("2026-10-06T08:10:00.000Z"),
+  };
+  const auto = (to, document, text = "Attached.") =>
+    decideAutoSend({ ...inside, to, replyFrom: to, text, document });
+
+  for (const document of [
+    { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv" },
+    { filename: "unpaid-invoices.pdf", mime: "application/pdf", kind: "invoice" },
+    { filename: "five-best-epc.xlsx", mime: xlsx, kind: "research" },
+  ]) {
+    const sent = auto(ownerNumber, document);
+    assert.equal(sent.send, true, document.filename);
+    assert.equal(sent.mode, "document");
+  }
+  for (const document of [
+    { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv" },
+    { filename: "bank-statement.pdf", mime: "application/pdf", kind: "bank_statement" },
+    { filename: "mission-export.csv", mime: "text/csv", kind: "mission_export" },
+    { filename: "five-best-epc-contractors.xlsx", mime: xlsx, kind: "research" },
+  ]) {
+    const filed = planDraft({
+      agentId: "triangle_scout",
+      to: fieldNumber,
+      text: "Attached.",
+      replyTo: "wamid.IN",
+      templateName: null,
+      recipientRole: "field",
+      attachment: { ...document, hasContent: true },
+    });
+    assert.equal(filed.ok, true, document.filename);
+    const sent = auto(fieldNumber, document);
+    assert.equal(sent.send, true, document.filename);
+    assert.equal(sent.mode, "document");
+  }
+
+  for (const document of [
+    { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv" },
+    { filename: "worker-profile.pdf", mime: "application/pdf", kind: "worker_profile" },
+    { filename: "unpaid-invoices.pdf", mime: "application/pdf", kind: "invoice" },
+    { filename: "monthly-bank.pdf", mime: "application/pdf", kind: "bank_statement" },
+  ]) {
+    assert.equal(documentBlockedForRecipient(document, "other").blocked, true, document.filename);
+    const filed = planDraft({
+      agentId: "triangle_hr",
+      to: otherNumber,
+      text: "Attached.",
+      replyTo: "wamid.IN",
+      templateName: null,
+      recipientRole: "other",
+      attachment: { ...document, hasContent: true },
+    });
+    assert.equal(filed.ok, false, document.filename);
+  }
+  const listForOther = planDraft({
+    agentId: "triangle_scout",
+    to: otherNumber,
+    text: "The company list.",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "other",
+    attachment: { filename: "companies.xlsx", mime: xlsx, kind: "company_list", hasContent: true },
+  });
+  assert.equal(listForOther.ok, true);
+  const needsApproval = decideSend({
+    actor: "human",
+    approve: false,
+    status: "draft",
+    to: otherNumber,
+    text: "The company list.",
+    draftTemplate: null,
+    allowlist: [otherNumber],
+    lastInboundAt: inside.lastInboundAt,
+    now: inside.now,
+    approvedTemplate: null,
+    templateLanguageCode: "en",
+    sendAttempted: false,
+    document: { filename: "companies.xlsx", mime: xlsx },
+  });
+  assert.equal(needsApproval.ok, false);
+  const approved = decideSend({
+    actor: "human",
+    approve: true,
+    status: "draft",
+    to: otherNumber,
+    text: "The company list.",
+    draftTemplate: null,
+    allowlist: [otherNumber],
+    lastInboundAt: inside.lastInboundAt,
+    now: inside.now,
+    approvedTemplate: null,
+    templateLanguageCode: "en",
+    sendAttempted: false,
+    document: { filename: "companies.xlsx", mime: xlsx },
+  });
+  assert.equal(approved.ok, true);
+  assert.equal(approved.mode, "document");
+  assert.match(read("src/lib/data/whatsapp.ts"), /documentBlockedForRecipient/);
+  assert.match(read("src/app/api/agent/whatsapp/drafts/route.ts"), /fileWhatsAppDraft/);
+
+  const wrongNumber = auto(ownerNumber, { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv" });
+  const misbound = decideAutoSend({
+    ...inside,
+    to: fieldNumber,
+    replyFrom: ownerNumber,
+    text: "Attached.",
+    document: { filename: "matej-cv.pdf", mime: "application/pdf", kind: "cv" },
+  });
+  assert.equal(wrongNumber.send, true);
+  assert.equal(misbound.send, false);
+  assert.match(misbound.reason, /not to the number that wrote in/);
+
+  const late = auto(fieldNumber, { filename: "mission-export.csv", mime: "text/csv", kind: "mission_export" });
+  const outside = decideAutoSend({
+    ...inside,
+    to: fieldNumber,
+    replyFrom: fieldNumber,
+    text: "Attached.",
+    now: new Date("2026-10-08T08:00:00.000Z"),
+    document: { filename: "mission-export.csv", mime: "text/csv", kind: "mission_export" },
+  });
+  assert.equal(late.send, true);
+  assert.equal(outside.send, false);
+  assert.match(outside.reason, /24-hour/);
+
+  const software = decideInbound({
+    text: "Please change the software and add a button",
+    from: fieldNumber,
+    senders: directory.senders,
+  });
+  assert.equal(software.action, "refuse");
+  assert.equal(software.flagOwner, true);
+  const held = decideAutoSend({
+    ...inside,
+    to: fieldNumber,
+    replyFrom: fieldNumber,
+    text: software.draftText,
+    inboundReason: software.reason,
+    flagged: true,
+    document: null,
+  });
+  assert.equal(held.send, false);
+
+  assert.equal(WHATSAPP_DOCUMENT_MAX_BYTES, 100 * 1024 * 1024);
+  assert.equal(documentBytesAllowed(WHATSAPP_DOCUMENT_MAX_BYTES).ok, true);
+  assert.equal(documentBytesAllowed(WHATSAPP_DOCUMENT_MAX_BYTES + 1).ok, false);
+  assert.match(documentBytesAllowed(WHATSAPP_DOCUMENT_MAX_BYTES + 1).error, /100 MB/);
+  assert.equal(decodeDraftDocument("hello").ok, false);
+  assert.match(decodeDraftDocument("hello").error, /not readable/);
+  const tiny = decodeDraftDocument(Buffer.from("csv,ok\n").toString("base64"));
+  assert.equal(tiny.ok, true);
+  const rejected = planDraft({
+    agentId: "triangle_scout",
+    to: fieldNumber,
+    text: "Attached.",
+    replyTo: "wamid.IN",
+    templateName: null,
+    recipientRole: "field",
+    attachment: { filename: "photo.png", mime: "image/png", kind: "research", hasContent: true },
+  });
+  assert.equal(rejected.ok, false);
+  assert.match(rejected.error, /cannot be attached|ordinary filename/);
+  assert.match(read(".env.example"), /100 MB/);
 });
 
 test("each badge can attach a document that auto-sends to the owner and the field", () => {

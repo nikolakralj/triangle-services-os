@@ -6,6 +6,27 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-06: Nikola and Ralph may receive any WhatsApp document
+
+Nikola decided this on the 6 October 2026 call, in his own words. Only he
+raises a bot's freedom. He said: "Lift the WhatsApp document block for Nikola
+and Ralph — they are the only two people allowed to talk to the bot's WhatsApp
+account, and they should be able to receive all possible documents including
+CVs and worker profiles, financial documents like unpaid invoices from Triangle
+Services and monthly bank PDFs, data from missions, and Scout research outputs
+as files (e.g. Excel for 'give me five best EPC contractors'). Everyone else
+still gets blocked."
+
+The reply still goes only to the number that wrote in, inside 24 hours, and
+only while `WHATSAPP_AUTO_SEND` is on. A CV, a worker profile, or a financial
+document to anyone else is refused, including when a person would approve the
+send. A list or other ordinary file to anyone else still needs that approval.
+A software-change request or a request to email someone else from Ralph stays
+a draft for Nikola. A document may be pdf, csv, txt, xls, xlsx, doc, docx,
+ppt, or pptx, up to WhatsApp's 100 MB document limit. A larger file or a type
+WhatsApp does not take is refused with a reason. The 4 MB figure in the
+document note below is replaced by that limit. No new migration.
+
 ### 2026-10-06: WhatsApp documents for the owner and the field
 
 Nikola decided this on 6 October 2026. The owner and the field sender may

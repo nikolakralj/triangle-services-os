@@ -36,6 +36,7 @@ import {
   decodeDraftDocument,
   decideInbound,
   documentBlockedForRecipient,
+  documentBytesAllowed,
   draftTextAllowed,
   employeeKeyOf,
   employeeMayDraftWhatsApp,
@@ -1341,7 +1342,8 @@ export async function sendApprovedWhatsAppDraft(params: {
   }
 
   const outboundText = params.text || String(draft.body ?? "");
-  const words = draftTextAllowed(outboundText);
+  const recipientRole = whatsAppRecipientRole(String(draft.to_number ?? ""), env.senders);
+  const words = draftTextAllowed(outboundText, recipientRole);
   if (!words.ok) return { ok: false, status: 400, error: words.error };
 
   const filename = (draft.attachment_filename as string | null) ?? null;
@@ -1351,7 +1353,6 @@ export async function sendApprovedWhatsAppDraft(params: {
     return { ok: false, status: 409, error: "That draft names a document but the file is not stored." };
   }
   if (filename && attachmentPath) {
-    const recipientRole = whatsAppRecipientRole(String(draft.to_number ?? ""), env.senders);
     const verdict = documentBlockedForRecipient(
       {
         filename,
@@ -1565,9 +1566,8 @@ async function downloadDraftFile(
     return { ok: false, status: 409, error: "The document is no longer stored. Nothing was sent." };
   }
   const bytes = new Uint8Array(await data.arrayBuffer());
-  if (bytes.byteLength < 1) {
-    return { ok: false, status: 409, error: "The document was empty. Nothing was sent." };
-  }
+  const size = documentBytesAllowed(bytes.byteLength);
+  if (!size.ok) return { ok: false, status: 400, error: size.error };
   return { ok: true, bytes };
 }
 
@@ -1590,7 +1590,7 @@ async function uploadGraphMedia(args: {
       method: "POST",
       headers: { Authorization: `Bearer ${args.accessToken}` },
       body: form,
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(120_000),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;

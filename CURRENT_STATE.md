@@ -14,7 +14,10 @@ status is answered by asking the Triangle Services Accounting bot through the
 employee's own runtime; Triangle has no channel to that bot and no Mare
 integration. Finance mail bodies are still discarded; `invoices`, `payments`,
 and `timesheets` exist as tables. No migration.
-`check:whatsapp` 17/17. `tsc --noEmit` passed. Eslint on the WhatsApp modules passed. Nothing was pushed.
+Nikola and Ralph may receive any attached document on a reply to their own
+inbound, up to WhatsApp's 100 MB limit. Everyone else stays blocked from CVs,
+worker profiles, and financial documents. `check:whatsapp` covers that matrix.
+Nothing was pushed.
 
 ## WhatsApp auto-send for owner and field — 3 October 2026
 

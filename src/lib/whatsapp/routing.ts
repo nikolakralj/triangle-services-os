@@ -18,10 +18,10 @@
 // software change and cannot ask for an email to be sent. Those are refused
 // as drafts. Nothing here sends.
 //
-// Data rule. An owner or field number may receive a CV, a worker profile, a
-// financial document, or a mission document. Everyone else is blocked from
-// CVs, worker profiles, and financial documents. A draft may still carry one
-// contractor, company, or subcontractor list. The words may say what an
+// Data rule. An owner or field number may receive any document on a reply to
+// their own inbound, including a CV, a worker profile, a financial document,
+// mission data, and a research spreadsheet. Everyone else is blocked from
+// CVs, worker profiles, and financial documents. The words may say what an
 // anonymised bio may say — initials, role, tickets, languages, right-to-work,
 // dated availability — and may not carry an email, a phone number, a rate,
 // or an IBAN. Asking to be sent a document is not a request to email someone
@@ -40,11 +40,14 @@ export const WHATSAPP_DRAFT_BUCKET = "whatsapp-drafts";
 /** Buckets a draft may point at. Anything else is refused. */
 export const WHATSAPP_ATTACHMENT_BUCKETS = ["whatsapp-drafts", "documents"] as const;
 
-/** Decoded file cap. Vercel's request body is 4.5 MB; this stays under it. */
-export const WHATSAPP_DOCUMENT_MAX_BYTES = 4 * 1024 * 1024;
+/**
+ * WhatsApp Cloud API document cap. A base64 body on the draft route still has
+ * to fit the host request limit; this is the size Triangle will accept and send.
+ */
+export const WHATSAPP_DOCUMENT_MAX_BYTES = 100 * 1024 * 1024;
 
 export const WHATSAPP_DATA_RULE =
-  "No CV or worker profile leaves Triangle by WhatsApp except to an owner or field number, and a financial document is the same. A draft may carry one contractor, company, or subcontractor list. The words may say what an anonymised bio may say — initials, role, tickets, languages, availability — and may not carry an email, a phone number, a rate, or an IBAN.";
+  "An owner or field number may receive any document on a reply to their own inbound, including a CV, a worker profile, a financial document, mission data, and a research spreadsheet. Everyone else is blocked from CVs, worker profiles, and financial documents, including when a person would approve the send. The words may say what an anonymised bio may say — initials, role, tickets, languages, availability — and may not carry an email, a phone number, a rate, or an IBAN.";
 
 export const ROUTE_MODEL_INSTRUCTIONS = [
   "You route one inbound WhatsApp message.",
@@ -578,7 +581,7 @@ const BLOCKED_KINDS = new Set([
   "work_permit",
 ]);
 
-const ALLOWED_EXTENSIONS = new Set(["csv", "pdf", "txt", "xls", "xlsx", "doc", "docx"]);
+const ALLOWED_EXTENSIONS = new Set(["csv", "pdf", "txt", "xls", "xlsx", "doc", "docx", "ppt", "pptx"]);
 
 const MIME_BY_EXT: Record<string, string> = {
   csv: "text/csv",
@@ -588,6 +591,8 @@ const MIME_BY_EXT: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   doc: "application/msword",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 export interface AttachmentInput {
@@ -781,7 +786,10 @@ export function planAttachment(
 
   const filename = safeDocumentFilename(input.filename ?? "");
   if (!filename) {
-    return { ok: false, error: "Attach a CSV, PDF, or spreadsheet, with an ordinary filename." };
+    return {
+      ok: false,
+      error: "Attach a pdf, spreadsheet, csv, Word, or PowerPoint file, with an ordinary filename.",
+    };
   }
   const mime = mimeFor(filename, input.mime);
   if (!mime) return { ok: false, error: "That file type cannot be attached on WhatsApp." };
@@ -830,7 +838,10 @@ const IDENTITY_LABEL =
  * The words on the draft. Anonymised bio facts may stay. Contact details, a
  * rate, an identity field, or a request to send the full CV may not.
  */
-export function draftTextAllowed(text: string): { ok: true } | { ok: false; error: string } {
+export function draftTextAllowed(
+  text: string,
+  recipient?: DocumentRecipient | null,
+): { ok: true } | { ok: false; error: string } {
   const body = text ?? "";
   if (!body.trim()) return { ok: true };
   if (EMAIL.test(body)) {
@@ -854,10 +865,23 @@ export function draftTextAllowed(text: string): { ok: true } | { ok: false; erro
       error: "That reply includes a worker's identity. An anonymised bio uses initials, role, tickets, and availability.",
     };
   }
-  if (explicitPackIntent(body) === "full_cv") {
+  if (explicitPackIntent(body) === "full_cv" && recipient !== "owner" && recipient !== "field") {
     return {
       ok: false,
-      error: "That reply would send a full CV. A CV does not leave by WhatsApp. Initials, role, tickets, and availability may.",
+      error: "That reply would send a full CV. A CV leaves by WhatsApp only to an owner or field number.",
+    };
+  }
+  return { ok: true };
+}
+
+export function documentBytesAllowed(byteLength: number): { ok: true } | { ok: false; error: string } {
+  if (!Number.isFinite(byteLength) || byteLength < 1) {
+    return { ok: false, error: "That document was empty." };
+  }
+  if (byteLength > WHATSAPP_DOCUMENT_MAX_BYTES) {
+    return {
+      ok: false,
+      error: "That document is larger than 100 MB. WhatsApp accepts a document up to 100 MB.",
     };
   }
   return { ok: true };
@@ -871,9 +895,7 @@ export function decodeDraftDocument(
     return { ok: false, error: "That document was not readable." };
   }
   const bytes = Buffer.from(compact, "base64");
-  if (bytes.length < 1) return { ok: false, error: "That document was empty." };
-  if (bytes.length > WHATSAPP_DOCUMENT_MAX_BYTES) {
-    return { ok: false, error: "That document is larger than 4 MB. WhatsApp drafts stay under that." };
-  }
+  const size = documentBytesAllowed(bytes.length);
+  if (!size.ok) return size;
   return { ok: true, bytes };
 }

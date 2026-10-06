@@ -46,7 +46,7 @@ mission or research data included. A missing `replyTo`, or a
 different `to`, stays a draft. `"sent": true` and a `wamid` mean it
 went out. `"sent": false` and `held` mean it stayed a draft. Anyone else
 stays a draft until a person sends it. Outside 24 hours the document and
-free text stay a draft. One document. csv, pdf, txt, xls, xlsx, doc, and docx are accepted. A CV, a
+free text stay a draft. One document, up to WhatsApp's 100 MB limit. csv, pdf, txt, xls, xlsx, doc, docx, ppt, and pptx are accepted. Anything else is refused with a reason. A CV, a
 worker profile, or a financial document may be attached only when the
 recipient is an owner or field number. Anyone else is refused, including
 when a person would approve it. A payment-status question is routed to Bob. If one reaches you anyway, from

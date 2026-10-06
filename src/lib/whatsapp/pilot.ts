@@ -416,7 +416,7 @@ export function planDraft(input: {
   if (!to) return { ok: false, error: "Say who to, as an E.164 number." };
   const text = input.text.trim();
   const templateName = input.templateName?.trim() || "";
-  const words = draftTextAllowed(text);
+  const words = draftTextAllowed(text, input.recipientRole ?? "other");
   if (!words.ok) return words;
   let attachment: NormalizedAttachment | null = null;
   if (input.attachment) {
@@ -833,7 +833,7 @@ export function decideAutoSend(input: {
     return { send: false, reason: "A refused or flagged reply stays a draft for the owner." };
   }
 
-  const words = draftTextAllowed(text);
+  const words = draftTextAllowed(text, role);
   if (!words.ok) return { send: false, reason: words.error };
 
   if (input.document) {
