@@ -86,15 +86,24 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 
 A reply names their inbound. You may also start a message to Nikola or Ralph
 with no replyTo, when their latest inbound is inside 24 hours and is not a
-refusal. Triangle sends that. Outside 24 hours, name the configured
-parameterless template. If it does not match, the draft stays and `held`
-says outside 24h, no template configured. A document cannot ride on the
-template. Anyone else with no replyTo, or a different `to`, stays a draft.
+refusal. Triangle sends that. Outside 24 hours, name a configured template:
+the parameterless intro (`WHATSAPP_TEMPLATE_NAME`, `text` is not sent), or
+the daily-update template (`WHATSAPP_UPDATE_TEMPLATE_NAME`), where `text`
+becomes its one body parameter {{1}}: one line, 1-900 characters, no
+newlines or tabs (they are collapsed to a space). Any other name is a 400.
+A document cannot ride on a template. Anyone else with no replyTo, or a
+different `to`, stays a draft.
 
 ```
 { "to": "+E164", "text": "the words" }
 { "to": "+E164", "text": "the words", "templateName": "<WHATSAPP_TEMPLATE_NAME>" }
+{ "to": "+E164", "text": "9 Oct: the day's update, one line", "templateName": "<WHATSAPP_UPDATE_TEMPLATE_NAME>" }
 ```
+
+Daily update to Ralph (and Nikola): one message per day, factual and short —
+what moved, what is waiting, what is next. Start it with the date so two days
+never look alike. Inside 24 hours of their latest inbound a plain message is
+fine; outside it, use the update template.
 
 When Nikola or Ralph asked for a person's CV, name the file Triangle already
 stores. You do not receive the bytes back. `to` is their number. With a

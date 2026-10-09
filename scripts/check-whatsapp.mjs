@@ -64,6 +64,11 @@ const {
   decideSend,
   draftFailureHint,
   graphDocumentBody,
+  graphSendBody,
+  resolveTemplate,
+  TEMPLATE_PARAM_MAX,
+  templateFailureHint,
+  templateParamText,
   graphMediaUrl,
   graphTypingBody,
   isAutoSentAudit,
@@ -1758,6 +1763,195 @@ test("typing indicator for owner and field, not a reply, and not for anyone else
   assert.doesNotMatch(decision, /\+\d{8,}/);
   assert.match(decision, /creative and funny/);
   assert.match(decision, /Hanna may start WhatsApp messages to me and Ralph/);
+});
+
+test("daily-update template: one body parameter, owner and field only, outside 24h", () => {
+  const ownerNumber = "+15551000001";
+  const fieldNumber = "+15551000002";
+  const senders = bindWhatsAppSenders(ownerNumber, fieldNumber).senders;
+  const late = {
+    enabled: true,
+    senders,
+    replyTo: null,
+    inboundReason: null,
+    latestInboundReason: "Unsure, so Hanna.",
+    flagged: false,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    now: new Date("2026-10-09T12:00:00.000Z"),
+    approvedTemplate: "pilot_hello",
+    templateLanguage: "en",
+    updateTemplate: "pilot_daily_update",
+    updateTemplateLanguage: "en",
+    document: null,
+  };
+
+  // Env: both names read, update language defaults to en.
+  const env = readWhatsAppEnv({
+    WHATSAPP_TEMPLATE_NAME: "pilot_hello",
+    WHATSAPP_UPDATE_TEMPLATE_NAME: " pilot_daily_update ",
+  });
+  assert.equal(env.templateName, "pilot_hello");
+  assert.equal(env.updateTemplateName, "pilot_daily_update");
+  assert.equal(env.updateTemplateLanguage, "en");
+  assert.equal(readWhatsAppEnv({ WHATSAPP_UPDATE_TEMPLATE_LANGUAGE: "de_DE" }).updateTemplateLanguage, "de_DE");
+  assert.equal(readWhatsAppEnv({}).updateTemplateName, null);
+
+  // Param text: newlines, tabs, and space runs collapse; empty and too long refused.
+  const collapsed = templateParamText("9 Oct:\n two CVs sent.\t\tBoxer     replied.  ");
+  assert.equal(collapsed.ok, true);
+  assert.equal(collapsed.text, "9 Oct: two CVs sent. Boxer replied.");
+  assert.doesNotMatch(collapsed.text, /[\n\t]| {5,}/);
+  assert.equal(templateParamText("  \n ").ok, false);
+  const tooLong = templateParamText("x".repeat(TEMPLATE_PARAM_MAX + 1));
+  assert.equal(tooLong.ok, false);
+  assert.match(tooLong.error, /900 or fewer/);
+  assert.equal(templateParamText("x".repeat(TEMPLATE_PARAM_MAX)).ok, true);
+
+  // Allowlist: only configured names.
+  const templates = { intro: "pilot_hello", introLanguage: "en", update: "pilot_daily_update", updateLanguage: "en" };
+  assert.equal(resolveTemplate(null, "x", templates), null);
+  assert.equal(resolveTemplate("other_template", "x", templates).ok, false);
+  assert.deepEqual(resolveTemplate("pilot_hello", "ignored", templates), {
+    ok: true,
+    templateName: "pilot_hello",
+    language: "en",
+    bodyText: null,
+  });
+  assert.equal(resolveTemplate("pilot_daily_update", "Done.", templates).bodyText, "Done.");
+  assert.equal(resolveTemplate("pilot_daily_update", "Done.", { ...templates, update: null }).ok, false);
+
+  // Employee-started, outside 24h: the update goes to owner and field with {{1}}.
+  for (const [to, audit] of [
+    [ownerNumber, "Auto-sent to the owner, started by employee."],
+    [fieldNumber, "Auto-sent to the field, started by employee."],
+  ]) {
+    const update = decideAutoSend({
+      ...late,
+      to,
+      text: "9 Oct: two CVs sent to Boxer.\nNo reply yet.",
+      templateName: "pilot_daily_update",
+    });
+    assert.equal(update.send, true);
+    assert.equal(update.mode, "template");
+    assert.equal(update.templateName, "pilot_daily_update");
+    assert.equal(update.language, "en");
+    assert.equal(update.bodyText, "9 Oct: two CVs sent to Boxer. No reply yet.");
+    assert.equal(update.audit, audit);
+  }
+
+  // The intro template still works unchanged, with no parameter.
+  const intro = decideAutoSend({ ...late, to: fieldNumber, text: "", templateName: "pilot_hello" });
+  assert.equal(intro.send, true);
+  assert.equal(intro.templateName, "pilot_hello");
+  assert.equal(intro.bodyText, null);
+
+  // Empty update text, an unknown name, a stranger, a refusal, a document: no send.
+  const empty = decideAutoSend({ ...late, to: ownerNumber, text: "  ", templateName: "pilot_daily_update" });
+  assert.equal(empty.send, false);
+  assert.match(empty.reason, /update template needs/);
+  const unknown = decideAutoSend({ ...late, to: ownerNumber, text: "Done.", templateName: "other_template" });
+  assert.equal(unknown.send, false);
+  assert.match(unknown.reason, /outside 24h, no template configured/);
+  const stranger = decideAutoSend({ ...late, to: "+15559999999", text: "Done.", templateName: "pilot_daily_update" });
+  assert.equal(stranger.send, false);
+  const refused = decideAutoSend({
+    ...late,
+    to: ownerNumber,
+    text: "Done.",
+    templateName: "pilot_daily_update",
+    latestInboundReason: "Refused: software change.",
+  });
+  assert.equal(refused.send, false);
+  const withDoc = decideAutoSend({
+    ...late,
+    to: ownerNumber,
+    text: "Done.",
+    templateName: "pilot_daily_update",
+    document: { filename: "notes.csv", mime: "text/csv", kind: "notes" },
+  });
+  assert.equal(withDoc.send, false);
+  assert.match(withDoc.reason, /document/);
+
+  // Inside 24h the same draft goes as free text.
+  const inside = decideAutoSend({
+    ...late,
+    to: ownerNumber,
+    text: "Done.",
+    templateName: "pilot_daily_update",
+    lastInboundAt: "2026-10-09T08:00:00.000Z",
+  });
+  assert.equal(inside.send, true);
+  assert.equal(inside.mode, "text");
+
+  // Human approval path: the update template carries the text as {{1}}.
+  const human = decideSend({
+    actor: "human",
+    approve: true,
+    status: "draft",
+    to: ownerNumber,
+    text: "Daily: one start confirmed.",
+    draftTemplate: "pilot_daily_update",
+    allowlist: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    now: new Date("2026-10-09T12:00:00.000Z"),
+    approvedTemplate: "pilot_hello",
+    templateLanguageCode: "en",
+    updateTemplate: "pilot_daily_update",
+    updateTemplateLanguageCode: "en",
+    sendAttempted: false,
+  });
+  assert.equal(human.ok, true);
+  assert.equal(human.mode, "template");
+  assert.equal(human.bodyText, "Daily: one start confirmed.");
+  const humanIntro = decideSend({
+    actor: "human",
+    approve: true,
+    status: "draft",
+    to: ownerNumber,
+    text: "",
+    draftTemplate: null,
+    allowlist: null,
+    lastInboundAt: "2026-09-01T08:00:00.000Z",
+    now: new Date("2026-10-09T12:00:00.000Z"),
+    approvedTemplate: "pilot_hello",
+    templateLanguageCode: "en",
+    updateTemplate: "pilot_daily_update",
+    sendAttempted: false,
+  });
+  assert.equal(humanIntro.ok && humanIntro.templateName, "pilot_hello");
+  assert.equal(humanIntro.ok && humanIntro.bodyText, undefined);
+
+  // Graph payload.
+  assert.deepEqual(
+    graphSendBody({ mode: "template", to: ownerNumber, templateName: "pilot_daily_update", language: "en", bodyText: "Done." }),
+    {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: ownerNumber,
+      type: "template",
+      template: {
+        name: "pilot_daily_update",
+        language: { code: "en" },
+        components: [{ type: "body", parameters: [{ type: "text", text: "Done." }] }],
+      },
+    },
+  );
+  const parameterless = graphSendBody({ mode: "template", to: ownerNumber, templateName: "pilot_hello", language: "en" });
+  assert.deepEqual(parameterless.template, { name: "pilot_hello", language: { code: "en" } });
+
+  // Route hint and docs.
+  assert.match(templateFailureHint(400, tooLong.error), /one line/);
+  assert.equal(templateFailureHint(403, tooLong.error), null);
+  assert.match(read("src/app/api/agent/whatsapp/drafts/route.ts"), /WHATSAPP_UPDATE_TEMPLATE_NAME/);
+  assert.match(read("src/app/api/agent/whatsapp/drafts/route.ts"), /templateFailureHint/);
+  assert.match(read("src/lib/data/whatsapp.ts"), /resolveTemplate/);
+  for (const file of ["agents/hanna.md", "agents/bob.md", "agents/scout.md"]) {
+    assert.match(read(file), /WHATSAPP_UPDATE_TEMPLATE_NAME/);
+  }
+  assert.match(read("agents/hanna.md"), /one message per day/i);
+  const decision = read("DECISIONS.md").split("### 2026-10-09")[1]?.split("### ")[0] ?? "";
+  assert.match(decision, /daily-update template/i);
+  assert.doesNotMatch(decision, /\+\d{8,}/);
 });
 
 test("24h window enforcement", () => {

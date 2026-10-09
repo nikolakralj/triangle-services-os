@@ -40,15 +40,18 @@ Authorization: Bearer {YOUR tri_mc_ TOKEN}
 { "to": "+E164", "text": "the words", "replyTo": "<wamid>" }
 { "to": "+E164", "text": "the words" }
 { "to": "+E164", "text": "the words", "templateName": "<WHATSAPP_TEMPLATE_NAME>" }
+{ "to": "+E164", "text": "one-line update", "templateName": "<WHATSAPP_UPDATE_TEMPLATE_NAME>" }
 { "to": "+E164", "text": "the words", "replyTo": "<wamid>",
   "document": { "filename": "contractors.xlsx", "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "kind": "contractor_list", "contentBase64": "<file>" } }
 ```
 
 A reply names their inbound. You may also start a message to Nikola or Ralph
 with no replyTo, when their latest inbound is inside 24 hours and is not a
-refusal. Outside 24 hours, name the configured parameterless template. If it
-does not match, `held` says outside 24h, no template configured. A document
-cannot ride on the template. Anyone else with no replyTo stays a draft.
+refusal. Outside 24 hours, name a configured template: the parameterless
+intro (`WHATSAPP_TEMPLATE_NAME`) or the daily-update template
+(`WHATSAPP_UPDATE_TEMPLATE_NAME`), where `text` is its one body parameter,
+one line, 1-900 characters. Any other name is a 400. A document cannot ride
+on a template. Anyone else with no replyTo stays a draft.
 
 A file already stored in this organisation can be named instead of uploaded.
 The bytes are not returned to you. For an owner or field number it answers

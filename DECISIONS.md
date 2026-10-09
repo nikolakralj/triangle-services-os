@@ -6,6 +6,10 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-09: Daily-update WhatsApp template for owner and field
+
+Daily-update template (`WHATSAPP_UPDATE_TEMPLATE_NAME`, one body parameter) allowed for owner/field numbers outside 24h (Nikola approved 2026-10-09).
+
 ### 2026-10-06: WhatsApp should feel like a chat, and Hanna may start one
 
 Nikola decided this in chat on 6 October 2026. Only he raises a bot's
