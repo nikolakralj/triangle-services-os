@@ -70,9 +70,11 @@ typing, that is not your reply: draft the answer. You answer
 by filing a WhatsApp message. A reply sets `replyTo` to their inbound, and
 `to` is that sender. You may also start a message to Nikola or Ralph with no
 replyTo when their latest inbound is inside 24 hours and is not a refusal.
-Outside 24 hours, name the configured parameterless template
-(`templateName`). If it does not match, `held` says outside 24h, no template
-configured. A document cannot ride on the template. Anyone else, or a
+Outside 24 hours, name a configured template (`templateName`): the
+parameterless intro (`WHATSAPP_TEMPLATE_NAME`) or the daily-update template
+(`WHATSAPP_UPDATE_TEMPLATE_NAME`), where `text` is its one body parameter,
+one line, 1-900 characters. Any other name is a 400. A document cannot ride
+on a template. Anyone else, or a
 different `to`, stays a draft.
 `"sent": true` means it went out. Nikola and Ralph may receive a file you
 attach — a bank statement, an invoice, a PDF, a spreadsheet, a csv, or a
@@ -85,6 +87,7 @@ organisation is named, not uploaded, and the bytes are not returned to you:
 { "to": "+E164", "text": "the words", "replyTo": "<wamid>" }
 { "to": "+E164", "text": "the words" }
 { "to": "+E164", "text": "the words", "templateName": "<WHATSAPP_TEMPLATE_NAME>" }
+{ "to": "+E164", "text": "one-line update", "templateName": "<WHATSAPP_UPDATE_TEMPLATE_NAME>" }
 { "to": "+E164", "text": "The invoice is attached.", "replyTo": "<wamid>",
   "document": { "documentId": "<documents uuid>" } }
 { "to": "+E164", "text": "The invoice is attached.",

@@ -26,6 +26,7 @@ import {
   planDraft,
   planInbound,
   readWhatsAppEnv,
+  resolveTemplate,
   storedDocumentReplyAllowed,
   schemaMissing,
   serviceWindowOpen,
@@ -975,8 +976,30 @@ export async function fileWhatsAppDraft(params: {
   if (!body) return { ok: false, status: 400, error: "Send a JSON object." };
   const replyTo = typeof body.replyTo === "string" && body.replyTo.trim() ? body.replyTo.trim() : null;
   let to = typeof body.to === "string" ? body.to : "";
-  const text = typeof body.text === "string" ? body.text : "";
+  let text = typeof body.text === "string" ? body.text : "";
   const templateName = typeof body.templateName === "string" ? body.templateName : null;
+  if (templateName?.trim()) {
+    // A named template must be one the owner configured. The update template
+    // carries the draft text as its one body parameter, stored on one line.
+    const configured = readWhatsAppEnv(process.env);
+    const resolved = resolveTemplate(templateName, text, {
+      intro: configured.templateName,
+      introLanguage: configured.templateLanguage,
+      update: configured.updateTemplateName,
+      updateLanguage: configured.updateTemplateLanguage,
+    });
+    if (resolved && !resolved.ok) {
+      const names = [configured.templateName, configured.updateTemplateName].filter(Boolean).join(", ");
+      const error =
+        resolved.error === "That template is not the approved one."
+          ? names
+            ? `That template is not an approved one. Approved: ${names}.`
+            : "That template is not an approved one. No template is configured."
+          : resolved.error;
+      return { ok: false, status: 400, error };
+    }
+    if (resolved?.ok && resolved.bodyText) text = resolved.bodyText;
+  }
   let personId = typeof body.personId === "string" && UUID.test(body.personId) ? body.personId : null;
   let missionId = typeof body.caseId === "string" && UUID.test(body.caseId) ? body.caseId : null;
   const document = asRecord(body.document);
@@ -1393,6 +1416,8 @@ async function considerAutoSend(
     templateName: input.templateName,
     approvedTemplate: env.templateName,
     templateLanguage: env.templateLanguage,
+    updateTemplate: env.updateTemplateName,
+    updateTemplateLanguage: env.updateTemplateLanguage,
     document: input.attachment
       ? {
           filename: input.attachment.filename,
@@ -1429,6 +1454,7 @@ async function considerAutoSend(
             to: decision.to,
             templateName: decision.templateName,
             language: decision.language,
+            bodyText: decision.bodyText ?? null,
           }
         : { ok: true, mode: "text", to: decision.to, body: decision.body };
 
@@ -1635,6 +1661,8 @@ export async function sendApprovedWhatsAppDraft(params: {
     now: new Date(),
     approvedTemplate: env.templateName,
     templateLanguageCode: env.templateLanguage,
+    updateTemplate: env.updateTemplateName,
+    updateTemplateLanguageCode: env.updateTemplateLanguage,
     sendAttempted: Boolean(draft.send_attempted_at),
   });
   if (!decision.ok) return decision;
@@ -1674,7 +1702,11 @@ async function transmitWhatsAppDraft(args: {
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = {
     send_attempted_at: now,
-    body: args.decision.mode === "template" ? args.priorBody : args.decision.body,
+    // The update template stores the one-line text it carried as {{1}}.
+    body:
+      args.decision.mode === "template"
+        ? (args.decision.bodyText ?? args.priorBody)
+        : args.decision.body,
     template_name: args.decision.mode === "template" ? args.decision.templateName : args.priorTemplate,
     updated_at: now,
   };

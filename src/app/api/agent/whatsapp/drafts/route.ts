@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyMachineToken } from "@/lib/auth/machine";
 import { badgeMayReport } from "@/lib/data/employee-report-policy";
 import { fileWhatsAppDraft } from "@/lib/data/whatsapp";
-import { draftFailureHint } from "@/lib/whatsapp/pilot";
+import { draftFailureHint, templateFailureHint } from "@/lib/whatsapp/pilot";
 
 // ---------------------------------------------------------------------------
 // POST /api/agent/whatsapp/drafts — Scout, Bob, or Hanna files a reply,
@@ -17,8 +17,12 @@ import { draftFailureHint } from "@/lib/whatsapp/pilot";
 // Reply: { "to", "text", "replyTo" }
 // Started, no replyTo, owner or field only:
 //   { "to", "text" } inside 24 hours of their latest inbound
-//   { "to", "text", "templateName" } outside that window, parameterless,
-//   and only when templateName is WHATSAPP_TEMPLATE_NAME
+//   { "to", "text", "templateName" } outside that window. templateName must
+//   be one of the configured names:
+//   - WHATSAPP_TEMPLATE_NAME: parameterless intro; text is not sent
+//   - WHATSAPP_UPDATE_TEMPLATE_NAME: daily update; text becomes the one body
+//     parameter {{1}}. One line, 1-900 characters. Newlines and tabs become a
+//     space and runs of spaces collapse to one. Any other name is a 400.
 // A document is either bytes or a reference, not both:
 // { "filename", "mime", "contentBase64" }
 // { "workerId": "<uuid>" } — that person's current CV in the documents bucket
@@ -61,7 +65,14 @@ export async function POST(request: Request) {
     const hadDocument = Boolean(
       body && typeof body === "object" && "document" in body && (body as { document?: unknown }).document,
     );
-    const hint = hadDocument ? draftFailureHint(result.status, result.error) : null;
+    const namedTemplate = Boolean(
+      body && typeof body === "object" && typeof (body as { templateName?: unknown }).templateName === "string",
+    );
+    const hint = hadDocument
+      ? draftFailureHint(result.status, result.error)
+      : namedTemplate
+        ? templateFailureHint(result.status, result.error)
+        : null;
     return NextResponse.json(
       hint ? { error: result.error, hint } : { error: result.error },
       { status: result.status },

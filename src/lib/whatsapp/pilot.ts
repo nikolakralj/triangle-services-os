@@ -6,9 +6,10 @@
 // draft. decideAutoSend says when that draft may leave on its own: an owner
 // or field number, inside 24 hours, and not a refusal. Anyone else waits for
 // a person. Free text, and one list document, are inside 24 hours of the
-// contact's last inbound. Outside it, the configured template is the only
-// thing a person may send, and it does not carry the document. This file
-// does not fetch and does not send.
+// contact's last inbound. Outside it, a configured template is the only
+// thing that may go: the parameterless intro, or the daily-update template
+// whose one body parameter is the draft text. Neither carries the document.
+// This file does not fetch and does not send.
 // ---------------------------------------------------------------------------
 
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
@@ -83,6 +84,71 @@ export function graphVersion(raw: string | null | undefined): string {
 export function templateLanguage(raw: string | null | undefined): string {
   const value = raw?.trim() ?? "";
   return /^[a-z]{2}(_[A-Z]{2})?$/.test(value) ? value : "en";
+}
+
+/** Meta caps one body parameter well above this; keep updates short. */
+export const TEMPLATE_PARAM_MAX = 900;
+
+/**
+ * The one {{1}} body parameter of the daily-update template. Meta rejects a
+ * parameter with a newline, a tab, or more than four consecutive spaces, so
+ * newlines and tabs become a space and any run of spaces collapses to one.
+ * Empty or longer than TEMPLATE_PARAM_MAX is refused with a clear reason.
+ */
+export function templateParamText(
+  raw: string | null | undefined,
+): { ok: true; text: string } | { ok: false; error: string } {
+  const text = (raw ?? "")
+    .replace(/[\r\n\t\v\f]+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+  if (!text) {
+    return { ok: false, error: "The update template needs the day's update in text, one line." };
+  }
+  if (text.length > TEMPLATE_PARAM_MAX) {
+    return {
+      ok: false,
+      error: `The update template text is ${text.length} characters. Keep it to ${TEMPLATE_PARAM_MAX} or fewer, on one line.`,
+    };
+  }
+  return { ok: true, text };
+}
+
+export interface ConfiguredTemplates {
+  /** WHATSAPP_TEMPLATE_NAME: parameterless intro. */
+  intro: string | null;
+  introLanguage: string;
+  /** WHATSAPP_UPDATE_TEMPLATE_NAME: one body text parameter, the draft text. */
+  update: string | null;
+  updateLanguage: string;
+}
+
+export type ResolvedTemplate =
+  | { ok: true; templateName: string; language: string; bodyText: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Allowlist for the templateName a draft names. It must equal one of the
+ * configured names. The update template takes the draft text as {{1}}.
+ */
+export function resolveTemplate(
+  requested: string | null | undefined,
+  text: string,
+  templates: ConfiguredTemplates,
+): ResolvedTemplate | null {
+  const asked = (requested ?? "").trim();
+  if (!asked) return null;
+  const update = templates.update?.trim() || null;
+  const intro = templates.intro?.trim() || null;
+  if (update && asked === update) {
+    const param = templateParamText(text);
+    if (!param.ok) return param;
+    return { ok: true, templateName: update, language: templateLanguage(templates.updateLanguage), bodyText: param.text };
+  }
+  if (intro && asked === intro) {
+    return { ok: true, templateName: intro, language: templateLanguage(templates.introLanguage), bodyText: null };
+  }
+  return { ok: false, error: "That template is not the approved one." };
 }
 
 export function readAllowlist(raw: string | null | undefined): string[] | null {
@@ -443,7 +509,7 @@ export function planDraft(input: {
 export type SendPlan =
   | { ok: true; mode: "text"; to: string; body: string }
   | { ok: true; mode: "document"; to: string; body: string; filename: string; mime: string }
-  | { ok: true; mode: "template"; to: string; templateName: string; language: string }
+  | { ok: true; mode: "template"; to: string; templateName: string; language: string; bodyText?: string | null }
   | { ok: false; status: number; error: string };
 
 export function decideSend(input: {
@@ -458,6 +524,9 @@ export function decideSend(input: {
   now: Date;
   approvedTemplate: string | null;
   templateLanguageCode: string;
+  /** WHATSAPP_UPDATE_TEMPLATE_NAME; the draft text is its one body parameter. */
+  updateTemplate?: string | null;
+  updateTemplateLanguageCode?: string | null;
   sendAttempted: boolean;
   document?: { filename: string; mime: string } | null;
 }): SendPlan {
@@ -511,6 +580,27 @@ export function decideSend(input: {
     return { ok: true, mode: "text", to, body };
   }
   const approved = input.approvedTemplate?.trim() || null;
+  const update = input.updateTemplate?.trim() || null;
+  const asked = input.draftTemplate?.trim() || null;
+  if (asked && update && asked === update) {
+    const resolved = resolveTemplate(asked, input.text, {
+      intro: approved,
+      introLanguage: input.templateLanguageCode,
+      update,
+      updateLanguage: input.updateTemplateLanguageCode ?? "en",
+    });
+    if (!resolved || !resolved.ok) {
+      return { ok: false, status: 400, error: resolved ? resolved.error : "That template is not the approved one." };
+    }
+    return {
+      ok: true,
+      mode: "template",
+      to,
+      templateName: resolved.templateName,
+      language: resolved.language,
+      bodyText: resolved.bodyText,
+    };
+  }
   if (!approved) {
     return {
       ok: false,
@@ -518,7 +608,6 @@ export function decideSend(input: {
       error: "Outside the 24-hour window. Only an approved template can be sent, and none is configured.",
     };
   }
-  const asked = input.draftTemplate?.trim() || null;
   if (asked && asked !== approved) {
     return { ok: false, status: 400, error: "That template is not the approved one." };
   }
@@ -583,8 +672,19 @@ export function draftFailureHint(status: number, error: string): string | null {
   return null;
 }
 
+/** A 400 about a named template. The update goes on one line, within the cap. */
+export function templateFailureHint(status: number, error: string): string | null {
+  if (status !== 400) return null;
+  if (/template/i.test(error)) {
+    return `Name WHATSAPP_UPDATE_TEMPLATE_NAME or WHATSAPP_TEMPLATE_NAME exactly. For the update template, put the day's update in text on one line, up to ${TEMPLATE_PARAM_MAX} characters.`;
+  }
+  return null;
+}
+
 export function graphSendBody(
-  plan: { mode: "text"; to: string; body: string } | { mode: "template"; to: string; templateName: string; language: string },
+  plan:
+    | { mode: "text"; to: string; body: string }
+    | { mode: "template"; to: string; templateName: string; language: string; bodyText?: string | null },
 ): Record<string, unknown> {
   if (plan.mode === "text") {
     return {
@@ -595,12 +695,16 @@ export function graphSendBody(
       text: { body: plan.body, preview_url: false },
     };
   }
+  const template: Record<string, unknown> = { name: plan.templateName, language: { code: plan.language } };
+  if (plan.bodyText) {
+    template.components = [{ type: "body", parameters: [{ type: "text", text: plan.bodyText }] }];
+  }
   return {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: plan.to,
     type: "template",
-    template: { name: plan.templateName, language: { code: plan.language } },
+    template,
   };
 }
 
@@ -619,6 +723,9 @@ export interface WhatsAppEnv {
   graphVersion: string;
   templateName: string | null;
   templateLanguage: string;
+  /** Daily-update template with one body text parameter. */
+  updateTemplateName: string | null;
+  updateTemplateLanguage: string;
   orgId: string | null;
   /** Unset is on. Off keeps every reply as a draft. */
   autoSend: boolean;
@@ -650,6 +757,8 @@ export function readWhatsAppEnv(env: Record<string, string | undefined>): WhatsA
     graphVersion: graphVersion(env.WHATSAPP_GRAPH_VERSION),
     templateName: clean(env.WHATSAPP_TEMPLATE_NAME),
     templateLanguage: templateLanguage(env.WHATSAPP_TEMPLATE_LANGUAGE),
+    updateTemplateName: clean(env.WHATSAPP_UPDATE_TEMPLATE_NAME),
+    updateTemplateLanguage: templateLanguage(env.WHATSAPP_UPDATE_TEMPLATE_LANGUAGE),
     orgId: org && UUID.test(org) ? org : null,
     autoSend: whatsAppAutoSendEnabled(env.WHATSAPP_AUTO_SEND),
   };
@@ -770,6 +879,7 @@ export type AutoSendPlan =
       to: string;
       templateName: string;
       language: string;
+      bodyText?: string | null;
       audit: string;
     }
   | { send: false; reason: string };
@@ -838,7 +948,8 @@ function startedByEmployeeAudit(role: "owner" | "field"): string {
  * Hanna, Bob, or Scout started this. There is no inbound to answer.
  * Owner and field only, and only when that number's latest inbound is not
  * a refusal. Inside 24 hours the text or document goes. Outside it, only
- * the configured parameterless template, and only when the draft names it.
+ * a configured template the draft names: the parameterless intro, or the
+ * daily-update template with the draft text as its one body parameter.
  */
 function decideEmployeeStarted(input: {
   to: string;
@@ -852,6 +963,8 @@ function decideEmployeeStarted(input: {
   templateName?: string | null;
   approvedTemplate?: string | null;
   templateLanguage?: string | null;
+  updateTemplate?: string | null;
+  updateTemplateLanguage?: string | null;
   document?: {
     filename: string;
     mime: string;
@@ -922,18 +1035,26 @@ function decideEmployeeStarted(input: {
       reason: "Outside the 24-hour window. A document cannot be sent then.",
     };
   }
-  const requested = (input.templateName ?? "").trim();
-  const approved = (input.approvedTemplate ?? "").trim();
-  if (requested && approved && requested === approved) {
+  const resolved = resolveTemplate(input.templateName, text, {
+    intro: input.approvedTemplate ?? null,
+    introLanguage: input.templateLanguage ?? "en",
+    update: input.updateTemplate ?? null,
+    updateLanguage: input.updateTemplateLanguage ?? "en",
+  });
+  if (resolved?.ok) {
     return {
       send: true,
       role,
       mode: "template",
       to,
-      templateName: approved,
-      language: templateLanguage(input.templateLanguage),
+      templateName: resolved.templateName,
+      language: resolved.language,
+      bodyText: resolved.bodyText,
       audit: startedByEmployeeAudit(role),
     };
+  }
+  if (resolved && input.updateTemplate?.trim() && input.templateName?.trim() === input.updateTemplate.trim()) {
+    return { send: false, reason: resolved.error };
   }
   return { send: false, reason: "outside 24h, no template configured" };
 }
@@ -968,6 +1089,8 @@ export function decideAutoSend(input: {
   templateName?: string | null;
   approvedTemplate?: string | null;
   templateLanguage?: string | null;
+  updateTemplate?: string | null;
+  updateTemplateLanguage?: string | null;
   document?: {
     filename: string;
     mime: string;
