@@ -3,6 +3,22 @@ import { after } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { getOpenAIClient } from "@/lib/ai/openai-client";
 import { wakeEmployee } from "@/lib/data/bot-runtime";
+import {
+  VOICE_ATTACHMENT_KIND,
+  VOICE_FAILED_REPLY,
+  VOICE_MAX_BYTES,
+  VOICE_REPLY_REASON,
+  VOICE_TRANSCRIPT_MAX_CHARS,
+  audioFilename,
+  cleanTranscript,
+  graphMediaInfoUrl,
+  planVoiceNote,
+  planVoiceSize,
+  readVoiceEnv,
+  voiceReplyKey,
+  voiceSenderRole,
+  type ParsedVoice,
+} from "@/lib/whatsapp/voice";
 import { whatsAppInboundHasReply, type WhatsAppRecord } from "@/lib/whatsapp/view";
 import {
   decideAutoSend,
@@ -112,6 +128,10 @@ export async function ingestWhatsAppWebhook(rawBody: string): Promise<{ status: 
       const outcome = await storeInbound(svc, env.orgId, env, business, message);
       if (outcome === "missing") return { status: 503 };
     }
+    for (const voice of change.voiceNotes) {
+      const outcome = await acceptVoiceNote(svc, env.orgId, env, business, voice);
+      if (outcome === "missing") return { status: 503 };
+    }
     for (const status of change.statuses) {
       const outcome = await applyStatus(svc, env.orgId, status);
       if (outcome === "missing") return { status: 503 };
@@ -130,6 +150,7 @@ async function storeInbound(
   },
   business: string,
   message: ParsedText,
+  voice: { mime: string | null } | null = null,
 ): Promise<"ok" | "missing"> {
   const { data: existing, error: readError } = await svc
     .from("whatsapp_messages")
@@ -207,6 +228,8 @@ async function storeInbound(
         mission_id: filing.missionId,
         routed_employee: route?.employee ?? null,
         route_reason: route?.reason ?? null,
+        // A voice note keeps its transcript in body; the audio is never stored.
+        ...(voice ? { attachment_kind: VOICE_ATTACHMENT_KIND, attachment_mime: voice.mime } : {}),
       })
       .select("id")
       .maybeSingle();
@@ -290,6 +313,7 @@ async function storeInbound(
           reason: chosen.reason,
           handoffNote: chosen.handoffNote,
           typingShown: typing.send,
+          ...(voice ? { voiceNote: true } : {}),
         });
       }
     } catch {
@@ -298,6 +322,219 @@ async function storeInbound(
     await indicator;
   });
   return "ok";
+}
+
+// ── Voice notes (2026-10-12) ───────────────────────────────────────────────
+// Download through the Graph media endpoint, transcribe, then hand the
+// transcript to storeInbound as if it were typed: same routing, typing
+// indicator and 24-hour logic. The audio stays in memory only.
+
+async function acceptVoiceNote(
+  svc: Svc,
+  orgId: string,
+  env: ReturnType<typeof readWhatsAppEnv>,
+  business: string,
+  voice: ParsedVoice,
+): Promise<"ok" | "missing"> {
+  const { data: existing, error } = await svc
+    .from("whatsapp_messages")
+    .select("id, body, attachment_kind")
+    .eq("org_id", orgId)
+    .eq("wamid", voice.wamid)
+    .maybeSingle();
+  if (schemaMissing(error)) {
+    console.error("whatsapp: whatsapp_messages is missing (migrations 054 and 055). Voice note was not stored.");
+    return "missing";
+  }
+  if (error) return "ok";
+  if (existing) {
+    // Meta redelivered. A transcribed note goes through storeInbound again so
+    // an interrupted wake still completes once; nothing is transcribed twice.
+    const body = typeof existing.body === "string" ? existing.body : "";
+    if (existing.attachment_kind === VOICE_ATTACHMENT_KIND && body && !isVoicePlaceholder(body)) {
+      return storeInbound(svc, orgId, env, business, {
+        wamid: voice.wamid,
+        from: voice.from,
+        text: body,
+        timestamp: voice.timestamp,
+      }, { mime: voice.mime });
+    }
+    return "ok";
+  }
+
+  const voiceEnv = readVoiceEnv(process.env);
+  const role = voiceSenderRole({
+    from: voice.from,
+    senders: env.senders,
+    unmatched: env.unmatched,
+    allowlist: env.allowlist,
+  });
+  const plan = planVoiceNote({ role, keyPresent: Boolean(voiceEnv.apiKey) });
+  if (plan.action === "ignore") {
+    console.error(`whatsapp: voice note ignored. ${plan.reason}`);
+    return "ok";
+  }
+
+  runAfterResponse(async () => {
+    if (plan.action === "reply") {
+      await voiceNotice(svc, orgId, env, business, voice, plan.text, plan.reason);
+      return;
+    }
+    const result = await transcribeVoiceNote(env, voiceEnv, voice);
+    if (!result.ok) {
+      await voiceNotice(svc, orgId, env, business, voice, result.reply, result.reason);
+      return;
+    }
+    await storeInbound(
+      svc,
+      orgId,
+      env,
+      business,
+      { wamid: voice.wamid, from: voice.from, text: result.text, timestamp: voice.timestamp },
+      { mime: voice.mime },
+    );
+  });
+  return "ok";
+}
+
+const VOICE_PLACEHOLDER_PREFIX = "[Voice note, not transcribed";
+
+function isVoicePlaceholder(body: string): boolean {
+  return body.startsWith(VOICE_PLACEHOLDER_PREFIX);
+}
+
+async function transcribeVoiceNote(
+  env: ReturnType<typeof readWhatsAppEnv>,
+  voiceEnv: ReturnType<typeof readVoiceEnv>,
+  voice: ParsedVoice,
+): Promise<{ ok: true; text: string } | { ok: false; reply: string; reason: string }> {
+  const failed = (reason: string) => ({ ok: false as const, reply: VOICE_FAILED_REPLY, reason });
+  if (!env.accessToken) return failed("WHATSAPP_ACCESS_TOKEN is missing; the audio could not be fetched.");
+  if (!voiceEnv.apiKey) return failed("No transcription key.");
+  try {
+    const info = await fetch(graphMediaInfoUrl(env.graphVersion, voice.mediaId), {
+      headers: { Authorization: `Bearer ${env.accessToken}` },
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (!info.ok) return failed(`Graph media lookup refused (${info.status}).`);
+    const meta = (await info.json().catch(() => null)) as { url?: string; file_size?: number; mime_type?: string } | null;
+    if (!meta?.url) return failed("Graph media lookup returned no URL.");
+    const size = typeof meta.file_size === "number" ? meta.file_size : null;
+    const sized = planVoiceSize(size);
+    if (sized.action === "reply") return { ok: false, reply: sized.text, reason: sized.reason };
+
+    const media = await fetch(meta.url, {
+      headers: { Authorization: `Bearer ${env.accessToken}` },
+      signal: AbortSignal.timeout(30_000),
+      cache: "no-store",
+    });
+    if (!media.ok) return failed(`Graph media download refused (${media.status}).`);
+    const declared = Number(media.headers.get("content-length") ?? "");
+    const tooBig = planVoiceSize(Number.isFinite(declared) && declared > 0 ? declared : null);
+    if (tooBig.action === "reply") return { ok: false, reply: tooBig.text, reason: tooBig.reason };
+    const bytes = await media.arrayBuffer();
+    const real = planVoiceSize(bytes.byteLength);
+    if (real.action === "reply") return { ok: false, reply: real.text, reason: real.reason };
+    if (bytes.byteLength > VOICE_MAX_BYTES) return failed("Over the cap.");
+
+    const mime = voice.mime ?? meta.mime_type ?? "audio/ogg";
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: mime.split(";")[0] }), audioFilename(mime));
+    form.append("model", voiceEnv.model);
+    // No language: German, English and Croatian are mixed, so auto-detect.
+    form.append("response_format", "json");
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${voiceEnv.apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(120_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return failed(`Transcription refused (${res.status}).`);
+    const json = (await res.json().catch(() => null)) as { text?: unknown } | null;
+    const text = cleanTranscript(json?.text);
+    if (!text) return failed("Transcription came back empty.");
+    return { ok: true, text };
+  } catch {
+    return failed("Download or transcription did not answer.");
+  }
+}
+
+/**
+ * The note could not become text. Store the inbound (so it shows as waiting)
+ * without waking anyone, and tell the sender once, in plain words.
+ */
+async function voiceNotice(
+  svc: Svc,
+  orgId: string,
+  env: ReturnType<typeof readWhatsAppEnv>,
+  business: string,
+  voice: ParsedVoice,
+  text: string,
+  reason: string,
+): Promise<void> {
+  try {
+    const filing = await resolveFiling(svc, orgId, voice.from);
+    const inserted = await svc.from("whatsapp_messages").insert({
+      org_id: orgId,
+      wamid: voice.wamid,
+      direction: "inbound",
+      from_number: voice.from,
+      to_number: business,
+      body: `${VOICE_PLACEHOLDER_PREFIX}: ${reason}]`,
+      wa_timestamp: voice.timestamp,
+      status: "received",
+      person_id: filing.personId,
+      mission_id: filing.missionId,
+      attachment_kind: VOICE_ATTACHMENT_KIND,
+      attachment_mime: voice.mime,
+      route_reason: `Voice note not transcribed: ${reason}`.slice(0, 300),
+    });
+    if (inserted.error?.code === "23505") return;
+    if (inserted.error) {
+      console.error("whatsapp: could not store the voice note. Nothing was sent.");
+      return;
+    }
+
+    const send = env.autoSend && Boolean(env.phoneNumberId && env.accessToken);
+    const { data, error } = await svc
+      .from("whatsapp_messages")
+      .insert({
+        org_id: orgId,
+        direction: "outbound",
+        from_number: business,
+        to_number: voice.from,
+        body: text,
+        wa_timestamp: new Date().toISOString(),
+        status: "draft",
+        person_id: filing.personId,
+        mission_id: filing.missionId,
+        reply_to_wamid: voice.wamid,
+        draft_key: voiceReplyKey(voice.wamid),
+        route_reason: VOICE_REPLY_REASON,
+      })
+      .select("id")
+      .maybeSingle();
+    if (error?.code === "23505" || error || !data?.id || !send) return;
+    const posted = await postToGraph({
+      version: env.graphVersion,
+      phoneNumberId: env.phoneNumberId as string,
+      accessToken: env.accessToken as string,
+      body: graphSendBody({ mode: "text", to: voice.from, body: text }),
+    });
+    await svc
+      .from("whatsapp_messages")
+      .update(
+        posted.ok
+          ? { status: "sent", wamid: posted.wamid, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+          : { status: "failed", error: posted.error, updated_at: new Date().toISOString() },
+      )
+      .eq("id", data.id)
+      .eq("org_id", orgId);
+  } catch {
+    console.error("whatsapp: the voice note notice failed. Nothing else was affected.");
+  }
 }
 
 function runAfterResponse(work: () => Promise<void>): void {
@@ -547,7 +784,7 @@ async function wakeRoutedEmployee(
           agent_instance_id: employee.id,
           mission_id: ctx.caseId,
           title: "WhatsApp",
-          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.typingShown ? " The sender sees typing." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
+          objective: `A WhatsApp message arrived (${ctx.messageId}) from ${ctx.sender}. Routed to ${who}: ${route.reason}. Person ${ctx.personId ?? "unknown"}. Case ${ctx.caseId ?? "none"}. Draft at ${ctx.draftEndpoint}.${handoff}${ctx.typingShown ? " The sender sees typing." : ""}${ctx.voiceNote ? " It is a voice note; the text is its transcript. After a client call, write it onto the client's page or case." : ""} Do not send. A CV, worker profile, financial document, or mission document may be attached only for an owner or field sender.`,
           expected_output: wakeExpectedOutput(
             whatsAppRecipientRole(ctx.sender, readWhatsAppEnv(process.env).senders),
           ),
@@ -562,12 +799,13 @@ async function wakeRoutedEmployee(
             sender: ctx.sender,
             person_id: ctx.personId,
             mission_id: ctx.caseId,
-            text: ctx.text.slice(0, 1500),
+            text: ctx.text.slice(0, ctx.voiceNote ? VOICE_TRANSCRIPT_MAX_CHARS : 1500),
             draft_endpoint: ctx.draftEndpoint,
             routed_employee: route.employee,
             route_reason: route.reason,
             ...(ctx.handoffNote ? { handoff_note: ctx.handoffNote } : {}),
             ...(ctx.typingShown ? { typing_shown: true } : {}),
+            ...(ctx.voiceNote ? { voice_note: true } : {}),
           },
         })
         .select("id")
@@ -613,6 +851,7 @@ async function wakeRoutedEmployee(
       draftEndpoint: ctx.draftEndpoint,
       ...(ctx.handoffNote ? { handoffNote: ctx.handoffNote } : {}),
       ...(ctx.typingShown ? { typingShown: true } : {}),
+      ...(ctx.voiceNote ? { voiceNote: true } : {}),
     },
   });
 }
