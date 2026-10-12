@@ -22,6 +22,7 @@
     "check:employee-reports": "node scripts/check-employee-reports.mjs",
     "check:case-page": "node scripts/check-case-page.mjs",
     "check:whatsapp": "node scripts/check-whatsapp.mjs",
+    "check:client-tabs": "node scripts/check-client-tabs.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
