@@ -10,6 +10,21 @@ This file records major product and implementation decisions so future agents do
 
 2026-10-12: owner approved an exception to the roadmap rule 'no new pages until the case page holds' for client tabs (EPG Linz as test) and WhatsApp voice notes.
 
+Voice notes, decided the same day:
+
+- calls do not reach the bots on their own, so a WhatsApp voice note to
+  Hanna after a call is how a call lands on the client's page or case;
+- a voice note from an owner or field number is downloaded through the Graph
+  media endpoint, transcribed (German, English and Croatian mixed, language
+  auto-detected), and then handled exactly like a typed message: same
+  routing, typing indicator and 24-hour logic;
+- the transcript is stored on the whatsapp_messages row; the audio is not
+  stored anywhere;
+- transcription reuses OPENAI_API_KEY. Without it, the sender is told "I got
+  your voice note but can't transcribe yet" and nothing crashes. Notes over
+  8 MB (well over 15 minutes) are refused with a short reply;
+- recording a client's call needs their consent (Austria, Germany); a note
+  after the call avoids that.
 Binding product rules from the owner, same day:
 
 - no CRM: the owner never fills forms. Bots write the tab from what already

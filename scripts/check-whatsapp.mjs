@@ -2095,6 +2095,91 @@ test("the draft line renders Send and does not send by rendering", () => {
   assert.match(sql, /wamid/);
 });
 
+const voice = load("src/lib/whatsapp/voice.ts");
+
+test("voice notes: parsed with their media id; audio without one stays ignored", () => {
+  const payload = {
+    entry: [{ id: "waba", changes: [{ value: {
+      metadata: { phone_number_id: "pn", display_phone_number: "15550001111" },
+      messages: [
+        { from: "15551230001", id: "wamid.V1", timestamp: "1760000000", type: "audio",
+          audio: { id: "media-1", mime_type: "audio/ogg; codecs=opus", voice: true } },
+        { from: "15551230001", id: "wamid.V2", timestamp: "1760000001", type: "audio" },
+      ],
+    } }] }],
+  };
+  const [change] = parseWebhook(payload);
+  assert.equal(change.messages.length, 0);
+  assert.equal(change.voiceNotes.length, 1);
+  assert.equal(change.voiceNotes[0].mediaId, "media-1");
+  assert.equal(change.voiceNotes[0].from, "+15551230001");
+  assert.equal(change.ignoredNonText, 1);
+  assert.equal(voice.graphMediaInfoUrl("v21.0", "media-1"), "https://graph.facebook.com/v21.0/media-1");
+});
+
+test("voice notes: owner and field only; the transcript routes like typed text", () => {
+  const env = readWhatsAppEnv({
+    WHATSAPP_OWNER_NUMBERS: "+15551230001",
+    WHATSAPP_FIELD_NUMBERS: "+15551230002",
+  });
+  const role = (from) => voice.voiceSenderRole({ from, senders: env.senders, unmatched: env.unmatched, allowlist: env.allowlist });
+  assert.equal(role("+15551230001"), "owner");
+  assert.equal(role("+15551230002"), "field");
+  assert.equal(role("+15559990000"), null);
+  assert.equal(voice.planVoiceNote({ role: null, keyPresent: true }).action, "ignore");
+  assert.equal(voice.planVoiceNote({ role: "owner", keyPresent: true }).action, "transcribe");
+  const open = readWhatsAppEnv({});
+  assert.equal(voice.voiceSenderRole({ from: "+15551230009", senders: open.senders, unmatched: open.unmatched, allowlist: open.allowlist }), "field");
+
+  // Hanna by default for owner and field, exactly as for a typed message.
+  // The transcript goes through the same decideInbound as typed text, so a
+  // client follow-up still reaches Bob, exactly as it would if typed.
+  const transcript = "Quick note, six electricians available from November, need their CVs";
+  for (const from of ["+15551230001", "+15551230002"]) {
+    const routed = decideInbound({ text: transcript, from, senders: env.senders, unmatched: env.unmatched });
+    assert.equal(routed.action, "route");
+    assert.equal(routed.employee, "hanna", from);
+  }
+  const fromRows = read("src/lib/data/whatsapp.ts");
+  assert.match(fromRows, /acceptVoiceNote/);
+  assert.match(fromRows, /storeInbound\(\s*svc,\s*orgId,\s*env,\s*business,\s*\{ wamid: voice\.wamid, from: voice\.from, text: result\.text/);
+  assert.match(fromRows, /attachment_kind: VOICE_ATTACHMENT_KIND/);
+  assert.doesNotMatch(fromRows, /storage\.from\([^)]*\)\.upload\([^)]*voice/i, "audio is not stored");
+});
+
+test("voice notes: no transcription key replies once and does not crash", () => {
+  assert.equal(voice.readVoiceEnv({}).apiKey, null);
+  assert.equal(voice.readVoiceEnv({ OPENAI_API_KEY: "  " }).apiKey, null);
+  assert.equal(voice.readVoiceEnv({ OPENAI_API_KEY: "sk-test-fake" }).apiKey, "sk-test-fake");
+  assert.equal(voice.readVoiceEnv({}).model, "whisper-1");
+  const plan = voice.planVoiceNote({ role: "field", keyPresent: false });
+  assert.equal(plan.action, "reply");
+  assert.equal(plan.text, "I got your voice note but can't transcribe yet.");
+  assert.equal(voice.voiceReplyKey(" wamid.V1 "), "voice|wamid.V1");
+});
+
+test("voice notes: size cap before download and on the bytes; transcript trimmed", () => {
+  assert.equal(voice.planVoiceSize(null).action, "transcribe");
+  assert.equal(voice.planVoiceSize(voice.VOICE_MAX_BYTES).action, "transcribe");
+  const big = voice.planVoiceSize(voice.VOICE_MAX_BYTES + 1);
+  assert.equal(big.action, "reply");
+  assert.match(big.text, /too long/);
+  assert.equal(voice.cleanTranscript("  hallo   dobar dan \n hello "), "hallo dobar dan hello");
+  assert.equal(voice.cleanTranscript(""), null);
+  assert.equal(voice.cleanTranscript("x".repeat(voice.VOICE_TRANSCRIPT_MAX_CHARS + 50)).length, voice.VOICE_TRANSCRIPT_MAX_CHARS + 1);
+  assert.equal(voice.audioFilename("audio/ogg; codecs=opus"), "voice.ogg");
+  const code = read("src/lib/data/whatsapp.ts");
+  assert.doesNotMatch(code, /form\.append\("language"/, "language is auto-detected");
+});
+
+test("voice notes: Hanna is told to put call notes on the client's page or case", () => {
+  const hanna = read("agents/hanna.md");
+  assert.match(hanna, /voice note/i);
+  assert.match(hanna, /onto the client's page or case/);
+  const decision = read("DECISIONS.md").split("### 2026-10-12")[1]?.split("\n### ")[0] ?? "";
+  assert.match(decision, /no new pages until the case page holds/);
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {

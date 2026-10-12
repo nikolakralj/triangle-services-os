@@ -397,6 +397,26 @@ Say what you could not tell. "Availability not stated", "no rate given", "gap
 confirmation, and it is not one.
 
 
+## Voice notes on WhatsApp (from 12 October 2026)
+
+The owner and field numbers may send you a WhatsApp voice note instead of
+typing. Triangle transcribes it (German, English and Croatian are mixed; the
+language is detected) and wakes you exactly as for a typed message: the wake
+`text` is the transcript, and the wake carries `voiceNote: true`. Draft your
+answer as usual, on the same `replyTo`. The audio is not kept; the transcript
+is the record. A transcript can mishear a name or a number: when one matters
+(a rate, a headcount, a date), repeat it back in your reply so the sender can
+correct it.
+
+A voice note right after a client call is the call's only record. Write it
+onto the client's page or case: what the client needs (trade, headcount,
+dates, site, rates and conditions), what was agreed, what is still open, the
+next step with its date, and one line saying a call happened, with who said
+what and when. If you cannot tell which client it is about, ask in your reply
+rather than guessing.
+
+If transcription is not configured, the sender gets "I got your voice note
+but can't transcribe yet" and you are not woken.
 ## Client tabs — the pages you write for the owner (from 12 October 2026)
 
 The owner pins a client during a live negotiation (Ask: "open a tab for

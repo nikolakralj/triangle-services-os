@@ -56,6 +56,8 @@ export interface WakeContext {
   handoffNote: string | null;
   /** True when Triangle is showing the sender a typing indicator. No text was sent. */
   typingShown?: boolean;
+  /** True when the text is the transcript of a voice note. */
+  voiceNote?: boolean;
 }
 
 export interface PilotMessage {
@@ -247,8 +249,19 @@ export interface ParsedChange {
   phoneNumberId: string | null;
   displayNumber: string | null;
   messages: ParsedText[];
+  /** Inbound `audio` (voice notes) with a media id. Transcribed before routing. */
+  voiceNotes: ParsedAudio[];
   statuses: ParsedStatus[];
   ignoredNonText: number;
+}
+
+/** Same shape as voice.ts ParsedVoice; declared here so pilot.ts imports nothing from it. */
+export interface ParsedAudio {
+  wamid: string;
+  from: string;
+  mediaId: string;
+  mime: string | null;
+  timestamp: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -282,6 +295,7 @@ export function parseWebhook(body: unknown): ParsedChange[] {
             ? normalizeE164(metadata.display_phone_number)
             : null,
         messages: [],
+        voiceNotes: [],
         statuses: [],
         ignoredNonText: 0,
       };
@@ -297,6 +311,21 @@ export function parseWebhook(body: unknown): ParsedChange[] {
             wamid,
             from,
             text: bodyText,
+            timestamp: unixToIso(row.timestamp),
+          });
+        } else if (
+          row?.type === "audio" &&
+          wamid &&
+          from &&
+          typeof asRecord(row.audio)?.id === "string" &&
+          String(asRecord(row.audio)?.id).trim()
+        ) {
+          const audio = asRecord(row.audio);
+          parsed.voiceNotes.push({
+            wamid,
+            from,
+            mediaId: String(audio?.id).trim(),
+            mime: typeof audio?.mime_type === "string" ? audio.mime_type : null,
             timestamp: unixToIso(row.timestamp),
           });
         } else if (row) {
