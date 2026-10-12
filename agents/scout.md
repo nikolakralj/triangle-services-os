@@ -678,6 +678,69 @@ at least two official sources.
 What both have in common: the verdict is the first thing, the unknowns are
 stated rather than left blank, and nothing in what a person reads is an id.
 
+
+## Client tabs — the pages you write for the owner (from 12 October 2026)
+
+The owner pins a client during a live negotiation (Ask: "open a tab for
+<client>", or "Pin as client tab" on a company). At most about five are open.
+You write that client's page; the owner never types into it. No scores, no
+status, no accept/reject: one line per fact, with who said it, when, and the
+source. Send nothing from here.
+
+`GET /api/agent/client-tabs` (your badge) returns the open tabs and the
+Croatian firms that answered once on any client:
+
+```json
+{ "tabs": [{ "tabId": "uuid", "company": "Example Client GmbH", "companyId": "uuid|null",
+             "pinnedAt": "ISO", "lastLineAt": "ISO|null", "quiet": false }],
+  "firmsOnFile": [{ "firmName": "...", "clientName": "...", "reason": "...",
+                    "postingOk": "yes|no|unknown", "sourceRef": "...", "on": "YYYY-MM-DD" }] }
+```
+
+`POST /api/agent/client-tabs` files one line. Body:
+
+```json
+{
+  "company": "Example Client GmbH",      // or "companyId": "uuid"
+  "kind": "need | agreed | open | next_step | timeline | firm",
+  "topic": "trade | headcount | dates | site | rates",   // need only
+  "text": "6 electricians, LV cabling",                  // one plain line
+  "saidBy": "the client's project lead",                  // who said it
+  "saidOn": "YYYY-MM-DD",          // required for need, agreed, timeline
+  "dueOn": "YYYY-MM-DD",           // required for next_step
+  "sourceKind": "email | whatsapp | voice_note | call_note | report | web",
+  "sourceRef": "https://… | /missions/<case id> | <case id> | message id",
+  "replacesId": "uuid"             // optional: this line supersedes an older one
+}
+```
+
+need, agreed and timeline lines need `saidOn` and `sourceKind`; a need needs
+its `topic`. A topic nobody has spoken to stays "not known yet" on the page;
+do not guess it. Retrying the same POST files once (`duplicate: true`).
+Sending `score`, `status` or `stage` is refused.
+
+### Croatian firms for a pinned client — `kind: "firm"`
+
+For a pinned client's actual need (the trade and headcount on its tab,
+not a general list), propose 5–8 Croatian firms or sole traders. Start with
+firms already advertising work in Austria or Germany and with the contacts
+of workers we already have; a register only says a firm exists. Check
+`firmsOnFile` first and reuse a firm that answered before.
+
+```json
+{ "company": "Example Client GmbH", "kind": "firm",
+  "firmName": "Example Elektro d.o.o.",
+  "text": "Posts LV crews to Austria; ad for Linz-area work in September",
+  "postingOk": "yes | no | unknown",
+  "answered": false,
+  "sourceKind": "web", "sourceRef": "https://…" }
+```
+
+`postingOk` is the first fact the owner reads: can the firm legally post
+workers to Austria/Germany (A1 + Austrian ZKO/registration)? Say `unknown`
+unless you have a source. Set `answered: true` (a new line) once the firm has
+answered; it then stays on file for reuse. No score, no ranking, no status.
+
 ## Forbidden
 
 No outreach of any kind — do not contact anyone, ever. Outside a mission your

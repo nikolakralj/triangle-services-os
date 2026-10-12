@@ -12,6 +12,8 @@ import { getOrganizationOperatingProfile } from "@/lib/data/organization-profile
 import { missionProvider } from "@/lib/ai/mission-models";
 import { askOnRecord } from "@/lib/data/ask-on-record";
 import { ROLE_CAPABILITIES } from "@/lib/auth/session";
+import { parseOpenTabIntent } from "@/lib/data/client-tab-policy";
+import { pinClientTab } from "@/lib/data/client-tabs";
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — the one box.
@@ -125,6 +127,26 @@ export async function POST(request: Request) {
   }
   const { question, missionId, context } = parsed.data;
   const orgId = access.organizationId;
+
+  // ── "open a tab for <client>": the owner names a client to pin ──────────
+  // The one thing the owner writes about a client. Everything on the tab
+  // after this is written by the bots (exception approved 2026-10-12).
+  const tabFor = parseOpenTabIntent(question);
+  if (tabFor) {
+    const pinned = await pinClientTab({ orgId, userId: access.userId, companyName: tabFor });
+    if (!pinned.ok) {
+      return NextResponse.json({ error: pinned.error }, { status: pinned.status });
+    }
+    return NextResponse.json(
+      {
+        kind: "client_tab",
+        key: pinned.companyId ?? pinned.companyName,
+        label: pinned.companyName,
+        alreadyOut: pinned.alreadyOpen,
+      },
+      { status: pinned.alreadyOpen ? 200 : 201 },
+    );
+  }
 
   // ── the next instruction inside a mission ────────────────────────────────
   // Short is fine here: "electrical first" answers the question Scout asked.

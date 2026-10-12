@@ -8,6 +8,7 @@ import { getCompanyCase } from "@/lib/data/company-case";
 import { AskPageContext } from "@/components/missions/ask-context";
 import { ReportedWork } from "@/components/modules/reported-work";
 import { listReportsForCompany } from "@/lib/data/employee-reports";
+import { PinClientTabButton } from "@/components/modules/client-tab-controls";
 
 export default async function CompanyDetailPage({
   params,
@@ -36,6 +37,10 @@ export default async function CompanyDetailPage({
         title={company.name}
         description="Commercial manager report: where the work is, who buys, what Triangle can offer, and the next safe action."
       />
+      {/* A live negotiation becomes a pinned client tab; the bots write it. */}
+      <div className="mb-3">
+        <PinClientTabButton companyId={company.id} />
+      </div>
       <CompanyCaseWorkspace
         company={company}
         intel={crossProjectIntel}

@@ -6,6 +6,27 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-12: Client tabs and WhatsApp voice notes — roadmap exception
+
+2026-10-12: owner approved an exception to the roadmap rule 'no new pages until the case page holds' for client tabs (EPG Linz as test) and WhatsApp voice notes.
+
+Binding product rules from the owner, same day:
+
+- no CRM: the owner never fills forms. Bots write the tab from what already
+  reaches them (forwarded email, WhatsApp, voice notes, employee reports,
+  Scout research). The owner's only acts are naming a client to pin and
+  closing the tab;
+- no status ladders, no fit scores, no accept/reject on every item. Show
+  what happened, with dates and the source;
+- no company directory and no profile page as a destination. At most about
+  five tabs are open; a tab closes when won, lost or gone quiet and folds
+  back into the company record, which the bots still read;
+- the shell stays Today / Missions / Talent / Team (+ Settings). Pinned
+  tabs are a strip under the top bar, not a menu item;
+- calls do not reach the bots on their own, so a voice note to Hanna after
+  each call is how a call lands on the client's page. Recording a client's
+  call needs their consent; a note after the call avoids that.
+
 ### 2026-10-09: Daily-update WhatsApp template for owner and field
 
 Daily-update template (`WHATSAPP_UPDATE_TEMPLATE_NAME`, one body parameter) allowed for owner/field numbers outside 24h (Nikola approved 2026-10-09).

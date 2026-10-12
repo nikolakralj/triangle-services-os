@@ -224,8 +224,9 @@ function AskDialog({
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
-        kind?: "mission" | "talent" | "assignment";
+        kind?: "mission" | "talent" | "assignment" | "client_tab";
         missionId?: string;
+        key?: string;
         lead?: string;
         emoji?: string;
         label?: string;
@@ -239,6 +240,13 @@ function AskDialog({
       if (body.kind === "mission" && body.missionId) {
         onClose();
         router.push(`/missions/${body.missionId}`);
+        router.refresh();
+        return;
+      }
+      if (body.kind === "client_tab" && body.key) {
+        // The owner named a client: open its pinned tab.
+        onClose();
+        router.push(`/client-tabs/${encodeURIComponent(body.key)}`);
         router.refresh();
         return;
       }
