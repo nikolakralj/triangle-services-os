@@ -6,6 +6,27 @@ This file records major product and implementation decisions so future agents do
 
 ## Decision Log
 
+### 2026-10-22: Finish the product before anything new
+
+Nikola, 22 October: "Let's forget about clients right now and focus on
+automating and finishing the app, so that agents know what they need to
+code. We need to create a good final product."
+
+Decision:
+
+- the queue is "Finish the product" in `ROADMAP_EXECUTION.md` (F1–F9): make
+  what exists work, look simple and run by itself; no new features, and no
+  client or deal model, until Nikola reopens them;
+- every pull request runs lint, types, every offline check and the
+  production build (`.github/workflows/checks.yml`); red is not merged;
+- an agent claims an item by opening a draft pull request titled with it.
+
+Why: the 22 October audit of production found the automation running (mail,
+wakes, WhatsApp) but the surfaces cluttered and partly stale — a Today of
+overdue follow-ups and raw machine text, 79 accept/reject items, stuck bot
+steps, twelve old pages, a 6,587-pixel Settings — and four red checks on
+`main`.
+
 ### 2026-10-12: Client tabs and WhatsApp voice notes — roadmap exception
 
 2026-10-12: owner approved an exception to the roadmap rule 'no new pages until the case page holds' for client tabs (EPG Linz as test) and WhatsApp voice notes.

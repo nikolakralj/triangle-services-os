@@ -25,9 +25,12 @@ snapshot here.
 
 ## Checks
 
-Use the scripts in `package.json`: `dev`, `lint`, `check:tenant-identity`,
-`build`, and `test:e2e`. Existing E2E coverage has material gaps documented in
-the [critical review](docs/reviews/CRITICAL_REVIEW_2026-09-08.md).
+Before every pull request: `npm run verify` (lint, types, every offline check
+in `scripts/check-*.mjs`) and `npm run build`. GitHub runs the same on every
+pull request (`.github/workflows/checks.yml`); red is not merged. What to build
+is "Finish the product" in [ROADMAP_EXECUTION](ROADMAP_EXECUTION.md).
+`test:e2e` exists, but its coverage has material gaps documented in the
+[critical review](docs/reviews/CRITICAL_REVIEW_2026-09-08.md).
 
 The `.claude` named-agent scripts are legacy shell automation, not proof of
 independent Codex/Antigravity/DevPit execution or review. See

@@ -586,14 +586,14 @@ test('nothing but the human route reaches the SMTP transport', () => {
     (f) => /from ["']@\/lib\/mail\/smtp-send["']/.test(fs.readFileSync(f, 'utf8')) && !f.endsWith('smtp-send.ts'),
   );
   assert.deepEqual(
-    importers.map((f) => path.relative(root, f)).sort(),
+    importers.map((f) => path.relative(root, f).split(path.sep).join('/')).sort(),
     ['src/lib/data/mail-send.ts'],
     'only mail-send.ts talks to SMTP',
   );
   const callers = files.filter(
     (f) => /sendFromTriangle\(/.test(fs.readFileSync(f, 'utf8')) && !f.endsWith('mail-send.ts'),
   );
-  assert.deepEqual(callers.map((f) => path.relative(root, f)).sort(), ['src/app/api/mail/send/route.ts']);
+  assert.deepEqual(callers.map((f) => path.relative(root, f).split(path.sep).join('/')).sort(), ['src/app/api/mail/send/route.ts']);
 });
 
 test('Today card: Send from Triangle only with a sender; Open mail stays; review shows To/From/Subject and the text', () => {

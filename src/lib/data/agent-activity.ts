@@ -2,7 +2,7 @@
 // Previous-day activity for a morning summary.
 //
 // Hanna (and any other badge) reads what every bot in the organisation did,
-// then tells Ralph. This module decides the window, the caps, and the shape.
+// then tells the field sender. This module decides the window, the caps, and the shape.
 // It does not read or write the database.
 //
 // The company calendar is Europe/Zagreb, the same clock as employee reports.

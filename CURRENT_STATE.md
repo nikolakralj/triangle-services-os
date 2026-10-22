@@ -1,5 +1,23 @@
 # Current state
 
+## Finish the product, F1 — 22 October 2026
+
+Checks run on every pull request and every push to `main`
+(`.github/workflows/checks.yml`: lint, `npm run typecheck`,
+`npm run check:all`, `npm run build`). `npm run verify` runs lint, types and
+every offline check locally. Fixed the four checks that were red on `main`
+(`2b06a80`): a real name in `src/lib/data/agent-activity.ts` and
+`src/app/api/agent/activity/route.ts` (tenant identity); two checks that
+asserted roadmap wording which changed when DEV-004 and DEV-010 went live;
+two Windows-only path and line-ending comparisons in `check-dev-004` and
+`check-dev-013`. `tsconfig.json` excludes stray agent folders (`tmp_*`,
+`.claude`). A pull request template asks for the evidence. The queue is now
+"Finish the product" in `ROADMAP_EXECUTION.md`.
+
+| Change | Commit | Checked | Limit |
+| --- | --- | --- | --- |
+| CI checks, `verify` / `typecheck` / `check:all`, four red checks fixed, PR template, the F1–F9 queue | this branch | `npm run verify`: lint 0 problems, types 0, 23/23 check files; `npm run build` 0 | The Checks run starts on GitHub once this is merged. Requiring it for merges is a GitHub setting only Nikola can turn on. No product behaviour changed; no migration |
+
 ## WhatsApp chat — 6 October 2026
 
 An owner or field inbound is marked read and shown typing. No canned line is

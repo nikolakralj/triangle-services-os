@@ -6,7 +6,7 @@ import { loadAgentActivity } from "@/lib/data/agent-activity-read";
 // ---------------------------------------------------------------------------
 // GET /api/agent/activity?since=<ISO>&until=<ISO>
 //
-// A morning summary for Ralph. Any active badge (Hanna's worker.propose,
+// A morning summary for the field sender. Any active badge (Hanna's worker.propose,
 // Scout's research.suggestion.create, or any other) reads what every bot in
 // its own organisation did. No extra scope: a new read scope would leave the
 // badges already in use unable to call this, and research.read would leave

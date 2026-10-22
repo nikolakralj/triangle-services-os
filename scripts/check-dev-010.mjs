@@ -146,7 +146,6 @@ const routeSrc = read('src/app/api/ask/route.ts');
 const launcherSrc = read('src/components/missions/ask-launcher.tsx');
 const contextSrc = read('src/components/missions/ask-context.tsx');
 const caseSrc = read('src/lib/data/company-case.ts');
-const roadmap = read('ROADMAP_EXECUTION.md');
 
 // ── acceptance 1: page context → missionless assignment on the record ───────
 test('project context: a substantial Ask is one missionless job bound to the project', async () => {
@@ -347,11 +346,7 @@ test('no new table, no nav change, no send path', () => {
   assert.doesNotMatch(src, /outreach|sendMail|gmail|resend/i);
 });
 
-test('ROADMAP_EXECUTION records DEV-010 as done in code with a signed-in check pending', () => {
-  const slice = roadmap.slice(roadmap.indexOf('### DEV-010'), roadmap.indexOf('### DEV-011'));
-  assert.match(slice, /`DONE`/);
-  assert.match(slice, /ask-on-record\.ts/);
-  assert.match(slice, /signed-in check/i);
-});
+// DEV-010 was checked signed in on Production on 17 September, so the roadmap
+// no longer says a signed-in check is pending. The code is what is checked here.
 
 run();

@@ -1,6 +1,6 @@
 # Roadmap execution — what happens next
 
-Updated 29 September 2026 — **start at "The plan" below**. The one place for next steps, for people and for
+Updated 22 October 2026 — **start at "Finish the product" below**. The one place for next steps, for people and for
 coding agents. What exists is in [CURRENT_STATE](CURRENT_STATE.md), why it was
 decided is in [DECISIONS](DECISIONS.md), and the long-term phases are in
 [ROADMAP](ROADMAP.md). The earlier, longer version of this file, the old work
@@ -16,9 +16,230 @@ work below.
 this human job and its follow-through? If not, name the exact capability,
 evidence or authority that is missing. Approval boundaries do not change.
 
-## The plan (29 September 2026) — read this before anything else
+## Finish the product (22 October 2026) — the only queue
 
-**This section is the only queue.** The 16 September "Operating shell" build
+Nikola, 22 October: "Let's forget about clients right now and focus on
+automating and finishing the app, so that agents know what they need to
+code. We need to create a good final product."
+
+So: no new features and no client or deal model now. Every item below makes
+something that already exists work properly, look simple, or run by itself.
+Each item names the evidence from the 22 October audit (production on
+`2b06a80`, signed in, read-only), what to change, and how it is proved.
+
+**What the audit found.** Mail is read every 10 minutes (59 emails in the
+last 7 days). Every bot step reached its bot (80 of 80 woken). WhatsApp works
+(62 replies sent in 7 days). But: Today shows 20 items, most of them
+follow-ups 32–38 days overdue and one stopped step written as raw machine
+text with phone numbers; Approvals holds 79 accept/reject items; 10 bot steps
+have not moved for more than two days; an email asking for people has never
+opened a case in production (`requirement_roles` has 0 rows); twelve old
+pages are still reachable off the menu; Settings is 6,587 pixels long; and
+four checks were red on `main`.
+
+### F1 — Green and guarded · `DONE` on merge · Claude, `claude/finish-the-app`
+
+Every pull request and every push to `main` now runs lint, types, every
+offline check and the production build (`.github/workflows/checks.yml`).
+`npm run verify` runs lint, types and all checks in one go;
+`npm run check:all` runs every `scripts/check-*.mjs`. The four red checks are
+fixed: a real name in `agent-activity` (tenant identity), two checks that
+asserted roadmap wording which went out of date when the items went live,
+and two Windows-only path and line-ending comparisons. A pull request
+template asks for the evidence below. Stray agent folders (`tmp_*`,
+`.claude`) no longer break a local type check.
+
+**Done when:** the Checks run is green on this pull request and on `main`.
+
+### F2 — Today shows only what is real · `READY`
+
+**Why:** 20 "need you" items, mostly G2 follow-ups 32–38 days overdue that
+nobody will act on; a STOPPED line that prints a step's raw text, including
+phone numbers; an in-progress line that prints Hanna's raw instructions. The
+Today badge says 31.
+
+**Change:**
+- A follow-up more than 14 days overdue, or a line nobody opened in 14 days,
+  leaves Today by itself and is recorded on its person and case as "gone
+  quiet" with the date. It comes back only if new mail or a WhatsApp arrives
+  on it. Code: `src/components/modules/today-missions.tsx` (the overdue
+  alert at line ~235) and `src/lib/data/today-*.ts`.
+- No raw machine text on Today: a stopped or working step is one plain
+  sentence written by `humaniseReport` (`src/lib/data/case-decision.ts`),
+  never the step's objective or error text. Phone numbers and emails are not
+  shown on the line.
+- The badge counts the lines Today shows, nothing else (`countDecisions` in
+  `src/lib/data/came-back.ts`, used by `src/app/(app)/layout.tsx`).
+
+**Done when:** signed in on the preview, Today fits on one screen at
+1440×1000, every line is something Nikola would act on this week, and the
+badge equals the number of lines. Offline: extend `check-today-slim.mjs`.
+
+### F3 — No approval farm · `READY` (research suggestions: Nikola's yes)
+
+**Why:** Approvals holds 79 items, each with Accept and ×. The law since
+10 September is "approve actions, not basic facts", and on 12 October "no
+accept/reject on every item".
+
+**Change:** a company or person an employee finds on a mission is filed
+straight onto the record as agent-found and unverified, with its source —
+through the same write `acceptFinding` (`src/lib/data/findings.ts`) does
+today — without a person accepting it. A person rules something out in words
+through the one Ask on the case. The 68 pending findings are filed the same
+way by a one-off data fix (written, not applied: Nikola applies it). The
+Approvals page leaves the product; anything that is a real decision (a send,
+a commitment, a name released) stays on Today.
+
+The 11 research-workbench suggestions (`acceptResearchSuggestion` in
+`src/lib/data/research.ts`) are different: `AGENTS.md` says a person accepts
+those. They leave the Approvals list and show on their project as proposed;
+filing them without a person needs Nikola's yes first.
+
+**Done when:** no Accept/Reject list exists anywhere, the pending count is
+0 after the data fix, and the records show "agent-found, unverified" with
+the source. Offline: a check that no page renders per-item accept/reject
+controls for findings.
+
+### F4 — Stuck work closes itself · `READY`
+
+**Why:** 15 bot steps are "active", 10 of them older than two days; 16 have
+failed. A stuck step stays on the mission and on Today forever.
+
+**Change:** a step with no report, no reply and no status change for 48 hours
+is woken once more with the same context. After another 24 hours it closes
+as "stalled", with one plain line on its case saying who stalled on what and
+since when, and the mission or Today line updates. Use the event outbox
+(`src/lib/data/event-outbox.ts`), not a new scheduler: the 10-minute GitHub
+Actions heartbeat (`.github/workflows/mail-sync.yml`) can call the outbox
+the way it calls mail sync.
+
+**Done when:** no step is older than 72 hours without moving, and every
+closed one says so on its case. Offline: fixture check of the 48/24-hour
+rule.
+
+### F5 — The core flow, proven once · `READY`
+
+**Why:** "An email asking for people becomes one case" (The plan, P2) is
+built and wired into both mail paths (`settlePeopleRequest` in
+`src/lib/data/requirement-case.ts`), but it has never fired in production:
+`requirement_roles` has 0 rows. Either no qualifying email arrived or the
+read is too strict (it opens only when the read is confident and has more
+than one role).
+
+**Change:** find out which, from the stored emails (`inbound_emails`,
+`job_leads`): list each people request of the last 30 days and what
+`decideRequirementCase` did with it. Fix the read if it is wrong. Then run
+one real request through: Nikola forwards a real request (or Ralph's Cologne
+email) to the connected mailbox.
+
+**Done when:** that email is one case on Today within 15 minutes, with its
+roles, Hanna's and Bob's steps started, and nothing sent. This also settles
+P4's owed signed-in run.
+
+### F6 — Retire the old pages · `READY` after Nikola's yes on the list
+
+**Why:** the menu is Today · Missions · Talent · Settings, but these still
+open: `/approvals` (13,269 px), `/job-intake` (16,992 px), `/hunter`
+(Signal Inbox), `/commercial`, `/delivery`, `/documents` (+ checklist,
+templates), `/imports`, `/onboarding`, `/workers/cert-checklist`,
+`/decisions` (redirects to Today), `/companies` and `/agents` (redirect).
+
+**Change:** for each page, either fold what is still used into Today, the
+case, the person or Settings, or delete the page, its components and its
+unused data functions. Tables stay; nothing is dropped from the database.
+Proposed: delete Approvals (after F3), Signal Inbox, Commercial, Delivery,
+Imports, Onboarding; move the mailbox rules of Job Intake into Settings;
+fold Documents and the certificate checklist into the person's page.
+
+**Done when:** every route in `src/app/(app)` is either on the menu or opened
+from a line, and the build has fewer pages. Offline: a check that lists the
+allowed routes.
+
+### F7 — One record of what happened · `READY`
+
+**Why:** what the employees did is written in at least six places
+(`employee_reports`, `agent_findings`, `research_suggestions`,
+`client_tab_lines`, `activities`, notes), so every screen shows a different
+slice.
+
+**Change:** one timeline per case, person and company, read from what
+already exists: emails, WhatsApp messages, employee reports, findings,
+sends. Extend `employee_reports` (it already has kind, who, person, company,
+case, date, source) with a `payload jsonb` for typed facts such as a rate or
+a call note, rather than adding a new table. The client tab and the case
+read the timeline; `client_tab_lines` becomes a view of it. One migration,
+written and not applied.
+
+**Done when:** the case, the person and the client tab show the same events
+in the same order, each with who, when and the source.
+
+### F8 — Settings on one screen · `READY`
+
+**Why:** Settings is 6,587 px with ten sections.
+
+**Change:** keep Team (the employees), Members, Your account, Mailboxes and
+Organisation. Fold "What the agent looks for", "Reply style" and "Business
+defaults" into the employees' "how they work" notes, or delete them if
+nothing reads them. Diagnostics stays one link.
+
+**Done when:** Settings fits in two screens and nothing that is read by the
+app was removed.
+
+### F9 — A mission shows its answer · `READY`
+
+**Why:** an older mission page leads with counters ("Researched 13 · still in
+play 13 · reachable 5") and 29 buttons. The law of 29 September: the answer
+in the shape the question needs, and no company counter the question did
+not ask for.
+
+**Change:** a mission shows its filed workspace (`WorkspaceView`) first; a
+mission without one shows the employee's last report in one paragraph and
+the one Ask. Counters and per-company buttons go behind "Show the record".
+
+**Done when:** every open mission fits one screen above the fold with one
+primary action.
+
+### Parked — not now
+
+Client tabs stay as they are (EPG Linz). The deal and stages model from the
+22 October design note, the link to HybridSaaS, Active searching, P5 trust
+and P6 a second agency wait until Nikola reopens them.
+
+### Rules for every coding agent
+
+1. **This list is the queue.** Take the first `READY` item that has no draft
+   pull request yet. Claim it by opening a draft pull request titled with the
+   item ("F3 — No approval farm") before writing code.
+2. One item, one branch from the current `main`, one pull request, small
+   enough to review in ten minutes. No stacked branches.
+3. `npm run verify` and `npm run build` must pass locally, and the Checks run
+   must be green before asking for a merge. Never weaken a check to make it
+   pass; fix the code, or say in the pull request why the check was wrong.
+4. Prove it signed in on the preview, read-only unless the item says
+   otherwise, and write what you saw in the pull request and in
+   `CURRENT_STATE.md`. Mark the item here in the same pull request.
+5. Never send email or WhatsApp from a test, apply SQL or a migration to the
+   live database, or promote to production without Nikola's yes. Stage
+   explicit paths. Stay out of other agents' folders.
+6. The laws bind: "Employees, not buttons", "The workspace is the answer",
+   and the 12 October rules — no forms for Nikola, no status ladders, no fit
+   scores, no accept/reject on every item.
+
+### Nikola's part
+
+- Merge F1. Then in GitHub → Settings → Branches → `main`, require the
+  **Checks** run, so nothing red can be merged.
+- Close the four stale pull requests (#27, #28, #29, #31, last touched
+  17–18 September) and delete the old branches.
+- Say yes, or change, the page list in F6.
+- For F5: forward one real request for people to the connected mailbox.
+
+## The plan (29 September 2026) — history since 22 October
+
+**Superseded on 22 October by "Finish the product" above, which is now the
+only queue.** What follows is kept as the record of P0–P4.
+
+**This section was the only queue.** The 16 September "Operating shell" build
 order under Development — now is history.
 
 Decision: "The plan" in `DECISIONS.md`. One sentence: **an email asking for

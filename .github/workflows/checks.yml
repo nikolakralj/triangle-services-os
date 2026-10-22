@@ -1,0 +1,35 @@
+name: Checks
+
+# Every pull request and every push to main: lint, types, every offline
+# check, and the production build. Red means do not merge.
+# No secrets are used. The checks use fixtures; nothing touches the live
+# database, the mailbox or WhatsApp.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Types
+        run: npm run typecheck
+      - name: Offline checks
+        run: npm run check:all
+      - name: Production build
+        run: npm run build
