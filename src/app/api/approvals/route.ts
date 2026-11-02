@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import {
   acceptResearchSuggestion,
   rejectResearchSuggestion,
@@ -14,8 +15,9 @@ import { recordRefusal } from "@/lib/data/refusals";
 // different promotion rules, but a manager should not have to care. One
 // endpoint, one decision, routed by `kind`.
 //
-// Session-only: no machine credential reaches this, so an agent can never
-// approve its own work.
+// A person approves. The static MCP key borrows a user id and looks like an
+// admin, and a badge is a machine credential. refuseUnlessHuman refuses both,
+// so an agent cannot approve its own work.
 // ---------------------------------------------------------------------------
 
 export async function PATCH(request: Request) {
@@ -23,9 +25,8 @@ export async function PATCH(request: Request) {
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  if (access.demo) {
-    return NextResponse.json({ error: "Not available in demo mode." }, { status: 403 });
-  }
+  const refused = refuseUnlessHuman(access, "canWrite", "approve or reject a proposal");
+  if (refused) return refused;
 
   let body: { id?: string; kind?: string; action?: string; reason?: string };
   try {

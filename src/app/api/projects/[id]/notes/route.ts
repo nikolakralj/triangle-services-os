@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import { getProjectNote, upsertProjectNote } from "@/lib/data/project-notes";
 
 // ---------------------------------------------------------------------------
@@ -40,15 +41,10 @@ export async function PUT(
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  const refused = refuseUnlessHuman(access, "canWrite", "change a project note");
+  if (refused) return refused;
 
   const { id: projectId } = await params;
-
-  if (access.demo) {
-    return NextResponse.json({
-      note: { body: "", updatedAt: null, updatedBy: null },
-      message: "Notes are read-only in demo mode.",
-    });
-  }
 
   let payload: { body?: unknown };
   try {
