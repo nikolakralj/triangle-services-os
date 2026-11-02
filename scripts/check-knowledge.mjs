@@ -82,6 +82,11 @@ test('an empty applies-to list is for every role, and a named list is not', () =
   assert.equal(knowledgeVisibleToRole([], 'hr'), true);
   assert.equal(knowledgeVisibleToRole(null, 'hr'), true);
   assert.equal(knowledgeVisibleToRole(['hr', 'inbox_coordinator'], 'hr'), true);
+  assert.equal(knowledgeVisibleToRole(['hr'], 'triangle_hr'), true);
+  assert.equal(knowledgeVisibleToRole(['hr'], 'resourcing'), true);
+  assert.equal(knowledgeVisibleToRole(['inbox_coordinator'], 'inbox_courier'), true);
+  assert.equal(knowledgeVisibleToRole(['inbox_coordinator'], 'commercial_ops'), true);
+  assert.equal(knowledgeVisibleToRole(['hr'], 'inbox_coordinator'), false);
   assert.equal(knowledgeVisibleToRole(['hr', 'inbox_coordinator'], 'project_researcher'), false);
   assert.equal(knowledgeVisibleToRole(['hr'], null), true);
 });
@@ -152,6 +157,8 @@ test('listKnowledgeItems keeps the org, maps the row, and honours the role', asy
 
   const items = await listKnowledgeItems(orgId, { roleKey: 'hr' });
   assert.deepEqual(items.map((item) => item.id), ['item-all', 'item-hr']);
+  const asHanna = await listKnowledgeItems(orgId, { roleKey: 'triangle_hr' });
+  assert.deepEqual(asHanna.map((item) => item.id), ['item-all', 'item-hr']);
   assert.equal(items[1].appliesToRoles.includes('inbox_coordinator'), true);
   assert.equal(items[1].saidBy, null);
   assert.equal(calls.some((call) => call.table === 'knowledge_items' && call.col === 'org_id' && call.val === orgId), true);
@@ -253,7 +260,10 @@ test('the hand-run seed proposes Nikola\'s six rules and is not a migration', ()
   assert.match(seed, /'Nikola'/);
   assert.match(seed, /date '2026-11-02'/);
   assert.match(seed, /'proposed'/);
-  assert.match(seed, /array\['hr', 'inbox_coordinator'\]/);
+  const roleArrays = seed.match(
+    /array\['hr', 'triangle_hr', 'resourcing', 'inbox_coordinator', 'inbox_courier'\]/g,
+  );
+  assert.equal(roleArrays?.length, 3);
   assert.match(seed, /Postovani \[Name\]/);
   assert.match(seed, /Ralph Loesekamm/);
   assert.match(seed, /Domagoj Marijanovic/);

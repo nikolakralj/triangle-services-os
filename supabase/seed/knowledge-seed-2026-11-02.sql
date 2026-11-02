@@ -10,17 +10,14 @@
 -- The organization is the oldest row named Triangle Services. No id is
 -- hardcoded.
 --
--- Role keys checked in code on 2 Nov 2026:
---   hr                  hire preset for Hanna (src/lib/data/agent-scopes.ts).
---                       A badge named triangle_hr is stored as role_key hr,
---                       because hiring strips the triangle_ prefix.
---   inbox_coordinator   Bob's role_key (migration 023, and the preferred
---                       role in src/lib/data/event-outbox.ts).
--- triangle_hr, resourcing, inbox_courier and commercial_ops are aliases the
--- routers also accept. They are not the keys stored for the current
--- employees, so they are not in applies_to_roles.
--- Rules 1 to 3 name those two roles. Rules 4 to 6 leave applies_to_roles
--- empty, which means every employee: they are "do not contact" decisions.
+-- Role keys the routers accept, stored on rules 1 to 3 (2 Nov 2026, Nikola):
+--   Hanna  hr, triangle_hr, resourcing
+--          (HANNA_ROLE_KEYS in src/lib/data/ask-hanna-policy.ts)
+--   Bob    inbox_coordinator, inbox_courier
+--          (BOB_ROLE_KEYS also accepts commercial_ops; that key is not in
+--          this seed)
+-- Rules 4 to 6 leave applies_to_roles empty, which means every employee:
+-- they are "do not contact" decisions.
 --
 -- worker_id stays null unless exactly one workers.full_name matches. Rules
 -- 4 and 6 name several people, so they are never linked. Rule 5 links
@@ -55,7 +52,7 @@ rows as (
       'candidate-filtering'::text,
       'Never discuss rates with a candidate'::text,
       'Never discuss or show rates/prices with any candidate. Rates are only discussed between Nikola and Ralph.'::text,
-      array['hr', 'inbox_coordinator']::text[],
+      array['hr', 'triangle_hr', 'resourcing', 'inbox_coordinator', 'inbox_courier']::text[],
       'nikola-voice-2026-11-02:rule-1'::text,
       'Never discuss or show rates/prices with any candidate. Rates are only discussed between Nikola and Ralph.'::text,
       null::text
@@ -65,7 +62,7 @@ rows as (
       'candidate-filtering',
       'First contact must not mention costs',
       'First-contact messages to candidates must not mention costs (accommodation, car, fuel, flights). Those are discussed during negotiations only.',
-      array['hr', 'inbox_coordinator']::text[],
+      array['hr', 'triangle_hr', 'resourcing', 'inbox_coordinator', 'inbox_courier']::text[],
       'nikola-voice-2026-11-02:rule-2',
       'First-contact messages to candidates must not mention costs (accommodation, car, fuel, flights). Those are discussed during negotiations only.',
       null
@@ -94,7 +91,7 @@ Ralph Loesekamm
 CEO, Triangle Services
 +49 175 2040989
 $body$,
-      array['hr', 'inbox_coordinator']::text[],
+      array['hr', 'triangle_hr', 'resourcing', 'inbox_coordinator', 'inbox_courier']::text[],
       'nikola-voice-2026-11-02:rule-3',
       'The approved first-contact template is candidate_outreach_template.txt (/workspace/offers/candidate_outreach_template.txt): greeting "Postovani [Name],", USA and Europe projects, no rate numbers, no cost details, vague pay wording at most, signature Nikola Kralj Partner and Ralph Loesekamm CEO.',
       null

@@ -1,4 +1,6 @@
 import "server-only";
+import { BOB_ROLE_KEYS } from "@/lib/data/ask-bob-policy";
+import { HANNA_ROLE_KEYS } from "@/lib/data/ask-hanna-policy";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +96,8 @@ export interface KnowledgeListFilters {
   category?: KnowledgeCategory | readonly KnowledgeCategory[];
   /**
    * When set, keep items whose applies-to list is empty and items that name
-   * this role key. An empty list means every employee.
+   * this role or an alias the routers treat as the same employee
+   * (HANNA_ROLE_KEYS, BOB_ROLE_KEYS). An empty list means every employee.
    */
   roleKey?: string | null;
   limit?: number;
@@ -131,15 +134,31 @@ function clampLimit(limit: number | undefined): number {
   return Math.max(1, Math.min(Math.floor(limit), ROLE_SCAN_CAP));
 }
 
-/** Empty applies-to means every role. No role filter means every item. */
+function roleAliases(roleKey: string): ReadonlySet<string> | null {
+  const key = roleKey.trim().toLowerCase();
+  if (HANNA_ROLE_KEYS.has(key)) return HANNA_ROLE_KEYS;
+  if (BOB_ROLE_KEYS.has(key)) return BOB_ROLE_KEYS;
+  return null;
+}
+
+/**
+ * Empty applies-to means every role. No role filter means every item.
+ * Hanna and Bob aliases match the way the routers do: a filter of
+ * `triangle_hr` sees an item stored for `hr`, and `inbox_courier` sees one
+ * stored for `inbox_coordinator`.
+ */
 export function knowledgeVisibleToRole(
   appliesTo: readonly string[] | null | undefined,
   roleKey: string | null | undefined,
 ): boolean {
   if (!roleKey) return true;
-  const roles = appliesTo ?? [];
+  const roles = (appliesTo ?? [])
+    .map((role) => role.trim().toLowerCase())
+    .filter((role) => role.length > 0);
   if (roles.length === 0) return true;
-  return roles.includes(roleKey);
+  const aliases = roleAliases(roleKey);
+  if (!aliases) return roles.includes(roleKey.trim().toLowerCase());
+  return roles.some((role) => aliases.has(role));
 }
 
 function toItem(row: Record<string, unknown>): KnowledgeItem | null {
