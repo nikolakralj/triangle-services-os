@@ -450,6 +450,59 @@ test('Event outbox sweep handles stale availability (>14d) and wakes Hanna', asy
   }
 });
 
+test('stale availability reads worker_notes.org_id, not organization_id', async () => {
+  const orgId = '00000000-0000-0000-0000-000000000001';
+  const otherOrg = '00000000-0000-0000-0000-000000000002';
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const fortyDaysAgo = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
+  const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+
+  const source = fs.readFileSync(path.resolve(root, 'src/lib/data/event-outbox.ts'), 'utf8');
+  const notesQuery = source.slice(source.indexOf('.from("worker_notes")'), source.indexOf('.from("worker_notes")') + 400);
+  assert.match(notesQuery, /\.eq\("org_id", orgId\)/);
+  assert.doesNotMatch(notesQuery, /organization_id/);
+
+  const { svc, tables } = mockDatabase({
+    agent_instances: [
+      { id: 'inst-hanna', org_id: orgId, role_key: 'hr', display_name: 'Hanna', status: 'active' },
+    ],
+    workers: [
+      { id: 'worker-fresh-note', organization_id: orgId, full_name: 'Ana Fresh', status: 'active', availability_status: 'available', updated_at: thirtyDaysAgo },
+      { id: 'worker-old-note', organization_id: orgId, full_name: 'Marko Old', status: 'active', availability_status: 'available', updated_at: thirtyDaysAgo },
+      { id: 'worker-wrong-column', organization_id: orgId, full_name: 'Ivo WrongColumn', status: 'active', availability_status: 'available', updated_at: thirtyDaysAgo },
+      { id: 'worker-other-kind', organization_id: orgId, full_name: 'Petra OtherKind', status: 'active', availability_status: 'available', updated_at: thirtyDaysAgo },
+      { id: 'worker-other-org', organization_id: orgId, full_name: 'Luka OtherOrg', status: 'active', availability_status: 'available', updated_at: thirtyDaysAgo },
+    ],
+    worker_notes: [
+      { worker_id: 'worker-fresh-note', org_id: orgId, kind: 'availability', occurred_on: twoDaysAgo },
+      { worker_id: 'worker-old-note', org_id: orgId, kind: 'availability', occurred_on: fortyDaysAgo },
+      { worker_id: 'worker-wrong-column', organization_id: orgId, kind: 'availability', occurred_on: twoDaysAgo },
+      { worker_id: 'worker-other-kind', org_id: orgId, kind: 'note', occurred_on: twoDaysAgo },
+      { worker_id: 'worker-other-org', org_id: otherOrg, kind: 'availability', occurred_on: twoDaysAgo },
+    ],
+  });
+
+  const loader = moduleLoader({
+    '@/lib/supabase/server': { createServiceSupabaseClient: () => svc },
+    './bot-runtime': { wakeEmployee: async () => ({ status: 'sent', httpStatus: 200 }) },
+    './follow-ups': { listFollowUpsDue: async () => ({ items: [], total: 0 }) },
+    './supply-partners': { CAPACITY_SHELF_LIFE_DAYS: 14 },
+  });
+
+  const { sweepStaleAvailability } = loader('src/lib/data/event-outbox.ts');
+  const res = await sweepStaleAvailability(orgId);
+
+  assert.equal(res.workersChecked, 5);
+  assert.equal(res.errors.length, 0, res.errors.join('; '));
+  const titles = tables.agent_assignments.map((a) => a.title);
+  assert.equal(titles.some((t) => t.includes('Ana Fresh')), false, 'a recent availability note on org_id is a confirmation');
+  assert.equal(titles.some((t) => t.includes('Marko Old')), true);
+  assert.equal(titles.some((t) => t.includes('Ivo WrongColumn')), true, 'organization_id on worker_notes is not a column and must not count');
+  assert.equal(titles.some((t) => t.includes('Petra OtherKind')), true);
+  assert.equal(titles.some((t) => t.includes('Luka OtherOrg')), true, 'a note from another org must not confirm this org');
+  assert.equal(res.dispatched, 4);
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {
