@@ -269,6 +269,9 @@ test('the hand-run seed proposes Nikola\'s six rules and is not a migration', ()
   assert.match(seed, /Domagoj Marijanovic/);
   assert.match(seed, /Teodor Luposoru/);
   assert.match(seed, /teodor lupusoru/);
+  assert.match(seed, /count\(\*\) = 1 then \(array_agg\(worker\.id\)\)\[1\]/);
+  assert.doesNotMatch(seed, /\bmin\s*\(/i);
+  assert.doesNotMatch(seed, /\bmax\s*\(/i);
   assert.match(seed, /Svrznjak and Togea/);
   assert.equal(fs.existsSync(path.resolve(root, 'supabase/migrations/057_knowledge_items.sql')), true);
   const migrations = fs.readdirSync(path.resolve(root, 'supabase/migrations'));

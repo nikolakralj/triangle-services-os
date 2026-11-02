@@ -152,7 +152,7 @@ select
   rows.applies_to_roles,
   case
     when rows.worker_match = 'teodor' then (
-      select case when count(*) = 1 then min(worker.id) else null end
+      select case when count(*) = 1 then (array_agg(worker.id))[1] else null end
       from public.workers worker
       where worker.organization_id = org.id
         and lower(btrim(worker.full_name)) in ('teodor luposoru', 'teodor lupusoru')
