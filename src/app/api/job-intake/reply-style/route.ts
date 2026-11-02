@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import {
   getReplyStyleMemory,
   upsertReplyStyleMemory,
@@ -32,12 +33,8 @@ export async function PUT(request: Request) {
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  if (access.demo) {
-    return NextResponse.json(
-      { error: "Reply style is read-only in demo mode." },
-      { status: 403 },
-    );
-  }
+  const refused = refuseUnlessHuman(access, "canWrite", "change the reply style");
+  if (refused) return refused;
   if (access.role !== "admin" && access.role !== "partner") {
     return NextResponse.json(
       { error: "Only an admin or partner can change the reply style." },

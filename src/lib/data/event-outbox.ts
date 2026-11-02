@@ -527,7 +527,7 @@ export async function sweepStaleAvailability(orgId: string): Promise<{
     ? await svc
         .from("worker_notes")
         .select("worker_id, occurred_on, created_at")
-        .eq("organization_id", orgId)
+        .eq("org_id", orgId)
         .eq("kind", "availability")
         .in("worker_id", workerIds)
         .order("occurred_on", { ascending: false })

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess } from "@/lib/supabase/server";
+import { refuseUnlessHuman } from "@/lib/auth/api-guards";
 import {
   addWorkerNote,
   listWorkerNotes,
@@ -29,9 +30,8 @@ export async function POST(
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  if (access.demo) {
-    return NextResponse.json({ error: "Not available in demo mode." }, { status: 403 });
-  }
+  const refused = refuseUnlessHuman(access, "canWrite", "add a note about a person");
+  if (refused) return refused;
 
   const { id } = await params;
 
