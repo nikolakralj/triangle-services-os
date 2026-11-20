@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readCv } from "@/lib/ai/cv-reader";
+import { missingWorkerCvColumn } from "@/lib/data/candidate-fields";
 import { extractCv } from "@/lib/data/cv-extract";
 import { createServiceSupabaseClient, requireApiAccess } from "@/lib/supabase/server";
 
@@ -39,12 +40,27 @@ export async function POST(
   const svc = createServiceSupabaseClient();
   if (!svc) return NextResponse.json({ error: "Database unavailable." }, { status: 503 });
 
-  const { data: worker } = await svc
+  const base =
+    "id, full_name, role, country, city, skills, certificates, languages, industries, notes";
+  let canStoreYears = true;
+  let workerResult = await svc
     .from("workers")
-    .select("id, full_name, role, country, city, skills, certificates, languages, industries, notes")
+    .select(`${base}, years_experience`)
     .eq("id", id)
     .eq("organization_id", access.organizationId)
     .maybeSingle();
+  if (workerResult.error && missingWorkerCvColumn(workerResult.error.message)) {
+    canStoreYears = false;
+    workerResult = await svc
+      .from("workers")
+      .select(base)
+      .eq("id", id)
+      .eq("organization_id", access.organizationId)
+      .maybeSingle();
+  }
+  const worker = workerResult.data as (typeof workerResult.data & {
+    years_experience?: number | null;
+  }) | null;
   if (!worker) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   // The text, from wherever it still exists: the finding filed at upload, or
@@ -127,6 +143,13 @@ export async function POST(
     updates.industries = reading.industries;
   }
   if (empty(worker.notes) && reading.summary) updates.notes = reading.summary;
+  if (
+    canStoreYears &&
+    worker.years_experience == null &&
+    typeof reading.years_experience === "number"
+  ) {
+    updates.years_experience = reading.years_experience;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({

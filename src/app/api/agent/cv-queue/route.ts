@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyMachineToken } from "@/lib/auth/machine";
+import { parseCandidateRecord } from "@/lib/data/candidate-fields";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -24,23 +25,6 @@ import { createServiceSupabaseClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 const SCOPE = "worker.propose";
-
-/** Fields the agent may contribute. Anything else is ignored on purpose. */
-const ALLOWED = new Set([
-  "full_name",
-  "role",
-  "worker_type",
-  "email",
-  "phone",
-  "country",
-  "city",
-  "skills",
-  "certificates",
-  "languages",
-  "industries",
-  "summary",
-  "years_experience",
-]);
 
 export async function GET(request: Request) {
   const machine = await verifyMachineToken(request);
@@ -95,10 +79,11 @@ export async function GET(request: Request) {
     cvs,
     note:
       "Read cvText and PATCH this endpoint with { findingId, payload } — role, skills, " +
-      "certificates, languages, city, years_experience, summary. Add to what is in " +
-      "alreadyRead; do not delete it. State only what the CV supports: an invented " +
-      "certificate puts an uncertified person on a live site. You cannot accept a " +
-      "proposal — a human does that in Approvals.",
+      "certificates, languages, city, years_experience, summary, initials, nationality, " +
+      "work_authorisation, visa_notes (or visa), linkedin_url, original_cv_drive_file_id " +
+      "(or cv_drive_file), triangle_cv_drive_file_id. Add to what is in alreadyRead; do not " +
+      "delete it. State only what the CV supports: an invented certificate puts an uncertified " +
+      "person on a live site. You cannot accept a proposal — a human does that in Approvals.",
   });
 }
 
@@ -153,13 +138,20 @@ export async function PATCH(request: Request) {
     );
   }
 
+  const parsed = parseCandidateRecord(body.payload, {
+    allowAvailability: false,
+    strict: true,
+    requireName: false,
+    ignoreProtected: true,
+  });
+  if (parsed.error) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
   const current = (finding.payload as Record<string, unknown>) ?? {};
   const merged: Record<string, unknown> = { ...current };
 
-  for (const [key, value] of Object.entries(body.payload)) {
-    if (!ALLOWED.has(key)) continue;
-    if (value == null || value === "") continue;
-
+  for (const [key, value] of Object.entries(parsed.fields)) {
     // Lists add rather than replace: the regex pass already found the
     // acronyms, the agent finds the rest, and neither should erase the other.
     if (Array.isArray(value)) {

@@ -103,12 +103,66 @@ export function ApprovalsQueue({
     );
   }
 
-  // Group by project so a pile on one project gets judged together.
-  const groups = new Map<string, ApprovalItem[]>();
+  // A project stays one group. A candidate import stays one batch, so it can
+  // be accepted together. Everything else is still "New discoveries".
+  const groups: Array<{
+    key: string;
+    title: string;
+    projectId: string | null;
+    batchId: string | null;
+    items: ApprovalItem[];
+  }> = [];
+  const groupIndex = new Map<string, (typeof groups)[number]>();
   for (const item of visible) {
-    const key = item.projectName ?? "New discoveries";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(item);
+    const key = item.projectName
+      ? `project:${item.projectName}`
+      : item.batchId
+        ? `batch:${item.batchId}`
+        : "discoveries";
+    let group = groupIndex.get(key);
+    if (!group) {
+      group = {
+        key,
+        title: item.projectName ?? item.batchLabel ?? "New discoveries",
+        projectId: item.projectId,
+        batchId: item.projectName ? null : item.batchId,
+        items: [],
+      };
+      groupIndex.set(key, group);
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+
+  async function acceptBatch(groupItems: ApprovalItem[]) {
+    setBusyId(groupItems[0]?.id ?? "batch");
+    setError(null);
+    setNotice(null);
+    const done = new Set<string>();
+    try {
+      for (const item of groupItems) {
+        const res = await fetch("/api/approvals", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id, kind: item.kind, action: "accept" }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          setDecided((prev) => new Set([...prev, ...done]));
+          setError(data.error ?? "Could not accept the rest of that batch.");
+          router.refresh();
+          return;
+        }
+        done.add(item.id);
+      }
+      setDecided((prev) => new Set([...prev, ...done]));
+      router.refresh();
+    } catch {
+      setDecided((prev) => new Set([...prev, ...done]));
+      setError("Network error — the decision was not saved. Try again.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -133,24 +187,43 @@ export function ApprovalsQueue({
         </div>
       )}
 
-      {Array.from(groups.entries()).map(([groupName, groupItems]) => {
-        const projectId = groupItems.find((i) => i.projectId)?.projectId ?? null;
+      {groups.map((group) => {
+        const groupItems = group.items;
+        const projectId = group.projectId;
+        const showAcceptAll = !readOnly && Boolean(group.batchId) && groupItems.length > 1;
         return (
-          <section key={groupName}>
+          <section key={group.key}>
             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-semibold text-slate-900">
                 {projectId ? (
                   <Link href={`/hunter/${projectId}`} className="hover:underline">
-                    {groupName}
+                    {group.title}
                   </Link>
                 ) : (
-                  groupName
+                  group.title
                 )}
               </h2>
-              <span className="text-xs text-slate-500">
-                {groupItems.length} {readOnly ? "item" : "to decide"}
-                {readOnly && groupItems.length !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-2">
+                {showAcceptAll && (
+                  <Button
+                    variant="secondary"
+                    className="h-7 px-2.5 text-xs"
+                    disabled={busyId !== null}
+                    onClick={() => void acceptBatch(groupItems)}
+                  >
+                    {busyId !== null ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    Accept all
+                  </Button>
+                )}
+                <span className="text-xs text-slate-500">
+                  {groupItems.length} {readOnly ? "item" : "to decide"}
+                  {readOnly && groupItems.length !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
 
             <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">

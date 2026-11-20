@@ -24,6 +24,7 @@
     "check:whatsapp": "node scripts/check-whatsapp.mjs",
     "check:agent-activity": "node scripts/check-agent-activity.mjs",
     "check:client-tabs": "node scripts/check-client-tabs.mjs",
+    "check:candidates": "node scripts/check-candidates.mjs",
     "smoke:ask-hanna": "node scripts/smoke-ask-hanna.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

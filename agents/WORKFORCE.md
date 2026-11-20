@@ -80,9 +80,11 @@ The database currently has three active identities:
 - canonical role file: `agents/hanna.md`, adopted 3 September 2026;
 - reads CVs from `/api/agent/cv-queue` and adds judgement to a pending worker
   proposal. On a mission she files candidates and availability updates through
-  `POST /api/agent/missions/{id}/pool`. She cannot create, update, or accept a
-  worker record, and cannot mark anyone available. Availability checks are
-  drafts a person sends.
+  `POST /api/agent/missions/{id}/pool`. She can also file up to 50 people at
+  once with `POST /api/agent/candidates`; each one stays a pending finding
+  until a person accepts it, and a new person stays a candidate. She cannot
+  create, update, or accept a worker record, and cannot mark anyone available.
+  Availability checks are drafts a person sends.
 
 Her privacy rules are stricter than the other roles because she is the only
 employee holding real people's personal data: nothing from a CV leaves

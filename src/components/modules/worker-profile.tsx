@@ -28,6 +28,7 @@ import {
   type WorkerNoteKind,
 } from "@/lib/data/worker-notes-shared";
 import { availabilityReading, type ReportView } from "@/lib/data/employee-report-policy";
+import { driveFileViewUrl, linkedinHref } from "@/lib/data/person-links";
 import { ReportedWork } from "@/components/modules/reported-work";
 import { WhatsAppOnRecord } from "@/components/modules/whatsapp-on-record";
 import type { WhatsAppRecord } from "@/lib/whatsapp/view";
@@ -71,6 +72,12 @@ export interface ProfileWorker {
   nationality: string | null;
   workAuthorisation: string[];
   visaNotes: string | null;
+  /** Stored initials, when someone filed them. The circle still derives from the name. */
+  initials: string | null;
+  yearsExperience: number | null;
+  linkedinUrl: string | null;
+  originalCvDriveFileId: string | null;
+  triangleCvDriveFileId: string | null;
   /** Projects from the CV. Some people have twenty, some have none. */
   workHistory: Array<{
     customer: string | null;
@@ -198,6 +205,7 @@ export function WorkerProfile({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const linkedin = linkedinHref(worker.linkedinUrl);
   const reading = availabilityReading({
     status: worker.availabilityStatus,
     reports,
@@ -273,8 +281,16 @@ export function WorkerProfile({
             <h1 className="text-xl font-semibold text-slate-950">{worker.fullName}</h1>
             <p className="mt-0.5 text-sm text-slate-600">
               {worker.role ?? "Role not recorded"}
+              {worker.yearsExperience != null
+                ? ` · ${worker.yearsExperience} ${worker.yearsExperience === 1 ? "year" : "years"}`
+                : ""}
               {worker.workerType ? ` · ${worker.workerType}` : ""}
             </p>
+            {worker.initials ? (
+              <p className="mt-0.5 break-words text-xs text-slate-500">
+                Initials {worker.initials}
+              </p>
+            ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
               {(worker.city || worker.country) && (
                 <span className="inline-flex items-center gap-1">
@@ -296,6 +312,16 @@ export function WorkerProfile({
                   <Phone className="h-3.5 w-3.5" />
                   {worker.phone}
                 </span>
+              )}
+              {linkedin && (
+                <a
+                  href={linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 hover:text-slate-800"
+                >
+                  LinkedIn
+                </a>
               )}
             </div>
           </div>
@@ -353,6 +379,28 @@ export function WorkerProfile({
                 >
                   <FileText className="h-3 w-3" />
                   {cvFileName ?? "Original CV"}
+                </a>
+              )}
+              {worker.originalCvDriveFileId && (
+                <a
+                  href={driveFileViewUrl(worker.originalCvDriveFileId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900"
+                >
+                  <FileText className="h-3 w-3" />
+                  Original CV (Drive)
+                </a>
+              )}
+              {worker.triangleCvDriveFileId && (
+                <a
+                  href={driveFileViewUrl(worker.triangleCvDriveFileId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900"
+                >
+                  <FileText className="h-3 w-3" />
+                  Triangle CV (Drive)
                 </a>
               )}
               {cvDocumentId && (

@@ -1,5 +1,19 @@
 # Current state
 
+## Candidate import — 20 November 2026
+
+Hanna's badge (`worker.propose`) can file up to 50 people with
+`POST /api/agent/candidates`. Each valid item is a pending worker finding.
+Approvals shows that import as one batch: accept all, or one at a time.
+Accepting creates a candidate and writes initials, years, LinkedIn, both
+Drive CV file ids, nationality, work authorisation, and visa notes.
+`open_to_work` with no status is available. A LinkedIn or email match, then
+the same name in the same country, comes back as `duplicate_of`. The same
+name alone is flagged and is not merged. The person page shows years,
+LinkedIn, the stored initials, and the two Drive links. The generated
+Triangle bio stays, and uses years when they are stored. Migration
+`058_worker_cv_links.sql` is written and not applied.
+
 ## WhatsApp chat — 6 October 2026
 
 An owner or field inbound is marked read and shown typing. No canned line is

@@ -114,7 +114,7 @@ history.
 | --- | --- |
 | `mission.work` | Reading and working mission steps, asking colleagues, reporting back |
 | `research.read`, `research.suggestion.create` | Reading research context and filing findings |
-| `worker.propose` | The CV queue and candidate / availability proposals on a mission |
+| `worker.propose` | The CV queue, candidate / availability proposals on a mission, and `POST /api/agent/candidates` |
 | `job_intake.ingest` | Sending mailbox messages into Job Intake |
 
 Revoking takes effect immediately, with no redeploy:
