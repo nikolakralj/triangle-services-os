@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiAccess, createServiceSupabaseClient } from "@/lib/supabase/server";
+import { missingWorkerCvColumn, omitWorkerCvColumns } from "@/lib/data/candidate-fields";
 import { extractCv } from "@/lib/data/cv-extract";
 import { readCv } from "@/lib/ai/cv-reader";
 
@@ -214,6 +215,9 @@ export async function POST(request: Request) {
     industries: payload.industries,
     notes: payload.summary,
     work_history: payload.work_history,
+    ...(typeof payload.years_experience === "number"
+      ? { years_experience: payload.years_experience }
+      : {}),
   };
 
   let worker: { id: string };
@@ -272,11 +276,18 @@ export async function POST(request: Request) {
       update[key] = value;
     }
     disagreements = kept;
-    const { error: updateError } = await svc
+    let { error: updateError } = await svc
       .from("workers")
       .update(update)
       .eq("id", existing.id)
       .eq("organization_id", access.organizationId);
+    if (updateError && missingWorkerCvColumn(updateError.message)) {
+      ({ error: updateError } = await svc
+        .from("workers")
+        .update(omitWorkerCvColumns(update))
+        .eq("id", existing.id)
+        .eq("organization_id", access.organizationId));
+    }
     if (updateError) {
       return NextResponse.json(
         { error: `Could not update the profile: ${updateError.message}` },
@@ -292,23 +303,31 @@ export async function POST(request: Request) {
     // model read can put somebody on a live site — a human still vouches, at
     // the point where vouching means something, rather than rubber-stamping a
     // parse.
-    const { data: created, error: workerError } = await svc
+    const createdRow = {
+      organization_id: access.organizationId,
+      full_name: fullName,
+      ...fields,
+      status: "candidate",
+      availability_status: "unknown",
+      created_by: access.userId,
+      updated_by: access.userId,
+    };
+    let { data: created, error: workerError } = await svc
       .from("workers")
-      .insert({
-        organization_id: access.organizationId,
-        full_name: fullName,
-        ...fields,
-        status: "candidate",
-        availability_status: "unknown",
-        created_by: access.userId,
-        updated_by: access.userId,
-      })
+      .insert(createdRow)
       .select("id")
       .single();
+    if (workerError && missingWorkerCvColumn(workerError.message)) {
+      ({ data: created, error: workerError } = await svc
+        .from("workers")
+        .insert(omitWorkerCvColumns(createdRow))
+        .select("id")
+        .single());
+    }
 
-    if (workerError) {
+    if (workerError || !created) {
       return NextResponse.json(
-        { error: `Could not create the profile: ${workerError.message}` },
+        { error: `Could not create the profile: ${workerError?.message ?? "no row returned"}` },
         { status: 500 },
       );
     }
@@ -458,6 +477,7 @@ type WorkerLike = {
   certificates: string[];
   languages: string[];
   industries: string[];
+  years_experience?: number | null;
 };
 
 /**
@@ -475,18 +495,28 @@ async function findSamePerson(
   orgId: string,
   cv: { email: string | null; fullName: string; country: string | null },
 ): Promise<WorkerLike | null> {
-  const columns =
+  const base =
     "id, full_name, email, role, city, country, status, skills, certificates, languages, industries, notes, work_history";
+  const columns = `${base}, years_experience`;
 
   if (cv.email) {
-    const { data } = await svc
+    let emailResult = await svc
       .from("workers")
       .select(columns)
       .eq("organization_id", orgId)
       .ilike("email", cv.email)
       .limit(1)
       .maybeSingle();
-    if (data) return data as unknown as WorkerLike;
+    if (emailResult.error && missingWorkerCvColumn(emailResult.error.message)) {
+      emailResult = await svc
+        .from("workers")
+        .select(base)
+        .eq("organization_id", orgId)
+        .ilike("email", cv.email)
+        .limit(1)
+        .maybeSingle();
+    }
+    if (emailResult.data) return emailResult.data as unknown as WorkerLike;
   }
 
   const target = normalizeName(cv.fullName);
@@ -495,10 +525,12 @@ async function findSamePerson(
   // Compared in JS rather than SQL: the normalisation strips accents and
   // punctuation, and "Müller" has to match "Mueller" written by a parser that
   // lost the umlaut.
-  const { data: candidates } = await svc
-    .from("workers")
-    .select(columns)
-    .eq("organization_id", orgId);
+  const listResult = await svc.from("workers").select(columns).eq("organization_id", orgId);
+  const listRetry =
+    listResult.error && missingWorkerCvColumn(listResult.error.message)
+      ? await svc.from("workers").select(base).eq("organization_id", orgId)
+      : null;
+  const candidates = (listRetry ?? listResult).data as Array<Record<string, unknown>> | null;
 
   for (const row of candidates ?? []) {
     if (normalizeName(String(row.full_name ?? "")) !== target) continue;

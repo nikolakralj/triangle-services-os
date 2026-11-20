@@ -5,6 +5,7 @@ import {
   letterheadForProfile,
   type OrganizationLetterhead,
 } from "@/lib/data/organization-profile";
+import { formatYearsNote, missingWorkerCvColumn } from "@/lib/data/candidate-fields";
 import {
   DEFAULT_PACK_INTENT,
   isAnonymisedIntent,
@@ -81,15 +82,26 @@ export async function buildWorkerCv(params: {
   const svc = createServiceSupabaseClient();
   if (!svc) return null;
 
-  const { data: w } = await svc
+  const baseSelect =
+    "id, full_name, role, worker_type, email, phone, country, city, languages, skills, certificates, industries, availability_status, available_from, preferred_countries, has_passport, has_a1_possible, has_own_tools, has_car, notes, work_history";
+  let workerResult = await svc
     .from("workers")
-    .select(
-      "id, full_name, role, worker_type, email, phone, country, city, languages, skills, certificates, industries, availability_status, available_from, preferred_countries, has_passport, has_a1_possible, has_own_tools, has_car, notes, work_history",
-    )
+    .select(`${baseSelect}, years_experience`)
     .eq("organization_id", params.orgId)
     .eq("id", params.workerId)
     .maybeSingle();
-  if (!w) return null;
+  // 058 adds years_experience. Until it is applied, the bio still builds and
+  // leaves the experience line off.
+  if (workerResult.error && missingWorkerCvColumn(workerResult.error.message)) {
+    workerResult = await svc
+      .from("workers")
+      .select(baseSelect)
+      .eq("organization_id", params.orgId)
+      .eq("id", params.workerId)
+      .maybeSingle();
+  }
+  const w = workerResult.data;
+  if (workerResult.error || !w) return null;
 
   const profile = await getOrganizationOperatingProfile(params.orgId);
   const orgName = profile?.name.trim() ?? "";
@@ -138,7 +150,7 @@ export async function buildWorkerCv(params: {
     role: role || "Role not recorded",
     workerType: w.worker_type ? String(w.worker_type) : null,
     basedIn: [w.city, w.country].filter(Boolean).join(", ") || null,
-    yearsNote: null,
+    yearsNote: formatYearsNote(w.years_experience),
     skills,
     certificates,
     languages,

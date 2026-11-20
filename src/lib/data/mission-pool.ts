@@ -2,6 +2,10 @@ import "server-only";
 import { z } from "zod";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 import { createOutreachDraft } from "@/lib/data/outreach";
+import {
+  parseCandidateRecord,
+  PROTECTED_PERSON_FIELDS,
+} from "@/lib/data/candidate-fields";
 import type { MissionCandidate } from "@/lib/data/mission-shared";
 
 // ---------------------------------------------------------------------------
@@ -22,38 +26,11 @@ import type { MissionCandidate } from "@/lib/data/mission-shared";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PROPOSALS_PER_CALL = 12;
 
-/** Same fields cv-queue already accepts. Anything else is ignored on purpose. */
-export const CANDIDATE_FIELDS = [
-  "full_name",
-  "role",
-  "worker_type",
-  "email",
-  "phone",
-  "country",
-  "city",
-  "skills",
-  "certificates",
-  "languages",
-  "industries",
-  "summary",
-  "years_experience",
-] as const;
+export { CANDIDATE_FIELDS } from "@/lib/data/candidate-fields";
 
-const FORBIDDEN_PERSON_FIELDS = new Set([
-  "cv_text",
-  "cvText",
-  "cv_file_name",
-  "cv_pages",
-  "date_of_birth",
-  "dob",
-  "birthdate",
-  "age",
-  "photo",
-  "photograph",
-  "religion",
-  "health",
-  "marital_status",
-  "family_status",
+/** Availability on a mission stays a separate proposal. CV text never comes along. */
+const FORBIDDEN_PERSON_FIELDS = new Set<string>([
+  ...PROTECTED_PERSON_FIELDS,
   "availability_status",
   "available_from",
 ]);
@@ -149,27 +126,12 @@ function text(value: unknown, max: number): string | null {
   return t.length > max ? t.slice(0, max) : t;
 }
 
-function stringList(value: unknown, max = 40): string[] {
-  if (!Array.isArray(value)) return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of value) {
-    const s = String(item ?? "").replace(/\s+/g, " ").trim();
-    if (!s || seen.has(s.toLowerCase())) continue;
-    seen.add(s.toLowerCase());
-    out.push(s.slice(0, 80));
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
 export function pickCandidateFields(raw: Record<string, unknown> | null | undefined): {
   fields: Record<string, unknown>;
   refused: string | null;
 } {
-  const fields: Record<string, unknown> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { fields, refused: null };
+    return { fields: {}, refused: null };
   }
   for (const key of Object.keys(raw)) {
     if (FORBIDDEN_PERSON_FIELDS.has(key)) {
@@ -183,20 +145,9 @@ export function pickCandidateFields(raw: Record<string, unknown> | null | undefi
       if (why) return { fields: {}, refused: why };
     }
   }
-  for (const key of CANDIDATE_FIELDS) {
-    if (!(key in raw)) continue;
-    const value = raw[key];
-    if (value == null || value === "") continue;
-    if (Array.isArray(value)) fields[key] = stringList(value);
-    else if (key === "years_experience") {
-      const n = Number(value);
-      if (Number.isFinite(n) && n >= 0 && n <= 60) fields[key] = Math.round(n);
-    } else {
-      const t = text(value, key === "summary" ? 700 : 200);
-      if (t) fields[key] = t;
-    }
-  }
-  return { fields, refused: null };
+  const parsed = parseCandidateRecord(raw, { allowAvailability: false, strict: false });
+  if (parsed.error) return { fields: {}, refused: parsed.error };
+  return { fields: parsed.fields, refused: null };
 }
 
 const checkSchema = z.object({

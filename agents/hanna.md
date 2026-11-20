@@ -162,6 +162,47 @@ The recruiting finish line counts people you named from the pool. Available
 counts only when the worker record itself says available or available soon —
 your proposal does not move that number.
 
+## Filing a batch of candidates
+
+When the people are already known — a spreadsheet, a set of CVs on Drive —
+file them in one call. They do not go into the Talent Pool until a person
+accepts them in Approvals. The batch is one group there: accept all of it, or
+one person at a time. A new person stays a candidate. This does not score
+anyone and it does not change who is placeable.
+
+```
+POST {TRIANGLE_URL}/api/agent/candidates
+Authorization: Bearer {YOUR tri_mc_ TOKEN}
+{ "candidates": [ { "full_name": "Ada Novak", "role": "Electrical supervisor" } ] }
+```
+
+At most 50 per call. `full_name` is required. Anything else is optional.
+
+| Field | What it is |
+| --- | --- |
+| `full_name` | Required. |
+| `initials` | How to refer to them before the name is released. 1–40 characters. |
+| `role` | Trade or title. |
+| `years_experience` | Whole years, 0–60. |
+| `nationality` | Passport. |
+| `work_authorisation` | Countries, as a list. |
+| `visa_notes` or `visa` | The sentence: which visa, until when. |
+| `linkedin_url` | Their LinkedIn profile, `https://linkedin.com/…`. |
+| `availability_status` | `available`, `available_soon`, `busy`, `unknown`, or `do_not_use`. |
+| `available_from` | `YYYY-MM-DD`. |
+| `open_to_work` | `true`, and no `availability_status`, is filed as available. |
+| `original_cv_drive_file_id` or `cv_drive_file` | A Drive file id, a `/file/d/{id}` link, or a `?id={id}` link. A folder link is refused. |
+| `triangle_cv_drive_file_id` | The Triangle CV on Drive, same shape. |
+| `email`, `phone`, `country`, `city` | As written. |
+| `worker_type` | How they are engaged. |
+| `skills`, `certificates`, `languages`, `industries` | Lists. |
+| `summary` | Goes to the notes on the person when a person accepts. |
+
+Each item comes back as `created` (with `findingId`), `duplicate_of` (an
+existing person or an earlier item in this batch: LinkedIn, then email, then
+the same name in the same country), or `error`. The same name without a
+matching country is still `created`, and the finding says it was not merged.
+
 Look up before you file: `GET /api/agent/lookup?q=…&type=worker`. It matches
 on the name inside Triangle and returns initials and the workerId, not the
 name or contact details.
@@ -195,9 +236,11 @@ PATCH {TRIANGLE_URL}/api/agent/cv-queue
 ```
 
 Only these fields are accepted; anything else is ignored on purpose:
-`full_name`, `role`, `worker_type`, `email`, `phone`, `country`, `city`,
-`skills`, `certificates`, `languages`, `industries`, `summary`,
-`years_experience`.
+`full_name`, `initials`, `role`, `worker_type`, `email`, `phone`, `country`,
+`city`, `skills`, `certificates`, `languages`, `industries`, `summary`,
+`years_experience`, `nationality`, `work_authorisation`, `visa_notes` (or
+`visa`), `linkedin_url`, `original_cv_drive_file_id` (or `cv_drive_file`),
+`triangle_cv_drive_file_id`.
 
 The proposal stays pending. A human accepts it.
 

@@ -1,5 +1,12 @@
 import "server-only";
 import { checkFindingSource, citedUrls, type SourceCheck } from "@/lib/data/finding-source-check";
+import {
+  DuplicateIndex,
+  identityOf,
+  missingWorkerCvColumn,
+  omitWorkerCvColumns,
+  workerColumnsFromPayload,
+} from "@/lib/data/candidate-fields";
 import { createServiceSupabaseClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -665,81 +672,64 @@ export async function acceptFinding(params: {
     const name = String(payload.full_name ?? payload.name ?? "").trim();
     if (!name) return null;
 
-    const asList = (v: unknown) =>
-      Array.isArray(v) ? v.map(String).filter(Boolean) : [];
+    const mapped = workerColumnsFromPayload(payload);
+    if (mapped.error) throw new Error(mapped.error);
 
-    // Re-uploading a CV for someone already on the books should enrich them,
-    // not create a second copy of the same person.
-    const email = payload.email ? String(payload.email).toLowerCase() : null;
-    const { data: existing } = await svc
-      .from("workers")
-      .select("id, skills, certificates, languages")
-      .eq("organization_id", params.orgId)
-      .or(email ? `email.eq.${email},full_name.ilike.${name}` : `full_name.ilike.${name}`)
-      .limit(1);
+    // LinkedIn, then email. A shared name is not the same person — the import
+    // flags that on the finding and accepting still creates a candidate.
+    const pool = await loadWorkersForMatch(svc, params.orgId);
+    const index = new DuplicateIndex();
+    for (const row of pool) {
+      index.add(
+        identityOf({
+          full_name: row.full_name,
+          email: row.email,
+          linkedin_url: row.linkedin_url,
+          country: row.country,
+        }),
+        { kind: "worker", id: String(row.id) },
+      );
+    }
+    const hit = index.match(identityOf({ ...payload, full_name: name }));
+    const existing =
+      hit.status === "duplicate" &&
+      hit.ref.kind === "worker" &&
+      (hit.via === "linkedin_url" || hit.via === "email")
+        ? pool.find((row) => String(row.id) === hit.ref.id) ?? null
+        : null;
 
-    const incoming = {
-      role: payload.role ? String(payload.role) : null,
-      email,
-      phone: payload.phone ? String(payload.phone) : null,
-      country: payload.country ? String(payload.country) : null,
-      city: payload.city ? String(payload.city) : null,
-      skills: asList(payload.skills),
-      certificates: asList(payload.certificates),
-      languages: asList(payload.languages),
-    };
-
-    const merge = (current: unknown, add: string[]) => {
-      const have = Array.isArray(current) ? current.map(String) : [];
-      const lower = new Set(have.map((v) => v.toLowerCase()));
-      return [...have, ...add.filter((v) => !lower.has(v.toLowerCase()))];
-    };
-
-    if (existing && existing.length > 0) {
-      const row = existing[0];
-      const { error } = await svc
-        .from("workers")
-        .update({
-          ...(incoming.role ? { role: incoming.role } : {}),
-          ...(incoming.email ? { email: incoming.email } : {}),
-          ...(incoming.phone ? { phone: incoming.phone } : {}),
-          ...(incoming.country ? { country: incoming.country } : {}),
-          ...(incoming.city ? { city: incoming.city } : {}),
-          skills: merge(row.skills, incoming.skills),
-          certificates: merge(row.certificates, incoming.certificates),
-          languages: merge(row.languages, incoming.languages),
-          updated_by: params.userId,
-        })
-        .eq("id", row.id as string);
-      if (!error) {
-        promotedTo = "worker";
-        entityId = row.id as string;
+    if (existing) {
+      const update = workerUpdateFrom(mapped.columns, existing);
+      update.updated_by = params.userId;
+      const { error } = await writeWorker(svc, "update", update, {
+        id: String(existing.id),
+        orgId: params.orgId,
+      });
+      if (error) {
+        console.error("acceptFinding worker update:", error);
+        throw new Error(`Could not update that person: ${error.message}`);
       }
+      promotedTo = "worker";
+      entityId = String(existing.id);
     } else {
-      const { data: created } = await svc
-        .from("workers")
-        .insert({
-          organization_id: params.orgId,
-          full_name: name.slice(0, 200),
-          role: incoming.role,
-          email: incoming.email,
-          phone: incoming.phone,
-          country: incoming.country,
-          city: incoming.city,
-          skills: incoming.skills,
-          certificates: incoming.certificates,
-          languages: incoming.languages,
-          availability_status: "unknown",
-          status: "candidate",
-          created_by: params.userId,
-          updated_by: params.userId,
-        })
-        .select("id")
-        .maybeSingle();
-      if (created) {
-        promotedTo = "worker";
-        entityId = created.id as string;
+      const insert: Record<string, unknown> = {
+        organization_id: params.orgId,
+        full_name: name.slice(0, 200),
+        availability_status: "unknown",
+        status: "candidate",
+        created_by: params.userId,
+        updated_by: params.userId,
+      };
+      Object.assign(insert, workerUpdateFrom(mapped.columns, null));
+      const { data: created, error } = await writeWorker(svc, "insert", insert, {
+        orgId: params.orgId,
+      });
+      if (error || !created) {
+        console.error("acceptFinding worker insert:", error);
+        throw new Error(`Could not add that person: ${error?.message ?? "no row returned"}`);
       }
+      promotedTo = "worker";
+      entityId = String(created.id);
     }
 
     // Attach the CV to whoever it turned out to be, so the original document
@@ -795,6 +785,90 @@ export async function rejectFinding(params: {
   return !error && (data?.length ?? 0) > 0;
 }
 
+
+const WORKER_LIST_COLUMNS = new Set([
+  "skills",
+  "certificates",
+  "languages",
+  "industries",
+  "work_authorisation",
+]);
+
+type WorkerMatchRow = Record<string, unknown> & { id: string };
+
+function workerUpdateFrom(
+  columns: Record<string, unknown>,
+  existing: WorkerMatchRow | null,
+): Record<string, unknown> {
+  const update: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(columns)) {
+    if (value == null || value === "") continue;
+    if (WORKER_LIST_COLUMNS.has(key)) {
+      const add = Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+      if (add.length === 0) continue;
+      update[key] = mergeWorkerLists(existing?.[key], add);
+      continue;
+    }
+    if (key === "notes") {
+      const current = String(existing?.notes ?? "").trim();
+      if (!current) update.notes = value;
+      continue;
+    }
+    update[key] = value;
+  }
+  return update;
+}
+
+function mergeWorkerLists(current: unknown, add: string[]): string[] {
+  const have = Array.isArray(current) ? current.map(String) : [];
+  const lower = new Set(have.map((value) => value.toLowerCase()));
+  return [...have, ...add.filter((value) => !lower.has(value.toLowerCase()))];
+}
+
+async function loadWorkersForMatch(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  orgId: string,
+): Promise<WorkerMatchRow[]> {
+  const withLink =
+    "id, full_name, email, country, skills, certificates, languages, industries, work_authorisation, notes, linkedin_url";
+  const first = await svc.from("workers").select(withLink).eq("organization_id", orgId);
+  if (!first.error) return (first.data ?? []) as unknown as WorkerMatchRow[];
+  if (!missingWorkerCvColumn(first.error.message)) {
+    throw new Error(`Could not read the Talent Pool: ${first.error.message}`);
+  }
+  const second = await svc
+    .from("workers")
+    .select(withLink.replace(", linkedin_url", ""))
+    .eq("organization_id", orgId);
+  if (second.error) throw new Error(`Could not read the Talent Pool: ${second.error.message}`);
+  return (second.data ?? []) as unknown as WorkerMatchRow[];
+}
+
+async function writeWorker(
+  svc: NonNullable<ReturnType<typeof createServiceSupabaseClient>>,
+  mode: "insert" | "update",
+  row: Record<string, unknown>,
+  where: { id?: string; orgId: string },
+): Promise<{ data: { id: string } | null; error: { message: string } | null }> {
+  const run = async (values: Record<string, unknown>) => {
+    if (mode === "insert") {
+      return svc.from("workers").insert(values).select("id").maybeSingle();
+    }
+    return svc
+      .from("workers")
+      .update(values)
+      .eq("id", where.id as string)
+      .eq("organization_id", where.orgId);
+  };
+  const first = await run(row);
+  if (first.error && missingWorkerCvColumn(first.error.message)) {
+    return (await run(omitWorkerCvColumns(row))) as {
+      data: { id: string } | null;
+      error: { message: string } | null;
+    };
+  }
+  return first as { data: { id: string } | null; error: { message: string } | null };
+}
 
 /**
  * Write published company reachability onto the company record.

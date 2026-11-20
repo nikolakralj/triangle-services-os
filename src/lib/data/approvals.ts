@@ -33,6 +33,9 @@ export interface ApprovalItem {
   /** Where it belongs — the project for a suggestion, null for a net-new finding. */
   projectId: string | null;
   projectName: string | null;
+  /** Set when Hanna filed this person as part of one candidate import. */
+  batchId: string | null;
+  batchLabel: string | null;
   agentName: string | null;
   agentEmoji: string | null;
 }
@@ -153,6 +156,8 @@ export async function listApprovals(
       createdAt: s.created_at as string,
       projectId: (s.project_id as string) ?? null,
       projectName: s.project_id ? projects.get(s.project_id as string) ?? null : null,
+      batchId: null,
+      batchLabel: null,
       agentName: who?.name ?? null,
       agentEmoji: who?.emoji ?? null,
     });
@@ -195,6 +200,8 @@ export async function listApprovals(
           p.role,
           p.parent ? `Part of ${String(p.parent)}` : null,
           p.project ? `On ${String(p.project)}` : null,
+          p.name_match ? "Same name already on file — not merged" : null,
+          typeof p.years_experience === "number" ? `${p.years_experience} years` : null,
           p.country,
           Array.isArray(p.certificates) && p.certificates.length
             ? (p.certificates as string[]).join(", ")
@@ -212,6 +219,9 @@ export async function listApprovals(
       createdAt: f.created_at as string,
       projectId: null,
       projectName: null,
+      batchId: typeof p.batch_id === "string" && p.batch_id.trim() ? p.batch_id.trim() : null,
+      batchLabel:
+        typeof p.batch_label === "string" && p.batch_label.trim() ? p.batch_label.trim() : null,
       agentName: who?.name ?? null,
       agentEmoji: who?.emoji ?? null,
     });

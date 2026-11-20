@@ -36,6 +36,16 @@ export type WorkerRow = {
   /** Countries beyond that where the right to work has been established. */
   work_authorisation: string[];
   visa_notes: string | null;
+  /** Stored form of the name used before it is released. Null when unset. */
+  initials: string | null;
+  /** Whole years of relevant experience. Null when not recorded. */
+  years_experience: number | null;
+  /** LinkedIn profile URL. Null when not recorded. */
+  linkedin_url: string | null;
+  /** Drive file id of the CV as it arrived. */
+  original_cv_drive_file_id: string | null;
+  /** Drive file id of the Triangle-formatted CV. */
+  triangle_cv_drive_file_id: string | null;
   /** Projects this person has done, newest first. Read from their CV. */
   work_history: Array<{
     customer: string | null;
